@@ -42,8 +42,8 @@ AppData/
 LocalAppData/
 
 # Models and inference binaries
-models/
-model-packs/
+/models/
+/model-packs/
 *.gguf
 *.safetensors
 *.onnx
