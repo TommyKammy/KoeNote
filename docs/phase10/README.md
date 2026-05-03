@@ -50,3 +50,25 @@ Development may continue on .NET 11 preview. For external beta, prefer self-cont
 3. License manifest and distribution layout docs
 4. Offline smoke-test command/script
 5. Final UI pass for first-run messages
+
+## Implementation Start
+
+Added the first Phase 10 packaging and first-run slice:
+
+- `win-x64-self-contained` publish profile
+- `scripts/phase10/Publish-KoeNote.ps1`
+- `scripts/phase10/Test-OfflineSmoke.ps1`
+- preview distribution README
+- preview license manifest
+- publish output placeholders for `tools`, `models/asr`, and `models/review`
+- first-run status summary in the app status bar
+- required runtime asset checks for ASR/review tools and models
+- optional .NET CLI check because the beta app is published self-contained
+
+Validated with:
+
+```powershell
+dotnet test
+powershell -ExecutionPolicy Bypass -File scripts\phase10\Publish-KoeNote.ps1
+powershell -ExecutionPolicy Bypass -File scripts\phase10\Test-OfflineSmoke.ps1
+```

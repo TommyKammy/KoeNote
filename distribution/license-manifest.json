@@ -1,0 +1,49 @@
+{
+  "product": "KoeNote",
+  "status": "preview",
+  "generatedForPhase": "Phase 10",
+  "entries": [
+    {
+      "name": "KoeNote",
+      "type": "application",
+      "license": "TBD",
+      "source": "this repository",
+      "notes": "Set the final application license before external beta distribution."
+    },
+    {
+      "name": "Microsoft.Data.Sqlite",
+      "type": "nuget",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/Microsoft.Data.Sqlite",
+      "notes": "Verify package license metadata during release packaging."
+    },
+    {
+      "name": "crispasr.exe",
+      "type": "runtime tool",
+      "license": "TBD",
+      "expectedPath": "tools/crispasr.exe",
+      "notes": "Do not distribute until the tool license and redistribution terms are confirmed."
+    },
+    {
+      "name": "llama-completion.exe",
+      "type": "runtime tool",
+      "license": "TBD",
+      "expectedPath": "tools/llama-completion.exe",
+      "notes": "Do not distribute until the tool license and redistribution terms are confirmed."
+    },
+    {
+      "name": "vibevoice-asr-q4_k.gguf",
+      "type": "model",
+      "license": "TBD",
+      "expectedPath": "models/asr/vibevoice-asr-q4_k.gguf",
+      "notes": "Model redistribution terms must be confirmed before external beta distribution."
+    },
+    {
+      "name": "llm-jp-4-8B-thinking-Q4_K_M.gguf",
+      "type": "model",
+      "license": "TBD",
+      "expectedPath": "models/review/llm-jp-4-8B-thinking-Q4_K_M.gguf",
+      "notes": "Model redistribution terms must be confirmed before external beta distribution."
+    }
+  ]
+}

@@ -10,13 +10,13 @@ public sealed class ToolStatusService(AppPaths paths)
     {
         return
         [
-            CheckCommand("dotnet", "dotnet", "--version", required: true),
+            CheckCommand("dotnet", "dotnet", "--version", required: false),
             CheckCommand("ffmpeg", "ffmpeg", "-version", required: true),
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: true),
-            CheckFile("crispasr", paths.CrispAsrPath, required: false),
-            CheckFile("llama-completion", paths.LlamaCompletionPath, required: false),
-            CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: false),
-            CheckFile("Review model", paths.ReviewModelPath, required: false),
+            CheckFile("crispasr", paths.CrispAsrPath, required: true),
+            CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
+            CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: true),
+            CheckFile("Review model", paths.ReviewModelPath, required: true),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),
             new("SQLite", paths.DatabasePath, File.Exists(paths.DatabasePath))
         ];
@@ -26,7 +26,8 @@ public sealed class ToolStatusService(AppPaths paths)
     {
         var exists = File.Exists(path);
         var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
-        return new StatusItem(name, value, exists || !required, path);
+        var detail = exists ? path : $"Place the file here: {path}";
+        return new StatusItem(name, value, exists || !required, detail);
     }
 
     private static StatusItem CheckCommand(string name, string commandName, string? arguments, bool required)
@@ -34,7 +35,7 @@ public sealed class ToolStatusService(AppPaths paths)
         var commandPath = ResolveCommand(commandName);
         if (commandPath is null)
         {
-            return new StatusItem(name, required ? "Missing" : "Not installed yet", !required);
+            return new StatusItem(name, required ? "Missing" : "Not installed yet", !required, $"Add {commandName} to PATH.");
         }
 
         var detail = commandPath;

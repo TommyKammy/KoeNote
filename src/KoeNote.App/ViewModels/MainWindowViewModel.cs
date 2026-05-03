@@ -185,6 +185,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string GpuUsageSummary => _statusBarInfo.GpuUsageSummary;
 
+    public string FirstRunSummary
+    {
+        get
+        {
+            var missingCount = EnvironmentStatus.Count(static item => !item.IsOk);
+            return missingCount == 0
+                ? "初回チェック OK"
+                : $"初回チェック: {missingCount} 件の確認が必要";
+        }
+    }
+
+    public string FirstRunDetail
+    {
+        get
+        {
+            var missingItems = EnvironmentStatus.Where(static item => !item.IsOk).ToArray();
+            return missingItems.Length == 0
+                ? "必要なランタイム、ツール、モデルを確認済みです。"
+                : string.Join(Environment.NewLine, missingItems.Select(static item => $"{item.Name}: {item.Detail}"));
+        }
+    }
+
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
     public ObservableCollection<JobSummary> Jobs { get; } = [];

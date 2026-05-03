@@ -167,6 +167,19 @@ public sealed class MainWindowViewModelTests
         Assert.Contains(viewModel.Logs, entry => entry.Stage == "export" && entry.Level == "error");
     }
 
+    [Fact]
+    public void FirstRunSummary_ReportsMissingRuntimeAssets()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Contains("初回チェック:", viewModel.FirstRunSummary, StringComparison.Ordinal);
+        Assert.Contains("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.Contains(paths.VibeVoiceAsrModelPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
