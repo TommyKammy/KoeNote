@@ -21,6 +21,10 @@ Implemented in the first Phase 1 slice:
   - center transcript segment table
   - right review and environment panes
   - bottom stage/status strip
+- audio file registration from the toolbar
+- ffmpeg-based 24 kHz mono WAV preprocessing worker
+- worker stdout/stderr log persistence
+- preprocessing stage progress persistence and UI binding
 
 ## Verification
 
@@ -38,10 +42,7 @@ Expected result:
 
 ## Remaining Phase 1 Work
 
-- wire real audio file selection into job creation
-- persist real jobs instead of sample view-model data
-- add ffmpeg version check through the shared process runner
-- save worker stdout/stderr into job logs
-- implement cancel as process-tree termination
-- add simple GPU detail parsing instead of only command presence
 - add first app smoke test once the UI shell is testable without launching WPF
+- implement cancel as process-tree termination from the UI button
+- load existing jobs from SQLite on startup
+- show detailed job logs in the right pane

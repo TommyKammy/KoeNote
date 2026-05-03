@@ -29,7 +29,7 @@ packages/
 logs/
 tmp/
 temp/
-jobs/
+/jobs/
 experiments/phase0/runs/
 *.sqlite
 *.sqlite3

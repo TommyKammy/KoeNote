@@ -44,8 +44,8 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <Button Content="音声追加" />
-                    <Button Content="実行" />
+                    <Button Content="音声追加" Command="{Binding AddAudioCommand}" />
+                    <Button Content="実行" Command="{Binding RunSelectedJobCommand}" />
                     <Button Content="キャンセル" />
                     <Button Content="エクスポート" />
                     <Button Content="設定" />
@@ -60,7 +60,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <ItemsControl ItemsSource="{Binding StageLabels}">
+                <ItemsControl ItemsSource="{Binding StageStatuses}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -68,7 +68,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding}" Margin="0,0,18,0" Padding="8,3" Background="#EEF4F2" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,18,0">
+                                <TextBlock Text="{Binding Name}" Padding="8,3" Background="#EEF4F2" />
+                                <TextBlock Text="{Binding Status}" Padding="6,3" Foreground="#68736F" />
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -87,13 +90,13 @@
             <Border Grid.Column="0" Padding="12" Margin="0,0,10,0">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="ジョブ" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,10" />
-                    <ItemsControl ItemsSource="{Binding Jobs}">
-                        <ItemsControl.ItemTemplate>
+                    <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob, Mode=TwoWay}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="10" Margin="0,0,0,8" BorderBrush="#D6DBD8" Background="#FAFBFA">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding FileName}" Foreground="#68736F" FontSize="12" />
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding FileName}" Foreground="#68736F" FontSize="12" TextWrapping="Wrap" />
                                         <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -106,8 +109,8 @@
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </DockPanel>
             </Border>
 
