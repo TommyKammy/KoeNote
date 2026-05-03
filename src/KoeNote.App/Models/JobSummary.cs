@@ -9,6 +9,7 @@ public sealed class JobSummary : INotifyPropertyChanged
     private int _progressPercent;
     private DateTimeOffset _updatedAt;
     private string? _normalizedAudioPath;
+    private int _unreviewedDrafts;
 
     public JobSummary(
         string jobId,
@@ -19,6 +20,7 @@ public sealed class JobSummary : INotifyPropertyChanged
         int progressPercent,
         int unreviewedDrafts,
         DateTimeOffset updatedAt,
+        DateTimeOffset? createdAt = null,
         string? normalizedAudioPath = null)
     {
         JobId = jobId;
@@ -27,8 +29,9 @@ public sealed class JobSummary : INotifyPropertyChanged
         SourceAudioPath = sourceAudioPath;
         _status = status;
         _progressPercent = progressPercent;
-        UnreviewedDrafts = unreviewedDrafts;
+        _unreviewedDrafts = unreviewedDrafts;
         _updatedAt = updatedAt;
+        CreatedAt = createdAt ?? updatedAt;
         _normalizedAudioPath = normalizedAudioPath;
     }
 
@@ -42,7 +45,15 @@ public sealed class JobSummary : INotifyPropertyChanged
 
     public string SourceAudioPath { get; }
 
-    public int UnreviewedDrafts { get; }
+    public DateTimeOffset CreatedAt { get; }
+
+    public int UnreviewedDrafts
+    {
+        get => _unreviewedDrafts;
+        set => SetField(ref _unreviewedDrafts, value);
+    }
+
+    public string UpdatedAtDisplay => UpdatedAt.ToString("yyyy/MM/dd HH:mm");
 
     public string Status
     {
@@ -59,7 +70,13 @@ public sealed class JobSummary : INotifyPropertyChanged
     public DateTimeOffset UpdatedAt
     {
         get => _updatedAt;
-        set => SetField(ref _updatedAt, value);
+        set
+        {
+            if (SetField(ref _updatedAt, value))
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatedAtDisplay)));
+            }
+        }
     }
 
     public string? NormalizedAudioPath
@@ -68,14 +85,15 @@ public sealed class JobSummary : INotifyPropertyChanged
         set => SetField(ref _normalizedAudioPath, value);
     }
 
-    private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))
         {
-            return;
+            return false;
         }
 
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
     }
 }

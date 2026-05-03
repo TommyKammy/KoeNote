@@ -10,4 +10,22 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = new MainWindowViewModel();
     }
+
+    private void OnDropAudioFiles(object sender, DragEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel
+            || !e.Data.GetDataPresent(DataFormats.FileDrop)
+            || e.Data.GetData(DataFormats.FileDrop) is not string[] files)
+        {
+            return;
+        }
+
+        viewModel.RegisterAudioFiles(files);
+    }
+
+    private void OnDragOverAudioFiles(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
 }

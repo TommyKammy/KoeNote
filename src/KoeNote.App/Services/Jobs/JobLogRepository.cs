@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using KoeNote.App.Models;
 using System.IO;
 using System.Text;
 
@@ -57,6 +58,48 @@ public sealed class JobLogRepository(AppPaths paths)
         command.Parameters.AddWithValue("$message", message);
         command.Parameters.AddWithValue("$created_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
+    }
+
+    public IReadOnlyList<JobLogEntry> ReadLatest(string? jobId, int limit = 80)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            command.CommandText = """
+                SELECT created_at, level, COALESCE(stage, ''), message
+                FROM job_log_events
+                ORDER BY created_at DESC
+                LIMIT $limit;
+                """;
+        }
+        else
+        {
+            command.CommandText = """
+                SELECT created_at, level, COALESCE(stage, ''), message
+                FROM job_log_events
+                WHERE job_id = $job_id
+                ORDER BY created_at DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$job_id", jobId);
+        }
+
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        var entries = new List<JobLogEntry>();
+        while (reader.Read())
+        {
+            entries.Add(new JobLogEntry(
+                DateTimeOffset.Parse(reader.GetString(0)),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3)));
+        }
+
+        entries.Reverse();
+        return entries;
     }
 
     private SqliteConnection OpenConnection()

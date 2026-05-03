@@ -99,6 +99,25 @@ public sealed class JobRepositoryTests
         Assert.Equal("ASR失敗: MissingRuntime", job.Status);
     }
 
+    [Fact]
+    public void LoadRecent_RestoresPersistedJobs()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkReviewSucceeded(created, draftCount: 2);
+
+        var restored = Assert.Single(repository.LoadRecent());
+
+        Assert.Equal(created.JobId, restored.JobId);
+        Assert.Equal("レビュー待ち", restored.Status);
+        Assert.Equal(@"C:\audio\meeting.wav", restored.SourceAudioPath);
+        Assert.Equal(90, restored.ProgressPercent);
+    }
+
     private static AppPaths CreatePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

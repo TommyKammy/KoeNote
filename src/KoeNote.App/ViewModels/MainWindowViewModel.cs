@@ -73,6 +73,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
+        LoadJobs();
+        RefreshLogs();
 
         Segments.Add(new TranscriptSegmentPreview(
             "00:00:00.000",
@@ -112,6 +114,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<TranscriptSegmentPreview> Segments { get; } = [];
 
+    public ObservableCollection<JobLogEntry> Logs { get; } = [];
+
     public ICommand AddAudioCommand { get; }
 
     public ICommand RunSelectedJobCommand { get; }
@@ -127,9 +131,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 {
                     command.RaiseCanExecuteChanged();
                 }
+
+                OnPropertyChanged(nameof(SelectedJobSourcePath));
+                OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
+                OnPropertyChanged(nameof(SelectedJobUpdatedAt));
+                OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+                RefreshLogs();
             }
         }
     }
+
+    public string SelectedJobSourcePath => SelectedJob?.SourceAudioPath ?? "";
+
+    public string SelectedJobNormalizedAudioPath => SelectedJob?.NormalizedAudioPath ?? "";
+
+    public string SelectedJobUpdatedAt => SelectedJob?.UpdatedAtDisplay ?? "";
+
+    public int SelectedJobUnreviewedDrafts => SelectedJob?.UnreviewedDrafts ?? 0;
+
+    public string JobCountSummary => $"合計 {Jobs.Count} 件のジョブ";
 
     public string ReviewIssueType
     {
@@ -193,7 +213,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SelectedJob = job;
         LatestLog = $"Registered audio job: {job.FileName}";
         _jobLogRepository.AddEvent(job.JobId, "created", "info", $"Registered audio file: {job.SourceAudioPath}");
+        RefreshLogs();
+        OnPropertyChanged(nameof(JobCountSummary));
         return job;
+    }
+
+    public void RegisterAudioFiles(IEnumerable<string> audioPaths)
+    {
+        var registered = 0;
+        foreach (var audioPath in audioPaths.Where(IsSupportedAudioFile))
+        {
+            RegisterAudioFile(audioPath);
+            registered++;
+        }
+
+        if (registered == 0)
+        {
+            LatestLog = "音声ファイルをドロップしてください。";
+            return;
+        }
+
+        LatestLog = $"{registered}件の音声ファイルを登録しました。";
     }
 
     public async Task RunSelectedJobAsync()
@@ -217,6 +257,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stage.ProgressPercent = 100;
             _jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             LatestLog = $"Generated normalized WAV: {result.NormalizedAudioPath}";
+            OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
 
             await RunAsrAsync(job, result.NormalizedAudioPath);
         }
@@ -227,6 +268,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkPreprocessFailed(job, "ffmpeg_failed");
             _jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
             LatestLog = exception.Message;
+            RefreshLogs();
         }
     }
 
@@ -278,6 +320,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkAsrSucceeded(job);
             _jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
             LatestLog = $"ASR completed: {result.Segments.Count} segments";
+            RefreshLogs();
 
             await RunReviewAsync(job, result.Segments);
         }
@@ -298,6 +341,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkAsrFailed(job, exception.Category.ToString());
             _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{exception.Category}: {exception.Message}");
             LatestLog = $"ASR failed ({exception.Category}): {exception.Message}";
+            RefreshLogs();
         }
         catch (Exception exception)
         {
@@ -316,6 +360,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
             _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{AsrFailureCategory.Unknown}: {exception.Message}");
             LatestLog = $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}";
+            RefreshLogs();
         }
     }
 
@@ -360,8 +405,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 result.Duration.TotalSeconds,
                 logPath: result.RawOutputPath);
             _jobRepository.MarkReviewSucceeded(job, result.Drafts.Count);
+            job.UnreviewedDrafts = result.Drafts.Count;
+            OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
             _jobLogRepository.AddEvent(job.JobId, "review", "info", $"Generated {result.Drafts.Count} correction drafts: {result.NormalizedDraftsPath}");
             LatestLog = $"Review completed: {result.Drafts.Count} drafts";
+            RefreshLogs();
 
             var firstDraft = result.Drafts.FirstOrDefault();
             if (firstDraft is not null)
@@ -395,6 +443,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkReviewFailed(job, exception.Category.ToString());
             _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{exception.Category}: {exception.Message}");
             LatestLog = $"Review failed ({exception.Category}): {exception.Message}";
+            RefreshLogs();
         }
         catch (Exception exception)
         {
@@ -413,6 +462,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkReviewFailed(job, ReviewFailureCategory.Unknown.ToString());
             _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
             LatestLog = $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}";
+            RefreshLogs();
         }
     }
 
@@ -438,6 +488,41 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Confidence = 0;
     }
 
+    private void LoadJobs()
+    {
+        foreach (var job in _jobRepository.LoadRecent())
+        {
+            Jobs.Add(job);
+        }
+
+        SelectedJob = Jobs.FirstOrDefault();
+        OnPropertyChanged(nameof(JobCountSummary));
+    }
+
+    private void RefreshLogs()
+    {
+        Logs.Clear();
+        foreach (var entry in _jobLogRepository.ReadLatest(SelectedJob?.JobId))
+        {
+            Logs.Add(entry);
+        }
+    }
+
+    private static bool IsSupportedAudioFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() is ".wav" or ".mp3" or ".m4a" or ".flac" or ".aac" or ".ogg" or ".opus";
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))
@@ -446,7 +531,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        OnPropertyChanged(propertyName);
         return true;
     }
 }

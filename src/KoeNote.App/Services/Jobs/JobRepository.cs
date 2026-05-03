@@ -6,6 +6,50 @@ namespace KoeNote.App.Services.Jobs;
 
 public sealed class JobRepository(AppPaths paths)
 {
+    public IReadOnlyList<JobSummary> LoadRecent(int limit = 50)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                job_id,
+                title,
+                source_audio_path,
+                normalized_audio_path,
+                status,
+                progress_percent,
+                unreviewed_draft_count,
+                created_at,
+                updated_at
+            FROM jobs
+            ORDER BY datetime(updated_at) DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        var jobs = new List<JobSummary>();
+        while (reader.Read())
+        {
+            var sourceAudioPath = reader.GetString(2);
+            var createdAt = DateTimeOffset.Parse(reader.GetString(7));
+            var updatedAt = DateTimeOffset.Parse(reader.GetString(8));
+            jobs.Add(new JobSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                Path.GetFileName(sourceAudioPath),
+                sourceAudioPath,
+                reader.GetString(4),
+                reader.GetInt32(5),
+                reader.GetInt32(6),
+                updatedAt,
+                createdAt,
+                reader.IsDBNull(3) ? null : reader.GetString(3)));
+        }
+
+        return jobs;
+    }
+
     public JobSummary CreateFromAudio(string sourceAudioPath)
     {
         var now = DateTimeOffset.Now;

@@ -27,6 +27,27 @@ public sealed class JobLogRepositoryTests
         Assert.Equal(1L, (long)command.ExecuteScalar()!);
     }
 
+    [Fact]
+    public void ReadLatest_ReturnsSelectedJobLogsInChronologicalOrder()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var repository = new JobLogRepository(paths);
+        repository.AddEvent("job-001", "created", "info", "first");
+        Thread.Sleep(5);
+        repository.AddEvent("job-002", "created", "info", "other");
+        Thread.Sleep(5);
+        repository.AddEvent("job-001", "asr", "info", "second");
+
+        var logs = repository.ReadLatest("job-001");
+
+        Assert.Equal(2, logs.Count);
+        Assert.Equal("first", logs[0].Message);
+        Assert.Equal("second", logs[1].Message);
+    }
+
     private static AppPaths CreatePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
