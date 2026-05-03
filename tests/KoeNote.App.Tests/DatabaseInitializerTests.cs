@@ -33,6 +33,52 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("stage_progress", tables);
         Assert.Contains("job_log_events", tables);
         Assert.Contains("asr_settings", tables);
+
+        Assert.Equal([1, 2], ReadSchemaVersions(connection));
+        Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
+    }
+
+    [Fact]
+    public void EnsureCreated_AppliesPendingMigrationToVersionOneDatabase()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateVersionOneDatabase(paths);
+
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Assert.Equal([1, 2], ReadSchemaVersions(connection));
+        Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
+        Assert.Contains("asr_settings", ReadTableNames(connection));
+    }
+
+    [Fact]
+    public void EnsureCreated_IsIdempotent()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        var initializer = new DatabaseInitializer(paths);
+
+        initializer.EnsureCreated();
+        initializer.EnsureCreated();
+
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Assert.Equal([1, 2], ReadSchemaVersions(connection));
     }
 
     private static string CreateTempDirectory()
@@ -55,5 +101,79 @@ public sealed class DatabaseInitializerTests
         }
 
         return tables;
+    }
+
+    private static List<int> ReadSchemaVersions(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT version FROM schema_version ORDER BY version;";
+
+        using var reader = command.ExecuteReader();
+        var versions = new List<int>();
+        while (reader.Read())
+        {
+            versions.Add(reader.GetInt32(0));
+        }
+
+        return versions;
+    }
+
+    private static HashSet<string> ReadColumnNames(SqliteConnection connection, string table)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({table});";
+
+        using var reader = command.ExecuteReader();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
+    }
+
+    private static void CreateVersionOneDatabase(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Execute(connection, """
+            CREATE TABLE schema_version (
+                version INTEGER NOT NULL PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
+            """);
+        Execute(connection, """
+            INSERT INTO schema_version (version, applied_at)
+            VALUES (1, datetime('now'));
+            """);
+        Execute(connection, """
+            CREATE TABLE jobs (
+                job_id TEXT NOT NULL PRIMARY KEY,
+                title TEXT NOT NULL,
+                source_audio_path TEXT NOT NULL,
+                normalized_audio_path TEXT,
+                status TEXT NOT NULL,
+                current_stage TEXT,
+                progress_percent INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                asr_engine TEXT,
+                asr_model TEXT,
+                review_model TEXT,
+                unreviewed_draft_count INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+    }
+
+    private static void Execute(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 }
