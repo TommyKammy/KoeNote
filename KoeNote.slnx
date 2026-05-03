@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/KoeNote.App/KoeNote.App.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KoeNote.App.Tests/KoeNote.App.Tests.csproj" />
+  </Folder>
 </Solution>

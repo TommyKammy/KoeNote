@@ -12,6 +12,9 @@ public sealed class ExternalProcessRunner
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
+        using var timeoutCancellation = new CancellationTokenSource(timeout);
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
+
         var start = DateTimeOffset.UtcNow;
         using var process = new Process
         {
@@ -29,16 +32,22 @@ public sealed class ExternalProcessRunner
 
         process.Start();
 
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        var exitTask = process.WaitForExitAsync(cancellationToken);
-        var timeoutTask = Task.Delay(timeout, cancellationToken);
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
 
-        var completed = await Task.WhenAny(exitTask, timeoutTask);
-        if (completed == timeoutTask)
+        try
         {
-            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(linkedCancellation.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            KillProcessTree(process);
             throw new TimeoutException($"{fileName} timed out after {timeout}.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            KillProcessTree(process);
+            throw;
         }
 
         return new ProcessRunResult(
@@ -46,5 +55,19 @@ public sealed class ExternalProcessRunner
             DateTimeOffset.UtcNow - start,
             await outputTask,
             await errorTask);
+    }
+
+    private static void KillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 }

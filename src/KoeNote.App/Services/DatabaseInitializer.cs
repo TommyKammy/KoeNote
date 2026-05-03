@@ -6,7 +6,12 @@ public sealed class DatabaseInitializer(AppPaths paths)
 {
     public void EnsureCreated()
     {
-        using var connection = new SqliteConnection($"Data Source={paths.DatabasePath}");
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString();
+
+        using var connection = new SqliteConnection(connectionString);
         connection.Open();
 
         Execute(connection, "PRAGMA journal_mode=WAL;");

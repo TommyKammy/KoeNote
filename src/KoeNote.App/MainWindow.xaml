@@ -137,9 +137,9 @@
                         <TextBlock Text="推敲レビュー" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,10" />
                         <TextBlock Text="{Binding ReviewIssueType}" Foreground="#8A5A00" FontWeight="SemiBold" />
                         <TextBlock Text="原文" Margin="0,14,0,3" Foreground="#68736F" />
-                        <TextBox Text="{Binding OriginalText}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="58" />
+                        <TextBox Text="{Binding OriginalText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="58" />
                         <TextBlock Text="候補" Margin="0,12,0,3" Foreground="#68736F" />
-                        <TextBox Text="{Binding SuggestedText}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="58" />
+                        <TextBox Text="{Binding SuggestedText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="58" />
                         <TextBlock Text="理由" Margin="0,12,0,3" Foreground="#68736F" />
                         <TextBlock Text="{Binding ReviewReason}" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Confidence, StringFormat=confidence: {0:P0}}" Margin="0,12,0,0" Foreground="#68736F" />

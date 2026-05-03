@@ -4,10 +4,10 @@ namespace KoeNote.App.Services;
 
 public sealed class AppPaths
 {
-    public AppPaths()
+    public AppPaths(string? appDataRoot = null, string? localAppDataRoot = null)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var appData = appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localAppData = localAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
         Root = Path.Combine(appData, "KoeNote");
         Jobs = Path.Combine(Root, "jobs");
