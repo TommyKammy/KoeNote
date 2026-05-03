@@ -25,14 +25,15 @@ public sealed class AsrWorker(
         }
 
         var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
+        var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput);
         var segments = normalizer.Normalize(options.JobId, rawOutput);
-        var paths = resultStore.Save(options.OutputDirectory, rawOutput, segments);
+        var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(options.OutputDirectory, segments);
         repository.SaveSegments(segments);
 
         return new AsrRunResult(
             options.JobId,
-            paths.RawOutputPath,
-            paths.NormalizedSegmentsPath,
+            rawOutputPath,
+            normalizedSegmentsPath,
             segments,
             processResult.Duration);
     }
