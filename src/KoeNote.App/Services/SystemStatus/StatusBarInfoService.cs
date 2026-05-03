@@ -25,7 +25,7 @@ public sealed class StatusBarInfoService(AppPaths paths)
         }
 
         var parts = firstLine.Split(',', StringSplitOptions.TrimEntries);
-        if (parts.Length < 2)
+        if (parts.Length != 2)
         {
             return $"GPU {firstLine}";
         }

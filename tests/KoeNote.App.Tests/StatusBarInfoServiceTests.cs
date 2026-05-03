@@ -25,6 +25,14 @@ public sealed class StatusBarInfoServiceTests
     }
 
     [Fact]
+    public void FormatGpuUsage_PreservesUnexpectedCsvShape()
+    {
+        var summary = StatusBarInfoService.FormatGpuUsage("12, 4096, extra");
+
+        Assert.Equal("GPU 12, 4096, extra", summary);
+    }
+
+    [Fact]
     public void GetStatusBarInfo_ReturnsAllSummaries()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
