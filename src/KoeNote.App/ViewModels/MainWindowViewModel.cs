@@ -373,6 +373,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 Confidence = firstDraft.Confidence;
                 UpdateSegmentReviewStates(result.Drafts);
             }
+            else
+            {
+                ClearReviewPreview();
+            }
         }
         catch (ReviewWorkerException exception)
         {
@@ -423,6 +427,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 Segments[i] = preview with { ReviewState = "推敲候補あり" };
             }
         }
+    }
+
+    private void ClearReviewPreview()
+    {
+        ReviewIssueType = "候補なし";
+        OriginalText = string.Empty;
+        SuggestedText = string.Empty;
+        ReviewReason = "推敲候補は生成されませんでした。";
+        Confidence = 0;
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
