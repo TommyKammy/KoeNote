@@ -32,7 +32,7 @@
                 </Grid>
             </Border>
 
-            <Border BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrushSoft}" Padding="18,10">
+            <Border Grid.Row="1" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrushSoft}" Padding="18,10">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Style="{StaticResource PrimaryButton}" Command="{Binding AddAudioCommand}">

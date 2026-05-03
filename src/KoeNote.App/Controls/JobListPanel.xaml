@@ -24,7 +24,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
-                                            <Button Padding="6,2" MinWidth="0">
+                                            <Button Grid.Column="1" Padding="6,2" MinWidth="0">
                                                 <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" />
                                             </Button>
                                         </Grid>
@@ -38,7 +38,7 @@
                                                 <Border Width="7" Height="7" CornerRadius="4" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
                                                 <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
                                             </StackPanel>
-                                            <TextBlock Text="{Binding ProgressPercent, StringFormat={}{0}%}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
                                         </Grid>
                                         <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Margin="0,0,0,12" />
                                         <Grid>
@@ -47,7 +47,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding UpdatedAtDisplay}" Style="{StaticResource MutedText}" />
-                                            <TextBlock Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}" Style="{StaticResource MutedText}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}" Style="{StaticResource MutedText}" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>

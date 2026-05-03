@@ -10,8 +10,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="ログ" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
-                        <Button Margin="12,0,0,0" Padding="10,6">
+                        <TextBlock Grid.Column="1" Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Margin="12,0,0,0" Padding="10,6">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE74E;" Style="{StaticResource IconText}" />
                                 <TextBlock Text="ログを保存" FontSize="12" />
@@ -29,9 +29,9 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="{StaticResource MutedBrush}" FontFamily="Consolas" FontSize="12" />
-                                    <TextBlock Text="{Binding Level}" Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" FontSize="12" />
-                                    <TextBlock Text="{Binding Stage}" Foreground="#64748B" FontFamily="Consolas" FontSize="12" />
-                                    <TextBlock Text="{Binding Message}" Foreground="#334155" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Level}" Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Stage}" Foreground="#64748B" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Message}" Foreground="#334155" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

@@ -10,7 +10,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="推敲レビュー" Style="{StaticResource SectionTitle}" />
-                            <Border Background="#FFF7ED" CornerRadius="12" Padding="9,4" VerticalAlignment="Top">
+                            <Border Grid.Column="1" Background="#FFF7ED" CornerRadius="12" Padding="9,4" VerticalAlignment="Top">
                                 <TextBlock Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}" Foreground="{StaticResource WarningBrush}" FontSize="12" FontWeight="SemiBold" />
                             </Border>
                         </Grid>
@@ -45,7 +45,7 @@
                                     <TextBlock Text="採用" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource OutlineDangerButton}">
+                            <Button Grid.Column="2" Style="{StaticResource OutlineDangerButton}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
                                     <TextBlock Text="却下" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" />
