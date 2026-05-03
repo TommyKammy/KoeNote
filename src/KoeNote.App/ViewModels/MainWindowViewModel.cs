@@ -24,6 +24,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
     private readonly AsrWorker _asrWorker;
     private readonly ReviewWorker _reviewWorker;
+    private readonly JobRunCoordinator _jobRunCoordinator;
     private JobSummary? _selectedJob;
     private CancellationTokenSource? _runCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
@@ -72,6 +73,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             new ReviewJsonNormalizer(),
             new ReviewResultStore(),
             new CorrectionDraftRepository(Paths));
+        _jobRunCoordinator = new JobRunCoordinator(
+            Paths,
+            _jobRepository,
+            _stageProgressRepository,
+            _jobLogRepository,
+            _audioPreprocessWorker,
+            _asrWorker,
+            _reviewWorker);
 
         var toolStatus = new ToolStatusService(Paths);
         foreach (var item in toolStatus.GetStatusItems())
