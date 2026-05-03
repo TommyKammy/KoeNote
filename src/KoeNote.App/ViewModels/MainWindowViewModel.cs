@@ -132,11 +132,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public string DiskFreeSummary => GetDiskFreeSummary();
 
-    public string MemorySummary => $"MEM {Process.GetCurrentProcess().WorkingSet64 / 1024 / 1024:N0} MB";
+    public string MemorySummary => GetMemorySummary();
 
-    public string CpuSummary => $"CPU {Environment.ProcessorCount} cores";
+    public string CpuSummary => GetCpuSummary();
 
-    public string GpuUsageSummary => "GPU --%";
+    public string GpuUsageSummary => GetGpuUsageSummary();
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
@@ -818,6 +818,72 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         catch (UnauthorizedAccessException)
         {
             return "空き容量 Unknown";
+        }
+    }
+
+    private static string GetMemorySummary()
+    {
+        using var process = Process.GetCurrentProcess();
+        return $"MEM {process.WorkingSet64 / 1024 / 1024:N0} MB";
+    }
+
+    private static string GetCpuSummary()
+    {
+        using var process = Process.GetCurrentProcess();
+        var uptime = DateTimeOffset.Now - process.StartTime;
+        if (uptime <= TimeSpan.Zero)
+        {
+            return "CPU Unknown";
+        }
+
+        var averageUsage = process.TotalProcessorTime.TotalMilliseconds / uptime.TotalMilliseconds / Environment.ProcessorCount * 100;
+        return $"CPU {Math.Clamp(averageUsage, 0, 100):N0}%";
+    }
+
+    private static string GetGpuUsageSummary()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "nvidia-smi",
+                Arguments = "--query-gpu=utilization.gpu,memory.used --format=csv,noheader,nounits",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            if (process is null)
+            {
+                return "GPU Unknown";
+            }
+
+            if (!process.WaitForExit(1200))
+            {
+                process.Kill(entireProcessTree: true);
+                return "GPU Unknown";
+            }
+
+            var firstLine = process.StandardOutput.ReadToEnd()
+                .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(firstLine))
+            {
+                return "GPU Unknown";
+            }
+
+            var parts = firstLine.Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length < 2)
+            {
+                return $"GPU {firstLine}";
+            }
+
+            return $"GPU {parts[0]}% / {parts[1]} MB";
+        }
+        catch
+        {
+            return "GPU Unknown";
         }
     }
 
