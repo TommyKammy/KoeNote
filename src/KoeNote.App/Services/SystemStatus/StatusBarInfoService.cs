@@ -1,15 +1,43 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace KoeNote.App.ViewModels;
+namespace KoeNote.App.Services.SystemStatus;
 
-public sealed partial class MainWindowViewModel
+public sealed class StatusBarInfoService(AppPaths paths)
 {
+    public StatusBarInfo GetStatusBarInfo()
+    {
+        return new StatusBarInfo(
+            GetDiskFreeSummary(),
+            GetMemorySummary(),
+            GetCpuSummary(),
+            GetGpuUsageSummary());
+    }
+
+    public static string FormatGpuUsage(string? output)
+    {
+        var firstLine = output?
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return "GPU Unknown";
+        }
+
+        var parts = firstLine.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length < 2)
+        {
+            return $"GPU {firstLine}";
+        }
+
+        return $"GPU {parts[0]}% / {parts[1]} MB";
+    }
+
     private string GetDiskFreeSummary()
     {
         try
         {
-            var root = Path.GetPathRoot(Paths.Root);
+            var root = Path.GetPathRoot(paths.Root);
             if (string.IsNullOrWhiteSpace(root))
             {
                 return "空き容量 Unknown";
@@ -23,6 +51,10 @@ public sealed partial class MainWindowViewModel
             return "空き容量 Unknown";
         }
         catch (UnauthorizedAccessException)
+        {
+            return "空き容量 Unknown";
+        }
+        catch (ArgumentException)
         {
             return "空き容量 Unknown";
         }
@@ -72,21 +104,7 @@ public sealed partial class MainWindowViewModel
                 return "GPU Unknown";
             }
 
-            var firstLine = process.StandardOutput.ReadToEnd()
-                .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
-                .FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(firstLine))
-            {
-                return "GPU Unknown";
-            }
-
-            var parts = firstLine.Split(',', StringSplitOptions.TrimEntries);
-            if (parts.Length < 2)
-            {
-                return $"GPU {firstLine}";
-            }
-
-            return $"GPU {parts[0]}% / {parts[1]} MB";
+            return FormatGpuUsage(process.StandardOutput.ReadToEnd());
         }
         catch
         {

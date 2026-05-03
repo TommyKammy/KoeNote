@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -11,7 +9,7 @@ using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
-using Microsoft.Win32;
+using KoeNote.App.Services.SystemStatus;
 
 namespace KoeNote.App.ViewModels;
 
@@ -25,6 +23,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AsrWorker _asrWorker;
     private readonly ReviewWorker _reviewWorker;
     private readonly JobRunCoordinator _jobRunCoordinator;
+    private readonly StatusBarInfo _statusBarInfo;
     private JobSummary? _selectedJob;
     private CancellationTokenSource? _runCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
@@ -81,6 +80,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             _audioPreprocessWorker,
             _asrWorker,
             _reviewWorker);
+        _statusBarInfo = new StatusBarInfoService(Paths).GetStatusBarInfo();
 
         var toolStatus = new ToolStatusService(Paths);
         foreach (var item in toolStatus.GetStatusItems())
@@ -139,13 +139,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string StoragePath => Paths.Root;
 
-    public string DiskFreeSummary => GetDiskFreeSummary();
+    public string DiskFreeSummary => _statusBarInfo.DiskFreeSummary;
 
-    public string MemorySummary => GetMemorySummary();
+    public string MemorySummary => _statusBarInfo.MemorySummary;
 
-    public string CpuSummary => GetCpuSummary();
+    public string CpuSummary => _statusBarInfo.CpuSummary;
 
-    public string GpuUsageSummary => GetGpuUsageSummary();
+    public string GpuUsageSummary => _statusBarInfo.GpuUsageSummary;
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
