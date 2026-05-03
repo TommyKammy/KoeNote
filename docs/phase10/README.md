@@ -6,6 +6,15 @@ Phase 10 prepares KoeNote for external beta distribution after the review, memor
 
 Create a local-first Windows distribution that can be installed and smoke-tested without hand-copying app files.
 
+## Pre-Implementation Gate
+
+Before starting packaging work, keep the UI and runtime surface beta-readable:
+
+- main navigation, stage labels, and operation labels are not mojibake
+- review/export/edit flows keep their current regression coverage green
+- `origin/main` is clean and tests pass
+- Phase 10 changes stay focused on packaging, first-run checks, and smoke-testability
+
 ## Scope
 
 - choose installer shape
@@ -33,3 +42,11 @@ Development may continue on .NET 11 preview. For external beta, prefer self-cont
 - Missing tools/models are reported with actionable UI.
 - License manifest is included.
 - Offline smoke test covers startup, sample import, review screen, and export path.
+
+## Initial Implementation Slices
+
+1. Packaging shape and publish profile
+2. First-run runtime/tool/model checks
+3. License manifest and distribution layout docs
+4. Offline smoke-test command/script
+5. Final UI pass for first-run messages

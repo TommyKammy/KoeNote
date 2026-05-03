@@ -93,7 +93,7 @@ public sealed partial class MainWindowViewModel
         return state switch
         {
             JobRunStageState.Running => "実行中",
-            JobRunStageState.Succeeded => "成功",
+            JobRunStageState.Succeeded => "完了",
             JobRunStageState.Cancelled => "中止",
             JobRunStageState.Failed when !string.IsNullOrWhiteSpace(errorCategory) => $"失敗: {errorCategory}",
             JobRunStageState.Failed => "失敗",
