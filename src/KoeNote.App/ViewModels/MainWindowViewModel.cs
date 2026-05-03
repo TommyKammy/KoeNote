@@ -329,6 +329,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         stage.Status = "実行中";
         stage.ProgressPercent = 10;
         _jobRepository.MarkPreprocessRunning(job);
+        RefreshJobViews();
         LatestLog = $"Running ffmpeg for {job.FileName}";
 
         try
@@ -337,8 +338,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stage.Status = "成功";
             stage.ProgressPercent = 100;
             _jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
+            RefreshJobViews();
             LatestLog = $"Generated normalized WAV: {result.NormalizedAudioPath}";
-            OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
 
             await RunAsrAsync(job, result.NormalizedAudioPath, cancellation.Token);
         }
@@ -347,6 +348,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stage.Status = "中止";
             stage.ProgressPercent = 100;
             _jobRepository.MarkCancelled(job, "preprocess");
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "preprocess", "info", "Run was cancelled.");
             LatestLog = "実行をキャンセルしました。";
             RefreshLogs();
@@ -356,6 +358,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stage.Status = "失敗";
             stage.ProgressPercent = 100;
             _jobRepository.MarkPreprocessFailed(job, "ffmpeg_failed");
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
             LatestLog = exception.Message;
             RefreshLogs();
@@ -374,6 +377,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         stage.Status = "実行中";
         stage.ProgressPercent = 10;
         _jobRepository.MarkAsrRunning(job);
+        RefreshJobViews();
         _stageProgressRepository.Upsert(job.JobId, "asr", "running", 10, startedAt: startedAt);
         LatestLog = $"Running ASR for {job.FileName}";
 
@@ -416,6 +420,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 result.Duration.TotalSeconds,
                 logPath: result.RawOutputPath);
             _jobRepository.MarkAsrSucceeded(job);
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
             LatestLog = $"ASR completed: {result.Segments.Count} segments";
             RefreshLogs();
@@ -437,6 +442,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: "cancelled");
             _jobRepository.MarkCancelled(job, "asr");
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "asr", "info", "Run was cancelled.");
             LatestLog = "ASRをキャンセルしました。";
             RefreshLogs();
@@ -456,6 +462,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: exception.Category.ToString());
             _jobRepository.MarkAsrFailed(job, exception.Category.ToString());
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{exception.Category}: {exception.Message}");
             LatestLog = $"ASR failed ({exception.Category}): {exception.Message}";
             RefreshLogs();
@@ -475,6 +482,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: AsrFailureCategory.Unknown.ToString());
             _jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{AsrFailureCategory.Unknown}: {exception.Message}");
             LatestLog = $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}";
             RefreshLogs();
@@ -494,6 +502,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         stage.Status = "実行中";
         stage.ProgressPercent = 10;
         _jobRepository.MarkReviewRunning(job);
+        RefreshJobViews();
         _stageProgressRepository.Upsert(job.JobId, "review", "running", 10, startedAt: startedAt);
         LatestLog = $"Running review for {job.FileName}";
 
@@ -524,7 +533,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 logPath: result.RawOutputPath);
             _jobRepository.MarkReviewSucceeded(job, result.Drafts.Count);
             job.UnreviewedDrafts = result.Drafts.Count;
-            OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "review", "info", $"Generated {result.Drafts.Count} correction drafts: {result.NormalizedDraftsPath}");
             LatestLog = $"Review completed: {result.Drafts.Count} drafts";
             RefreshLogs();
@@ -559,6 +568,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: "cancelled");
             _jobRepository.MarkCancelled(job, "review");
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "review", "info", "Run was cancelled.");
             LatestLog = "推敲をキャンセルしました。";
             RefreshLogs();
@@ -578,6 +588,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: exception.Category.ToString());
             _jobRepository.MarkReviewFailed(job, exception.Category.ToString());
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{exception.Category}: {exception.Message}");
             LatestLog = $"Review failed ({exception.Category}): {exception.Message}";
             RefreshLogs();
@@ -597,6 +608,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: ReviewFailureCategory.Unknown.ToString());
             _jobRepository.MarkReviewFailed(job, ReviewFailureCategory.Unknown.ToString());
+            RefreshJobViews();
             _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
             LatestLog = $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}";
             RefreshLogs();
@@ -650,6 +662,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             Logs.Add(entry);
         }
+    }
+
+    private void RefreshJobViews()
+    {
+        FilteredJobs.Refresh();
+        OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
+        OnPropertyChanged(nameof(SelectedJobUpdatedAt));
+        OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
     }
 
     private bool FilterJob(object item)
