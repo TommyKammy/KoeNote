@@ -8,6 +8,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Review;
 using Microsoft.Win32;
 
 namespace KoeNote.App.ViewModels;
@@ -19,8 +20,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly StageProgressRepository _stageProgressRepository;
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
     private readonly AsrWorker _asrWorker;
+    private readonly ReviewWorker _reviewWorker;
     private JobSummary? _selectedJob;
     private string _latestLog;
+    private string _reviewIssueType = "意味不明語の疑い";
+    private string _originalText = "この仕様はサーバーのミギワで処理します。";
+    private string _suggestedText = "この仕様はサーバーの右側で処理します。";
+    private string _reviewReason = "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になる。";
+    private double _confidence = 0.62;
 
     public MainWindowViewModel()
         : this(new AppPaths())
@@ -46,6 +53,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new AsrJsonNormalizer(),
             new AsrResultStore(),
             new TranscriptSegmentRepository(Paths));
+        _reviewWorker = new ReviewWorker(
+            processRunner,
+            new ReviewCommandBuilder(),
+            new ReviewPromptBuilder(),
+            new ReviewJsonNormalizer(),
+            new ReviewResultStore(),
+            new CorrectionDraftRepository(Paths));
 
         var toolStatus = new ToolStatusService(Paths);
         foreach (var item in toolStatus.GetStatusItems())
@@ -117,15 +131,35 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ReviewIssueType => "意味不明語の疑い";
+    public string ReviewIssueType
+    {
+        get => _reviewIssueType;
+        private set => SetField(ref _reviewIssueType, value);
+    }
 
-    public string OriginalText => "この仕様はサーバーのミギワで処理します。";
+    public string OriginalText
+    {
+        get => _originalText;
+        private set => SetField(ref _originalText, value);
+    }
 
-    public string SuggestedText => "この仕様はサーバーの右側で処理します。";
+    public string SuggestedText
+    {
+        get => _suggestedText;
+        private set => SetField(ref _suggestedText, value);
+    }
 
-    public string ReviewReason => "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になる。";
+    public string ReviewReason
+    {
+        get => _reviewReason;
+        private set => SetField(ref _reviewReason, value);
+    }
 
-    public double Confidence => 0.62;
+    public double Confidence
+    {
+        get => _confidence;
+        private set => SetField(ref _confidence, value);
+    }
 
     public string LatestLog
     {
@@ -225,7 +259,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     FormatTimestamp(segment.EndSeconds),
                     segment.SpeakerId ?? "",
                     segment.NormalizedText ?? segment.RawText,
-                    "候補なし"));
+                    "候補なし",
+                    segment.SegmentId));
             }
 
             var finishedAt = DateTimeOffset.Now;
@@ -243,6 +278,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobRepository.MarkAsrSucceeded(job);
             _jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
             LatestLog = $"ASR completed: {result.Segments.Count} segments";
+
+            await RunReviewAsync(job, result.Segments);
         }
         catch (AsrWorkerException exception)
         {
@@ -286,6 +323,106 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var time = TimeSpan.FromSeconds(seconds);
         return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
+    }
+
+    private async Task RunReviewAsync(JobSummary job, IReadOnlyList<TranscriptSegment> segments)
+    {
+        var stage = StageStatuses.First(item => item.Name == "推敲");
+        var startedAt = DateTimeOffset.Now;
+        stage.Status = "実行中";
+        stage.ProgressPercent = 10;
+        _jobRepository.MarkReviewRunning(job);
+        _stageProgressRepository.Upsert(job.JobId, "review", "running", 10, startedAt: startedAt);
+        LatestLog = $"Running review for {job.FileName}";
+
+        try
+        {
+            var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "review");
+            var result = await _reviewWorker.RunAsync(new ReviewRunOptions(
+                job.JobId,
+                Paths.LlamaCompletionPath,
+                Paths.ReviewModelPath,
+                outputDirectory,
+                segments,
+                MinConfidence: 0.5,
+                Timeout: TimeSpan.FromHours(2)));
+
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "成功";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "review",
+                "succeeded",
+                100,
+                startedAt,
+                finishedAt,
+                result.Duration.TotalSeconds,
+                logPath: result.RawOutputPath);
+            _jobRepository.MarkReviewSucceeded(job, result.Drafts.Count);
+            _jobLogRepository.AddEvent(job.JobId, "review", "info", $"Generated {result.Drafts.Count} correction drafts: {result.NormalizedDraftsPath}");
+            LatestLog = $"Review completed: {result.Drafts.Count} drafts";
+
+            var firstDraft = result.Drafts.FirstOrDefault();
+            if (firstDraft is not null)
+            {
+                ReviewIssueType = firstDraft.IssueType;
+                OriginalText = firstDraft.OriginalText;
+                SuggestedText = firstDraft.SuggestedText;
+                ReviewReason = firstDraft.Reason;
+                Confidence = firstDraft.Confidence;
+                UpdateSegmentReviewStates(result.Drafts);
+            }
+        }
+        catch (ReviewWorkerException exception)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = $"失敗: {exception.Category}";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "review",
+                "failed",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: exception.Category.ToString());
+            _jobRepository.MarkReviewFailed(job, exception.Category.ToString());
+            _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{exception.Category}: {exception.Message}");
+            LatestLog = $"Review failed ({exception.Category}): {exception.Message}";
+        }
+        catch (Exception exception)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "失敗: Unknown";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "review",
+                "failed",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: ReviewFailureCategory.Unknown.ToString());
+            _jobRepository.MarkReviewFailed(job, ReviewFailureCategory.Unknown.ToString());
+            _jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
+            LatestLog = $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}";
+        }
+    }
+
+    private void UpdateSegmentReviewStates(IReadOnlyList<CorrectionDraft> drafts)
+    {
+        var draftSegmentIds = drafts.Select(draft => draft.SegmentId).ToHashSet(StringComparer.Ordinal);
+        for (var i = 0; i < Segments.Count; i++)
+        {
+            var preview = Segments[i];
+            if (draftSegmentIds.Contains(preview.SegmentId))
+            {
+                Segments[i] = preview with { ReviewState = "推敲候補あり" };
+            }
+        }
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

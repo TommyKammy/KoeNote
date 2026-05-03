@@ -135,6 +135,21 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, $"ASR失敗: {errorCategory}", "asr_failed", 70, job.NormalizedAudioPath, errorCategory);
     }
 
+    public void MarkReviewRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "推敲中", "reviewing", 82, job.NormalizedAudioPath);
+    }
+
+    public void MarkReviewSucceeded(JobSummary job, int draftCount)
+    {
+        UpdatePreprocessResult(job, draftCount > 0 ? "レビュー待ち" : "推敲候補なし", "review_ready", 90, job.NormalizedAudioPath);
+    }
+
+    public void MarkReviewFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, $"推敲失敗: {errorCategory}", "review_failed", 90, job.NormalizedAudioPath, errorCategory);
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder

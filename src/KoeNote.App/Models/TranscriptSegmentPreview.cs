@@ -5,4 +5,5 @@ public sealed record TranscriptSegmentPreview(
     string End,
     string Speaker,
     string Text,
-    string ReviewState);
+    string ReviewState,
+    string SegmentId = "");
