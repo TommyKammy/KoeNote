@@ -1,0 +1,41 @@
+<UserControl x:Class="KoeNote.App.Controls.LogPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+            <Border Style="{StaticResource PanelBorder}" Padding="16">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="ログ" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
+                        <Button Margin="12,0,0,0" Padding="10,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE74E;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="ログを保存" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent" FontFamily="Consolas">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76" />
+                                        <ColumnDefinition Width="62" />
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="{StaticResource MutedBrush}" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Text="{Binding Level}" Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Text="{Binding Stage}" Foreground="#64748B" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Text="{Binding Message}" Foreground="#334155" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+</UserControl>
