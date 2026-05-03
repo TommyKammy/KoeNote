@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -126,6 +127,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string AsrModel => "VibeVoice ASR Q4";
 
     public string ReviewModel => "llm-jp Q4_K_M";
+
+    public string StoragePath => Paths.Root;
+
+    public string DiskFreeSummary => GetDiskFreeSummary();
+
+    public string MemorySummary => $"MEM {Process.GetCurrentProcess().WorkingSet64 / 1024 / 1024:N0} MB";
+
+    public string CpuSummary => $"CPU {Environment.ProcessorCount} cores";
+
+    public string GpuUsageSummary => "GPU --%";
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
@@ -785,6 +796,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         return Path.GetExtension(path).ToLowerInvariant() is ".wav" or ".mp3" or ".m4a" or ".flac" or ".aac" or ".ogg" or ".opus";
+    }
+
+    private string GetDiskFreeSummary()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Paths.Root);
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                return "空き容量 Unknown";
+            }
+
+            var drive = new DriveInfo(root);
+            return $"空き容量 {drive.AvailableFreeSpace / 1024d / 1024d / 1024d:N1} GB";
+        }
+        catch (IOException)
+        {
+            return "空き容量 Unknown";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "空き容量 Unknown";
+        }
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

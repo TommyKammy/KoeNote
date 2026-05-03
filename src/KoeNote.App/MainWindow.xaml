@@ -4,46 +4,224 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="KoeNote" Height="820" Width="1360" MinHeight="700" MinWidth="1120"
-        Background="#F7F8F6"
+        Title="KoeNote" Height="860" Width="1440" MinHeight="760" MinWidth="1180"
+        Background="#F8F9FA"
+        FontFamily="Yu Gothic UI"
         AllowDrop="True"
         DragOver="OnDragOverAudioFiles"
         Drop="OnDropAudioFiles">
     <Window.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F8F9FA" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="BorderBrushSoft" Color="#E5E7EB" />
+        <SolidColorBrush x:Key="TextBrush" Color="#1F2933" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#7B8794" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#2F8F5B" />
+        <SolidColorBrush x:Key="AccentLightBrush" Color="#EAF6EF" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#D64545" />
+        <SolidColorBrush x:Key="DangerLightBrush" Color="#FDECEC" />
+        <SolidColorBrush x:Key="BlueLightBrush" Color="#EFF6FF" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#A16207" />
+
         <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#202626" />
-            <Setter Property="FontFamily" Value="Yu Gothic UI" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="4,0" />
-            <Setter Property="Padding" Value="12,7" />
-            <Setter Property="MinWidth" Value="78" />
-        </Style>
-        <Style TargetType="Border">
-            <Setter Property="BorderBrush" Value="#D6DBD8" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="#FFFFFF" />
-        </Style>
+
         <Style x:Key="MutedText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#68736F" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
             <Setter Property="FontSize" Value="12" />
         </Style>
+
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+
+        <Style x:Key="IconText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+
+        <Style x:Key="PanelBorder" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#F1F3F5" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#E9ECEF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="OutlineSuccessButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="OutlineDangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+        </Style>
+
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="5" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Background" Value="#E9ECEF" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style x:Key="CardListBox" TargetType="ListBox">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        </Style>
+
+        <Style x:Key="CardListBoxItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="SelectedRail" BorderThickness="0,0,0,0" BorderBrush="{StaticResource AccentBrush}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectedRail" Property="BorderThickness" Value="4,0,0,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SegmentListBoxItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="RowChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="4,0,0,0"
+                                CornerRadius="6"
+                                Margin="0,0,0,4">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowChrome" Property="Background" Value="#FAFBFC" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="RowChrome" Property="Background" Value="{StaticResource BlueLightBrush}" />
+                                <Setter TargetName="RowChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
-    <DockPanel LastChildFill="True">
-        <Grid DockPanel.Dock="Top" Background="#FFFFFF">
+    <Grid Background="{StaticResource AppBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="104" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="176" />
+            <RowDefinition Height="28" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Background="#FFFFFF">
             <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
-                <RowDefinition Height="58" />
+                <RowDefinition Height="48" />
+                <RowDefinition Height="56" />
             </Grid.RowDefinitions>
 
-            <Border BorderThickness="0,0,0,1" Padding="12,0">
+            <Border BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrushSoft}" Padding="22,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -52,130 +230,128 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="KoeNote" FontSize="20" FontWeight="SemiBold" Margin="0,0,18,0" />
-                        <TextBlock Text="●" Foreground="#2E9D57" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding AppMode}" />
+                        <TextBlock Text="KoeNote" FontSize="22" FontWeight="SemiBold" Margin="0,0,14,0" />
+                        <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0" />
+                        <TextBlock Text="{Binding AppMode}" Foreground="{StaticResource AccentBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="GPU" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding GpuSummary}" MaxWidth="260" Margin="0,0,18,0" />
+                        <TextBlock Text="{Binding GpuSummary}" FontSize="12" MaxWidth="230" Margin="0,0,22,0" />
                         <TextBlock Text="ASR" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding AsrModel}" Margin="0,0,18,0" />
+                        <TextBlock Text="{Binding AsrModel}" FontSize="12" Margin="0,0,22,0" />
                         <TextBlock Text="推敲" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding ReviewModel}" />
+                        <TextBlock Text="{Binding ReviewModel}" FontSize="12" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1" BorderThickness="0,0,0,1" Padding="18,10">
+            <Border Grid.Row="1" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrushSoft}" Padding="18,10">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="音声をインポート" Command="{Binding AddAudioCommand}" />
-                        <Separator Width="18" Opacity="0" />
-                        <Button Content="▶ 実行" Command="{Binding RunSelectedJobCommand}" />
-                        <Button Content="□ 中止" Command="{Binding CancelCommand}" />
-                        <Separator Width="18" Opacity="0" />
-                        <Button Content="TXT出力" />
-                        <Button Content="JSON出力" />
-                        <Button Content="SRT出力" />
-                        <Button Content="DOCX出力" />
-                        <Separator Width="18" Opacity="0" />
-                        <Button Content="設定" />
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding AddAudioCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                <TextBlock Text="音声をインポート" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding RunSelectedJobCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="実行" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding CancelCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="中止" />
+                            </StackPanel>
+                        </Button>
+                        <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
+                        <Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="TXT" />
+                            </StackPanel>
+                        </Button>
+                        <Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE943;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="JSON" />
+                            </StackPanel>
+                        </Button>
+                        <Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="SRT" />
+                            </StackPanel>
+                        </Button>
+                        <Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="DOCX" />
+                            </StackPanel>
+                        </Button>
+                        <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
+                        <Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="設定" />
+                            </StackPanel>
+                        </Button>
                         <TextBlock Text="音声ファイルをこの画面へドロップして登録できます" Style="{StaticResource MutedText}" Margin="18,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>
 
-        <Grid DockPanel.Dock="Bottom" Height="170" Background="#FFFFFF">
+        <Grid Grid.Row="1" Margin="18">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="500" />
+                <ColumnDefinition Width="310" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="370" />
             </Grid.ColumnDefinitions>
 
-            <Border BorderThickness="0,1,1,0" Padding="14,12">
+            <Border Grid.Column="0" Style="{StaticResource PanelBorder}" Padding="16" Margin="0,0,14,0">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="処理ステージ" Style="{StaticResource SectionTitle}" />
-                    <ItemsControl ItemsSource="{Binding StageStatuses}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Rows="1" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="4,0">
-                                    <TextBlock Text="{Binding Name}" TextAlignment="Center" FontWeight="SemiBold" />
-                                    <ProgressBar Height="6" Margin="0,8,0,6" Maximum="100" Value="{Binding ProgressPercent}" />
-                                    <TextBlock Text="{Binding Status}" TextAlignment="Center" Style="{StaticResource MutedText}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </DockPanel>
-            </Border>
-
-            <Border Grid.Column="1" BorderThickness="0,1,0,0" Padding="14,12">
-                <DockPanel>
-                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="ログ" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
-                        <Button Grid.Column="2" Content="ログを保存" Margin="12,0,0,0" />
+                    <TextBlock DockPanel.Dock="Top" Text="ジョブ一覧" Style="{StaticResource SectionTitle}" />
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" Margin="12,0,0,0" VerticalAlignment="Center" Panel.ZIndex="1" />
+                        <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Padding="32,7,10,7" MinHeight="34" ToolTip="ジョブ名で検索" />
                     </Grid>
-                    <DataGrid ItemsSource="{Binding Logs}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="時刻" Binding="{Binding CreatedAtDisplay}" Width="70" />
-                            <DataGridTextColumn Header="Lv" Binding="{Binding Level}" Width="60" />
-                            <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="90" />
-                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </DockPanel>
-            </Border>
-        </Grid>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding JobCountSummary}" Style="{StaticResource MutedText}" Margin="0,0,0,12" />
 
-        <Grid Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="340" />
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Padding="12" Margin="0,0,10,0">
-                <DockPanel>
-                    <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="ジョブ一覧" Style="{StaticResource SectionTitle}" />
-                        <TextBox Grid.Row="1" Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" MinHeight="28" ToolTip="ジョブ名で検索" />
-                        <TextBlock Grid.Row="2" Text="{Binding JobCountSummary}" Style="{StaticResource MutedText}" />
-                    </Grid>
-
-                    <ListBox ItemsSource="{Binding FilteredJobs}" SelectedItem="{Binding SelectedJob, Mode=TwoWay}" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox ItemsSource="{Binding FilteredJobs}"
+                             SelectedItem="{Binding SelectedJob, Mode=TwoWay}"
+                             Style="{StaticResource CardListBox}"
+                             ItemContainerStyle="{StaticResource CardListBoxItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="10" Margin="0,0,0,8" BorderBrush="#D6DBD8" Background="#FAFBFA">
+                                <Border Padding="14" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding FileName}" Foreground="#68736F" FontSize="12" TextWrapping="Wrap" TextTrimming="None" />
-                                        <Grid Margin="0,8,0,0">
+                                        <Grid Margin="0,0,0,8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Status}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" />
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+                                            <Button Grid.Column="1" Padding="6,2" MinWidth="0">
+                                                <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" />
+                                            </Button>
                                         </Grid>
-                                        <ProgressBar Height="5" Margin="0,5,0,6" Value="{Binding ProgressPercent}" Maximum="100" />
+                                        <TextBlock Text="{Binding FileName}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,12" />
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="7" Height="7" CornerRadius="4" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                                <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                                        </Grid>
+                                        <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Margin="0,0,0,12" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -192,102 +368,274 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Padding="12" Margin="0,0,10,0">
+            <Border Grid.Column="1" Style="{StaticResource PanelBorder}" Padding="16" Margin="0,0,14,0">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="文字起こし" Style="{StaticResource SectionTitle}" />
+                        <CheckBox Grid.Column="1" Content="自動スクロール" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,10" Foreground="{StaticResource MutedBrush}" />
+                        <TextBox Grid.Column="2" Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="34" Padding="10,7" ToolTip="発話内容を検索" Margin="0,0,0,10" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding SpeakerFilters}" SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}" Margin="8,0,0,10" MinHeight="34" />
+                    </Grid>
+
+                    <Border DockPanel.Dock="Bottom" Background="#FAFBFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,14,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Padding="9,7" MinWidth="0">
+                                <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" />
+                            </Button>
+                            <Button Grid.Column="1" Padding="9,7" MinWidth="0" Margin="4,0,12,0">
+                                <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" />
+                            </Button>
+                            <Grid Grid.Column="2" VerticalAlignment="Center" Height="34">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Width="5" Height="14" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="5" Height="24" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="2" Width="5" Height="18" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="3" Width="5" Height="30" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="4" Width="5" Height="20" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="5" Width="5" Height="28" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="6" Width="5" Height="16" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="7" Width="5" Height="26" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="8" Width="5" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                <Border Grid.Column="9" Width="5" Height="22" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                <Slider VerticalAlignment="Bottom" Minimum="0" Maximum="100" Value="35" Margin="0,26,0,0" />
+                            </Grid>
+                            <TextBlock Grid.Column="3" Text="00:03:21 / 00:10:00" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                        </Grid>
+                    </Border>
+
+                    <ListBox ItemsSource="{Binding FilteredSegments}"
+                             Style="{StaticResource CardListBox}"
+                             ItemContainerStyle="{StaticResource SegmentListBoxItem}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,11" Background="Transparent" BorderBrush="#EEF1F3" BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Start}" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Top" />
+                                        <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="12" Padding="9,4" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None" FontSize="14" LineHeight="22" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource PanelBorder}" Padding="18">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="推敲レビュー" Style="{StaticResource SectionTitle}" />
+                            <Border Grid.Column="1" Background="#FFF7ED" CornerRadius="12" Padding="9,4" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}" Foreground="{StaticResource WarningBrush}" FontSize="12" FontWeight="SemiBold" />
+                            </Border>
+                        </Grid>
+
+                        <Border Background="#FEF3C7" CornerRadius="12" Padding="10,5" HorizontalAlignment="Left" Margin="0,0,0,14">
+                            <TextBlock Text="{Binding ReviewIssueType}" Foreground="{StaticResource WarningBrush}" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+
+                        <TextBlock Text="原文" Style="{StaticResource MutedText}" />
+                        <TextBox Text="{Binding OriginalText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="82" Margin="0,5,0,14" Background="#FAFBFC" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
+                            <TextBlock Text="提案文" Style="{StaticResource MutedText}" />
+                            <Border Background="{StaticResource AccentLightBrush}" CornerRadius="10" Padding="8,3" Margin="8,-2,0,0">
+                                <TextBlock Text="API連携" Foreground="{StaticResource AccentBrush}" FontSize="11" FontWeight="SemiBold" />
+                            </Border>
+                        </StackPanel>
+                        <TextBox Text="{Binding SuggestedText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="82" Margin="0,0,0,14" Background="#F7FCF9" BorderBrush="#B7D8C4" />
+
+                        <TextBlock Text="理由" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding ReviewReason}" TextWrapping="Wrap" TextTrimming="None" LineHeight="21" Margin="0,5,0,18" />
+
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Style="{StaticResource OutlineSuccessButton}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="採用" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="2" Style="{StaticResource OutlineDangerButton}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
+                                    <TextBlock Text="却下" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <Border Background="#FAFBFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="ASRコンテキスト" Style="{StaticResource SectionTitle}" FontSize="14" Margin="0,0,0,10" />
+                                <TextBlock Text="Context" Style="{StaticResource MutedText}" />
+                                <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}" MinHeight="62" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,5,0,12" />
+                                <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
+                                <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="38" TextWrapping="Wrap" AcceptsReturn="True" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="18,0,18,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="510" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource PanelBorder}" Padding="16" Margin="0,0,14,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="処理ステージ" Style="{StaticResource SectionTitle}" />
+                    <ItemsControl ItemsSource="{Binding StageStatuses}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Height="36">
+                                        <Border Height="2" Background="{StaticResource BorderBrushSoft}" VerticalAlignment="Center" Margin="0" />
+                                        <Border HorizontalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border" BasedOn="{StaticResource PanelBorder}">
+                                                    <Setter Property="CornerRadius" Value="15" />
+                                                    <Setter Property="Width" Value="30" />
+                                                    <Setter Property="Height" Value="30" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
+                                                            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
+                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
+                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
+                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1" Text="{Binding Name}" TextAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="0,7,0,2" />
+                                    <TextBlock Grid.Row="2" Text="{Binding Status}" TextAlignment="Center" Style="{StaticResource MutedText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource PanelBorder}" Padding="16">
                 <DockPanel>
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="170" />
-                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="文字起こし" Style="{StaticResource SectionTitle}" />
-                        <CheckBox Grid.Column="1" Content="自動スクロール" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <TextBox Grid.Column="2" Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="28" ToolTip="発話内容を検索" />
-                        <ComboBox Grid.Column="3" ItemsSource="{Binding SpeakerFilters}" SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}" Margin="8,0,0,0" />
+                        <TextBlock Text="ログ" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Grid.Column="1" Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Margin="12,0,0,0" Padding="10,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE74E;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="ログを保存" FontSize="12" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
-                    <DataGrid ItemsSource="{Binding FilteredSegments}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" HeadersVisibility="Column" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="時間" Binding="{Binding Start}" Width="95" />
-                            <DataGridTextColumn Header="終了" Binding="{Binding End}" Width="95" />
-                            <DataGridTextColumn Header="話者" Binding="{Binding Speaker}" Width="90" />
-                            <DataGridTextColumn Header="発話内容" Binding="{Binding Text}" Width="*" MinWidth="220" />
-                            <DataGridTextColumn Header="レビュー" Binding="{Binding ReviewState}" Width="115" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent" FontFamily="Consolas">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2,0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76" />
+                                        <ColumnDefinition Width="62" />
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="{StaticResource MutedBrush}" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Level}" Foreground="{StaticResource AccentBrush}" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Stage}" Foreground="#64748B" FontFamily="Consolas" FontSize="12" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Message}" Foreground="#334155" FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </DockPanel>
             </Border>
-
-            <Border Grid.Column="2" Padding="0">
-                <TabControl>
-                    <TabItem Header="ジョブ情報">
-                        <ScrollViewer Padding="12">
-                            <StackPanel>
-                                <TextBlock Text="ジョブ情報" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="入力音声" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding SelectedJobSourcePath, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Margin="0,4,0,12" />
-                                <TextBlock Text="normalized WAV" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding SelectedJobNormalizedAudioPath, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Margin="0,4,0,12" />
-                                <TextBlock Text="更新日時" Style="{StaticResource MutedText}" />
-                                <TextBlock Text="{Binding SelectedJobUpdatedAt}" Margin="0,4,0,12" />
-                                <TextBlock Text="未レビュー候補" Style="{StaticResource MutedText}" />
-                                <TextBlock Text="{Binding SelectedJobUnreviewedDrafts}" Margin="0,4,0,12" />
-                                <TextBlock Text="Context" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}" MinHeight="66" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,12" />
-                                <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,0" />
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="推敲レビュー">
-                        <ScrollViewer Padding="12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="推敲レビュー" Style="{StaticResource SectionTitle}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}" Foreground="#8A5A00" FontWeight="SemiBold" />
-                                </Grid>
-                                <TextBlock Text="{Binding ReviewIssueType}" Foreground="#8A5A00" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                <TextBlock Text="原文" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding OriginalText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="66" Margin="0,4,0,12" />
-                                <TextBlock Text="候補" Style="{StaticResource MutedText}" />
-                                <TextBox Text="{Binding SuggestedText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="66" Margin="0,4,0,12" />
-                                <TextBlock Text="理由" Style="{StaticResource MutedText}" />
-                                <TextBlock Text="{Binding ReviewReason}" TextWrapping="Wrap" Margin="0,4,0,16" />
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Content="採用" />
-                                    <Button Content="却下" />
-                                    <Button Content="手修正" />
-                                </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <TabItem Header="ログ">
-                        <DataGrid ItemsSource="{Binding Logs}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="時刻" Binding="{Binding CreatedAtDisplay}" Width="70" />
-                                <DataGridTextColumn Header="段階" Binding="{Binding Stage}" Width="90" />
-                                <DataGridTextColumn Header="内容" Binding="{Binding Message}" Width="*" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </TabItem>
-
-                    <TabItem Header="設定">
-                        <DataGrid ItemsSource="{Binding EnvironmentStatus}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="項目" Binding="{Binding Name}" Width="120" />
-                                <DataGridTextColumn Header="状態" Binding="{Binding Value}" Width="110" />
-                                <DataGridTextColumn Header="詳細" Binding="{Binding Detail}" Width="*" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </TabItem>
-                </TabControl>
-            </Border>
         </Grid>
-    </DockPanel>
+
+        <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="0,1,0,0" Padding="18,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding StoragePath, StringFormat=保存先: {0}}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DiskFreeSummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding MemorySummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding CpuSummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding GpuUsageSummary}" Style="{StaticResource MutedText}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
