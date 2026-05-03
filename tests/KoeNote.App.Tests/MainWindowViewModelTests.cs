@@ -43,7 +43,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void AsrSettings_RestoreAfterRecreatingViewModel()
+    public async Task AsrSettings_RestoreAfterRecreatingViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
@@ -52,6 +52,7 @@ public sealed class MainWindowViewModelTests
             AsrContextText = "製品開発会議",
             AsrHotwordsText = "KoeNote\r\nRTX 3060"
         };
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
 
         var second = new MainWindowViewModel(paths);
 

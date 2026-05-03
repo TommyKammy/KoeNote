@@ -25,6 +25,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly ReviewWorker _reviewWorker;
     private JobSummary? _selectedJob;
     private CancellationTokenSource? _runCancellation;
+    private CancellationTokenSource? _asrSettingsSaveDebounce;
     private string _latestLog;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
@@ -240,9 +241,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _asrContextText;
         set
         {
-            if (SetField(ref _asrContextText, value))
+            if (SetField(ref _asrContextText, value ?? string.Empty))
             {
-                SaveAsrSettings();
+                ScheduleSaveAsrSettings();
             }
         }
     }
@@ -252,9 +253,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _asrHotwordsText;
         set
         {
-            if (SetField(ref _asrHotwordsText, value))
+            if (SetField(ref _asrHotwordsText, value ?? string.Empty))
             {
-                SaveAsrSettings();
+                ScheduleSaveAsrSettings();
             }
         }
     }
@@ -415,6 +416,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "asr");
+            SaveAsrSettings();
             var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText);
             var result = await _asrWorker.RunAsync(new AsrRunOptions(
                 job.JobId,
@@ -658,7 +660,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void SaveAsrSettings()
     {
+        _asrSettingsSaveDebounce?.Cancel();
+        _asrSettingsSaveDebounce = null;
         _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText));
+    }
+
+    private void ScheduleSaveAsrSettings()
+    {
+        _asrSettingsSaveDebounce?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _asrSettingsSaveDebounce = cancellation;
+        _ = SaveAsrSettingsAfterDelayAsync(cancellation.Token);
+    }
+
+    private async Task SaveAsrSettingsAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken).ConfigureAwait(false);
+            _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText));
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private void UpdateSegmentReviewStates(IReadOnlyList<CorrectionDraft> drafts)
