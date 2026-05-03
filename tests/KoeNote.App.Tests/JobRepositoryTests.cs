@@ -74,6 +74,31 @@ public sealed class JobRepositoryTests
         Assert.NotEqual(first.JobId, second.JobId);
     }
 
+    [Fact]
+    public void MarkAsrFailed_PersistsVisibleFailureCategory()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        repository.MarkAsrFailed(job, "MissingRuntime");
+
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status, current_stage, last_error_category FROM jobs WHERE job_id = $job_id;";
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("ASR失敗: MissingRuntime", reader.GetString(0));
+        Assert.Equal("asr_failed", reader.GetString(1));
+        Assert.Equal("MissingRuntime", reader.GetString(2));
+        Assert.Equal("ASR失敗: MissingRuntime", job.Status);
+    }
+
     private static AppPaths CreatePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

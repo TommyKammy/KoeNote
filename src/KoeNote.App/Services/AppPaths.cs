@@ -4,18 +4,19 @@ namespace KoeNote.App.Services;
 
 public sealed class AppPaths
 {
-    public AppPaths(string? appDataRoot = null, string? localAppDataRoot = null)
+    public AppPaths(string? appDataRoot = null, string? localAppDataRoot = null, string? appBaseDirectory = null)
     {
         var appData = appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var localAppData = localAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var baseDirectory = appBaseDirectory ?? AppContext.BaseDirectory;
 
         Root = Path.Combine(appData, "KoeNote");
         Jobs = Path.Combine(Root, "jobs");
         DatabasePath = Path.Combine(Root, "jobs.sqlite");
         SettingsPath = Path.Combine(Root, "settings.json");
         Logs = Path.Combine(localAppData, "KoeNote", "logs");
-        RuntimeTools = Path.Combine(AppContext.BaseDirectory, "tools");
-        Models = Path.Combine(AppContext.BaseDirectory, "models");
+        RuntimeTools = Path.Combine(baseDirectory, "tools");
+        Models = Path.Combine(baseDirectory, "models");
         CrispAsrPath = Path.Combine(RuntimeTools, "crispasr.exe");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "llama-completion.exe");
         VibeVoiceAsrModelPath = Path.Combine(Models, "asr", "vibevoice-asr-q4_k.gguf");

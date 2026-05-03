@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Jobs;
@@ -14,22 +16,36 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
+    private readonly StageProgressRepository _stageProgressRepository;
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
+    private readonly AsrWorker _asrWorker;
     private JobSummary? _selectedJob;
     private string _latestLog;
 
     public MainWindowViewModel()
+        : this(new AppPaths())
     {
-        Paths = new AppPaths();
+    }
+
+    public MainWindowViewModel(AppPaths paths)
+    {
+        Paths = paths;
         Paths.EnsureCreated();
 
         var database = new DatabaseInitializer(Paths);
         database.EnsureCreated();
 
         _jobRepository = new JobRepository(Paths);
-        var stageProgressRepository = new StageProgressRepository(Paths);
+        _stageProgressRepository = new StageProgressRepository(Paths);
         _jobLogRepository = new JobLogRepository(Paths);
-        _audioPreprocessWorker = new AudioPreprocessWorker(new ExternalProcessRunner(), stageProgressRepository, _jobLogRepository);
+        var processRunner = new ExternalProcessRunner();
+        _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
+        _asrWorker = new AsrWorker(
+            processRunner,
+            new AsrCommandBuilder(),
+            new AsrJsonNormalizer(),
+            new AsrResultStore(),
+            new TranscriptSegmentRepository(Paths));
 
         var toolStatus = new ToolStatusService(Paths);
         foreach (var item in toolStatus.GetStatusItems())
@@ -132,15 +148,21 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return Task.CompletedTask;
         }
 
-        var job = _jobRepository.CreateFromAudio(dialog.FileName);
+        RegisterAudioFile(dialog.FileName);
+        return Task.CompletedTask;
+    }
+
+    public JobSummary RegisterAudioFile(string audioPath)
+    {
+        var job = _jobRepository.CreateFromAudio(audioPath);
         Jobs.Insert(0, job);
         SelectedJob = job;
         LatestLog = $"Registered audio job: {job.FileName}";
         _jobLogRepository.AddEvent(job.JobId, "created", "info", $"Registered audio file: {job.SourceAudioPath}");
-        return Task.CompletedTask;
+        return job;
     }
 
-    private async Task RunSelectedJobAsync()
+    public async Task RunSelectedJobAsync()
     {
         if (SelectedJob is null)
         {
@@ -161,6 +183,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stage.ProgressPercent = 100;
             _jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             LatestLog = $"Generated normalized WAV: {result.NormalizedAudioPath}";
+
+            await RunAsrAsync(job, result.NormalizedAudioPath);
         }
         catch (Exception exception)
         {
@@ -170,6 +194,98 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
             LatestLog = exception.Message;
         }
+    }
+
+    private async Task RunAsrAsync(JobSummary job, string normalizedAudioPath)
+    {
+        var stage = StageStatuses.First(item => item.Name == "ASR");
+        var startedAt = DateTimeOffset.Now;
+        stage.Status = "実行中";
+        stage.ProgressPercent = 10;
+        _jobRepository.MarkAsrRunning(job);
+        _stageProgressRepository.Upsert(job.JobId, "asr", "running", 10, startedAt: startedAt);
+        LatestLog = $"Running ASR for {job.FileName}";
+
+        try
+        {
+            var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "asr");
+            var result = await _asrWorker.RunAsync(new AsrRunOptions(
+                job.JobId,
+                normalizedAudioPath,
+                Paths.CrispAsrPath,
+                Paths.VibeVoiceAsrModelPath,
+                outputDirectory,
+                Timeout: TimeSpan.FromHours(2)));
+
+            Segments.Clear();
+            foreach (var segment in result.Segments)
+            {
+                Segments.Add(new TranscriptSegmentPreview(
+                    FormatTimestamp(segment.StartSeconds),
+                    FormatTimestamp(segment.EndSeconds),
+                    segment.SpeakerId ?? "",
+                    segment.NormalizedText ?? segment.RawText,
+                    "候補なし"));
+            }
+
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "成功";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "asr",
+                "succeeded",
+                100,
+                startedAt,
+                finishedAt,
+                result.Duration.TotalSeconds,
+                logPath: result.RawOutputPath);
+            _jobRepository.MarkAsrSucceeded(job);
+            _jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
+            LatestLog = $"ASR completed: {result.Segments.Count} segments";
+        }
+        catch (AsrWorkerException exception)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = $"失敗: {exception.Category}";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "asr",
+                "failed",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: exception.Category.ToString());
+            _jobRepository.MarkAsrFailed(job, exception.Category.ToString());
+            _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{exception.Category}: {exception.Message}");
+            LatestLog = $"ASR failed ({exception.Category}): {exception.Message}";
+        }
+        catch (Exception exception)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "失敗: Unknown";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "asr",
+                "failed",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: AsrFailureCategory.Unknown.ToString());
+            _jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
+            _jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{AsrFailureCategory.Unknown}: {exception.Message}");
+            LatestLog = $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}";
+        }
+    }
+
+    private static string FormatTimestamp(double seconds)
+    {
+        var time = TimeSpan.FromSeconds(seconds);
+        return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

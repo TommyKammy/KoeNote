@@ -120,6 +120,21 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, "音声変換失敗", "preprocessing_failed", 100, null, errorCategory);
     }
 
+    public void MarkAsrRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "文字起こし中", "asr", 45, job.NormalizedAudioPath);
+    }
+
+    public void MarkAsrSucceeded(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "文字起こし完了", "asr_completed", 70, job.NormalizedAudioPath);
+    }
+
+    public void MarkAsrFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, $"ASR失敗: {errorCategory}", "asr_failed", 70, job.NormalizedAudioPath, errorCategory);
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
