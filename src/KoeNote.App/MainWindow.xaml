@@ -59,7 +59,7 @@
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="GPU" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding GpuSummary}" MaxWidth="330" Margin="0,0,18,0" />
+                        <TextBlock Text="{Binding GpuSummary}" MaxWidth="260" Margin="0,0,18,0" />
                         <TextBlock Text="ASR" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                         <TextBlock Text="{Binding AsrModel}" Margin="0,0,18,0" />
                         <TextBlock Text="推敲" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
@@ -69,20 +69,22 @@
             </Border>
 
             <Border Grid.Row="1" BorderThickness="0,0,0,1" Padding="18,10">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="音声をインポート" Command="{Binding AddAudioCommand}" />
-                    <Separator Width="18" Opacity="0" />
-                    <Button Content="▶ 実行" Command="{Binding RunSelectedJobCommand}" />
-                    <Button Content="□ 中止" />
-                    <Separator Width="18" Opacity="0" />
-                    <Button Content="TXT出力" />
-                    <Button Content="JSON出力" />
-                    <Button Content="SRT出力" />
-                    <Button Content="DOCX出力" />
-                    <Separator Width="18" Opacity="0" />
-                    <Button Content="設定" />
-                    <TextBlock Text="音声ファイルをこの画面へドロップして登録できます" Style="{StaticResource MutedText}" Margin="18,0,0,0" VerticalAlignment="Center" />
-                </StackPanel>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="音声をインポート" Command="{Binding AddAudioCommand}" />
+                        <Separator Width="18" Opacity="0" />
+                        <Button Content="▶ 実行" Command="{Binding RunSelectedJobCommand}" />
+                        <Button Content="□ 中止" />
+                        <Separator Width="18" Opacity="0" />
+                        <Button Content="TXT出力" />
+                        <Button Content="JSON出力" />
+                        <Button Content="SRT出力" />
+                        <Button Content="DOCX出力" />
+                        <Separator Width="18" Opacity="0" />
+                        <Button Content="設定" />
+                        <TextBlock Text="音声ファイルをこの画面へドロップして登録できます" Style="{StaticResource MutedText}" Margin="18,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
 

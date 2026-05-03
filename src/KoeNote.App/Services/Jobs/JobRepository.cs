@@ -22,7 +22,7 @@ public sealed class JobRepository(AppPaths paths)
                 created_at,
                 updated_at
             FROM jobs
-            ORDER BY datetime(updated_at) DESC
+            ORDER BY updated_at DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);
