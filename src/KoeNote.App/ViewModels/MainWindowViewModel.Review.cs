@@ -61,8 +61,7 @@ public sealed partial class MainWindowViewModel
         var segment = Segments.FirstOrDefault(item => item.SegmentId == draft.SegmentId);
         if (segment is not null && !EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment))
         {
-            _selectedSegment = segment;
-            OnPropertyChanged(nameof(SelectedSegment));
+            SelectedSegment = segment;
         }
     }
 
@@ -118,12 +117,18 @@ public sealed partial class MainWindowViewModel
         try
         {
             IsReviewOperationInProgress = true;
-            var result = await Task.Run(() => operation(_reviewOperationService, currentDraftId, finalText));
-            ApplyReviewOperationResult(currentDraftId, result);
+            var result = operation(_reviewOperationService, currentDraftId, finalText);
+            ApplyReviewOperationResult(currentDraftId, result, finalText);
+            await Task.CompletedTask;
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
             LatestLog = $"レビュー操作に失敗しました: {exception.Message}";
+            LoadReviewQueue();
+        }
+        catch (Exception exception)
+        {
+            LatestLog = $"Review decision failed unexpectedly: {exception.Message}";
             LoadReviewQueue();
         }
         finally
@@ -132,14 +137,14 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private void ApplyReviewOperationResult(string decidedDraftId, ReviewOperationResult result)
+    private void ApplyReviewOperationResult(string decidedDraftId, ReviewOperationResult result, string selectedSuggestionText)
     {
         var decidedIndex = ReviewQueue.ToList().FindIndex(item => item.DraftId == decidedDraftId);
         var decidedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
         if (decidedDraft is not null)
         {
             ReviewQueue.Remove(decidedDraft);
-            UpdateCorrectionMemory(decidedDraft, result);
+            UpdateCorrectionMemory(decidedDraft, result, selectedSuggestionText);
         }
 
         UpdateSegmentAfterDecision(result);
@@ -161,7 +166,7 @@ public sealed partial class MainWindowViewModel
         SelectedCorrectionDraft = ReviewQueue[nextIndex];
     }
 
-    private void UpdateCorrectionMemory(CorrectionDraft decidedDraft, ReviewOperationResult result)
+    private void UpdateCorrectionMemory(CorrectionDraft decidedDraft, ReviewOperationResult result, string selectedSuggestionText)
     {
         if (string.Equals(result.Action, "rejected", StringComparison.Ordinal))
         {
@@ -178,7 +183,7 @@ public sealed partial class MainWindowViewModel
             {
                 _correctionMemoryService.RememberCorrection(
                     decidedDraft with { Source = "llm", SourceRefId = null },
-                    result.FinalText);
+                    selectedSuggestionText);
             }
 
             return;
@@ -186,7 +191,7 @@ public sealed partial class MainWindowViewModel
 
         if (RememberCorrection && result.FinalText is not null)
         {
-            _correctionMemoryService.RememberCorrection(decidedDraft, result.FinalText);
+            _correctionMemoryService.RememberCorrection(decidedDraft, selectedSuggestionText);
         }
     }
 

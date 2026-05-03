@@ -24,6 +24,35 @@ public sealed class ReviewOperationServiceTests
     }
 
     [Fact]
+    public void AcceptDraft_ReplacesOriginalTextInsideSegment()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "今日は旧サービス名を確認します")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft(
+                "draft-001",
+                "job-001",
+                "segment-001",
+                "wording",
+                "旧サービス名",
+                "KoeNote",
+                "suggestion",
+                0.75)
+        ]);
+
+        var result = new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        Assert.Equal("今日はKoeNoteを確認します", result.FinalText);
+        AssertDraftDecision(paths, "draft-001", "accepted", "accepted", "今日はKoeNoteを確認します", expectedNote: null);
+        AssertSegment(paths, finalText: "今日はKoeNoteを確認します", reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
     public void RejectDraft_LeavesFinalTextUnsetAndRecordsDecision()
     {
         var paths = CreatePaths();
@@ -71,7 +100,7 @@ public sealed class ReviewOperationServiceTests
         InsertJob(paths, "job-001");
         InsertDraftWithoutSegment(paths, "draft-001");
 
-        Assert.Throws<InvalidOperationException>(() => new ReviewOperationService(paths).AcceptDraft("draft-001"));
+        Assert.Throws<KeyNotFoundException>(() => new ReviewOperationService(paths).AcceptDraft("draft-001"));
 
         using var connection = Open(paths);
         using var command = connection.CreateCommand();

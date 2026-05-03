@@ -48,7 +48,8 @@ public sealed class ReviewOperationService(AppPaths paths)
 
         var before = LoadHistorySnapshot(connection, transaction, draft)
             ?? throw new InvalidOperationException($"Transcript segment was not found: {draft.JobId}/{draft.SegmentId}");
-        var finalText = finalTextSelector(draft);
+        var selectedText = finalTextSelector(draft);
+        var finalText = selectedText is null ? null : BuildSegmentFinalText(draft, selectedText);
         UpdateDraftStatus(connection, transaction, draftId, draftStatus);
         var decisionId = UpsertDecision(connection, transaction, draftId, action, finalText, manualNote);
         UpdateSegment(connection, transaction, draft.JobId, draft.SegmentId, finalText);
@@ -82,9 +83,17 @@ public sealed class ReviewOperationService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT job_id, segment_id, original_text, suggested_text, status
-            FROM correction_drafts
-            WHERE draft_id = $draft_id;
+            SELECT
+                d.job_id,
+                d.segment_id,
+                d.original_text,
+                d.suggested_text,
+                d.status,
+                COALESCE(s.final_text, s.normalized_text, s.raw_text)
+            FROM correction_drafts d
+            JOIN transcript_segments s
+                ON s.job_id = d.job_id AND s.segment_id = d.segment_id
+            WHERE d.draft_id = $draft_id;
             """;
         command.Parameters.AddWithValue("$draft_id", draftId);
 
@@ -100,7 +109,20 @@ public sealed class ReviewOperationService(AppPaths paths)
             reader.GetString(1),
             reader.GetString(2),
             reader.GetString(3),
-            reader.GetString(4));
+            reader.GetString(4),
+            reader.GetString(5));
+    }
+
+    private static string BuildSegmentFinalText(DraftSnapshot draft, string selectedText)
+    {
+        if (string.Equals(draft.CurrentSegmentText, draft.OriginalText, StringComparison.Ordinal))
+        {
+            return selectedText;
+        }
+
+        return draft.CurrentSegmentText.Contains(draft.OriginalText, StringComparison.Ordinal)
+            ? draft.CurrentSegmentText.Replace(draft.OriginalText, selectedText, StringComparison.Ordinal)
+            : selectedText;
     }
 
     private static void UpdateDraftStatus(SqliteConnection connection, SqliteTransaction transaction, string draftId, string status)
@@ -306,5 +328,6 @@ public sealed class ReviewOperationService(AppPaths paths)
         string SegmentId,
         string OriginalText,
         string SuggestedText,
-        string Status);
+        string Status,
+        string CurrentSegmentText);
 }

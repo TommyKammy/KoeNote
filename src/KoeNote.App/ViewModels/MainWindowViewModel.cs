@@ -116,9 +116,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         var asrSettings = _asrSettingsRepository.Load();
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
+        FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
+        FilteredJobs.Filter = FilterJob;
+        FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
+        FilteredSegments.Filter = FilterSegment;
         LoadJobs();
         RefreshLogs();
 
+        if (Segments.Count == 0)
+        {
         Segments.Add(new TranscriptSegmentPreview(
             "00:00:00.000",
             "00:00:05.810",
@@ -133,6 +139,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             "この仕様はサーバーのミギワで処理します。",
             "推敲候補あり"));
 
+        }
+
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null && !IsRunInProgress);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
@@ -145,10 +153,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
 
-        FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
-        FilteredJobs.Filter = FilterJob;
-        FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
-        FilteredSegments.Filter = FilterSegment;
         RefreshSpeakerFilters();
     }
 
@@ -233,6 +237,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
                 RefreshLogs();
+                ReloadSegmentsForSelectedJob();
                 LoadReviewQueue();
             }
         }
@@ -243,7 +248,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedSegment;
         set
         {
-            if (SetField(ref _selectedSegment, value) && value is not null)
+            if (!SetField(ref _selectedSegment, value))
+            {
+                return;
+            }
+
+            if (value is null)
+            {
+                SelectedSegmentEditText = string.Empty;
+                SelectedSpeakerAlias = string.Empty;
+                UpdateSegmentEditCommandStates();
+            }
+            else
             {
                 SelectedSegmentEditText = value.Text;
                 SelectedSpeakerAlias = value.Speaker;

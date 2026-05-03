@@ -68,12 +68,15 @@ public sealed partial class MainWindowViewModel
         }
 
         var previews = _transcriptSegmentRepository.ReadPreviews(SelectedJob.JobId);
+        Segments.Clear();
         if (previews.Count == 0)
         {
+            SelectedSegment = null;
+            RefreshSpeakerFilters();
+            FilteredSegments.Refresh();
             return;
         }
 
-        Segments.Clear();
         foreach (var preview in previews)
         {
             Segments.Add(preview);

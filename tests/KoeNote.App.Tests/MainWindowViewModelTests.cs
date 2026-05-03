@@ -5,6 +5,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
 using KoeNote.App.ViewModels;
+using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -84,14 +85,65 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("draft-001", viewModel.SelectedCorrectionDraftId);
         Assert.Equal("1 / 2", viewModel.DraftPositionText);
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(viewModel.SelectedSegment?.Text, viewModel.SelectedSegmentEditText);
+        Assert.True(viewModel.AcceptDraftCommand.CanExecute(null));
 
         viewModel.AcceptDraftCommand.Execute(null);
         Assert.False(viewModel.SelectNextDraftCommand.CanExecute(null));
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        for (var i = 0; i < 20 && viewModel.SelectedCorrectionDraftId == "draft-001"; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
 
-        Assert.Equal("draft-002", viewModel.SelectedCorrectionDraftId);
+        Assert.True(
+            viewModel.SelectedCorrectionDraftId == "draft-002",
+            $"Expected draft-002 but was {viewModel.SelectedCorrectionDraftId}. InProgress: {viewModel.IsReviewOperationInProgress}. LatestLog: {viewModel.LatestLog}");
         Assert.Equal("1 / 1", viewModel.DraftPositionText);
-        Assert.Equal(1, viewModel.SelectedJobUnreviewedDrafts);
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(viewModel.SelectedSegment?.Text, viewModel.SelectedSegmentEditText);
+        Assert.True(
+            viewModel.SelectedJobUnreviewedDrafts == 1,
+            $"Expected one pending draft but saw {viewModel.SelectedJobUnreviewedDrafts}. LatestLog: {viewModel.LatestLog}");
+    }
+
+    [Fact]
+    public async Task AcceptDraft_RemembersSuggestedFragmentInsteadOfWholeSegment()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "今日は旧サービス名を確認します")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "旧サービス名", "KoeNote", "suggestion", 0.8)
+        ]);
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.AcceptDraftCommand.Execute(null);
+        for (var i = 0; i < 20 && viewModel.SelectedCorrectionDraftId == "draft-001"; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT wrong_text, correct_text
+            FROM correction_memory;
+            """;
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("旧サービス名", reader.GetString(0));
+        Assert.Equal("KoeNote", reader.GetString(1));
     }
 
     private static MainWindowViewModel CreateViewModel()
