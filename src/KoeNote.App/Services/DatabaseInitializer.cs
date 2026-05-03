@@ -106,6 +106,14 @@ public sealed class DatabaseInitializer(AppPaths paths)
             );
             """);
         Execute(connection, """
+            CREATE TABLE IF NOT EXISTS asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
+            );
+            """);
+        Execute(connection, """
             INSERT OR IGNORE INTO schema_version (version, applied_at)
             VALUES (1, datetime('now'));
             """);

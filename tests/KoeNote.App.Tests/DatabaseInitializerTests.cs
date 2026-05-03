@@ -32,6 +32,7 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("review_decisions", tables);
         Assert.Contains("stage_progress", tables);
         Assert.Contains("job_log_events", tables);
+        Assert.Contains("asr_settings", tables);
     }
 
     private static string CreateTempDirectory()

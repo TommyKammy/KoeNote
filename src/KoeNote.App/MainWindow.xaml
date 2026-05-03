@@ -233,9 +233,9 @@
                                 <TextBlock Text="未レビュー候補" Style="{StaticResource MutedText}" />
                                 <TextBlock Text="{Binding SelectedJobUnreviewedDrafts}" Margin="0,4,0,12" />
                                 <TextBlock Text="Context" Style="{StaticResource MutedText}" />
-                                <TextBox MinHeight="66" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,12" />
+                                <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}" MinHeight="66" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,12" />
                                 <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
-                                <TextBox MinHeight="32" Margin="0,4,0,0" />
+                                <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,0" />
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

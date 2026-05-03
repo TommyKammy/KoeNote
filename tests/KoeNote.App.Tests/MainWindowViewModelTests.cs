@@ -42,6 +42,23 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("サーバー", segment.Text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AsrSettings_RestoreAfterRecreatingViewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        var first = new MainWindowViewModel(paths)
+        {
+            AsrContextText = "製品開発会議",
+            AsrHotwordsText = "KoeNote\r\nRTX 3060"
+        };
+
+        var second = new MainWindowViewModel(paths);
+
+        Assert.Equal(first.AsrContextText, second.AsrContextText);
+        Assert.Equal(first.AsrHotwordsText, second.AsrHotwordsText);
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

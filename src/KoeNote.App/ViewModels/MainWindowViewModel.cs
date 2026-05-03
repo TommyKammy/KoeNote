@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
     private readonly StageProgressRepository _stageProgressRepository;
+    private readonly AsrSettingsRepository _asrSettingsRepository;
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
     private readonly AsrWorker _asrWorker;
     private readonly ReviewWorker _reviewWorker;
@@ -28,6 +29,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private string _selectedSpeakerFilter = "全話者";
+    private string _asrContextText = string.Empty;
+    private string _asrHotwordsText = string.Empty;
     private bool _isRunInProgress;
     private string _reviewIssueType = "意味不明語の疑い";
     private string _originalText = "この仕様はサーバーのミギワで処理します。";
@@ -51,6 +54,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _jobRepository = new JobRepository(Paths);
         _stageProgressRepository = new StageProgressRepository(Paths);
         _jobLogRepository = new JobLogRepository(Paths);
+        _asrSettingsRepository = new AsrSettingsRepository(Paths);
         var processRunner = new ExternalProcessRunner();
         _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
         _asrWorker = new AsrWorker(
@@ -79,6 +83,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
+        var asrSettings = _asrSettingsRepository.Load();
+        _asrContextText = asrSettings.ContextText;
+        _asrHotwordsText = asrSettings.HotwordsText;
         LoadJobs();
         RefreshLogs();
 
@@ -224,6 +231,30 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 {
                     runCommand.RaiseCanExecuteChanged();
                 }
+            }
+        }
+    }
+
+    public string AsrContextText
+    {
+        get => _asrContextText;
+        set
+        {
+            if (SetField(ref _asrContextText, value))
+            {
+                SaveAsrSettings();
+            }
+        }
+    }
+
+    public string AsrHotwordsText
+    {
+        get => _asrHotwordsText;
+        set
+        {
+            if (SetField(ref _asrHotwordsText, value))
+            {
+                SaveAsrSettings();
             }
         }
     }
@@ -384,12 +415,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "asr");
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText);
             var result = await _asrWorker.RunAsync(new AsrRunOptions(
                 job.JobId,
                 normalizedAudioPath,
                 Paths.CrispAsrPath,
                 Paths.VibeVoiceAsrModelPath,
                 outputDirectory,
+                asrSettings.Hotwords,
+                string.IsNullOrWhiteSpace(asrSettings.ContextText) ? null : asrSettings.ContextText,
                 Timeout: TimeSpan.FromHours(2)),
                 cancellationToken);
 
@@ -620,6 +654,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _runCancellation?.Cancel();
         LatestLog = "キャンセルを要求しました。";
         return Task.CompletedTask;
+    }
+
+    private void SaveAsrSettings()
+    {
+        _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText));
     }
 
     private void UpdateSegmentReviewStates(IReadOnlyList<CorrectionDraft> drafts)
