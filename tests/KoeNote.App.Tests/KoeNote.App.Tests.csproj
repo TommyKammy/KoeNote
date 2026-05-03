@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\KoeNote.App\KoeNote.App.csproj" />
+    <ProjectReference Include="..\..\src\KoeNote.EvalBench\KoeNote.EvalBench.csproj" />
   </ItemGroup>
 
   <ItemGroup>

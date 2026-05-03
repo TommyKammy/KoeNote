@@ -16,50 +16,141 @@
                         <ComboBox Grid.Column="3" ItemsSource="{Binding SpeakerFilters}" SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}" Margin="8,0,0,10" MinHeight="34" />
                     </Grid>
 
-                    <Border DockPanel.Dock="Bottom" Background="#FAFBFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,14,0,0">
+                    <Border DockPanel.Dock="Bottom" Background="#FAFBFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,14,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Button Padding="9,7" MinWidth="0">
-                                <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" />
-                            </Button>
-                            <Button Grid.Column="1" Padding="9,7" MinWidth="0" Margin="4,0,12,0">
-                                <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" />
-                            </Button>
-                            <Grid Grid.Column="2" VerticalAlignment="Center" Height="34">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Width="5" Height="14" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="5" Height="24" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="2" Width="5" Height="18" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="3" Width="5" Height="30" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="4" Width="5" Height="20" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="5" Width="5" Height="28" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="6" Width="5" Height="16" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="7" Width="5" Height="26" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="8" Width="5" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
-                                <Border Grid.Column="9" Width="5" Height="22" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
-                                <Slider VerticalAlignment="Bottom" Minimum="0" Maximum="100" Value="35" Margin="0,26,0,0" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <Button Padding="7,6" MinWidth="0" ToolTip="前へ">
+                                    <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" />
+                                </Button>
+                                <Button Padding="10,7" MinWidth="0" Margin="3,0" Background="{StaticResource AccentLightBrush}" ToolTip="再生 / 一時停止">
+                                    <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource AccentBrush}" />
+                                </Button>
+                                <Button Padding="7,6" MinWidth="0" ToolTip="次へ">
+                                    <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" />
+                                </Button>
+                                <ComboBox Width="66" MinHeight="30" Margin="6,0,0,0" SelectedIndex="0">
+                                    <ComboBoxItem Content="1.0x" />
+                                    <ComboBoxItem Content="1.25x" />
+                                    <ComboBoxItem Content="1.5x" />
+                                    <ComboBoxItem Content="2.0x" />
+                                </ComboBox>
+                            </StackPanel>
+
+                            <Grid Grid.Column="1" VerticalAlignment="Center" MinWidth="180">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <UniformGrid Rows="1" Columns="28" Height="30" VerticalAlignment="Center" Margin="0,0,0,2">
+                                    <Border Width="4" Height="10" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="18" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="14" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="24" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="16" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="28" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="22" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="9" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="20" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="26" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="15" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="23" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="29" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="18" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="11" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="21" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="14" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="25" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="17" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="10" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="23" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="13" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="27" Background="#2F8F5B" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="16" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
+                                    <Border Width="4" Height="20" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
+                                </UniformGrid>
+                                <Slider Grid.Row="1" Minimum="0" Maximum="100" Value="35" />
                             </Grid>
-                            <TextBlock Grid.Column="3" Text="00:03:21 / 00:10:00" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="14,0,0,0" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                <TextBlock Text="00:00:17.350 / 01:12:34" Style="{StaticResource MutedText}" VerticalAlignment="Center" FontSize="11" />
+                                <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" FontSize="15" VerticalAlignment="Center" Margin="9,0,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border DockPanel.Dock="Bottom" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="選択セグメントを手修正" Style="{StaticResource MutedText}" />
+                                <TextBox Text="{Binding SelectedSegmentEditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         TextWrapping="Wrap"
+                                         MinHeight="44"
+                                         Margin="0,5,0,0"
+                                         ToolTip="元の文字起こしは残ります。出力には、ここで保存した文章が使われます。" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="話者名" Style="{StaticResource MutedText}" />
+                                <TextBox Text="{Binding SelectedSpeakerAlias, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         MinHeight="34"
+                                         Margin="0,5,0,0"
+                                         ToolTip="同じ話者 ID の表示名として保存します。" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="10,0,0,0">
+                                <Button Style="{StaticResource OutlineNeutralButton}" Padding="12,9" Command="{Binding SaveSegmentEditCommand}" ToolTip="本文を final_text として保存">
+                                    <TextBlock Text="本文保存" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Style="{StaticResource OutlineNeutralButton}" Padding="12,9" Command="{Binding SaveSpeakerAliasCommand}" Margin="6,0,0,0" ToolTip="話者表示名を保存">
+                                    <TextBlock Text="話者保存" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Padding="10,9" Command="{Binding UndoLastOperationCommand}" Margin="6,0,0,0" ToolTip="直前のレビュー/編集/話者変更を取り消す">
+                                    <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" />
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.ColumnSpan="4"
+                                       Text="元の文字起こしは残ります。出力には、ここで保存した文章が使われます。"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="11"
+                                       Margin="0,8,0,0" />
+                        </Grid>
+                    </Border>
+
+                    <Border DockPanel.Dock="Top" Background="#FAFBFC" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,8" Margin="0,0,0,2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="92" />
+                                <ColumnDefinition Width="96" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="時間" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="話者" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="発話内容" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
                         </Grid>
                     </Border>
 
                     <ListBox ItemsSource="{Binding FilteredSegments}"
+                             SelectedItem="{Binding SelectedSegment, Mode=TwoWay}"
                              Style="{StaticResource CardListBox}"
                              ItemContainerStyle="{StaticResource SegmentListBoxItem}">
                         <ListBox.ItemTemplate>

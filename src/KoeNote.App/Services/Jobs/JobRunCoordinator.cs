@@ -13,7 +13,8 @@ public sealed class JobRunCoordinator(
     JobLogRepository jobLogRepository,
     AudioPreprocessWorker audioPreprocessWorker,
     AsrWorker asrWorker,
-    ReviewWorker reviewWorker)
+    ReviewWorker reviewWorker,
+    CorrectionMemoryService correctionMemoryService)
 {
     public async Task RunAsync(
         JobSummary job,
@@ -68,6 +69,7 @@ public sealed class JobRunCoordinator(
 
         try
         {
+            var effectiveAsrSettings = correctionMemoryService.EnrichAsrSettings(asrSettings);
             var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
             var result = await asrWorker.RunAsync(new AsrRunOptions(
                 job.JobId,
@@ -75,8 +77,8 @@ public sealed class JobRunCoordinator(
                 paths.CrispAsrPath,
                 paths.VibeVoiceAsrModelPath,
                 outputDirectory,
-                asrSettings.Hotwords,
-                string.IsNullOrWhiteSpace(asrSettings.ContextText) ? null : asrSettings.ContextText,
+                effectiveAsrSettings.Hotwords,
+                string.IsNullOrWhiteSpace(effectiveAsrSettings.ContextText) ? null : effectiveAsrSettings.ContextText,
                 Timeout: TimeSpan.FromHours(2)),
                 cancellationToken);
 

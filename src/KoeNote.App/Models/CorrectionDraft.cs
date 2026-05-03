@@ -10,4 +10,6 @@ public sealed record CorrectionDraft(
     string Reason,
     double Confidence,
     string Status = "pending",
-    DateTimeOffset? CreatedAt = null);
+    DateTimeOffset? CreatedAt = null,
+    string Source = "llm",
+    string? SourceRefId = null);

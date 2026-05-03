@@ -18,61 +18,92 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
-                                    <Grid Height="36">
+                                    <Grid Height="48">
                                         <Border Height="2" Background="{StaticResource BorderBrushSoft}" VerticalAlignment="Center" Margin="0" />
-                                        <Border HorizontalAlignment="Center">
+                                        <Border HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
                                             <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource PanelBorder}">
-                                                    <Setter Property="CornerRadius" Value="15" />
-                                                    <Setter Property="Width" Value="30" />
-                                                    <Setter Property="Height" Value="30" />
+                                                <Style TargetType="Border">
+                                                    <Setter Property="CornerRadius" Value="20" />
+                                                    <Setter Property="Width" Value="40" />
+                                                    <Setter Property="Height" Value="40" />
                                                     <Setter Property="BorderThickness" Value="2" />
                                                     <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
                                                     <Setter Property="Background" Value="#FFFFFF" />
+                                                    <Setter Property="Opacity" Value="0.72" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
-                                                            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                            <Setter Property="Background" Value="{Binding IconStroke}" />
+                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
+                                                            <Setter Property="Opacity" Value="1" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
-                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                            <Setter Property="Background" Value="{Binding IconSoftBackground}" />
+                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
+                                                            <Setter Property="Opacity" Value="1" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
-                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                            <Setter Property="Background" Value="{Binding IconSoftBackground}" />
+                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
+                                                            <Setter Property="Opacity" Value="1" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
-                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                            <Setter Property="Background" Value="{Binding IconSoftBackground}" />
+                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
+                                                            <Setter Property="Opacity" Value="1" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
-                                            <TextBlock Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
-                                                                <Setter Property="Foreground" Value="#FFFFFF" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
+                                            <Grid Width="40"
+                                                  Height="40"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center">
+                                                <Border Margin="4"
+                                                        CornerRadius="16"
+                                                        BorderThickness="1"
+                                                        BorderBrush="#33FFFFFF"
+                                                        Background="#22FFFFFF" />
+                                                <Viewbox Width="22" Height="22" Stretch="Uniform"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center">
+                                                    <Grid Width="24" Height="24">
+                                                        <Path Data="{Binding IconPathData}"
+                                                              Stretch="None"
+                                                              StrokeThickness="1.75"
+                                                              StrokeStartLineCap="Round"
+                                                              StrokeEndLineCap="Round"
+                                                              StrokeLineJoin="Round"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center">
+                                                            <Path.Style>
+                                                                <Style TargetType="Path">
+                                                                    <Setter Property="Stroke" Value="{Binding IconStroke}" />
+                                                                    <Setter Property="Opacity" Value="0.75" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
+                                                                            <Setter Property="Stroke" Value="#FFFFFF" />
+                                                                            <Setter Property="Opacity" Value="1" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
+                                                                            <Setter Property="Opacity" Value="1" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
+                                                                            <Setter Property="Opacity" Value="1" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
+                                                                            <Setter Property="Opacity" Value="1" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Path.Style>
+                                                        </Path>
+                                                    </Grid>
+                                                </Viewbox>
+                                            </Grid>
                                         </Border>
                                     </Grid>
-                                    <TextBlock Grid.Row="1" Text="{Binding Name}" TextAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="0,7,0,2" />
+                                    <TextBlock Grid.Row="1" Text="{Binding Name}" TextAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="0,5,0,2" />
                                     <TextBlock Grid.Row="2" Text="{Binding Status}" TextAlignment="Center" Style="{StaticResource MutedText}" />
                                 </Grid>
                             </DataTemplate>

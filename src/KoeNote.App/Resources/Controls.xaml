@@ -91,6 +91,14 @@
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
+    <Style x:Key="OutlineNeutralButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style TargetType="TextBox">
         <Setter Property="Background" Value="#FFFFFF" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />

@@ -20,19 +20,31 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly StageProgressRepository _stageProgressRepository;
     private readonly AsrSettingsRepository _asrSettingsRepository;
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
+    private readonly TranscriptSegmentRepository _transcriptSegmentRepository;
     private readonly AsrWorker _asrWorker;
     private readonly ReviewWorker _reviewWorker;
     private readonly JobRunCoordinator _jobRunCoordinator;
+    private readonly CorrectionDraftRepository _correctionDraftRepository;
+    private readonly ReviewOperationService _reviewOperationService;
+    private readonly TranscriptEditService _transcriptEditService;
+    private readonly CorrectionMemoryService _correctionMemoryService;
+    private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfo _statusBarInfo;
     private JobSummary? _selectedJob;
+    private TranscriptSegmentPreview? _selectedSegment;
+    private CorrectionDraft? _selectedCorrectionDraft;
     private CancellationTokenSource? _runCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
+    private bool _isReviewOperationInProgress;
+    private bool _rememberCorrection = true;
     private string _latestLog;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private string _selectedSpeakerFilter = "全話者";
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
+    private string _selectedSegmentEditText = string.Empty;
+    private string _selectedSpeakerAlias = string.Empty;
     private bool _isRunInProgress;
     private string _reviewIssueType = "意味不明語の疑い";
     private string _originalText = "この仕様はサーバーのミギワで処理します。";
@@ -57,6 +69,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _stageProgressRepository = new StageProgressRepository(Paths);
         _jobLogRepository = new JobLogRepository(Paths);
         _asrSettingsRepository = new AsrSettingsRepository(Paths);
+        _correctionDraftRepository = new CorrectionDraftRepository(Paths);
+        _reviewOperationService = new ReviewOperationService(Paths);
+        _transcriptEditService = new TranscriptEditService(Paths);
+        _correctionMemoryService = new CorrectionMemoryService(Paths);
+        _transcriptSegmentRepository = new TranscriptSegmentRepository(Paths);
         var processRunner = new ExternalProcessRunner();
         _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
         _asrWorker = new AsrWorker(
@@ -64,14 +81,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             new AsrCommandBuilder(),
             new AsrJsonNormalizer(),
             new AsrResultStore(),
-            new TranscriptSegmentRepository(Paths));
+            _transcriptSegmentRepository);
         _reviewWorker = new ReviewWorker(
             processRunner,
             new ReviewCommandBuilder(),
             new ReviewPromptBuilder(),
             new ReviewJsonNormalizer(),
             new ReviewResultStore(),
-            new CorrectionDraftRepository(Paths));
+            new CorrectionDraftRepository(Paths),
+            _correctionMemoryService);
         _jobRunCoordinator = new JobRunCoordinator(
             Paths,
             _jobRepository,
@@ -79,7 +97,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             _jobLogRepository,
             _audioPreprocessWorker,
             _asrWorker,
-            _reviewWorker);
+            _reviewWorker,
+            _correctionMemoryService);
         _statusBarInfo = new StatusBarInfoService(Paths).GetStatusBarInfo();
 
         var toolStatus = new ToolStatusService(Paths);
@@ -88,9 +107,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             EnvironmentStatus.Add(item);
         }
 
-        foreach (var stageName in new[] { "音声変換", "ASR", "推敲", "レビュー", "出力" })
+        foreach (var stageStatus in CreateStageStatuses())
         {
-            StageStatuses.Add(new StageStatus(stageName));
+            StageStatuses.Add(stageStatus);
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
@@ -117,6 +136,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null && !IsRunInProgress);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
+        AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
+        RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
+        ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
+        SelectPreviousDraftCommand = new RelayCommand(SelectPreviousDraftAsync, CanSelectPreviousDraft);
+        SelectNextDraftCommand = new RelayCommand(SelectNextDraftAsync, CanSelectNextDraft);
+        SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
+        SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
+        UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
 
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
@@ -157,6 +184,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<JobLogEntry> Logs { get; } = [];
 
+    public ObservableCollection<CorrectionDraft> ReviewQueue { get; } = [];
+
+    public ObservableCollection<DiffToken> DiffTokens { get; } = [];
+
     public ObservableCollection<string> SpeakerFilters { get; } = ["全話者"];
 
     public ICollectionView FilteredJobs { get; }
@@ -168,6 +199,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunSelectedJobCommand { get; }
 
     public ICommand CancelCommand { get; }
+
+    public ICommand AcceptDraftCommand { get; }
+
+    public ICommand RejectDraftCommand { get; }
+
+    public ICommand ApplyManualEditCommand { get; }
+
+    public ICommand SelectPreviousDraftCommand { get; }
+
+    public ICommand SelectNextDraftCommand { get; }
+
+    public ICommand SaveSegmentEditCommand { get; }
+
+    public ICommand SaveSpeakerAliasCommand { get; }
+
+    public ICommand UndoLastOperationCommand { get; }
 
     public JobSummary? SelectedJob
     {
@@ -186,7 +233,75 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
                 RefreshLogs();
+                LoadReviewQueue();
             }
+        }
+    }
+
+    public TranscriptSegmentPreview? SelectedSegment
+    {
+        get => _selectedSegment;
+        set
+        {
+            if (SetField(ref _selectedSegment, value) && value is not null)
+            {
+                SelectedSegmentEditText = value.Text;
+                SelectedSpeakerAlias = value.Speaker;
+                SelectFirstDraftForSegment(value.SegmentId);
+                UpdateSegmentEditCommandStates();
+            }
+        }
+    }
+
+    public CorrectionDraft? SelectedCorrectionDraft
+    {
+        get => _selectedCorrectionDraft;
+        set
+        {
+            if (SetField(ref _selectedCorrectionDraft, value))
+            {
+                ApplySelectedDraftToReviewPane();
+            }
+        }
+    }
+
+    public string SelectedCorrectionDraftId => SelectedCorrectionDraft?.DraftId ?? string.Empty;
+
+    public string SelectedSegmentEditText
+    {
+        get => _selectedSegmentEditText;
+        set
+        {
+            if (SetField(ref _selectedSegmentEditText, value ?? string.Empty))
+            {
+                UpdateSegmentEditCommandStates();
+            }
+        }
+    }
+
+    public string SelectedSpeakerAlias
+    {
+        get => _selectedSpeakerAlias;
+        set
+        {
+            if (SetField(ref _selectedSpeakerAlias, value ?? string.Empty))
+            {
+                UpdateSegmentEditCommandStates();
+            }
+        }
+    }
+
+    public string DraftPositionText
+    {
+        get
+        {
+            if (SelectedCorrectionDraft is null || ReviewQueue.Count == 0)
+            {
+                return "0 / 0";
+            }
+
+            var index = ReviewQueue.IndexOf(SelectedCorrectionDraft);
+            return index < 0 ? "0 / 0" : $"{index + 1} / {ReviewQueue.Count}";
         }
     }
 
@@ -252,8 +367,29 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 {
                     runCommand.RaiseCanExecuteChanged();
                 }
+
+                UpdateReviewCommandStates();
+                UpdateSegmentEditCommandStates();
             }
         }
+    }
+
+    public bool IsReviewOperationInProgress
+    {
+        get => _isReviewOperationInProgress;
+        private set
+        {
+            if (SetField(ref _isReviewOperationInProgress, value))
+            {
+                UpdateReviewCommandStates();
+            }
+        }
+    }
+
+    public bool RememberCorrection
+    {
+        get => _rememberCorrection;
+        set => SetField(ref _rememberCorrection, value);
     }
 
     public string AsrContextText
@@ -289,13 +425,25 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string OriginalText
     {
         get => _originalText;
-        private set => SetField(ref _originalText, value);
+        private set
+        {
+            if (SetField(ref _originalText, value))
+            {
+                RefreshDiffTokens();
+            }
+        }
     }
 
     public string SuggestedText
     {
         get => _suggestedText;
-        private set => SetField(ref _suggestedText, value);
+        set
+        {
+            if (SetField(ref _suggestedText, value))
+            {
+                RefreshDiffTokens();
+            }
+        }
     }
 
     public string ReviewReason
@@ -319,6 +467,39 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static IEnumerable<StageStatus> CreateStageStatuses()
+    {
+        yield return new StageStatus(
+            "音声変換",
+            "M4,12 C5.1,12 5.1,7 6.2,7 C7.4,7 7.3,17 8.5,17 C9.7,17 9.7,9 10.9,9 C12.1,9 12.1,15 13.3,15 C14.5,15 14.5,10 15.7,10 C16.9,10 16.9,14 18.1,14 C19.1,14 19.3,12 20,12 M4,5 L7,5 M5.5,3.5 L5.5,6.5 M17,5 L20,5 M18.5,3.5 L18.5,6.5",
+            "#2F8F5B",
+            "#EAF6EF");
+
+        yield return new StageStatus(
+            "ASR",
+            "M8,6 C8,3.8 9.8,2.5 12,2.5 C14.2,2.5 16,3.8 16,6 L16,11 C16,13.2 14.2,14.5 12,14.5 C9.8,14.5 8,13.2 8,11 Z M5.5,10 C5.5,14 8.2,17 12,17 C15.8,17 18.5,14 18.5,10 M12,17 L12,21 M9,21 L15,21",
+            "#2563EB",
+            "#EFF6FF");
+
+        yield return new StageStatus(
+            "推敲",
+            "M5,16.5 L4,20 L7.5,19 L17.8,8.7 C18.6,7.9 18.6,6.7 17.8,5.9 L16.1,4.2 C15.3,3.4 14.1,3.4 13.3,4.2 Z M12.5,5 L17,9.5 M17.5,15 L20,15 M18.75,13.75 L18.75,16.25 M6.5,6.5 L8.5,6.5 M7.5,5.5 L7.5,7.5",
+            "#7C3AED",
+            "#F3E8FF");
+
+        yield return new StageStatus(
+            "レビュー",
+            "M6,3.5 L15,3.5 L19,7.5 L19,20.5 L6,20.5 Z M15,3.5 L15,7.5 L19,7.5 M8.5,13 L11,15.5 L15.8,10.7 M8.5,18 L15.5,18",
+            "#D97706",
+            "#FEF3C7");
+
+        yield return new StageStatus(
+            "出力",
+            "M5,5 L13.5,5 M13.5,5 L13.5,9.5 M13.5,5 L4.5,14 M8,10 L8,20 L20,20 L20,8 L16,8 M13,15 L17,15 M17,15 L15,13 M17,15 L15,17",
+            "#0F766E",
+            "#CCFBF1");
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

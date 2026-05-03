@@ -11,7 +11,7 @@ public sealed class ReviewOperationService(AppPaths paths)
 
     public ReviewOperationResult RejectDraft(string draftId)
     {
-        return Decide(draftId, "rejected", "rejected", static draft => draft.OriginalText, null);
+        return Decide(draftId, "rejected", "rejected", static _ => null, null);
     }
 
     public ReviewOperationResult ApplyManualEdit(string draftId, string finalText, string? manualNote = null)
@@ -28,7 +28,7 @@ public sealed class ReviewOperationService(AppPaths paths)
         string draftId,
         string draftStatus,
         string action,
-        Func<DraftSnapshot, string> finalTextSelector,
+        Func<DraftSnapshot, string?> finalTextSelector,
         string? manualNote)
     {
         if (string.IsNullOrWhiteSpace(draftId))
@@ -46,11 +46,25 @@ public sealed class ReviewOperationService(AppPaths paths)
             throw new InvalidOperationException($"Correction draft has already been decided: {draftId}");
         }
 
+        var before = LoadHistorySnapshot(connection, transaction, draft)
+            ?? throw new InvalidOperationException($"Transcript segment was not found: {draft.JobId}/{draft.SegmentId}");
         var finalText = finalTextSelector(draft);
         UpdateDraftStatus(connection, transaction, draftId, draftStatus);
-        UpsertDecision(connection, transaction, draftId, action, finalText, manualNote);
+        var decisionId = UpsertDecision(connection, transaction, draftId, action, finalText, manualNote);
         UpdateSegment(connection, transaction, draft.JobId, draft.SegmentId, finalText);
         RefreshJobPendingCount(connection, transaction, draft.JobId);
+        var afterSnapshot = LoadHistorySnapshot(connection, transaction, draft)
+            ?? throw new InvalidOperationException($"Transcript segment was not found after review operation: {draft.JobId}/{draft.SegmentId}");
+        var after = afterSnapshot with { DecisionId = decisionId };
+        TranscriptEditService.InsertHistory(
+            connection,
+            transaction,
+            draft.JobId,
+            draftId,
+            draft.SegmentId,
+            "review_decision",
+            before,
+            after);
 
         transaction.Commit();
 
@@ -81,6 +95,7 @@ public sealed class ReviewOperationService(AppPaths paths)
         }
 
         return new DraftSnapshot(
+            draftId,
             reader.GetString(0),
             reader.GetString(1),
             reader.GetString(2),
@@ -106,12 +121,12 @@ public sealed class ReviewOperationService(AppPaths paths)
         }
     }
 
-    private static void UpsertDecision(
+    private static string UpsertDecision(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string draftId,
         string action,
-        string finalText,
+        string? finalText,
         string? manualNote)
     {
         using var command = connection.CreateCommand();
@@ -134,10 +149,11 @@ public sealed class ReviewOperationService(AppPaths paths)
                 $decided_at
             );
             """;
-        command.Parameters.AddWithValue("$decision_id", Guid.NewGuid().ToString("N"));
+        var decisionId = Guid.NewGuid().ToString("N");
+        command.Parameters.AddWithValue("$decision_id", decisionId);
         command.Parameters.AddWithValue("$draft_id", draftId);
         command.Parameters.AddWithValue("$action", action);
-        command.Parameters.AddWithValue("$final_text", finalText);
+        command.Parameters.AddWithValue("$final_text", (object?)finalText ?? DBNull.Value);
         command.Parameters.AddWithValue("$manual_note", (object?)manualNote ?? DBNull.Value);
         command.Parameters.AddWithValue("$decided_at", DateTimeOffset.Now.ToString("o"));
         var updated = command.ExecuteNonQuery();
@@ -145,6 +161,8 @@ public sealed class ReviewOperationService(AppPaths paths)
         {
             throw new InvalidOperationException($"Review decision could not be recorded: {draftId}");
         }
+
+        return decisionId;
     }
 
     private static void UpdateSegment(
@@ -152,28 +170,46 @@ public sealed class ReviewOperationService(AppPaths paths)
         SqliteTransaction transaction,
         string jobId,
         string segmentId,
-        string finalText)
+        string? finalText)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE transcript_segments
-            SET final_text = $final_text,
-                review_state = CASE
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM correction_drafts
-                        WHERE job_id = $job_id
-                            AND segment_id = $segment_id
-                            AND status = 'pending'
-                    ) THEN 'has_draft'
-                    ELSE 'reviewed'
-                END
-            WHERE job_id = $job_id AND segment_id = $segment_id;
-            """;
+        command.CommandText = finalText is null
+            ? """
+              UPDATE transcript_segments
+              SET review_state = CASE
+                      WHEN EXISTS (
+                          SELECT 1
+                          FROM correction_drafts
+                          WHERE job_id = $job_id
+                              AND segment_id = $segment_id
+                              AND status = 'pending'
+                      ) THEN 'has_draft'
+                      ELSE 'reviewed'
+                  END
+              WHERE job_id = $job_id AND segment_id = $segment_id;
+              """
+            : """
+              UPDATE transcript_segments
+              SET final_text = $final_text,
+                  review_state = CASE
+                      WHEN EXISTS (
+                          SELECT 1
+                          FROM correction_drafts
+                          WHERE job_id = $job_id
+                              AND segment_id = $segment_id
+                              AND status = 'pending'
+                      ) THEN 'has_draft'
+                      ELSE 'reviewed'
+                  END
+              WHERE job_id = $job_id AND segment_id = $segment_id;
+              """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$segment_id", segmentId);
-        command.Parameters.AddWithValue("$final_text", finalText);
+        if (finalText is not null)
+        {
+            command.Parameters.AddWithValue("$final_text", finalText);
+        }
         var updated = command.ExecuteNonQuery();
         if (updated != 1)
         {
@@ -216,6 +252,44 @@ public sealed class ReviewOperationService(AppPaths paths)
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
+    private static TranscriptEditService.ReviewDecisionHistorySnapshot? LoadHistorySnapshot(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        DraftSnapshot draft)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+                d.status,
+                s.final_text,
+                s.review_state,
+                j.unreviewed_draft_count
+            FROM correction_drafts d
+            JOIN transcript_segments s
+                ON s.job_id = d.job_id AND s.segment_id = d.segment_id
+            JOIN jobs j
+                ON j.job_id = d.job_id
+            WHERE d.draft_id = $draft_id;
+            """;
+        command.Parameters.AddWithValue("$draft_id", draft.DraftId);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        return new TranscriptEditService.ReviewDecisionHistorySnapshot(
+            draft.JobId,
+            draft.SegmentId,
+            draft.DraftId,
+            reader.GetString(0),
+            reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt32(3));
+    }
+
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
@@ -227,6 +301,7 @@ public sealed class ReviewOperationService(AppPaths paths)
     }
 
     private sealed record DraftSnapshot(
+        string DraftId,
         string JobId,
         string SegmentId,
         string OriginalText,

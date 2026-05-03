@@ -7,7 +7,9 @@ public sealed class DatabaseInitializer(AppPaths paths)
     private static readonly IReadOnlyList<DatabaseMigration> Migrations =
     [
         new(1, ApplyInitialSchema),
-        new(2, ApplyStatusAndAsrSettingsSchema)
+        new(2, ApplyStatusAndAsrSettingsSchema),
+        new(3, ApplyEditingAndUndoSchema),
+        new(4, ApplyCorrectionMemorySchema)
     ];
 
     public void EnsureCreated()
@@ -163,6 +165,87 @@ public sealed class DatabaseInitializer(AppPaths paths)
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    private static void ApplyEditingAndUndoSchema(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS speaker_aliases (
+                job_id TEXT NOT NULL,
+                speaker_id TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (job_id, speaker_id)
+            );
+            """);
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS review_operation_history (
+                operation_id TEXT NOT NULL PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                draft_id TEXT,
+                segment_id TEXT,
+                operation_type TEXT NOT NULL,
+                before_json TEXT NOT NULL,
+                after_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    private static void ApplyCorrectionMemorySchema(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        AddColumnIfMissing(connection, transaction, "correction_drafts", "source", "TEXT NOT NULL DEFAULT 'llm'");
+        AddColumnIfMissing(connection, transaction, "correction_drafts", "source_ref_id", "TEXT");
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS user_terms (
+                term_id TEXT NOT NULL PRIMARY KEY,
+                surface TEXT NOT NULL,
+                reading TEXT,
+                category TEXT NOT NULL DEFAULT 'general',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        Execute(connection, transaction, """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_terms_surface_category
+            ON user_terms(surface, category);
+            """);
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS correction_memory (
+                memory_id TEXT NOT NULL PRIMARY KEY,
+                wrong_text TEXT NOT NULL,
+                correct_text TEXT NOT NULL,
+                issue_type TEXT NOT NULL,
+                scope TEXT NOT NULL DEFAULT 'global',
+                accepted_count INTEGER NOT NULL DEFAULT 1,
+                rejected_count INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        Execute(connection, transaction, """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_correction_memory_pair_scope
+            ON correction_memory(wrong_text, correct_text, scope);
+            """);
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS correction_memory_events (
+                event_id TEXT NOT NULL PRIMARY KEY,
+                memory_id TEXT,
+                draft_id TEXT,
+                job_id TEXT NOT NULL,
+                segment_id TEXT,
+                event_type TEXT NOT NULL,
+                created_at TEXT NOT NULL
             );
             """);
     }

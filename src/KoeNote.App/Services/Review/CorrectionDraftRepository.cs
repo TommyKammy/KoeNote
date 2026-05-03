@@ -5,6 +5,47 @@ namespace KoeNote.App.Services.Review;
 
 public sealed class CorrectionDraftRepository(AppPaths paths)
 {
+    public IReadOnlyList<CorrectionDraft> ReadPendingForJob(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return [];
+        }
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                d.draft_id,
+                d.job_id,
+                d.segment_id,
+                d.issue_type,
+                d.original_text,
+                d.suggested_text,
+                d.reason,
+                d.confidence,
+                d.status,
+                d.created_at,
+                d.source,
+                d.source_ref_id
+            FROM correction_drafts d
+            JOIN transcript_segments s
+                ON s.job_id = d.job_id AND s.segment_id = d.segment_id
+            WHERE d.job_id = $job_id AND d.status = 'pending'
+            ORDER BY s.start_seconds ASC, d.confidence DESC, d.created_at ASC;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+
+        using var reader = command.ExecuteReader();
+        var drafts = new List<CorrectionDraft>();
+        while (reader.Read())
+        {
+            drafts.Add(ReadDraft(reader));
+        }
+
+        return drafts;
+    }
+
     public void SaveDrafts(IReadOnlyList<CorrectionDraft> drafts)
     {
         if (drafts.Count == 0)
@@ -51,7 +92,9 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
                     reason,
                     confidence,
                     status,
-                    created_at
+                    created_at,
+                    source,
+                    source_ref_id
                 )
                 VALUES (
                     $draft_id,
@@ -63,7 +106,9 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
                     $reason,
                     $confidence,
                     $status,
-                    $created_at
+                    $created_at,
+                    $source,
+                    $source_ref_id
                 )
                 ON CONFLICT(draft_id) DO UPDATE SET
                     issue_type = excluded.issue_type,
@@ -71,7 +116,9 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
                     suggested_text = excluded.suggested_text,
                     reason = excluded.reason,
                     confidence = excluded.confidence,
-                    status = excluded.status;
+                    status = excluded.status,
+                    source = excluded.source,
+                    source_ref_id = excluded.source_ref_id;
                 """;
             command.Parameters.AddWithValue("$draft_id", draft.DraftId);
             command.Parameters.AddWithValue("$job_id", draft.JobId);
@@ -83,6 +130,8 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
             command.Parameters.AddWithValue("$confidence", draft.Confidence);
             command.Parameters.AddWithValue("$status", draft.Status);
             command.Parameters.AddWithValue("$created_at", (draft.CreatedAt ?? DateTimeOffset.Now).ToString("o"));
+            command.Parameters.AddWithValue("$source", draft.Source);
+            command.Parameters.AddWithValue("$source_ref_id", (object?)draft.SourceRefId ?? DBNull.Value);
             command.ExecuteNonQuery();
 
             using var segmentCommand = connection.CreateCommand();
@@ -121,5 +170,22 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
         }.ToString());
         connection.Open();
         return connection;
+    }
+
+    private static CorrectionDraft ReadDraft(SqliteDataReader reader)
+    {
+        return new CorrectionDraft(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.GetDouble(7),
+            reader.GetString(8),
+            DateTimeOffset.TryParse(reader.GetString(9), out var createdAt) ? createdAt : null,
+            reader.GetString(10),
+            reader.IsDBNull(11) ? null : reader.GetString(11));
     }
 }

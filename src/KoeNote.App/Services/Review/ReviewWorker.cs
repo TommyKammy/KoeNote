@@ -10,7 +10,8 @@ public sealed class ReviewWorker(
     ReviewPromptBuilder promptBuilder,
     ReviewJsonNormalizer normalizer,
     ReviewResultStore resultStore,
-    CorrectionDraftRepository repository)
+    CorrectionDraftRepository repository,
+    CorrectionMemoryService? correctionMemoryService = null)
 {
     public async Task<ReviewRunResult> RunAsync(ReviewRunOptions options, CancellationToken cancellationToken = default)
     {
@@ -37,6 +38,7 @@ public sealed class ReviewWorker(
             processResult = repairResult;
         }
 
+        drafts = MergeMemoryDrafts(options.JobId, options.Segments, drafts);
         var normalizedDraftsPath = resultStore.SaveNormalizedDrafts(options.OutputDirectory, drafts);
         repository.ReplaceDrafts(options.JobId, drafts);
 
@@ -65,6 +67,36 @@ public sealed class ReviewWorker(
         }
 
         return processResult;
+    }
+
+    private IReadOnlyList<CorrectionDraft> MergeMemoryDrafts(
+        string jobId,
+        IReadOnlyList<TranscriptSegment> segments,
+        IReadOnlyList<CorrectionDraft> llmDrafts)
+    {
+        if (correctionMemoryService is null)
+        {
+            return llmDrafts;
+        }
+
+        var memoryDrafts = correctionMemoryService.BuildMemoryDrafts(jobId, segments);
+        if (memoryDrafts.Count == 0)
+        {
+            return llmDrafts;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var drafts = new List<CorrectionDraft>(memoryDrafts.Count + llmDrafts.Count);
+        foreach (var draft in memoryDrafts.Concat(llmDrafts))
+        {
+            var key = $"{draft.SegmentId}\u001f{draft.OriginalText}\u001f{draft.SuggestedText}";
+            if (seen.Add(key))
+            {
+                drafts.Add(draft);
+            }
+        }
+
+        return drafts;
     }
 
     private static void ValidateInputs(ReviewRunOptions options)

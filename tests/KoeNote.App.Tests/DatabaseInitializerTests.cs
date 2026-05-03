@@ -33,9 +33,16 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("stage_progress", tables);
         Assert.Contains("job_log_events", tables);
         Assert.Contains("asr_settings", tables);
+        Assert.Contains("speaker_aliases", tables);
+        Assert.Contains("review_operation_history", tables);
+        Assert.Contains("user_terms", tables);
+        Assert.Contains("correction_memory", tables);
+        Assert.Contains("correction_memory_events", tables);
 
-        Assert.Equal([1, 2], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
+        Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
+        Assert.Contains("source_ref_id", ReadColumnNames(connection, "correction_drafts"));
     }
 
     [Fact]
@@ -55,9 +62,15 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
+        Assert.Contains("speaker_aliases", ReadTableNames(connection));
+        Assert.Contains("review_operation_history", ReadTableNames(connection));
+        Assert.Contains("user_terms", ReadTableNames(connection));
+        Assert.Contains("correction_memory", ReadTableNames(connection));
+        Assert.Contains("correction_memory_events", ReadTableNames(connection));
+        Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
     }
 
     [Fact]
@@ -78,7 +91,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
     }
 
     private static string CreateTempDirectory()

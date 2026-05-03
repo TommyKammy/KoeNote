@@ -112,7 +112,10 @@ public sealed partial class MainWindowViewModel
                 segment.SpeakerId ?? "",
                 segment.NormalizedText ?? segment.RawText,
                 "候補なし",
-                segment.SegmentId));
+                segment.SegmentId,
+                segment.SpeakerId ?? "",
+                segment.RawText,
+                segment.NormalizedText));
         }
 
         RefreshSpeakerFilters();
@@ -121,18 +124,20 @@ public sealed partial class MainWindowViewModel
 
     private void ApplyReviewDrafts(IReadOnlyList<CorrectionDraft> drafts)
     {
-        var firstDraft = drafts.FirstOrDefault();
-        if (firstDraft is null)
+        ReviewQueue.Clear();
+        foreach (var draft in drafts.Where(static draft => draft.Status == "pending"))
+        {
+            ReviewQueue.Add(draft);
+        }
+
+        if (ReviewQueue.Count == 0)
         {
             ClearReviewPreview();
+            UpdateReviewCommandStates();
             return;
         }
 
-        ReviewIssueType = firstDraft.IssueType;
-        OriginalText = firstDraft.OriginalText;
-        SuggestedText = firstDraft.SuggestedText;
-        ReviewReason = firstDraft.Reason;
-        Confidence = firstDraft.Confidence;
+        SelectedCorrectionDraft = ReviewQueue[0];
         UpdateSegmentReviewStates(drafts);
     }
 }

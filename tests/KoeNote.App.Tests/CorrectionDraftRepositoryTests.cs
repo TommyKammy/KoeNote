@@ -81,6 +81,51 @@ public sealed class CorrectionDraftRepositoryTests
         Assert.Equal(0, reader.GetInt32(2));
     }
 
+    [Fact]
+    public void ReadPendingForJob_ReturnsPendingDraftsInSegmentOrder()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-late", "job-001", 20, 21, "Speaker_0", "late"),
+            new TranscriptSegment("segment-early", "job-001", 1, 2, "Speaker_0", "early")
+        ]);
+        var repository = new CorrectionDraftRepository(paths);
+        repository.SaveDrafts([
+            new CorrectionDraft("draft-late", "job-001", "segment-late", "wording", "late", "late fixed", "reason", 0.95),
+            new CorrectionDraft("draft-early", "job-001", "segment-early", "wording", "early", "early fixed", "reason", 0.50, Source: "memory", SourceRefId: "memory-001")
+        ]);
+        new ReviewOperationService(paths).AcceptDraft("draft-early");
+
+        var drafts = repository.ReadPendingForJob("job-001");
+
+        var draft = Assert.Single(drafts);
+        Assert.Equal("draft-late", draft.DraftId);
+    }
+
+    [Fact]
+    public void ReadPendingForJob_ReturnsDraftSourceMetadata()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 1, 2, "Speaker_0", "wrong")
+        ]);
+        var repository = new CorrectionDraftRepository(paths);
+        repository.SaveDrafts([
+            new CorrectionDraft("draft-memory", "job-001", "segment-001", "wording", "wrong", "right", "reason", 0.88, Source: "memory", SourceRefId: "memory-001")
+        ]);
+
+        var draft = Assert.Single(repository.ReadPendingForJob("job-001"));
+
+        Assert.Equal("memory", draft.Source);
+        Assert.Equal("memory-001", draft.SourceRefId);
+    }
+
     private static AppPaths CreatePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

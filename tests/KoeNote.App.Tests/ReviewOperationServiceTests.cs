@@ -24,7 +24,7 @@ public sealed class ReviewOperationServiceTests
     }
 
     [Fact]
-    public void RejectDraft_KeepsOriginalTextAndRecordsDecision()
+    public void RejectDraft_LeavesFinalTextUnsetAndRecordsDecision()
     {
         var paths = CreatePaths();
         ArrangeDraft(paths, "draft-001", originalText: "繝溘ぐ繝ｯ", suggestedText: "蜿ｳ蛛ｴ");
@@ -32,9 +32,9 @@ public sealed class ReviewOperationServiceTests
         var result = new ReviewOperationService(paths).RejectDraft("draft-001");
 
         Assert.Equal("rejected", result.Action);
-        Assert.Equal("繝溘ぐ繝ｯ", result.FinalText);
-        AssertDraftDecision(paths, "draft-001", "rejected", "rejected", "繝溘ぐ繝ｯ", expectedNote: null);
-        AssertSegment(paths, finalText: "繝溘ぐ繝ｯ", reviewState: "reviewed", pendingDraftCount: 0);
+        Assert.Null(result.FinalText);
+        AssertDraftDecision(paths, "draft-001", "rejected", "rejected", expectedFinalText: null, expectedNote: null);
+        AssertSegment(paths, finalText: null, reviewState: "reviewed", pendingDraftCount: 0);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed class ReviewOperationServiceTests
         string draftId,
         string expectedDraftStatus,
         string expectedAction,
-        string expectedFinalText,
+        string? expectedFinalText,
         string? expectedNote)
     {
         using var connection = Open(paths);
@@ -132,7 +132,14 @@ public sealed class ReviewOperationServiceTests
         Assert.True(reader.Read());
         Assert.Equal(expectedDraftStatus, reader.GetString(0));
         Assert.Equal(expectedAction, reader.GetString(1));
-        Assert.Equal(expectedFinalText, reader.GetString(2));
+        if (expectedFinalText is null)
+        {
+            Assert.True(reader.IsDBNull(2));
+        }
+        else
+        {
+            Assert.Equal(expectedFinalText, reader.GetString(2));
+        }
         if (expectedNote is null)
         {
             Assert.True(reader.IsDBNull(3));
@@ -143,7 +150,7 @@ public sealed class ReviewOperationServiceTests
         }
     }
 
-    private static void AssertSegment(AppPaths paths, string finalText, string reviewState, int pendingDraftCount)
+    private static void AssertSegment(AppPaths paths, string? finalText, string reviewState, int pendingDraftCount)
     {
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
@@ -156,7 +163,14 @@ public sealed class ReviewOperationServiceTests
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal(finalText, reader.GetString(0));
+        if (finalText is null)
+        {
+            Assert.True(reader.IsDBNull(0));
+        }
+        else
+        {
+            Assert.Equal(finalText, reader.GetString(0));
+        }
         Assert.Equal(reviewState, reader.GetString(1));
         Assert.Equal(pendingDraftCount, reader.GetInt32(2));
     }

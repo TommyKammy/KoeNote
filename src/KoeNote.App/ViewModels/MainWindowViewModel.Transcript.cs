@@ -31,6 +31,9 @@ public sealed partial class MainWindowViewModel
         SuggestedText = string.Empty;
         ReviewReason = "推敲候補は生成されませんでした。";
         Confidence = 0;
+        DiffTokens.Clear();
+        OnPropertyChanged(nameof(SelectedCorrectionDraftId));
+        OnPropertyChanged(nameof(DraftPositionText));
     }
 
     private bool FilterSegment(object item)

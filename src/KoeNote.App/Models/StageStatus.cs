@@ -3,7 +3,11 @@ using System.Runtime.CompilerServices;
 
 namespace KoeNote.App.Models;
 
-public sealed class StageStatus(string name) : INotifyPropertyChanged
+public sealed class StageStatus(
+    string name,
+    string iconPathData,
+    string iconStroke,
+    string iconSoftBackground) : INotifyPropertyChanged
 {
     private string _status = "未開始";
     private int _progressPercent;
@@ -11,6 +15,12 @@ public sealed class StageStatus(string name) : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public string Name { get; } = name;
+
+    public string IconPathData { get; } = iconPathData;
+
+    public string IconStroke { get; } = iconStroke;
+
+    public string IconSoftBackground { get; } = iconSoftBackground;
 
     public string Status
     {
