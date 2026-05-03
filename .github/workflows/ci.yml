@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET preview
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          $solutions = Get-ChildItem -Path . -Filter *.sln -Recurse
+          if ($solutions.Count -eq 0) {
+            Write-Host "No solution file yet; skipping restore."
+            return
+          }
+
+          foreach ($solution in $solutions) {
+            dotnet restore $solution.FullName
+          }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $solutions = Get-ChildItem -Path . -Filter *.sln -Recurse
+          if ($solutions.Count -eq 0) {
+            Write-Host "No solution file yet; skipping build."
+            return
+          }
+
+          foreach ($solution in $solutions) {
+            dotnet build $solution.FullName --configuration Release --no-restore
+          }
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem -Path . -Filter *Tests.csproj -Recurse
+          if ($testProjects.Count -eq 0) {
+            Write-Host "No test projects yet; skipping tests."
+            return
+          }
+
+          foreach ($project in $testProjects) {
+            dotnet test $project.FullName --configuration Release --no-build --verbosity normal
+          }

@@ -1,0 +1,97 @@
+# Build output
+bin/
+obj/
+out/
+artifacts/
+TestResults/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET / NuGet
+project.lock.json
+project.assets.json
+*.nupkg
+*.snupkg
+packages/
+
+# Local runtime data
+logs/
+tmp/
+temp/
+jobs/
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# KoeNote local app data snapshots
+AppData/
+LocalAppData/
+
+# Models and inference binaries
+models/
+model-packs/
+*.gguf
+*.safetensors
+*.onnx
+*.pt
+*.pth
+*.bin
+
+# Bundled native/runtime binaries copied in locally
+tools/
+runtime/
+ffmpeg.exe
+ffprobe.exe
+crispasr.exe
+llama-completion.exe
+llama-cli.exe
+llama-server.exe
+*.dll
+*.pdb
+
+# Audio/video samples and private evaluation data
+samples/private/
+data/private/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.aac
+*.ogg
+*.opus
+*.mp4
+*.mov
+*.mkv
+
+# Generated transcription/review output
+*.srt
+*.vtt
+*.docx
+*.transcript.json
+*.review.json
+*.raw.json
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Secrets / local configuration
+.env
+.env.*
+*.local.json
+appsettings.Development.json
