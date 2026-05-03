@@ -99,7 +99,11 @@ public sealed class ReviewOperationService(AppPaths paths)
             """;
         command.Parameters.AddWithValue("$status", status);
         command.Parameters.AddWithValue("$draft_id", draftId);
-        command.ExecuteNonQuery();
+        var updated = command.ExecuteNonQuery();
+        if (updated != 1)
+        {
+            throw new InvalidOperationException($"Correction draft could not be updated: {draftId}");
+        }
     }
 
     private static void UpsertDecision(
@@ -136,7 +140,11 @@ public sealed class ReviewOperationService(AppPaths paths)
         command.Parameters.AddWithValue("$final_text", finalText);
         command.Parameters.AddWithValue("$manual_note", (object?)manualNote ?? DBNull.Value);
         command.Parameters.AddWithValue("$decided_at", DateTimeOffset.Now.ToString("o"));
-        command.ExecuteNonQuery();
+        var updated = command.ExecuteNonQuery();
+        if (updated != 1)
+        {
+            throw new InvalidOperationException($"Review decision could not be recorded: {draftId}");
+        }
     }
 
     private static void UpdateSegment(
@@ -166,7 +174,11 @@ public sealed class ReviewOperationService(AppPaths paths)
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$segment_id", segmentId);
         command.Parameters.AddWithValue("$final_text", finalText);
-        command.ExecuteNonQuery();
+        var updated = command.ExecuteNonQuery();
+        if (updated != 1)
+        {
+            throw new InvalidOperationException($"Transcript segment was not found: {jobId}/{segmentId}");
+        }
     }
 
     private static void RefreshJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId)
@@ -185,7 +197,11 @@ public sealed class ReviewOperationService(AppPaths paths)
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.ExecuteNonQuery();
+        var updated = command.ExecuteNonQuery();
+        if (updated != 1)
+        {
+            throw new InvalidOperationException($"Job was not found while refreshing pending draft count: {jobId}");
+        }
     }
 
     private static int CountPendingDrafts(SqliteConnection connection, string jobId)

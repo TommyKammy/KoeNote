@@ -62,6 +62,33 @@ public sealed class ReviewOperationServiceTests
         Assert.Throws<InvalidOperationException>(() => service.AcceptDraft("draft-001"));
     }
 
+    [Fact]
+    public void AcceptDraft_RollsBackWhenSegmentIsMissing()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        InsertDraftWithoutSegment(paths, "draft-001");
+
+        Assert.Throws<InvalidOperationException>(() => new ReviewOperationService(paths).AcceptDraft("draft-001"));
+
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                (SELECT status FROM correction_drafts WHERE draft_id = 'draft-001'),
+                (SELECT COUNT(*) FROM review_decisions WHERE draft_id = 'draft-001'),
+                (SELECT unreviewed_draft_count FROM jobs WHERE job_id = 'job-001');
+            """;
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("pending", reader.GetString(0));
+        Assert.Equal(0, reader.GetInt32(1));
+        Assert.Equal(1, reader.GetInt32(2));
+    }
+
     private static void ArrangeDraft(AppPaths paths, string draftId, string originalText, string suggestedText)
     {
         paths.EnsureCreated();
@@ -178,5 +205,44 @@ public sealed class ReviewOperationServiceTests
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$now", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
+    }
+
+    private static void InsertDraftWithoutSegment(AppPaths paths, string draftId)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO correction_drafts (
+                draft_id,
+                job_id,
+                segment_id,
+                issue_type,
+                original_text,
+                suggested_text,
+                reason,
+                confidence,
+                status,
+                created_at
+            )
+            VALUES (
+                $draft_id,
+                'job-001',
+                'missing-segment',
+                'wording',
+                'original',
+                'suggested',
+                'reason',
+                0.75,
+                'pending',
+                $now
+            );
+            """;
+        command.Parameters.AddWithValue("$draft_id", draftId);
+        command.Parameters.AddWithValue("$now", DateTimeOffset.Now.ToString("o"));
+        command.ExecuteNonQuery();
+
+        using var jobCommand = connection.CreateCommand();
+        jobCommand.CommandText = "UPDATE jobs SET unreviewed_draft_count = 1 WHERE job_id = 'job-001';";
+        jobCommand.ExecuteNonQuery();
     }
 }
