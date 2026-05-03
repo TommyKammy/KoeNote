@@ -28,4 +28,17 @@ public sealed class ExternalProcessRunnerTests
             "-NoProfile -Command Start-Sleep -Seconds 5",
             TimeSpan.FromMilliseconds(100)));
     }
+
+    [Fact]
+    public async Task RunAsync_CancelsAndKillsProcess()
+    {
+        var runner = new ExternalProcessRunner();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runner.RunAsync(
+            "powershell",
+            "-NoProfile -Command Start-Sleep -Seconds 5",
+            TimeSpan.FromSeconds(10),
+            cancellation.Token));
+    }
 }

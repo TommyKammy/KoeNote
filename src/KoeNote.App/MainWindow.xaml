@@ -74,7 +74,7 @@
                         <Button Content="音声をインポート" Command="{Binding AddAudioCommand}" />
                         <Separator Width="18" Opacity="0" />
                         <Button Content="▶ 実行" Command="{Binding RunSelectedJobCommand}" />
-                        <Button Content="□ 中止" />
+                        <Button Content="□ 中止" Command="{Binding CancelCommand}" />
                         <Separator Width="18" Opacity="0" />
                         <Button Content="TXT出力" />
                         <Button Content="JSON出力" />
@@ -156,11 +156,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="ジョブ一覧" Style="{StaticResource SectionTitle}" />
-                        <TextBox Grid.Row="1" Margin="0,2,0,8" MinHeight="28" ToolTip="ジョブ名で検索" />
+                        <TextBox Grid.Row="1" Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" MinHeight="28" ToolTip="ジョブ名で検索" />
                         <TextBlock Grid.Row="2" Text="{Binding JobCountSummary}" Style="{StaticResource MutedText}" />
                     </Grid>
 
-                    <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob, Mode=TwoWay}" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox ItemsSource="{Binding FilteredJobs}" SelectedItem="{Binding SelectedJob, Mode=TwoWay}" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="10" Margin="0,0,0,8" BorderBrush="#D6DBD8" Background="#FAFBFA">
@@ -203,14 +203,10 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="文字起こし" Style="{StaticResource SectionTitle}" />
                         <CheckBox Grid.Column="1" Content="自動スクロール" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <TextBox Grid.Column="2" MinHeight="28" ToolTip="発話内容を検索" />
-                        <ComboBox Grid.Column="3" Margin="8,0,0,0" SelectedIndex="0">
-                            <ComboBoxItem Content="全話者" />
-                            <ComboBoxItem Content="Speaker_0" />
-                            <ComboBoxItem Content="Speaker_1" />
-                        </ComboBox>
+                        <TextBox Grid.Column="2" Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="28" ToolTip="発話内容を検索" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding SpeakerFilters}" SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}" Margin="8,0,0,0" />
                     </Grid>
-                    <DataGrid ItemsSource="{Binding Segments}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" HeadersVisibility="Column" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <DataGrid ItemsSource="{Binding FilteredSegments}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal" HeadersVisibility="Column" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="時間" Binding="{Binding Start}" Width="95" />
                             <DataGridTextColumn Header="終了" Binding="{Binding End}" Width="95" />

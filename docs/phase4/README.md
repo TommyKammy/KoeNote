@@ -9,8 +9,9 @@ Phase 4 moves the WPF shell closer to the target KoeNote UI.
   - toolbar row for import, run, cancel placeholder, exports, settings
 - drag-and-drop audio registration on the main window
 - persisted job restore on startup
-- left job list with search field placeholder, progress, updated time, and unreviewed count
-- center transcript segment grid with speaker filter/search placeholders
+- left job list with live search, progress, updated time, and unreviewed count
+- center transcript segment grid with live text search and speaker filter
+- cancel button wired to the active preprocess/ASR/review worker cancellation token
 - right pane tabs:
   - job info
   - review
@@ -33,12 +34,11 @@ Additional checks performed:
 
 - WPF startup smoke
 - Phase 4 shell screenshot generated at `artifacts/phase4-shell-screenshot-v2.png`
-- repository tests cover persisted job restore and selected job log restore
+- repository tests cover persisted job restore, selected job log restore, and cancelled job state
+- external process tests cover cancellation-token process termination
 
 ## Remaining Work
 
-- real search/filter behavior for job and segment grids
-- functional cancel command
 - export command implementations
 - persisted selected UI state
 - job delete/rename/retry/open export actions

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Windows.Data;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
@@ -22,7 +23,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly AsrWorker _asrWorker;
     private readonly ReviewWorker _reviewWorker;
     private JobSummary? _selectedJob;
+    private CancellationTokenSource? _runCancellation;
     private string _latestLog;
+    private string _jobSearchText = string.Empty;
+    private string _segmentSearchText = string.Empty;
+    private string _selectedSpeakerFilter = "全話者";
+    private bool _isRunInProgress;
     private string _reviewIssueType = "意味不明語の疑い";
     private string _originalText = "この仕様はサーバーのミギワで処理します。";
     private string _suggestedText = "この仕様はサーバーの右側で処理します。";
@@ -91,7 +97,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             "推敲候補あり"));
 
         AddAudioCommand = new RelayCommand(AddAudioAsync);
-        RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null);
+        RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null && !IsRunInProgress);
+        CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
+
+        FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
+        FilteredJobs.Filter = FilterJob;
+        FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
+        FilteredSegments.Filter = FilterSegment;
+        RefreshSpeakerFilters();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -116,9 +129,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<JobLogEntry> Logs { get; } = [];
 
+    public ObservableCollection<string> SpeakerFilters { get; } = ["全話者"];
+
+    public ICollectionView FilteredJobs { get; }
+
+    public ICollectionView FilteredSegments { get; }
+
     public ICommand AddAudioCommand { get; }
 
     public ICommand RunSelectedJobCommand { get; }
+
+    public ICommand CancelCommand { get; }
 
     public JobSummary? SelectedJob
     {
@@ -150,6 +171,62 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public int SelectedJobUnreviewedDrafts => SelectedJob?.UnreviewedDrafts ?? 0;
 
     public string JobCountSummary => $"合計 {Jobs.Count} 件のジョブ";
+
+    public string JobSearchText
+    {
+        get => _jobSearchText;
+        set
+        {
+            if (SetField(ref _jobSearchText, value))
+            {
+                FilteredJobs.Refresh();
+            }
+        }
+    }
+
+    public string SegmentSearchText
+    {
+        get => _segmentSearchText;
+        set
+        {
+            if (SetField(ref _segmentSearchText, value))
+            {
+                FilteredSegments.Refresh();
+            }
+        }
+    }
+
+    public string SelectedSpeakerFilter
+    {
+        get => _selectedSpeakerFilter;
+        set
+        {
+            if (SetField(ref _selectedSpeakerFilter, value))
+            {
+                FilteredSegments.Refresh();
+            }
+        }
+    }
+
+    public bool IsRunInProgress
+    {
+        get => _isRunInProgress;
+        private set
+        {
+            if (SetField(ref _isRunInProgress, value))
+            {
+                if (CancelCommand is RelayCommand cancelCommand)
+                {
+                    cancelCommand.RaiseCanExecuteChanged();
+                }
+
+                if (RunSelectedJobCommand is RelayCommand runCommand)
+                {
+                    runCommand.RaiseCanExecuteChanged();
+                }
+            }
+        }
+    }
 
     public string ReviewIssueType
     {
@@ -210,6 +287,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var job = _jobRepository.CreateFromAudio(audioPath);
         Jobs.Insert(0, job);
+        FilteredJobs.Refresh();
         SelectedJob = job;
         LatestLog = $"Registered audio job: {job.FileName}";
         _jobLogRepository.AddEvent(job.JobId, "created", "info", $"Registered audio file: {job.SourceAudioPath}");
@@ -238,12 +316,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public async Task RunSelectedJobAsync()
     {
-        if (SelectedJob is null)
+        if (SelectedJob is null || IsRunInProgress)
         {
             return;
         }
 
         var job = SelectedJob;
+        using var cancellation = new CancellationTokenSource();
+        _runCancellation = cancellation;
+        IsRunInProgress = true;
         var stage = StageStatuses.First(item => item.Name == "音声変換");
         stage.Status = "実行中";
         stage.ProgressPercent = 10;
@@ -252,14 +333,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         try
         {
-            var result = await _audioPreprocessWorker.NormalizeAsync(job, "ffmpeg", Paths);
+            var result = await _audioPreprocessWorker.NormalizeAsync(job, "ffmpeg", Paths, cancellation.Token);
             stage.Status = "成功";
             stage.ProgressPercent = 100;
             _jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             LatestLog = $"Generated normalized WAV: {result.NormalizedAudioPath}";
             OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
 
-            await RunAsrAsync(job, result.NormalizedAudioPath);
+            await RunAsrAsync(job, result.NormalizedAudioPath, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            stage.Status = "中止";
+            stage.ProgressPercent = 100;
+            _jobRepository.MarkCancelled(job, "preprocess");
+            _jobLogRepository.AddEvent(job.JobId, "preprocess", "info", "Run was cancelled.");
+            LatestLog = "実行をキャンセルしました。";
+            RefreshLogs();
         }
         catch (Exception exception)
         {
@@ -270,9 +360,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             LatestLog = exception.Message;
             RefreshLogs();
         }
+        finally
+        {
+            _runCancellation = null;
+            IsRunInProgress = false;
+        }
     }
 
-    private async Task RunAsrAsync(JobSummary job, string normalizedAudioPath)
+    private async Task RunAsrAsync(JobSummary job, string normalizedAudioPath, CancellationToken cancellationToken)
     {
         var stage = StageStatuses.First(item => item.Name == "ASR");
         var startedAt = DateTimeOffset.Now;
@@ -291,7 +386,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 Paths.CrispAsrPath,
                 Paths.VibeVoiceAsrModelPath,
                 outputDirectory,
-                Timeout: TimeSpan.FromHours(2)));
+                Timeout: TimeSpan.FromHours(2)),
+                cancellationToken);
 
             Segments.Clear();
             foreach (var segment in result.Segments)
@@ -304,6 +400,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     "候補なし",
                     segment.SegmentId));
             }
+            RefreshSpeakerFilters();
+            FilteredSegments.Refresh();
 
             var finishedAt = DateTimeOffset.Now;
             stage.Status = "成功";
@@ -322,7 +420,26 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             LatestLog = $"ASR completed: {result.Segments.Count} segments";
             RefreshLogs();
 
-            await RunReviewAsync(job, result.Segments);
+            await RunReviewAsync(job, result.Segments, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "中止";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "asr",
+                "cancelled",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: "cancelled");
+            _jobRepository.MarkCancelled(job, "asr");
+            _jobLogRepository.AddEvent(job.JobId, "asr", "info", "Run was cancelled.");
+            LatestLog = "ASRをキャンセルしました。";
+            RefreshLogs();
         }
         catch (AsrWorkerException exception)
         {
@@ -370,7 +487,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
     }
 
-    private async Task RunReviewAsync(JobSummary job, IReadOnlyList<TranscriptSegment> segments)
+    private async Task RunReviewAsync(JobSummary job, IReadOnlyList<TranscriptSegment> segments, CancellationToken cancellationToken)
     {
         var stage = StageStatuses.First(item => item.Name == "推敲");
         var startedAt = DateTimeOffset.Now;
@@ -390,7 +507,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 outputDirectory,
                 segments,
                 MinConfidence: 0.5,
-                Timeout: TimeSpan.FromHours(2)));
+                Timeout: TimeSpan.FromHours(2)),
+                cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
             stage.Status = "成功";
@@ -425,6 +543,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             {
                 ClearReviewPreview();
             }
+        }
+        catch (OperationCanceledException)
+        {
+            var finishedAt = DateTimeOffset.Now;
+            stage.Status = "中止";
+            stage.ProgressPercent = 100;
+            _stageProgressRepository.Upsert(
+                job.JobId,
+                "review",
+                "cancelled",
+                100,
+                startedAt,
+                finishedAt,
+                (finishedAt - startedAt).TotalSeconds,
+                errorCategory: "cancelled");
+            _jobRepository.MarkCancelled(job, "review");
+            _jobLogRepository.AddEvent(job.JobId, "review", "info", "Run was cancelled.");
+            LatestLog = "推敲をキャンセルしました。";
+            RefreshLogs();
         }
         catch (ReviewWorkerException exception)
         {
@@ -464,6 +601,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             LatestLog = $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}";
             RefreshLogs();
         }
+    }
+
+    private Task CancelRunAsync()
+    {
+        _runCancellation?.Cancel();
+        LatestLog = "キャンセルを要求しました。";
+        return Task.CompletedTask;
     }
 
     private void UpdateSegmentReviewStates(IReadOnlyList<CorrectionDraft> drafts)
@@ -506,6 +650,48 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             Logs.Add(entry);
         }
+    }
+
+    private bool FilterJob(object item)
+    {
+        if (item is not JobSummary job || string.IsNullOrWhiteSpace(JobSearchText))
+        {
+            return true;
+        }
+
+        return job.Title.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase)
+            || job.FileName.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase)
+            || job.Status.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool FilterSegment(object item)
+    {
+        if (item is not TranscriptSegmentPreview segment)
+        {
+            return false;
+        }
+
+        var speakerMatches = SelectedSpeakerFilter == "全話者"
+            || string.Equals(segment.Speaker, SelectedSpeakerFilter, StringComparison.Ordinal);
+        var textMatches = string.IsNullOrWhiteSpace(SegmentSearchText)
+            || segment.Text.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase)
+            || segment.Speaker.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase)
+            || segment.ReviewState.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase);
+
+        return speakerMatches && textMatches;
+    }
+
+    private void RefreshSpeakerFilters()
+    {
+        var selected = SelectedSpeakerFilter;
+        SpeakerFilters.Clear();
+        SpeakerFilters.Add("全話者");
+        foreach (var speaker in Segments.Select(segment => segment.Speaker).Where(static speaker => !string.IsNullOrWhiteSpace(speaker)).Distinct().Order())
+        {
+            SpeakerFilters.Add(speaker);
+        }
+
+        SelectedSpeakerFilter = SpeakerFilters.Contains(selected) ? selected : "全話者";
     }
 
     private static bool IsSupportedAudioFile(string path)

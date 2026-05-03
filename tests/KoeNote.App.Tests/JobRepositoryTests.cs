@@ -118,6 +118,29 @@ public sealed class JobRepositoryTests
         Assert.Equal(90, restored.ProgressPercent);
     }
 
+    [Fact]
+    public void MarkCancelled_PersistsCancelledState()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkCancelled(job, "asr");
+
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status, current_stage, last_error_category FROM jobs WHERE job_id = $job_id;";
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("キャンセル済み", reader.GetString(0));
+        Assert.Equal("asr_cancelled", reader.GetString(1));
+        Assert.Equal("cancelled", reader.GetString(2));
+    }
+
     private static AppPaths CreatePaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
