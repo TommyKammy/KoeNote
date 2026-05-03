@@ -69,7 +69,7 @@ public sealed partial class MainWindowViewModel
         Process.Start(new ProcessStartInfo
         {
             FileName = "explorer.exe",
-            Arguments = LastExportFolder,
+            Arguments = $"\"{LastExportFolder}\"",
             UseShellExecute = true
         });
         return Task.CompletedTask;

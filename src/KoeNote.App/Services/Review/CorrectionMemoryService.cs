@@ -93,7 +93,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
             return;
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
         var now = DateTimeOffset.Now.ToString("o");
         var memoryId = UpsertMemory(connection, transaction, draft.OriginalText, finalText, draft.IssueType, now);
@@ -109,7 +109,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
             return;
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
         var now = DateTimeOffset.Now.ToString("o");
         var counterColumn = action switch
@@ -140,7 +140,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
 
     private IReadOnlyList<UserTermRow> ReadEnabledTerms(int limit)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT surface
@@ -163,7 +163,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
 
     private IReadOnlyList<MemoryRow> ReadEnabledMemories(int limit)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT memory_id, wrong_text, correct_text, issue_type, accepted_count, rejected_count
@@ -192,7 +192,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
 
     private void RecordEvent(string memoryId, string draftId, string jobId, string segmentId, string eventType)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
         InsertEvent(connection, transaction, memoryId, draftId, jobId, segmentId, eventType, DateTimeOffset.Now.ToString("o"));
         transaction.Commit();
@@ -331,16 +331,6 @@ public sealed class CorrectionMemoryService(AppPaths paths)
         }
 
         return Math.Clamp(0.62 + (memory.AcceptedCount / (double)total) * 0.28, 0.62, 0.90);
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
     }
 
     private sealed record UserTermRow(string Surface);

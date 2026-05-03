@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.IO;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Transcript;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Services.Export;
@@ -66,10 +67,18 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private ExportSnapshot LoadSnapshot(string jobId)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         var title = LoadJobTitle(connection, jobId);
         var pendingDraftCount = LoadPendingDraftCount(connection, jobId);
-        var segments = LoadSegments(connection, jobId);
+        var segments = new TranscriptReadRepository(paths)
+            .ReadForJob(jobId)
+            .Select(static segment => new TranscriptExportSegment(
+                segment.SegmentId,
+                segment.StartSeconds,
+                segment.EndSeconds,
+                segment.Speaker,
+                segment.Text))
+            .ToArray();
         return new ExportSnapshot(jobId, title, pendingDraftCount, segments);
     }
 
@@ -93,39 +102,6 @@ public sealed class TranscriptExportService(AppPaths paths)
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
-    private static IReadOnlyList<TranscriptExportSegment> LoadSegments(SqliteConnection connection, string jobId)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                s.segment_id,
-                s.start_seconds,
-                s.end_seconds,
-                COALESCE(a.display_name, s.speaker_name, s.speaker_id, ''),
-                COALESCE(s.final_text, s.normalized_text, s.raw_text)
-            FROM transcript_segments s
-            LEFT JOIN speaker_aliases a
-                ON a.job_id = s.job_id AND a.speaker_id = s.speaker_id
-            WHERE s.job_id = $job_id
-            ORDER BY s.start_seconds ASC, s.end_seconds ASC;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-
-        using var reader = command.ExecuteReader();
-        var segments = new List<TranscriptExportSegment>();
-        while (reader.Read())
-        {
-            segments.Add(new TranscriptExportSegment(
-                reader.GetString(0),
-                reader.GetDouble(1),
-                reader.GetDouble(2),
-                reader.GetString(3),
-                reader.GetString(4)));
-        }
-
-        return segments;
-    }
-
     private static string Render(ExportSnapshot snapshot, TranscriptExportFormat format)
     {
         return format switch
@@ -145,9 +121,9 @@ public sealed class TranscriptExportService(AppPaths paths)
         foreach (var segment in snapshot.Segments)
         {
             builder.Append('[')
-                .Append(FormatTimestamp(segment.StartSeconds))
+                .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
                 .Append(" - ")
-                .Append(FormatTimestamp(segment.EndSeconds))
+                .Append(TimestampFormatter.FormatDisplay(segment.EndSeconds))
                 .Append("] ");
             if (!string.IsNullOrWhiteSpace(segment.Speaker))
             {
@@ -177,7 +153,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         foreach (var segment in snapshot.Segments)
         {
             builder.Append("- `")
-                .Append(FormatTimestamp(segment.StartSeconds))
+                .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
                 .Append("` ");
             if (!string.IsNullOrWhiteSpace(segment.Speaker))
             {
@@ -210,9 +186,9 @@ public sealed class TranscriptExportService(AppPaths paths)
         {
             var segment = snapshot.Segments[i];
             builder.AppendLine((i + 1).ToString());
-            builder.Append(FormatSubtitleTimestamp(segment.StartSeconds, comma: true))
+            builder.Append(TimestampFormatter.FormatSrt(segment.StartSeconds))
                 .Append(" --> ")
-                .AppendLine(FormatSubtitleTimestamp(segment.EndSeconds, comma: true));
+                .AppendLine(TimestampFormatter.FormatSrt(segment.EndSeconds));
             builder.AppendLine(FormatSubtitleText(segment));
             builder.AppendLine();
         }
@@ -225,9 +201,9 @@ public sealed class TranscriptExportService(AppPaths paths)
         var builder = new StringBuilder("WEBVTT").AppendLine().AppendLine();
         foreach (var segment in snapshot.Segments)
         {
-            builder.Append(FormatSubtitleTimestamp(segment.StartSeconds, comma: false))
+            builder.Append(TimestampFormatter.FormatVtt(segment.StartSeconds))
                 .Append(" --> ")
-                .AppendLine(FormatSubtitleTimestamp(segment.EndSeconds, comma: false));
+                .AppendLine(TimestampFormatter.FormatVtt(segment.EndSeconds));
             builder.AppendLine(FormatSubtitleText(segment));
             builder.AppendLine();
         }
@@ -257,19 +233,6 @@ public sealed class TranscriptExportService(AppPaths paths)
             : normalized;
     }
 
-    private static string FormatTimestamp(double seconds)
-    {
-        var time = TimeSpan.FromSeconds(seconds);
-        return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
-    }
-
-    private static string FormatSubtitleTimestamp(double seconds, bool comma)
-    {
-        var time = TimeSpan.FromSeconds(seconds);
-        var separator = comma ? "," : ".";
-        return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}{separator}{time.Milliseconds:000}";
-    }
-
     private static string GetExtension(TranscriptExportFormat format)
     {
         return format switch
@@ -288,16 +251,6 @@ public sealed class TranscriptExportService(AppPaths paths)
         var invalid = Path.GetInvalidFileNameChars().ToHashSet();
         var sanitized = new string(value.Select(character => invalid.Contains(character) ? '_' : character).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(sanitized) ? "transcript" : sanitized;
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
     }
 
     private sealed record ExportSnapshot(

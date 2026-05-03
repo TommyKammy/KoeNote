@@ -74,6 +74,7 @@ public sealed partial class MainWindowViewModel
             SelectedSegment = null;
             RefreshSpeakerFilters();
             FilteredSegments.Refresh();
+            UpdateExportCommandStates();
             return;
         }
 

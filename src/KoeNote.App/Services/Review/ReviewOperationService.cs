@@ -36,7 +36,7 @@ public sealed class ReviewOperationService(AppPaths paths)
             throw new ArgumentException("Draft id is required.", nameof(draftId));
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         var draft = LoadDraft(connection, transaction, draftId)
@@ -310,16 +310,6 @@ public sealed class ReviewOperationService(AppPaths paths)
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.GetString(2),
             reader.GetInt32(3));
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
     }
 
     private sealed record DraftSnapshot(

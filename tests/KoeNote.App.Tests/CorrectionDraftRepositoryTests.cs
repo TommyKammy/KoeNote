@@ -82,6 +82,77 @@ public sealed class CorrectionDraftRepositoryTests
     }
 
     [Fact]
+    public void ReplaceDrafts_PreservesDecidedDraftsAndReviewDecisions()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "wrong")
+        ]);
+        var repository = new CorrectionDraftRepository(paths);
+        repository.SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "wrong", "right", "reason", 0.8)
+        ]);
+        new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        repository.ReplaceDrafts("job-001", []);
+
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                (SELECT COUNT(*) FROM correction_drafts WHERE draft_id = 'draft-001' AND status = 'accepted'),
+                (SELECT COUNT(*) FROM review_decisions WHERE draft_id = 'draft-001'),
+                (SELECT review_state FROM transcript_segments WHERE job_id = 'job-001' AND segment_id = 'segment-001'),
+                (SELECT unreviewed_draft_count FROM jobs WHERE job_id = 'job-001');
+            """;
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(1, reader.GetInt32(0));
+        Assert.Equal(1, reader.GetInt32(1));
+        Assert.Equal("reviewed", reader.GetString(2));
+        Assert.Equal(0, reader.GetInt32(3));
+    }
+
+    [Fact]
+    public void ReplaceDrafts_GeneratesReplacementIdWhenNewDraftConflictsWithDecidedDraft()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "wrong")
+        ]);
+        var repository = new CorrectionDraftRepository(paths);
+        repository.SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "wrong", "right", "reason", 0.8)
+        ]);
+        new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        repository.ReplaceDrafts("job-001", [
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "wrong again", "right again", "reason", 0.7)
+        ]);
+
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT draft_id, original_text
+            FROM correction_drafts
+            WHERE job_id = 'job-001' AND status = 'pending';
+            """;
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.StartsWith("draft-001-rerun-", reader.GetString(0), StringComparison.Ordinal);
+        Assert.Equal("wrong again", reader.GetString(1));
+        Assert.False(reader.Read());
+    }
+
+    [Fact]
     public void ReadPendingForJob_ReturnsPendingDraftsInSegmentOrder()
     {
         var paths = CreatePaths();

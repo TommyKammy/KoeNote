@@ -1,5 +1,5 @@
 using KoeNote.App.Models;
-using Microsoft.Data.Sqlite;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Services.Asr;
 
@@ -12,43 +12,21 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
             return [];
         }
 
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                s.segment_id,
-                s.start_seconds,
-                s.end_seconds,
-                COALESCE(a.display_name, s.speaker_name, s.speaker_id, ''),
-                COALESCE(s.final_text, s.normalized_text, s.raw_text),
-                s.review_state,
-                COALESCE(s.speaker_id, ''),
-                s.raw_text,
-                s.normalized_text,
-                s.final_text
-            FROM transcript_segments s
-            LEFT JOIN speaker_aliases a
-                ON a.job_id = s.job_id AND a.speaker_id = s.speaker_id
-            WHERE s.job_id = $job_id
-            ORDER BY s.start_seconds ASC, s.end_seconds ASC;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-
-        using var reader = command.ExecuteReader();
+        var segments = new TranscriptReadRepository(paths).ReadForJob(jobId);
         var previews = new List<TranscriptSegmentPreview>();
-        while (reader.Read())
+        foreach (var segment in segments)
         {
             previews.Add(new TranscriptSegmentPreview(
-                FormatTimestamp(reader.GetDouble(1)),
-                FormatTimestamp(reader.GetDouble(2)),
-                reader.GetString(3),
-                reader.GetString(4),
-                FormatReviewState(reader.GetString(5)),
-                reader.GetString(0),
-                reader.GetString(6),
-                reader.GetString(7),
-                reader.IsDBNull(8) ? null : reader.GetString(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9)));
+                TimestampFormatter.FormatDisplay(segment.StartSeconds),
+                TimestampFormatter.FormatDisplay(segment.EndSeconds),
+                segment.Speaker,
+                segment.Text,
+                FormatReviewState(segment.ReviewState),
+                segment.SegmentId,
+                segment.SpeakerId,
+                segment.RawText,
+                segment.NormalizedText,
+                segment.FinalText));
         }
 
         return previews;
@@ -61,7 +39,7 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
             return;
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         foreach (var segment in segments)
@@ -113,22 +91,6 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
         }
 
         transaction.Commit();
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
-
-    private static string FormatTimestamp(double seconds)
-    {
-        var time = TimeSpan.FromSeconds(seconds);
-        return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
     }
 
     private static string FormatReviewState(string state)

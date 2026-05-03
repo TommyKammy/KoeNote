@@ -1,5 +1,4 @@
 using KoeNote.App.Models;
-using Microsoft.Data.Sqlite;
 using System.IO;
 
 namespace KoeNote.App.Services.Jobs;
@@ -8,7 +7,7 @@ public sealed class JobRepository(AppPaths paths)
 {
     public IReadOnlyList<JobSummary> LoadRecent(int limit = 50)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -68,7 +67,7 @@ public sealed class JobRepository(AppPaths paths)
             0,
             now);
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO jobs (
@@ -127,7 +126,7 @@ public sealed class JobRepository(AppPaths paths)
         job.NormalizedAudioPath = normalizedAudioPath;
         job.UpdatedAt = DateTimeOffset.Now;
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             UPDATE jobs
@@ -199,13 +198,4 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, "キャンセル済み", $"{currentStage}_cancelled", job.ProgressPercent, job.NormalizedAudioPath, "cancelled");
     }
 
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

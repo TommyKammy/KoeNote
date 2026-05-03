@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using KoeNote.App.Models;
 using System.IO;
 using System.Text;
@@ -31,7 +30,7 @@ public sealed class JobLogRepository(AppPaths paths)
 
     public void AddEvent(string? jobId, string? stage, string level, string message)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO job_log_events (
@@ -62,7 +61,7 @@ public sealed class JobLogRepository(AppPaths paths)
 
     public IReadOnlyList<JobLogEntry> ReadLatest(string? jobId, int limit = 80)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         if (string.IsNullOrWhiteSpace(jobId))
         {
@@ -102,13 +101,4 @@ public sealed class JobLogRepository(AppPaths paths)
         return entries;
     }
 
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

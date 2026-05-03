@@ -12,7 +12,7 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
             return [];
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -58,13 +58,13 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
 
     public void ReplaceDrafts(string jobId, IReadOnlyList<CorrectionDraft> drafts)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         using (var deleteCommand = connection.CreateCommand())
         {
             deleteCommand.Transaction = transaction;
-            deleteCommand.CommandText = "DELETE FROM correction_drafts WHERE job_id = $job_id;";
+            deleteCommand.CommandText = "DELETE FROM correction_drafts WHERE job_id = $job_id AND status = 'pending';";
             deleteCommand.Parameters.AddWithValue("$job_id", jobId);
             deleteCommand.ExecuteNonQuery();
         }
@@ -72,13 +72,21 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
         using (var segmentResetCommand = connection.CreateCommand())
         {
             segmentResetCommand.Transaction = transaction;
-            segmentResetCommand.CommandText = "UPDATE transcript_segments SET review_state = 'none' WHERE job_id = $job_id;";
+            segmentResetCommand.CommandText = """
+                UPDATE transcript_segments
+                SET review_state = CASE
+                    WHEN final_text IS NULL THEN 'none'
+                    ELSE 'reviewed'
+                END
+                WHERE job_id = $job_id AND review_state = 'has_draft';
+                """;
             segmentResetCommand.Parameters.AddWithValue("$job_id", jobId);
             segmentResetCommand.ExecuteNonQuery();
         }
 
         foreach (var draft in drafts)
         {
+            var persistedDraft = EnsureWritableDraftId(connection, transaction, draft);
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
@@ -120,18 +128,18 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
                     source = excluded.source,
                     source_ref_id = excluded.source_ref_id;
                 """;
-            command.Parameters.AddWithValue("$draft_id", draft.DraftId);
-            command.Parameters.AddWithValue("$job_id", draft.JobId);
-            command.Parameters.AddWithValue("$segment_id", draft.SegmentId);
-            command.Parameters.AddWithValue("$issue_type", draft.IssueType);
-            command.Parameters.AddWithValue("$original_text", draft.OriginalText);
-            command.Parameters.AddWithValue("$suggested_text", draft.SuggestedText);
-            command.Parameters.AddWithValue("$reason", draft.Reason);
-            command.Parameters.AddWithValue("$confidence", draft.Confidence);
-            command.Parameters.AddWithValue("$status", draft.Status);
-            command.Parameters.AddWithValue("$created_at", (draft.CreatedAt ?? DateTimeOffset.Now).ToString("o"));
-            command.Parameters.AddWithValue("$source", draft.Source);
-            command.Parameters.AddWithValue("$source_ref_id", (object?)draft.SourceRefId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$draft_id", persistedDraft.DraftId);
+            command.Parameters.AddWithValue("$job_id", persistedDraft.JobId);
+            command.Parameters.AddWithValue("$segment_id", persistedDraft.SegmentId);
+            command.Parameters.AddWithValue("$issue_type", persistedDraft.IssueType);
+            command.Parameters.AddWithValue("$original_text", persistedDraft.OriginalText);
+            command.Parameters.AddWithValue("$suggested_text", persistedDraft.SuggestedText);
+            command.Parameters.AddWithValue("$reason", persistedDraft.Reason);
+            command.Parameters.AddWithValue("$confidence", persistedDraft.Confidence);
+            command.Parameters.AddWithValue("$status", persistedDraft.Status);
+            command.Parameters.AddWithValue("$created_at", (persistedDraft.CreatedAt ?? DateTimeOffset.Now).ToString("o"));
+            command.Parameters.AddWithValue("$source", persistedDraft.Source);
+            command.Parameters.AddWithValue("$source_ref_id", (object?)persistedDraft.SourceRefId ?? DBNull.Value);
             command.ExecuteNonQuery();
 
             using var segmentCommand = connection.CreateCommand();
@@ -141,8 +149,8 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
                 SET review_state = 'has_draft'
                 WHERE job_id = $job_id AND segment_id = $segment_id;
                 """;
-            segmentCommand.Parameters.AddWithValue("$job_id", draft.JobId);
-            segmentCommand.Parameters.AddWithValue("$segment_id", draft.SegmentId);
+            segmentCommand.Parameters.AddWithValue("$job_id", persistedDraft.JobId);
+            segmentCommand.Parameters.AddWithValue("$segment_id", persistedDraft.SegmentId);
             segmentCommand.ExecuteNonQuery();
         }
 
@@ -162,14 +170,55 @@ public sealed class CorrectionDraftRepository(AppPaths paths)
         transaction.Commit();
     }
 
-    private SqliteConnection OpenConnection()
+    private static CorrectionDraft EnsureWritableDraftId(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CorrectionDraft draft)
     {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+                status,
+                EXISTS(SELECT 1 FROM review_decisions WHERE draft_id = $draft_id)
+            FROM correction_drafts
+            WHERE draft_id = $draft_id;
+            """;
+        command.Parameters.AddWithValue("$draft_id", draft.DraftId);
+
+        using var reader = command.ExecuteReader();
+        var hasExistingDraft = reader.Read();
+        var status = hasExistingDraft ? reader.GetString(0) : null;
+        var hasDecision = hasExistingDraft && reader.GetInt32(1) != 0;
+        reader.Close();
+
+        if (!hasExistingDraft)
         {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
+            return draft;
+        }
+
+        if (string.Equals(status, "pending", StringComparison.Ordinal) && !hasDecision)
+        {
+            return draft;
+        }
+
+        return draft with { DraftId = CreateReplacementDraftId(connection, transaction, draft.DraftId) };
+    }
+
+    private static string CreateReplacementDraftId(SqliteConnection connection, SqliteTransaction transaction, string baseDraftId)
+    {
+        while (true)
+        {
+            var candidate = $"{baseDraftId}-rerun-{Guid.NewGuid():N}";
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT COUNT(*) FROM correction_drafts WHERE draft_id = $draft_id;";
+            command.Parameters.AddWithValue("$draft_id", candidate);
+            if (Convert.ToInt32(command.ExecuteScalar()) == 0)
+            {
+                return candidate;
+            }
+        }
     }
 
     private static CorrectionDraft ReadDraft(SqliteDataReader reader)

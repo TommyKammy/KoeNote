@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.ViewModels;
@@ -7,8 +8,7 @@ public sealed partial class MainWindowViewModel
 {
     private static string FormatTimestamp(double seconds)
     {
-        var time = TimeSpan.FromSeconds(seconds);
-        return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
+        return TimestampFormatter.FormatDisplay(seconds);
     }
 
     private void UpdateSegmentReviewStates(IReadOnlyList<CorrectionDraft> drafts)

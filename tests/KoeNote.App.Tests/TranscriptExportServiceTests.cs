@@ -4,7 +4,6 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
-using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -13,8 +12,8 @@ public sealed class TranscriptExportServiceTests
     [Fact]
     public void ExportJob_WritesFilesUsingFallbackTextAndSpeakerAliases()
     {
-        var paths = CreateReadyPaths();
-        InsertJob(paths, "job-001", "meeting");
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("seg-001", "job-001", 1, 2.5, "spk-1", "raw one", "normalized one"),
             new TranscriptSegment("seg-002", "job-001", 3, 4.25, "spk-2", "raw two")
@@ -54,8 +53,8 @@ public sealed class TranscriptExportServiceTests
     [Fact]
     public void ExportJob_CanWriteSelectedFormatsOnly()
     {
-        var paths = CreateReadyPaths();
-        InsertJob(paths, "job-001", "selected");
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "selected");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
         ]);
@@ -72,8 +71,8 @@ public sealed class TranscriptExportServiceTests
     [Fact]
     public void ExportJob_NormalizesBlankLinesInsideSubtitleCues()
     {
-        var paths = CreateReadyPaths();
-        InsertJob(paths, "job-001", "subtitle");
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "subtitle");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "first line\r\n\r\nsecond line")
         ]);
@@ -90,49 +89,9 @@ public sealed class TranscriptExportServiceTests
         Assert.DoesNotContain($"first line{Environment.NewLine}{Environment.NewLine}second line", vtt, StringComparison.Ordinal);
     }
 
-    private static AppPaths CreateReadyPaths()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var paths = new AppPaths(root, local);
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
-        return paths;
-    }
-
-    private static void InsertJob(AppPaths paths, string jobId, string title)
-    {
-        using var connection = Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO jobs (
-                job_id,
-                title,
-                source_audio_path,
-                status,
-                progress_percent,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                $job_id,
-                $title,
-                'test.wav',
-                'review_ready',
-                90,
-                $now,
-                $now
-            );
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$title", title);
-        command.Parameters.AddWithValue("$now", DateTimeOffset.Now.ToString("o"));
-        command.ExecuteNonQuery();
-    }
-
     private static void SetFinalText(AppPaths paths, string jobId, string segmentId, string finalText)
     {
-        using var connection = Open(paths);
+        using var connection = TestDatabase.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             UPDATE transcript_segments
@@ -147,7 +106,7 @@ public sealed class TranscriptExportServiceTests
 
     private static void SetSpeakerAlias(AppPaths paths, string jobId, string speakerId, string displayName)
     {
-        using var connection = Open(paths);
+        using var connection = TestDatabase.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO speaker_aliases (job_id, speaker_id, display_name, updated_at)
@@ -160,13 +119,4 @@ public sealed class TranscriptExportServiceTests
         command.ExecuteNonQuery();
     }
 
-    private static SqliteConnection Open(AppPaths paths)
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

@@ -1,5 +1,3 @@
-using Microsoft.Data.Sqlite;
-
 namespace KoeNote.App.Services.Jobs;
 
 public sealed class StageProgressRepository(AppPaths paths)
@@ -16,7 +14,7 @@ public sealed class StageProgressRepository(AppPaths paths)
         string? errorCategory = null,
         string? logPath = null)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO stage_progress (
@@ -68,13 +66,4 @@ public sealed class StageProgressRepository(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

@@ -33,6 +33,20 @@ public sealed class EvaluationBenchTests
     }
 
     [Fact]
+    public void Runner_CreatesDistinctReportPathsForBackToBackRuns()
+    {
+        var outputRoot = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var runner = new EvaluationBenchRunner();
+
+        var first = runner.Run(new EvaluationBenchOptions(outputRoot));
+        var second = runner.Run(new EvaluationBenchOptions(outputRoot));
+
+        Assert.NotEqual(first.ReportPath, second.ReportPath);
+        Assert.True(File.Exists(first.ReportPath));
+        Assert.True(File.Exists(second.ReportPath));
+    }
+
+    [Fact]
     public void EvaluateReviewJson_ReturnsParseFailureMetricInsteadOfThrowing()
     {
         var result = EvaluationBenchRunner.EvaluateReviewJson(

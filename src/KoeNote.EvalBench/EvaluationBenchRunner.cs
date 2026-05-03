@@ -20,7 +20,8 @@ public sealed class EvaluationBenchRunner
     {
         var runStarted = DateTimeOffset.Now;
         var stopwatch = Stopwatch.StartNew();
-        var runDirectory = Path.Combine(options.OutputRoot, runStarted.ToString("yyyyMMdd-HHmmss"));
+        var runId = $"{runStarted:yyyyMMdd-HHmmss-fff}-{Guid.NewGuid():N}"[..27];
+        var runDirectory = Path.Combine(options.OutputRoot, runId);
         Directory.CreateDirectory(runDirectory);
 
         var cases = RunFixtureCases();

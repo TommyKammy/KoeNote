@@ -1,5 +1,3 @@
-using Microsoft.Data.Sqlite;
-
 namespace KoeNote.App.Services.Asr;
 
 public sealed record AsrSettings(string ContextText, string HotwordsText)
@@ -15,7 +13,7 @@ public sealed class AsrSettingsRepository(AppPaths paths)
 {
     public AsrSettings Load()
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT context_text, hotwords_text
@@ -34,7 +32,7 @@ public sealed class AsrSettingsRepository(AppPaths paths)
 
     public void Save(AsrSettings settings)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO asr_settings (settings_id, context_text, hotwords_text, updated_at)
@@ -50,13 +48,4 @@ public sealed class AsrSettingsRepository(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

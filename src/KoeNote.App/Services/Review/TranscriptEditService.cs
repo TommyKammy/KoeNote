@@ -22,7 +22,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             throw new ArgumentException("Final text is required.", nameof(finalText));
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         var before = LoadSegmentSnapshot(connection, transaction, jobId, segmentId)
@@ -73,7 +73,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             throw new ArgumentException("Display name is required.", nameof(displayName));
         }
 
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         var before = LoadSpeakerAliasSnapshot(connection, transaction, jobId, speakerId);
@@ -109,7 +109,7 @@ public sealed class TranscriptEditService(AppPaths paths)
 
     public bool UndoLast(string? jobId = null)
     {
-        using var connection = OpenConnection();
+        using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
         var operation = LoadLastOperation(connection, transaction, jobId);
@@ -382,16 +382,6 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.CommandText = "DELETE FROM review_operation_history WHERE operation_id = $operation_id;";
         command.Parameters.AddWithValue("$operation_id", operationId);
         command.ExecuteNonQuery();
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
     }
 
     internal sealed record ReviewDecisionHistorySnapshot(
