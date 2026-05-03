@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using KoeNote.App.Models;
 
@@ -104,7 +105,8 @@ public sealed class AsrJsonNormalizer
                 return number;
             }
 
-            if (property.ValueKind == JsonValueKind.String && double.TryParse(property.GetString(), out var parsed))
+            if (property.ValueKind == JsonValueKind.String
+                && double.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
             {
                 return parsed;
             }

@@ -12,6 +12,15 @@ public sealed class ExternalProcessRunner
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
+        return await RunAsync(fileName, SplitArguments(arguments), timeout, cancellationToken);
+    }
+
+    public async Task<ProcessRunResult> RunAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
         using var timeoutCancellation = new CancellationTokenSource(timeout);
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
 
@@ -21,7 +30,6 @@ public sealed class ExternalProcessRunner
             StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -29,6 +37,11 @@ public sealed class ExternalProcessRunner
             },
             EnableRaisingEvents = true
         };
+
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
 
         process.Start();
 
@@ -69,5 +82,46 @@ public sealed class ExternalProcessRunner
         catch (InvalidOperationException)
         {
         }
+    }
+
+    private static IReadOnlyList<string> SplitArguments(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return [];
+        }
+
+        var result = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+
+        foreach (var character in arguments)
+        {
+            if (character == '"')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(character) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    result.Add(current.ToString());
+                    current.Clear();
+                }
+
+                continue;
+            }
+
+            current.Append(character);
+        }
+
+        if (current.Length > 0)
+        {
+            result.Add(current.ToString());
+        }
+
+        return result;
     }
 }
