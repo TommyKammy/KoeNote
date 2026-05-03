@@ -54,6 +54,12 @@ experiments/
 
 If a result should be preserved in Git, summarize it in Markdown without embedding private audio, full transcripts, or large raw outputs.
 
+## Phase 0 Tools
+
+- `scripts/phase0/Collect-HostInfo.ps1` captures the current Windows development host profile.
+- `scripts/phase0/Test-Phase0Prereqs.ps1` checks required and optional local tools/models.
+- `docs/phase0/RUNBOOK.md` describes the Phase 0 command sequence.
+
 ## Phase 0 Gate
 
 Phase 0 is complete when the following command-line path works on Windows:

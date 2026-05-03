@@ -30,6 +30,7 @@ logs/
 tmp/
 temp/
 jobs/
+experiments/phase0/runs/
 *.sqlite
 *.sqlite3
 *.db
