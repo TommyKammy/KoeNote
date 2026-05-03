@@ -14,6 +14,12 @@ public sealed class AppPaths
         DatabasePath = Path.Combine(Root, "jobs.sqlite");
         SettingsPath = Path.Combine(Root, "settings.json");
         Logs = Path.Combine(localAppData, "KoeNote", "logs");
+        RuntimeTools = Path.Combine(AppContext.BaseDirectory, "tools");
+        Models = Path.Combine(AppContext.BaseDirectory, "models");
+        CrispAsrPath = Path.Combine(RuntimeTools, "crispasr.exe");
+        LlamaCompletionPath = Path.Combine(RuntimeTools, "llama-completion.exe");
+        VibeVoiceAsrModelPath = Path.Combine(Models, "asr", "vibevoice-asr-q4_k.gguf");
+        ReviewModelPath = Path.Combine(Models, "review", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
     }
 
     public string Root { get; }
@@ -25,6 +31,18 @@ public sealed class AppPaths
     public string SettingsPath { get; }
 
     public string Logs { get; }
+
+    public string RuntimeTools { get; }
+
+    public string Models { get; }
+
+    public string CrispAsrPath { get; }
+
+    public string LlamaCompletionPath { get; }
+
+    public string VibeVoiceAsrModelPath { get; }
+
+    public string ReviewModelPath { get; }
 
     public void EnsureCreated()
     {

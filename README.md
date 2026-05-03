@@ -13,3 +13,4 @@ KoeNote is an experimental Windows desktop app for fully local Japanese ASR and 
 
 - [Phase 0 preflight](docs/phase0/README.md)
 - [Phase 1 Windows runtime foundation](docs/phase1/README.md)
+- [Phase 2 ASR worker](docs/phase2/README.md)

@@ -13,10 +13,10 @@ public sealed class ToolStatusService(AppPaths paths)
             CheckCommand("dotnet", "dotnet", "--version", required: true),
             CheckCommand("ffmpeg", "ffmpeg", "-version", required: true),
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: true),
-            CheckFile("crispasr", Path.Combine(AppContext.BaseDirectory, "tools", "crispasr.exe"), required: false),
-            CheckFile("llama-completion", Path.Combine(AppContext.BaseDirectory, "tools", "llama-completion.exe"), required: false),
-            CheckFile("ASR model", Path.Combine(AppContext.BaseDirectory, "models", "asr", "vibevoice-asr-q4_k.gguf"), required: false),
-            CheckFile("Review model", Path.Combine(AppContext.BaseDirectory, "models", "review", "llm-jp-4-8B-thinking-Q4_K_M.gguf"), required: false),
+            CheckFile("crispasr", paths.CrispAsrPath, required: false),
+            CheckFile("llama-completion", paths.LlamaCompletionPath, required: false),
+            CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: false),
+            CheckFile("Review model", paths.ReviewModelPath, required: false),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),
             new("SQLite", paths.DatabasePath, File.Exists(paths.DatabasePath))
         ];
