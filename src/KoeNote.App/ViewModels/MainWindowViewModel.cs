@@ -7,6 +7,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
+using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.SystemStatus;
@@ -28,6 +29,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly ReviewOperationService _reviewOperationService;
     private readonly TranscriptEditService _transcriptEditService;
     private readonly CorrectionMemoryService _correctionMemoryService;
+    private readonly TranscriptExportService _transcriptExportService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfo _statusBarInfo;
     private JobSummary? _selectedJob;
@@ -37,6 +39,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _asrSettingsSaveDebounce;
     private bool _isReviewOperationInProgress;
     private bool _rememberCorrection = true;
+    private string _exportWarning = string.Empty;
+    private string _lastExportFolder = string.Empty;
     private string _latestLog;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
@@ -73,6 +77,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _reviewOperationService = new ReviewOperationService(Paths);
         _transcriptEditService = new TranscriptEditService(Paths);
         _correctionMemoryService = new CorrectionMemoryService(Paths);
+        _transcriptExportService = new TranscriptExportService(Paths);
         _transcriptSegmentRepository = new TranscriptSegmentRepository(Paths);
         var processRunner = new ExternalProcessRunner();
         _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
@@ -152,6 +157,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
+        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
+        OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
 
         RefreshSpeakerFilters();
     }
@@ -220,6 +227,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand UndoLastOperationCommand { get; }
 
+    public ICommand ExportSelectedJobCommand { get; }
+
+    public ICommand OpenExportFolderCommand { get; }
+
     public JobSummary? SelectedJob
     {
         get => _selectedJob;
@@ -239,6 +250,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
                 LoadReviewQueue();
+                UpdateExportCommandStates();
             }
         }
     }
@@ -406,6 +418,24 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _rememberCorrection;
         set => SetField(ref _rememberCorrection, value);
+    }
+
+    public string ExportWarning
+    {
+        get => _exportWarning;
+        private set => SetField(ref _exportWarning, value);
+    }
+
+    public string LastExportFolder
+    {
+        get => _lastExportFolder;
+        private set
+        {
+            if (SetField(ref _lastExportFolder, value))
+            {
+                UpdateExportCommandStates();
+            }
+        }
     }
 
     public string AsrContextText

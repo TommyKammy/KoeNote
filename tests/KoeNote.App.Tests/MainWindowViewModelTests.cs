@@ -146,6 +146,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("KoeNote", reader.GetString(1));
     }
 
+    [Fact]
+    public void ExportSelectedJobToFolder_RecordsErrorWithoutThrowing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.ExportSelectedJobToFolder(string.Empty);
+
+        Assert.StartsWith("Export failed:", viewModel.ExportWarning, StringComparison.Ordinal);
+        Assert.StartsWith("Export failed:", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains(viewModel.Logs, entry => entry.Stage == "export" && entry.Level == "error");
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

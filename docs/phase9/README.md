@@ -45,3 +45,21 @@ Rejecting a draft should not create `final_text`; this fallback preserves the me
 - Speaker aliases appear in exported files.
 - Export logs include file paths and failure categories.
 - Tests cover fallback order and unresolved-review warnings.
+
+## Implementation Start
+
+Added the first app export workflow:
+
+- `TranscriptExportService`
+- TXT export
+- Markdown export
+- JSON export
+- SRT export
+- VTT export
+- `final_text ?? normalized_text ?? raw_text` fallback
+- speaker alias resolution
+- unresolved pending draft warning in the result and UI
+- export log events through `JobLogRepository`
+- transcript-panel Export and open-folder buttons
+
+DOCX remains out of the initial implementation slice and should be added only after confirming the packaging/runtime dependency path.

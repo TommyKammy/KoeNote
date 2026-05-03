@@ -86,6 +86,7 @@ public sealed partial class MainWindowViewModel
         FilteredSegments.Refresh();
         SelectedSegment = Segments.FirstOrDefault(segment => segment.SegmentId == preferredSegmentId)
             ?? Segments.FirstOrDefault();
+        UpdateExportCommandStates();
     }
 
     private bool CanEditSelectedSegment()
