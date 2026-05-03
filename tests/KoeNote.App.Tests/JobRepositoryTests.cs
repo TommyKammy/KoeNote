@@ -16,7 +16,7 @@ public sealed class JobRepositoryTests
         var repository = new JobRepository(paths);
         var sourcePath = Path.Combine(
             Path.GetTempPath(),
-            "これは非常に長い日本語ファイル名の会議録音サンプルです_株式会社テスト_開発定例_2026年05月03日.m4a");
+            "これは非常に長い日本語ファイル名の会議録音サンプルです株式会社テスト開発定例2026年05月03日.m4a");
 
         var job = repository.CreateFromAudio(sourcePath);
 
@@ -44,7 +44,7 @@ public sealed class JobRepositoryTests
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
 
-        repository.UpdatePreprocessResult(job, "音声変換完了", "preprocessed", 100, @"C:\normalized\audio.wav");
+        repository.MarkPreprocessSucceeded(job, @"C:\normalized\audio.wav");
 
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
@@ -57,6 +57,21 @@ public sealed class JobRepositoryTests
         Assert.Equal("preprocessed", reader.GetString(1));
         Assert.Equal(100, reader.GetInt32(2));
         Assert.Equal(@"C:\normalized\audio.wav", reader.GetString(3));
+    }
+
+    [Fact]
+    public void CreateFromAudio_GeneratesUniqueIdsForRapidRegistrations()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var repository = new JobRepository(paths);
+
+        var first = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        var second = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        Assert.NotEqual(first.JobId, second.JobId);
     }
 
     private static AppPaths CreatePaths()

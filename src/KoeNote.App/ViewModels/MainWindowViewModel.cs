@@ -151,7 +151,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var stage = StageStatuses.First(item => item.Name == "音声変換");
         stage.Status = "実行中";
         stage.ProgressPercent = 10;
-        _jobRepository.UpdatePreprocessResult(job, "音声変換中", "preprocessing", 10, null);
+        _jobRepository.MarkPreprocessRunning(job);
         LatestLog = $"Running ffmpeg for {job.FileName}";
 
         try
@@ -159,14 +159,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             var result = await _audioPreprocessWorker.NormalizeAsync(job, "ffmpeg", Paths);
             stage.Status = "成功";
             stage.ProgressPercent = 100;
-            _jobRepository.UpdatePreprocessResult(job, "音声変換完了", "preprocessed", 100, result.NormalizedAudioPath);
+            _jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             LatestLog = $"Generated normalized WAV: {result.NormalizedAudioPath}";
         }
         catch (Exception exception)
         {
             stage.Status = "失敗";
             stage.ProgressPercent = 100;
-            _jobRepository.UpdatePreprocessResult(job, "音声変換失敗", "preprocessing_failed", 100, null, "ffmpeg_failed");
+            _jobRepository.MarkPreprocessFailed(job, "ffmpeg_failed");
             _jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
             LatestLog = exception.Message;
         }

@@ -14,12 +14,12 @@ public sealed class JobLogRepositoryTests
         new DatabaseInitializer(paths).EnsureCreated();
 
         var repository = new JobLogRepository(paths);
-        var logPath = repository.SaveWorkerLog("job-001", "preprocess", "stdout text", "stderr text");
+        var logPath = repository.SaveWorkerLog("job-001", "preprocess", "stdout text 日本語", "stderr text 音声変換");
 
         Assert.True(File.Exists(logPath));
         var content = File.ReadAllText(logPath);
-        Assert.Contains("stdout text", content);
-        Assert.Contains("stderr text", content);
+        Assert.Contains("stdout text 日本語", content);
+        Assert.Contains("stderr text 音声変換", content);
 
         using var connection = Open(paths);
         using var command = connection.CreateCommand();

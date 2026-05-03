@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using System.IO;
+using System.Text;
 
 namespace KoeNote.App.Services.Jobs;
 
@@ -11,7 +12,7 @@ public sealed class JobLogRepository(AppPaths paths)
         Directory.CreateDirectory(logDirectory);
 
         var logPath = Path.Combine(logDirectory, $"{stage}.log");
-        File.WriteAllText(logPath, $"""
+        var content = $"""
             # {stage}
 
             ## stdout
@@ -19,7 +20,9 @@ public sealed class JobLogRepository(AppPaths paths)
 
             ## stderr
             {standardError}
-            """);
+            """;
+
+        File.WriteAllText(logPath, content, Encoding.UTF8);
 
         AddEvent(jobId, stage, "info", $"Saved {stage} worker log: {logPath}");
         return logPath;

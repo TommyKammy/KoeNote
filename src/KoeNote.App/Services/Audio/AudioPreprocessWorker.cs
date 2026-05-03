@@ -31,10 +31,23 @@ public sealed class AudioPreprocessWorker(
                 TimeSpan.FromMinutes(30),
                 cancellationToken);
         }
-        catch (Exception exception)
+        catch (OperationCanceledException)
         {
             var failedAt = DateTimeOffset.Now;
-            jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
+            stageProgressRepository.Upsert(
+                job.JobId,
+                "preprocess",
+                "cancelled",
+                100,
+                startedAt,
+                failedAt,
+                (failedAt - startedAt).TotalSeconds,
+                errorCategory: "cancelled");
+            throw;
+        }
+        catch (Exception)
+        {
+            var failedAt = DateTimeOffset.Now;
             stageProgressRepository.Upsert(
                 job.JobId,
                 "preprocess",
@@ -65,6 +78,23 @@ public sealed class AudioPreprocessWorker(
                 logPath);
 
             throw new InvalidOperationException($"ffmpeg exited with code {result.ExitCode}. See log: {logPath}");
+        }
+
+        if (!File.Exists(normalizedAudioPath))
+        {
+            stageProgressRepository.Upsert(
+                job.JobId,
+                "preprocess",
+                "failed",
+                100,
+                startedAt,
+                finishedAt,
+                result.Duration.TotalSeconds,
+                result.ExitCode,
+                "ffmpeg_output_missing",
+                logPath);
+
+            throw new FileNotFoundException($"ffmpeg succeeded but did not create the normalized WAV. See log: {logPath}", normalizedAudioPath);
         }
 
         stageProgressRepository.Upsert(

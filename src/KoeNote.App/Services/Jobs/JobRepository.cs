@@ -9,7 +9,8 @@ public sealed class JobRepository(AppPaths paths)
     public JobSummary CreateFromAudio(string sourceAudioPath)
     {
         var now = DateTimeOffset.Now;
-        var jobId = now.ToString("yyyyMMdd-HHmmssfff");
+        var uniqueSuffix = Guid.NewGuid().ToString("N")[..8];
+        var jobId = $"{now:yyyyMMdd-HHmmssfff}-{uniqueSuffix}";
         var title = Path.GetFileNameWithoutExtension(sourceAudioPath);
         var fileName = Path.GetFileName(sourceAudioPath);
 
@@ -102,6 +103,21 @@ public sealed class JobRepository(AppPaths paths)
         command.Parameters.AddWithValue("$last_error_category", (object?)errorCategory ?? DBNull.Value);
         command.Parameters.AddWithValue("$job_id", job.JobId);
         command.ExecuteNonQuery();
+    }
+
+    public void MarkPreprocessRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "音声変換中", "preprocessing", 10, null);
+    }
+
+    public void MarkPreprocessSucceeded(JobSummary job, string normalizedAudioPath)
+    {
+        UpdatePreprocessResult(job, "音声変換完了", "preprocessed", 100, normalizedAudioPath);
+    }
+
+    public void MarkPreprocessFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, "音声変換失敗", "preprocessing_failed", 100, null, errorCategory);
     }
 
     private SqliteConnection OpenConnection()
