@@ -1,0 +1,141 @@
+using System.IO;
+using System.Text.Json;
+using KoeNote.App.Services.Models;
+
+namespace KoeNote.App.Services.Setup;
+
+internal sealed class SetupReadinessService(
+    AppPaths paths,
+    SetupStateService stateService,
+    ToolStatusService toolStatusService,
+    InstalledModelRepository installedModelRepository)
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    public IReadOnlyList<SetupEnvironmentCheck> GetEnvironmentChecks()
+    {
+        return toolStatusService.GetStatusItems()
+            .Select(static item => new SetupEnvironmentCheck(item.Name, item.IsOk, item.Detail))
+            .ToArray();
+    }
+
+    public IReadOnlyList<SetupModelAudit> GetSelectedModelAudit()
+    {
+        var state = stateService.Load();
+        return GetSelectedInstalledModels(state)
+            .Select(model => new SetupModelAudit(
+                model.ModelId,
+                !string.IsNullOrWhiteSpace(model.Sha256),
+                string.IsNullOrWhiteSpace(model.Sha256) ? "checksum not recorded" : model.Sha256,
+                !string.IsNullOrWhiteSpace(model.ManifestPath) && File.Exists(model.ManifestPath),
+                string.IsNullOrWhiteSpace(model.ManifestPath) ? "manifest not recorded" : model.ManifestPath,
+                !string.IsNullOrWhiteSpace(model.LicenseName),
+                string.IsNullOrWhiteSpace(model.LicenseName) ? "license not recorded" : model.LicenseName))
+            .ToArray();
+    }
+
+    public SetupSmokeResult RunSmokeCheck()
+    {
+        var state = stateService.Load();
+        var checks = BuildSmokeChecks(state);
+        var succeeded = checks.All(static check => check.IsOk);
+        var updated = stateService.Save(state with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            LastSmokeSucceeded = succeeded,
+            IsCompleted = state.IsCompleted && succeeded
+        });
+        WriteReport(updated, checks);
+        return new SetupSmokeResult(succeeded, checks, paths.SetupReportPath);
+    }
+
+    public SetupState CompleteIfReady()
+    {
+        var state = stateService.Load();
+        var checks = BuildSmokeChecks(state);
+        var smokeSucceeded = checks.All(static check => check.IsOk);
+        var selectedModels = GetSelectedInstalledModels(state)
+            .Where(static model => model.Verified && (File.Exists(model.FilePath) || Directory.Exists(model.FilePath)))
+            .ToArray();
+        var ready = state.LicenseAccepted &&
+            smokeSucceeded &&
+            selectedModels.Any(model => model.Role.Equals("asr", StringComparison.OrdinalIgnoreCase)) &&
+            selectedModels.Any(model => model.Role.Equals("review", StringComparison.OrdinalIgnoreCase));
+
+        var updated = stateService.Save(state with
+        {
+            CurrentStep = ready ? SetupStep.Complete : SetupStep.SmokeTest,
+            LastSmokeSucceeded = smokeSucceeded,
+            IsCompleted = ready
+        });
+        WriteReport(updated, checks);
+        return updated;
+    }
+
+    private SetupSmokeCheck CheckFile(string name, string path)
+    {
+        var exists = File.Exists(path);
+        return new SetupSmokeCheck(name, exists, exists ? path : $"Missing: {path}");
+    }
+
+    private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state)
+    {
+        return
+        [
+            CheckFile("ffmpeg", paths.FfmpegPath),
+            CheckSelectedModel("ASR model", state.SelectedAsrModelId),
+            CheckSelectedModel("Review LLM model", state.SelectedReviewModelId),
+            new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
+            new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
+        ];
+    }
+
+    private SetupSmokeCheck CheckSelectedModel(string name, string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return new SetupSmokeCheck(name, false, "Select a model in Setup.");
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(modelId);
+        if (installed is null)
+        {
+            return new SetupSmokeCheck(name, false, $"Not installed: {modelId}");
+        }
+
+        var exists = File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
+        var verified = installed.Verified && exists;
+        return new SetupSmokeCheck(name, verified, verified ? installed.FilePath : $"Verification failed or missing: {installed.FilePath}");
+    }
+
+    private void WriteReport(SetupState state, IReadOnlyList<SetupSmokeCheck> checks)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SetupReportPath)!);
+        var messages = checks
+            .Where(static check => !check.IsOk)
+            .Select(static check => $"{check.Name}: {check.Detail}")
+            .DefaultIfEmpty("Setup smoke check passed.")
+            .ToArray();
+        var report = new SetupReport(
+            DateTimeOffset.Now,
+            state,
+            toolStatusService.GetStatusItems(),
+            GetSelectedInstalledModels(state),
+            checks,
+            state.IsCompleted || checks.All(static check => check.IsOk),
+            messages);
+        File.WriteAllText(paths.SetupReportPath, JsonSerializer.Serialize(report, JsonOptions));
+    }
+
+    private IReadOnlyList<InstalledModel> GetSelectedInstalledModels(SetupState state)
+    {
+        return new[] { state.SelectedAsrModelId, state.SelectedReviewModelId }
+            .Where(static modelId => !string.IsNullOrWhiteSpace(modelId))
+            .Select(modelId => installedModelRepository.FindInstalledModel(modelId!))
+            .OfType<InstalledModel>()
+            .ToArray();
+    }
+}

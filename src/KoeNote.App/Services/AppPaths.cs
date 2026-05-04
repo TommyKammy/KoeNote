@@ -2,14 +2,39 @@ using System.IO;
 
 namespace KoeNote.App.Services;
 
+public enum InstallScope
+{
+    CurrentUser,
+    AllUsers
+}
+
+public sealed record AppPathOptions(
+    string? AppDataRoot = null,
+    string? LocalAppDataRoot = null,
+    string? ProgramDataRoot = null,
+    string? AppBaseDirectory = null,
+    InstallScope InstallScope = InstallScope.CurrentUser);
+
 public sealed class AppPaths
 {
     public AppPaths(string? appDataRoot = null, string? localAppDataRoot = null, string? appBaseDirectory = null)
+        : this(new AppPathOptions(
+            AppDataRoot: appDataRoot,
+            LocalAppDataRoot: localAppDataRoot,
+            AppBaseDirectory: appBaseDirectory))
     {
-        var appData = appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var localAppData = localAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var baseDirectory = appBaseDirectory ?? AppContext.BaseDirectory;
+    }
 
+    public AppPaths(AppPathOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var appData = options.AppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localAppData = options.LocalAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var programData = options.ProgramDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var baseDirectory = options.AppBaseDirectory ?? AppContext.BaseDirectory;
+
+        InstallScope = options.InstallScope;
         Root = Path.Combine(appData, "KoeNote");
         Jobs = Path.Combine(Root, "jobs");
         DatabasePath = Path.Combine(Root, "jobs.sqlite");
@@ -18,6 +43,8 @@ public sealed class AppPaths
         SetupReportPath = Path.Combine(Root, "setup_report.json");
         Logs = Path.Combine(localAppData, "KoeNote", "logs");
         UserModels = Path.Combine(localAppData, "KoeNote", "models");
+        MachineModels = Path.Combine(programData, "KoeNote", "models");
+        DefaultModelStorageRoot = InstallScope == InstallScope.AllUsers ? MachineModels : UserModels;
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         Models = Path.Combine(baseDirectory, "models");
@@ -32,6 +59,8 @@ public sealed class AppPaths
         ReazonSpeechK2ModelPath = Path.Combine(Models, "asr", "reazonspeech-k2-v3");
         ReviewModelPath = Path.Combine(Models, "review", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
     }
+
+    public InstallScope InstallScope { get; }
 
     public string Root { get; }
 
@@ -48,6 +77,10 @@ public sealed class AppPaths
     public string Logs { get; }
 
     public string UserModels { get; }
+
+    public string MachineModels { get; }
+
+    public string DefaultModelStorageRoot { get; }
 
     public string ModelDownloads { get; }
 

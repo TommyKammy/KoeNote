@@ -1,6 +1,4 @@
-using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
-using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -9,15 +7,14 @@ public sealed class AsrRunRepositoryTests
     [Fact]
     public void StartAndMarkSucceeded_PersistAsrRunLifecycle()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
         var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
         repository.MarkSucceeded(asrRunId, TimeSpan.FromSeconds(1.25), "raw.json", "segments.json");
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT engine_id, model_id, status, duration_seconds, raw_output_path, normalized_output_path
@@ -39,15 +36,14 @@ public sealed class AsrRunRepositoryTests
     [Fact]
     public void MarkFailed_PersistsErrorCategory()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
         var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
         repository.MarkFailed(asrRunId, "MissingModel");
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT status, error_category
@@ -65,15 +61,14 @@ public sealed class AsrRunRepositoryTests
     [Fact]
     public void MarkCancelled_PersistsCancelledStatus()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
         var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
         repository.MarkCancelled(asrRunId);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT status, error_category
@@ -88,20 +83,4 @@ public sealed class AsrRunRepositoryTests
         Assert.Equal("cancelled", reader.GetString(1));
     }
 
-    private static AppPaths CreatePaths()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        return new AppPaths(root, local);
-    }
-
-    private static SqliteConnection Open(AppPaths paths)
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

@@ -56,7 +56,7 @@ public sealed class ModelInstallService(
     public string GetDefaultInstallPath(ModelCatalogItem catalogItem)
     {
         var extension = catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) ? ".gguf" : "";
-        return Path.Combine(paths.UserModels, catalogItem.Role, catalogItem.ModelId + extension);
+        return Path.Combine(paths.DefaultModelStorageRoot, catalogItem.Role, catalogItem.ModelId + extension);
     }
 
     private static long? CalculateSizeBytes(string path)

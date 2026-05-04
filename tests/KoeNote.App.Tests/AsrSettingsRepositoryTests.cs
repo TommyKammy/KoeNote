@@ -1,4 +1,3 @@
-using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 
 namespace KoeNote.App.Tests;
@@ -8,9 +7,7 @@ public sealed class AsrSettingsRepositoryTests
     [Fact]
     public void SaveAndLoad_RestoresContextHotwordsAndEngineId()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
         var repository = new AsrSettingsRepository(paths);
 
         repository.Save(new AsrSettings("product meeting", "KoeNote\r\nRTX 3060,Whisper", "faster-whisper-large-v3-turbo"));
@@ -25,9 +22,7 @@ public sealed class AsrSettingsRepositoryTests
     [Fact]
     public void Load_ReturnsDefaultSettingsWhenNotSaved()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
         var restored = new AsrSettingsRepository(paths).Load();
 
@@ -37,9 +32,4 @@ public sealed class AsrSettingsRepositoryTests
         Assert.Empty(restored.Hotwords);
     }
 
-    private static AppPaths CreatePaths()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        return new AppPaths(root, root, AppContext.BaseDirectory);
-    }
 }

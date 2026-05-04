@@ -1,6 +1,4 @@
-using KoeNote.App.Services;
 using KoeNote.App.Services.Jobs;
-using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -9,9 +7,8 @@ public sealed class JobRepositoryTests
     [Fact]
     public void CreateFromAudio_PersistsJobWithLongJapaneseFileName()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
 
         var repository = new JobRepository(paths);
         var sourcePath = Path.Combine(
@@ -22,7 +19,7 @@ public sealed class JobRepositoryTests
 
         Assert.Contains("非常に長い日本語ファイル名", job.FileName);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT title, source_audio_path, status FROM jobs WHERE job_id = $job_id;";
         command.Parameters.AddWithValue("$job_id", job.JobId);
@@ -37,16 +34,15 @@ public sealed class JobRepositoryTests
     [Fact]
     public void UpdatePreprocessResult_PersistsNormalizedAudioAndProgress()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
 
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
 
         repository.MarkPreprocessSucceeded(job, @"C:\normalized\audio.wav");
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT status, current_stage, progress_percent, normalized_audio_path FROM jobs WHERE job_id = $job_id;";
         command.Parameters.AddWithValue("$job_id", job.JobId);
@@ -62,9 +58,7 @@ public sealed class JobRepositoryTests
     [Fact]
     public void CreateFromAudio_GeneratesUniqueIdsForRapidRegistrations()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
         var repository = new JobRepository(paths);
 
@@ -77,16 +71,15 @@ public sealed class JobRepositoryTests
     [Fact]
     public void MarkAsrFailed_PersistsVisibleFailureCategory()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
 
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
 
         repository.MarkAsrFailed(job, "MissingRuntime");
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT status, current_stage, last_error_category FROM jobs WHERE job_id = $job_id;";
         command.Parameters.AddWithValue("$job_id", job.JobId);
@@ -102,9 +95,7 @@ public sealed class JobRepositoryTests
     [Fact]
     public void LoadRecent_RestoresPersistedJobs()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
         var repository = new JobRepository(paths);
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
@@ -121,15 +112,14 @@ public sealed class JobRepositoryTests
     [Fact]
     public void MarkCancelled_PersistsCancelledState()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
 
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
         repository.MarkCancelled(job, "asr");
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT status, current_stage, last_error_category FROM jobs WHERE job_id = $job_id;";
         command.Parameters.AddWithValue("$job_id", job.JobId);
@@ -141,20 +131,4 @@ public sealed class JobRepositoryTests
         Assert.Equal("cancelled", reader.GetString(2));
     }
 
-    private static AppPaths CreatePaths()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        return new AppPaths(root, local);
-    }
-
-    private static SqliteConnection Open(AppPaths paths)
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
 }

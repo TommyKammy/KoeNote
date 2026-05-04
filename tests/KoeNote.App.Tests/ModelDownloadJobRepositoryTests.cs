@@ -1,6 +1,4 @@
-using KoeNote.App.Services;
 using KoeNote.App.Services.Models;
-using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -9,9 +7,8 @@ public sealed class ModelDownloadJobRepositoryTests
     [Fact]
     public void StartMarkPausedAndMarkFailed_PersistsDownloadJob()
     {
-        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         var repository = new ModelDownloadJobRepository(paths);
 
         var downloadId = repository.Start("model-001", "https://example.com/model.bin", "target.bin", "target.bin.partial", "abc");
@@ -20,8 +17,7 @@ public sealed class ModelDownloadJobRepositoryTests
         Assert.Equal("paused", repository.Find(downloadId)?.Status);
         repository.MarkFailed(downloadId, "network unavailable", "def");
 
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = paths.DatabasePath }.ToString());
-        connection.Open();
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT status, bytes_downloaded, bytes_total, error_message, sha256_actual
@@ -43,9 +39,7 @@ public sealed class ModelDownloadJobRepositoryTests
     [Fact]
     public void MarkCancelled_PersistsCancelledState()
     {
-        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
         var repository = new ModelDownloadJobRepository(paths);
 
         var downloadId = repository.Start("model-001", "https://example.com/model.bin", "target.bin", "target.bin.partial", null);
@@ -54,8 +48,4 @@ public sealed class ModelDownloadJobRepositoryTests
         Assert.Equal("cancelled", repository.Find(downloadId)?.Status);
     }
 
-    private static string CreateRoot()
-    {
-        return Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-    }
 }

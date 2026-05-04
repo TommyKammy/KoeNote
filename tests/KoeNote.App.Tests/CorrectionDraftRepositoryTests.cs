@@ -2,7 +2,6 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Review;
-using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
@@ -11,9 +10,8 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void SaveDrafts_PersistsDraftsAndMarksSegments()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "この仕様はサーバーのミギワで処理します")
         ]);
@@ -31,7 +29,7 @@ public sealed class CorrectionDraftRepositoryTests
                 0.62)
         ]);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT d.issue_type, s.review_state, j.unreviewed_draft_count
@@ -51,9 +49,8 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void ReplaceDrafts_ClearsStaleDraftsWhenNoCandidatesRemain()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "この仕様はサーバーのミギワで処理します")
         ]);
@@ -65,7 +62,7 @@ public sealed class CorrectionDraftRepositoryTests
 
         repository.ReplaceDrafts("job-001", []);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -84,9 +81,8 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void ReplaceDrafts_PreservesDecidedDraftsAndReviewDecisions()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         InsertJob(paths, "job-001");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "wrong")
@@ -99,7 +95,7 @@ public sealed class CorrectionDraftRepositoryTests
 
         repository.ReplaceDrafts("job-001", []);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -120,9 +116,8 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void ReplaceDrafts_GeneratesReplacementIdWhenNewDraftConflictsWithDecidedDraft()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
         InsertJob(paths, "job-001");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "wrong")
@@ -137,7 +132,7 @@ public sealed class CorrectionDraftRepositoryTests
             new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "wrong again", "right again", "reason", 0.7)
         ]);
 
-        using var connection = Open(paths);
+        using var connection = fixture.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT draft_id, original_text
@@ -155,9 +150,7 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void ReadPendingForJob_ReturnsPendingDraftsInSegmentOrder()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
         InsertJob(paths, "job-001");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("segment-late", "job-001", 20, 21, "Speaker_0", "late"),
@@ -179,9 +172,7 @@ public sealed class CorrectionDraftRepositoryTests
     [Fact]
     public void ReadPendingForJob_ReturnsDraftSourceMetadata()
     {
-        var paths = CreatePaths();
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
         InsertJob(paths, "job-001");
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("segment-001", "job-001", 1, 2, "Speaker_0", "wrong")
@@ -197,26 +188,9 @@ public sealed class CorrectionDraftRepositoryTests
         Assert.Equal("memory-001", draft.SourceRefId);
     }
 
-    private static AppPaths CreatePaths()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        return new AppPaths(root, local);
-    }
-
-    private static SqliteConnection Open(AppPaths paths)
-    {
-        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = paths.DatabasePath
-        }.ToString());
-        connection.Open();
-        return connection;
-    }
-
     private static void InsertJob(AppPaths paths, string jobId)
     {
-        using var connection = Open(paths);
+        using var connection = TestDatabase.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO jobs (

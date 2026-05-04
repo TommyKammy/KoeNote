@@ -14,17 +14,17 @@ public sealed class SetupStateService(AppPaths paths)
     {
         if (!File.Exists(paths.SetupStatePath))
         {
-            return SetupState.Default(paths.UserModels);
+            return SetupState.Default(paths.DefaultModelStorageRoot);
         }
 
         try
         {
             var json = File.ReadAllText(paths.SetupStatePath);
-            return JsonSerializer.Deserialize<SetupState>(json, JsonOptions) ?? SetupState.Default(paths.UserModels);
+            return JsonSerializer.Deserialize<SetupState>(json, JsonOptions) ?? SetupState.Default(paths.DefaultModelStorageRoot);
         }
         catch (JsonException)
         {
-            return SetupState.Default(paths.UserModels);
+            return SetupState.Default(paths.DefaultModelStorageRoot);
         }
     }
 
@@ -38,7 +38,7 @@ public sealed class SetupStateService(AppPaths paths)
 
     public SetupState Reset()
     {
-        var state = SetupState.Default(paths.UserModels);
+        var state = SetupState.Default(paths.DefaultModelStorageRoot);
         return Save(state);
     }
 }

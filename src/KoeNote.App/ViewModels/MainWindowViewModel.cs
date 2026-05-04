@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -25,13 +24,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
-    private readonly StageProgressRepository _stageProgressRepository;
     private readonly AsrSettingsRepository _asrSettingsRepository;
-    private readonly AudioPreprocessWorker _audioPreprocessWorker;
     private readonly TranscriptSegmentRepository _transcriptSegmentRepository;
-    private readonly AsrWorker _asrWorker;
     private readonly AsrEngineRegistry _asrEngineRegistry;
-    private readonly ReviewWorker _reviewWorker;
     private readonly JobRunCoordinator _jobRunCoordinator;
     private readonly CorrectionDraftRepository _correctionDraftRepository;
     private readonly ReviewOperationService _reviewOperationService;
@@ -42,7 +37,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly InstalledModelRepository _installedModelRepository;
     private readonly ModelInstallService _modelInstallService;
     private readonly ModelLicenseViewer _modelLicenseViewer;
-    private readonly SetupStateService _setupStateService;
     private readonly SetupWizardService _setupWizardService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
@@ -86,93 +80,31 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public MainWindowViewModel(AppPaths paths)
+        : this(paths, MainWindowServices.Create(paths))
+    {
+    }
+
+    internal MainWindowViewModel(AppPaths paths, MainWindowServices services)
     {
         Paths = paths;
-        Paths.EnsureCreated();
-
-        var database = new DatabaseInitializer(Paths);
-        database.EnsureCreated();
-
-        _jobRepository = new JobRepository(Paths);
-        _stageProgressRepository = new StageProgressRepository(Paths);
-        _jobLogRepository = new JobLogRepository(Paths);
-        _asrSettingsRepository = new AsrSettingsRepository(Paths);
-        _correctionDraftRepository = new CorrectionDraftRepository(Paths);
-        _reviewOperationService = new ReviewOperationService(Paths);
-        _transcriptEditService = new TranscriptEditService(Paths);
-        _correctionMemoryService = new CorrectionMemoryService(Paths);
-        _transcriptExportService = new TranscriptExportService(Paths);
-        _modelCatalogService = new ModelCatalogService(Paths);
-        _installedModelRepository = new InstalledModelRepository(Paths);
-        var modelVerificationService = new ModelVerificationService();
-        _modelInstallService = new ModelInstallService(Paths, _installedModelRepository, modelVerificationService);
-        _modelLicenseViewer = new ModelLicenseViewer(_modelCatalogService);
-        var modelPackImportService = new ModelPackImportService(Paths, _modelCatalogService, _modelInstallService);
-        var modelDownloadService = new ModelDownloadService(
-            new HttpClient(),
-            new ModelDownloadJobRepository(Paths),
-            modelVerificationService,
-            _modelInstallService);
-        _setupStateService = new SetupStateService(Paths);
-        _setupWizardService = new SetupWizardService(
-            Paths,
-            _setupStateService,
-            new ToolStatusService(Paths),
-            _modelCatalogService,
-            _installedModelRepository,
-            _modelInstallService,
-            modelPackImportService,
-            modelDownloadService);
+        _jobRepository = services.JobRepository;
+        _jobLogRepository = services.JobLogRepository;
+        _asrSettingsRepository = services.AsrSettingsRepository;
+        _correctionDraftRepository = services.CorrectionDraftRepository;
+        _reviewOperationService = services.ReviewOperationService;
+        _transcriptEditService = services.TranscriptEditService;
+        _correctionMemoryService = services.CorrectionMemoryService;
+        _transcriptExportService = services.TranscriptExportService;
+        _modelCatalogService = services.ModelCatalogService;
+        _installedModelRepository = services.InstalledModelRepository;
+        _modelInstallService = services.ModelInstallService;
+        _modelLicenseViewer = services.ModelLicenseViewer;
+        _setupWizardService = services.SetupWizardService;
         _setupState = _setupWizardService.LoadState();
-        _transcriptSegmentRepository = new TranscriptSegmentRepository(Paths);
-        var processRunner = new ExternalProcessRunner();
-        _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
-        _asrWorker = new AsrWorker(
-            processRunner,
-            new AsrCommandBuilder(),
-            new AsrJsonNormalizer(),
-            new AsrResultStore(),
-            _transcriptSegmentRepository);
-        _reviewWorker = new ReviewWorker(
-            processRunner,
-            new ReviewCommandBuilder(),
-            new ReviewPromptBuilder(),
-            new ReviewJsonNormalizer(),
-            new ReviewResultStore(),
-            new CorrectionDraftRepository(Paths),
-            _correctionMemoryService);
-        _asrEngineRegistry = new AsrEngineRegistry([
-            new VibeVoiceCrispAsrEngine(_asrWorker, new AsrRunRepository(Paths)),
-            new ScriptedJsonAsrEngine(
-                "faster-whisper-large-v3-turbo",
-                "faster-whisper large-v3-turbo",
-                "faster-whisper",
-                processRunner,
-                new AsrJsonNormalizer(),
-                new AsrResultStore(),
-                _transcriptSegmentRepository,
-                new AsrRunRepository(Paths)),
-            new ScriptedJsonAsrEngine(
-                "reazonspeech-k2-v3",
-                "ReazonSpeech v3 k2",
-                "reazonspeech-k2",
-                processRunner,
-                new AsrJsonNormalizer(),
-                new AsrResultStore(),
-                _transcriptSegmentRepository,
-                new AsrRunRepository(Paths))
-        ]);
-        _jobRunCoordinator = new JobRunCoordinator(
-            Paths,
-            _jobRepository,
-            _stageProgressRepository,
-            _jobLogRepository,
-            _audioPreprocessWorker,
-            _asrEngineRegistry,
-            _installedModelRepository,
-            _reviewWorker,
-            _correctionMemoryService);
-        _statusBarInfoService = new StatusBarInfoService(Paths);
+        _transcriptSegmentRepository = services.TranscriptSegmentRepository;
+        _asrEngineRegistry = services.AsrEngineRegistry;
+        _jobRunCoordinator = services.JobRunCoordinator;
+        _statusBarInfoService = services.StatusBarInfoService;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -181,8 +113,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _statusRefreshTimer.Tick += async (_, _) => await RefreshStatusBarInfoAsync();
         _statusRefreshTimer.Start();
 
-        var toolStatus = new ToolStatusService(Paths);
-        foreach (var item in toolStatus.GetStatusItems())
+        foreach (var item in services.ToolStatusService.GetStatusItems())
         {
             EnvironmentStatus.Add(item);
         }
@@ -530,7 +461,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupMode => _setupState.SetupMode;
 
-    public string SetupStorageRoot => _setupState.StorageRoot ?? Paths.UserModels;
+    public string SetupStorageRoot => _setupState.StorageRoot ?? Paths.DefaultModelStorageRoot;
 
     public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
 

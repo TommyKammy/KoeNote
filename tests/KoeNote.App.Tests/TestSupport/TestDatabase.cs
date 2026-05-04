@@ -7,12 +7,17 @@ internal static class TestDatabase
 {
     public static AppPaths CreateReadyPaths()
     {
+        return CreateRepositoryFixture().Paths;
+    }
+
+    public static RepositoryTestFixture CreateRepositoryFixture()
+    {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, local);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
-        return paths;
+        return new RepositoryTestFixture(paths);
     }
 
     public static SqliteConnection Open(AppPaths paths)
@@ -48,5 +53,15 @@ internal static class TestDatabase
         command.Parameters.AddWithValue("$title", title);
         command.Parameters.AddWithValue("$now", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
+    }
+}
+
+internal sealed class RepositoryTestFixture(AppPaths paths)
+{
+    public AppPaths Paths { get; } = paths;
+
+    public SqliteConnection Open()
+    {
+        return TestDatabase.Open(Paths);
     }
 }

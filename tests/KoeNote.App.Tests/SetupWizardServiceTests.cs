@@ -32,6 +32,17 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupStateService_AllUsersScope_DefaultsStorageToMachineModels()
+    {
+        var paths = CreatePaths(InstallScope.AllUsers);
+        var service = new SetupStateService(paths);
+
+        var initial = service.Load();
+
+        Assert.Equal(paths.MachineModels, initial.StorageRoot);
+    }
+
+    [Fact]
     public void SetupWizard_ListsReazonSpeechFasterWhisperAndReviewChoices()
     {
         var wizard = CreateWizard(CreatePaths());
@@ -42,6 +53,29 @@ public sealed class SetupWizardServiceTests
         Assert.Contains(asrModels, entry => entry.DisplayName.Contains("ReazonSpeech", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(asrModels, entry => entry.DisplayName.Contains("faster-whisper", StringComparison.OrdinalIgnoreCase));
         Assert.NotEmpty(reviewModels);
+    }
+
+    [Fact]
+    public void SetupWizard_RecommendedSelections_UseInstallScopeDefaultStorage()
+    {
+        var paths = CreatePaths(InstallScope.AllUsers);
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.UseRecommendedSelections();
+
+        Assert.Equal(paths.MachineModels, state.StorageRoot);
+    }
+
+    [Fact]
+    public void SetupWizard_BlankStorageRoot_UsesInstallScopeDefaultStorage()
+    {
+        var paths = CreatePaths(InstallScope.AllUsers);
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.SetStorageRoot(" ");
+
+        Assert.Equal(paths.MachineModels, state.StorageRoot);
+        Assert.True(Directory.Exists(paths.MachineModels));
     }
 
     [Fact]
@@ -151,6 +185,40 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_ImportOfflineModelPack_UsesInstallScopeDefaultStorage()
+    {
+        var paths = CreatePaths(InstallScope.AllUsers);
+        var wizard = CreateWizard(paths);
+        var packPath = CreateOfflinePack(paths, "vibevoice-asr-q4-k", "model.bin");
+
+        var result = wizard.ImportOfflineModelPack(packPath);
+
+        var installed = Assert.Single(result.InstalledModels);
+        Assert.True(result.IsSucceeded);
+        Assert.StartsWith(paths.MachineModels, installed.FilePath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ModelInstallService_DefaultInstallPath_UsesInstallScopeDefaultStorage()
+    {
+        var paths = CreatePaths(InstallScope.AllUsers);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogItem = new ModelCatalogService(paths)
+            .LoadBuiltInCatalog()
+            .Models
+            .First(model => model.ModelId == "faster-whisper-large-v3");
+        var service = new ModelInstallService(
+            paths,
+            new InstalledModelRepository(paths),
+            new ModelVerificationService());
+
+        var installPath = service.GetDefaultInstallPath(catalogItem);
+
+        Assert.StartsWith(paths.MachineModels, installPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SetupWizard_DownloadFailure_ReturnsFailureAndKeepsSetupIncomplete()
     {
         var paths = CreatePaths();
@@ -187,10 +255,17 @@ public sealed class SetupWizardServiceTests
                 installService));
     }
 
-    private static AppPaths CreatePaths()
+    private static AppPaths CreatePaths(InstallScope installScope = InstallScope.CurrentUser)
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        return new AppPaths(root, root, AppContext.BaseDirectory);
+        return installScope == InstallScope.CurrentUser
+            ? new AppPaths(root, root, AppContext.BaseDirectory)
+            : new AppPaths(new AppPathOptions(
+                AppDataRoot: root,
+                LocalAppDataRoot: Path.Combine(root, "local"),
+                ProgramDataRoot: Path.Combine(root, "program-data"),
+                AppBaseDirectory: AppContext.BaseDirectory,
+                InstallScope: installScope));
     }
 
     private static void UpsertVerified(InstalledModelRepository repository, string modelId, string role, string engineId, string filePath)

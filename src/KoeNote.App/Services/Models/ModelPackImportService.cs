@@ -18,8 +18,8 @@ public sealed class ModelPackImportService(
         }
 
         var packName = Path.GetFileNameWithoutExtension(modelPackPath);
-        var finalRoot = Path.Combine(paths.UserModels, "model-packs", packName);
-        var stagingRoot = Path.Combine(paths.UserModels, "model-packs", $".staging-{packName}-{Guid.NewGuid():N}");
+        var finalRoot = Path.Combine(paths.DefaultModelStorageRoot, "model-packs", packName);
+        var stagingRoot = Path.Combine(paths.DefaultModelStorageRoot, "model-packs", $".staging-{packName}-{Guid.NewGuid():N}");
 
         try
         {
