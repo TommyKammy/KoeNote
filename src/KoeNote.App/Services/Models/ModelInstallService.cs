@@ -55,8 +55,31 @@ public sealed class ModelInstallService(
 
     public string GetDefaultInstallPath(ModelCatalogItem catalogItem)
     {
-        var extension = catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) ? ".gguf" : "";
-        return Path.Combine(paths.DefaultModelStorageRoot, catalogItem.Role, catalogItem.ModelId + extension);
+        if (catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(
+                paths.DefaultModelStorageRoot,
+                catalogItem.Role,
+                catalogItem.ModelId,
+                ResolveDownloadFileName(catalogItem));
+        }
+
+        return Path.Combine(paths.DefaultModelStorageRoot, catalogItem.Role, catalogItem.ModelId);
+    }
+
+    private static string ResolveDownloadFileName(ModelCatalogItem catalogItem)
+    {
+        if (catalogItem.Download.Url is { Length: > 0 } url &&
+            Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var fileName = Path.GetFileName(uri.LocalPath);
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                return fileName;
+            }
+        }
+
+        return $"{catalogItem.ModelId}.gguf";
     }
 
     private static long? CalculateSizeBytes(string path)

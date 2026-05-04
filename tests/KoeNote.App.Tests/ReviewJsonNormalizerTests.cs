@@ -59,6 +59,54 @@ public sealed class ReviewJsonNormalizerTests
     }
 
     [Fact]
+    public void Normalize_ReadsSingleObjectDraft()
+    {
+        var segments = new[]
+        {
+            new TranscriptSegment("000012", "job-001", 0, 1, "Speaker_0", "この仕様はサーバーのミギワで処理します")
+        };
+        const string rawJson = """
+            {
+              "segment_id": "000012",
+              "issue_type": "意味不明語の疑い",
+              "original_text": "この仕様はサーバーのミギワで処理します",
+              "suggested_text": "この仕様はサーバーの右側で処理します",
+              "reason": "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になる。",
+              "confidence": 0.62
+            }
+            """;
+
+        var drafts = new ReviewJsonNormalizer().Normalize("job-001", segments, rawJson, minConfidence: 0.5);
+
+        var draft = Assert.Single(drafts);
+        Assert.Equal("000012", draft.SegmentId);
+        Assert.Equal("この仕様はサーバーの右側で処理します", draft.SuggestedText);
+    }
+
+    [Fact]
+    public void Normalize_DropsNoOpSingleObjectDraft()
+    {
+        var segments = new[]
+        {
+            new TranscriptSegment("0", "job-001", 0, 1, "Speaker_0", "インタビュアー、よろしくお願いします。")
+        };
+        const string rawJson = """
+            {
+              "segment_id": "0",
+              "issue_type": "意味不明語の疑い",
+              "original_text": "インタビュアー、よろしくお願いします。",
+              "suggested_text": "インタビュアー、よろしくお願いします。",
+              "reason": "文脈上問題なし。そのままで可。",
+              "confidence": 0.99
+            }
+            """;
+
+        var drafts = new ReviewJsonNormalizer().Normalize("job-001", segments, rawJson, minConfidence: 0.5);
+
+        Assert.Empty(drafts);
+    }
+
+    [Fact]
     public void Normalize_ThrowsForInvalidJson()
     {
         var exception = Assert.Throws<ReviewWorkerException>(() =>

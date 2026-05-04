@@ -6,11 +6,20 @@ namespace KoeNote.App.Services.Setup;
 internal sealed class SetupModelInstallService(
     SetupStateService stateService,
     SetupModelSelectionService selectionService,
+    InstalledModelRepository installedModelRepository,
     ModelInstallService modelInstallService,
     ModelPackImportService modelPackImportService,
     ModelDownloadService modelDownloadService)
 {
     public async Task<SetupInstallResult> DownloadSelectedModelAsync(string role, CancellationToken cancellationToken = default)
+    {
+        return await DownloadSelectedModelAsync(role, progress: null, cancellationToken);
+    }
+
+    public async Task<SetupInstallResult> DownloadSelectedModelAsync(
+        string role,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -20,8 +29,17 @@ internal sealed class SetupModelInstallService(
                 return new SetupInstallResult(false, $"No selected {role} model.", []);
             }
 
+            var existing = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
+            if (existing is not null &&
+                existing.Verified &&
+                (File.Exists(existing.FilePath) || Directory.Exists(existing.FilePath)))
+            {
+                MarkInstallStep();
+                return new SetupInstallResult(true, $"Already installed: {existing.DisplayName}", [existing]);
+            }
+
             var targetPath = modelInstallService.GetDefaultInstallPath(catalogItem);
-            var installed = await modelDownloadService.DownloadAndInstallAsync(catalogItem, targetPath, cancellationToken: cancellationToken);
+            var installed = await modelDownloadService.DownloadAndInstallAsync(catalogItem, targetPath, progress, cancellationToken);
             MarkInstallStep();
             return new SetupInstallResult(true, $"Downloaded and installed: {installed.DisplayName}", [installed]);
         }

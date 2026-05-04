@@ -8,7 +8,7 @@ public sealed partial class MainWindowViewModel
     {
         _asrSettingsSaveDebounce?.Cancel();
         _asrSettingsSaveDebounce = null;
-        _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId));
+        _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, EnableReviewStage));
     }
 
     private void ScheduleSaveAsrSettings()
@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             await Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken).ConfigureAwait(false);
-            _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId));
+            _asrSettingsRepository.Save(new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, EnableReviewStage));
         }
         catch (OperationCanceledException)
         {

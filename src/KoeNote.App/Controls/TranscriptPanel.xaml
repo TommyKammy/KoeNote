@@ -44,18 +44,13 @@
                                 <Button Padding="7,6" MinWidth="0" ToolTip="前へ">
                                     <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" />
                                 </Button>
-                                <Button Padding="10,7" MinWidth="0" Margin="3,0" Background="{StaticResource AccentLightBrush}" ToolTip="再生 / 一時停止">
-                                    <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource AccentBrush}" />
+                                <Button Padding="10,7" MinWidth="0" Margin="3,0" Background="{StaticResource AccentLightBrush}" Command="{Binding PlayPauseAudioCommand}" ToolTip="{Binding SelectedJobPlaybackPath}">
+                                    <TextBlock Text="{Binding PlayPauseAudioIcon}" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource AccentBrush}" />
                                 </Button>
                                 <Button Padding="7,6" MinWidth="0" ToolTip="次へ">
                                     <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" />
                                 </Button>
-                                <ComboBox Width="66" MinHeight="30" Margin="6,0,0,0" SelectedIndex="0">
-                                    <ComboBoxItem Content="1.0x" />
-                                    <ComboBoxItem Content="1.25x" />
-                                    <ComboBoxItem Content="1.5x" />
-                                    <ComboBoxItem Content="2.0x" />
-                                </ComboBox>
+                                <ComboBox Width="66" MinHeight="30" Margin="6,0,0,0" ItemsSource="{Binding PlaybackRates}" SelectedItem="{Binding PlaybackRate, Mode=TwoWay}" ItemStringFormat="{}{0:0.##}x" />
                             </StackPanel>
 
                             <Grid Grid.Column="1" VerticalAlignment="Center" MinWidth="180">
@@ -93,10 +88,10 @@
                                     <Border Width="4" Height="12" Background="#B7D8C4" CornerRadius="2" VerticalAlignment="Center" />
                                     <Border Width="4" Height="20" Background="#7DB994" CornerRadius="2" VerticalAlignment="Center" />
                                 </UniformGrid>
-                                <Slider Grid.Row="1" Minimum="0" Maximum="100" Value="35" />
+                                <Slider Grid.Row="1" Minimum="0" Maximum="{Binding PlaybackDurationSeconds}" Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsMoveToPointEnabled="True" />
                             </Grid>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                                <TextBlock Text="00:00:17.350 / 01:12:34" Style="{StaticResource MutedText}" VerticalAlignment="Center" FontSize="11" />
+                                <TextBlock Text="{Binding PlaybackTimeDisplay}" Style="{StaticResource MutedText}" VerticalAlignment="Center" FontSize="11" />
                                 <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" FontSize="15" VerticalAlignment="Center" Margin="9,0,0,0" />
                             </StackPanel>
                         </Grid>

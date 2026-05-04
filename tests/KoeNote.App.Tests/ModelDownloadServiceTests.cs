@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.Tests;
 
@@ -42,12 +43,12 @@ public sealed class ModelDownloadServiceTests
     }
 
     [Fact]
-    public async Task DownloadAndInstallAsync_RejectsCatalogLandingPages()
+    public async Task DownloadAndInstallAsync_RejectsHuggingFaceSearchPages()
     {
         var paths = CreatePaths();
         var catalogItem = CreateCatalogItem(null) with
         {
-            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/Systran/faster-whisper-large-v3", null)
+            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/models?search=faster-whisper-large-v3", null)
         };
         var service = CreateService(paths, new StubHandler("<html>not a model</html>"));
         var targetPath = Path.Combine(paths.UserModels, "asr", "landing-page.bin");
@@ -78,6 +79,26 @@ public sealed class ModelDownloadServiceTests
     }
 
     [Fact]
+    public async Task DownloadAndInstallAsync_DownloadsHuggingFaceRepositoryToDirectory()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null) with
+        {
+            ModelId = "hf-repo-model",
+            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/org/repo-model", null)
+        };
+        var targetPath = Path.Combine(paths.UserModels, "asr", "repo-model");
+        var service = CreateService(paths, new HuggingFaceRepositoryHandler());
+
+        var installed = await service.DownloadAndInstallAsync(catalogItem, targetPath);
+
+        Assert.True(installed.Verified);
+        Assert.True(Directory.Exists(targetPath));
+        Assert.Equal("model", File.ReadAllText(Path.Combine(targetPath, "model.bin")));
+        Assert.Equal("config", File.ReadAllText(Path.Combine(targetPath, "nested", "config.json")));
+    }
+
+    [Fact]
     public async Task ResumeDownloadAndInstallAsync_ContinuesPartialFile()
     {
         var paths = CreatePaths();
@@ -97,6 +118,85 @@ public sealed class ModelDownloadServiceTests
 
         Assert.True(installed.Verified);
         Assert.Equal(payload, File.ReadAllText(targetPath));
+    }
+
+    [Fact]
+    public async Task ResumeDownloadAndInstallAsync_ReportsExistingProgressBeforeReadingNetwork()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null);
+        var targetPath = Path.Combine(paths.UserModels, "asr", "progress.bin");
+        var repository = new ModelDownloadJobRepository(paths);
+        var downloadId = repository.Start(catalogItem.ModelId, catalogItem.Download.Url!, targetPath, $"{targetPath}.partial", null);
+        repository.UpdateProgress(downloadId, 128, 1024);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var reports = new List<ModelDownloadProgress>();
+        var service = CreateService(paths, new StubHandler("payload"));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.ResumeDownloadAndInstallAsync(
+                catalogItem,
+                downloadId,
+                new Progress<ModelDownloadProgress>(reports.Add),
+                cancellation.Token));
+
+        var report = Assert.Single(reports);
+        Assert.Equal(128, report.BytesDownloaded);
+        Assert.Equal(1024, report.BytesTotal);
+    }
+
+    [Fact]
+    public async Task ResumeDownloadAndInstallAsync_PreservesPausedStatusWhenCancelledAfterPause()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null);
+        var targetPath = Path.Combine(paths.UserModels, "asr", "paused.bin");
+        var repository = new ModelDownloadJobRepository(paths);
+        var downloadId = repository.Start(catalogItem.ModelId, catalogItem.Download.Url!, targetPath, $"{targetPath}.partial", null);
+        repository.MarkPaused(downloadId);
+        var service = CreateService(paths, new StubHandler("payload"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.ResumeDownloadAndInstallAsync(catalogItem, downloadId, cancellationToken: cancellation.Token));
+        Assert.Equal("paused", repository.Find(downloadId)?.Status);
+    }
+
+    [Fact]
+    public async Task SetupDownloadSelectedModelAsync_SkipsAlreadyInstalledModel()
+    {
+        var paths = CreatePaths();
+        var catalogService = new ModelCatalogService(paths);
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var modelPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(modelPath);
+        File.WriteAllText(Path.Combine(modelPath, "model.bin"), "installed");
+        var installedRepository = new InstalledModelRepository(paths);
+        var verification = new ModelVerificationService();
+        var installService = new ModelInstallService(paths, installedRepository, verification);
+        installService.RegisterLocalModel(catalogItem, modelPath, "download");
+        var stateService = new SetupStateService(paths);
+        stateService.Save(SetupState.Default(paths.UserModels) with
+        {
+            SelectedAsrModelId = catalogItem.ModelId
+        });
+        var setup = new SetupWizardService(
+            paths,
+            stateService,
+            new ToolStatusService(paths),
+            catalogService,
+            installedRepository,
+            installService,
+            new ModelPackImportService(paths, catalogService, installService),
+            new ModelDownloadService(new HttpClient(new ThrowingHandler()), new ModelDownloadJobRepository(paths), verification, installService));
+
+        var result = await setup.DownloadSelectedModelAsync("asr");
+
+        Assert.True(result.IsSucceeded);
+        Assert.Contains("Already installed", result.Message, StringComparison.Ordinal);
+        Assert.Null(new ModelDownloadJobRepository(paths).FindLatestForModel(catalogItem.ModelId));
     }
 
     private static AppPaths CreatePaths()
@@ -162,4 +262,41 @@ public sealed class ModelDownloadServiceTests
             return Task.FromResult(response);
         }
     }
+
+    private sealed class HuggingFaceRepositoryHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            var body = path switch
+            {
+                "/api/models/org/repo-model" => """
+                    {
+                      "siblings": [
+                        { "rfilename": ".gitattributes", "size": 1 },
+                        { "rfilename": "model.bin", "size": 5 },
+                        { "rfilename": "nested/config.json", "size": 6 }
+                      ]
+                    }
+                    """,
+                "/org/repo-model/resolve/main/model.bin" => "model",
+                "/org/repo-model/resolve/main/nested/config.json" => "config",
+                _ => throw new InvalidOperationException($"Unexpected URL: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body)
+            });
+        }
+    }
+
+    private sealed class ThrowingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("Network should not be used for installed models.");
+        }
+    }
+
 }

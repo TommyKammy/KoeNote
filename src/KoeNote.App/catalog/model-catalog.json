@@ -46,7 +46,7 @@
       "size_bytes": null,
       "download": {
         "type": "huggingface",
-        "url": "https://huggingface.co/models?search=faster-whisper-large-v3-turbo",
+        "url": "https://huggingface.co/h2oai/faster-whisper-large-v3-turbo",
         "sha256": null
       },
       "license": {
@@ -64,7 +64,7 @@
       "model_id": "faster-whisper-large-v3",
       "family": "whisper",
       "role": "asr",
-      "engine_id": "faster-whisper-large-v3-turbo",
+      "engine_id": "faster-whisper-large-v3",
       "display_name": "faster-whisper large-v3",
       "language": ["ja", "multi"],
       "recommended_for": ["high_accuracy_baseline", "general_transcription"],
@@ -132,13 +132,13 @@
       },
       "size_bytes": 5304881888,
       "download": {
-        "type": "none",
-        "url": null,
+        "type": "huggingface",
+        "url": "https://huggingface.co/alfredplpl/llm-jp-4-8b-thinking-gguf/resolve/main/llm-jp-4-8B-thinking-Q4_K_M.gguf",
         "sha256": null
       },
       "license": {
-        "name": "See distribution license manifest",
-        "url": null
+        "name": "Apache-2.0",
+        "url": "https://huggingface.co/alfredplpl/llm-jp-4-8b-thinking-gguf"
       },
       "requirements": {
         "gpu_required": false,

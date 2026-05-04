@@ -56,6 +56,7 @@ public sealed class AppPaths
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
         VibeVoiceAsrModelPath = Path.Combine(Models, "asr", "vibevoice-asr-q4_k.gguf");
         FasterWhisperModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3-turbo");
+        FasterWhisperLargeV3ModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3");
         ReazonSpeechK2ModelPath = Path.Combine(Models, "asr", "reazonspeech-k2-v3");
         ReviewModelPath = Path.Combine(Models, "review", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
     }
@@ -103,6 +104,8 @@ public sealed class AppPaths
     public string VibeVoiceAsrModelPath { get; }
 
     public string FasterWhisperModelPath { get; }
+
+    public string FasterWhisperLargeV3ModelPath { get; }
 
     public string ReazonSpeechK2ModelPath { get; }
 

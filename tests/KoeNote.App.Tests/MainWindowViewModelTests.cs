@@ -3,6 +3,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
 using KoeNote.App.ViewModels;
@@ -27,6 +28,26 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(first.SelectedAsrEngineId, second.SelectedAsrEngineId);
         Assert.Contains(second.AvailableAsrEngines, engine => engine.EngineId == "reazonspeech-k2-v3");
+    }
+
+    [Fact]
+    public void AsrModel_ReflectsSelectedAsrEngine()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedAsrEngineId = "faster-whisper-large-v3-turbo";
+
+        Assert.Contains("faster-whisper", viewModel.AsrModel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AsrModel_DistinguishesFasterWhisperLargeV3FromTurbo()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedAsrEngineId = "faster-whisper-large-v3";
+
+        Assert.Equal("faster-whisper large-v3", viewModel.AsrModel);
     }
 
     [Fact]
@@ -72,7 +93,8 @@ public sealed class MainWindowViewModelTests
         var first = new MainWindowViewModel(paths)
         {
             AsrContextText = "製品開発会議",
-            AsrHotwordsText = "KoeNote\r\nRTX 3060"
+            AsrHotwordsText = "KoeNote\r\nRTX 3060",
+            EnableReviewStage = false
         };
         await Task.Delay(TimeSpan.FromMilliseconds(500));
 
@@ -80,6 +102,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(first.AsrContextText, second.AsrContextText);
         Assert.Equal(first.AsrHotwordsText, second.AsrHotwordsText);
+        Assert.False(second.EnableReviewStage);
     }
 
     [Fact]
@@ -186,6 +209,36 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void FormatExportCommands_EnableWhenSelectedJobHasSegments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.ExportTxtCommand.CanExecute(null));
+        Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
+        Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
+        Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void IncludeExportTimestamps_CanBeToggled()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.IncludeExportTimestamps = false;
+
+        Assert.False(viewModel.IncludeExportTimestamps);
+    }
+
+    [Fact]
     public void FirstRunSummary_ReportsMissingRuntimeAssets()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -210,6 +263,85 @@ public sealed class MainWindowViewModelTests
 
         Assert.Contains("Model Catalog", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.Contains("Setup Wizard", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Equal(2, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(1, viewModel.SelectedDetailPanelTabIndex);
+        Assert.True(viewModel.IsDetailPanelOpen);
+    }
+
+    [Fact]
+    public void HeaderNavigationCommands_SelectExpectedLogPanelTabs()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.OpenSettingsCommand.Execute(null);
+        Assert.Equal(1, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(0, viewModel.SelectedDetailPanelTabIndex);
+        Assert.True(viewModel.IsDetailPanelOpen);
+
+        viewModel.ShowModelCatalogCommand.Execute(null);
+        Assert.Equal(3, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
+
+        viewModel.OpenSetupCommand.Execute(null);
+        Assert.Equal(2, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(1, viewModel.SelectedDetailPanelTabIndex);
+    }
+
+    [Fact]
+    public void DetailPanelCommands_OpenAndCloseWidePanel()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.OpenSelectedDetailPanelCommand.CanExecute(null));
+
+        viewModel.SelectedLogPanelTabIndex = 3;
+        Assert.True(viewModel.OpenSelectedDetailPanelCommand.CanExecute(null));
+        viewModel.OpenSelectedDetailPanelCommand.Execute(null);
+
+        Assert.True(viewModel.IsDetailPanelOpen);
+        Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("Models", viewModel.DetailPanelTitle);
+
+        viewModel.CloseDetailPanelCommand.Execute(null);
+        Assert.False(viewModel.IsDetailPanelOpen);
+    }
+
+    [Fact]
+    public void PlayPauseAudioCommand_IsDisabledWhenNoPlayableAudioIsSelected()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.PlayPauseAudioCommand.CanExecute(null));
+        Assert.Empty(viewModel.SelectedJobPlaybackPath);
+    }
+
+    [Fact]
+    public void PlayPauseAudioCommand_UsesSelectedJobSourceAudioWhenNormalizedAudioIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+        var job = new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now);
+
+        viewModel.Jobs.Add(job);
+        viewModel.SelectedJob = job;
+
+        Assert.True(viewModel.PlayPauseAudioCommand.CanExecute(null));
+        Assert.Equal(audioPath, viewModel.SelectedJobPlaybackPath);
+        Assert.Equal("\uE768", viewModel.PlayPauseAudioIcon);
+        Assert.Equal("00:00 / 00:00", viewModel.PlaybackTimeDisplay);
+    }
+
+    [Fact]
+    public void PlaybackRate_UpdatesSelectedSpeed()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.PlaybackRate = 1.5;
+
+        Assert.Equal(1.5, viewModel.PlaybackRate);
+        Assert.Contains(2.0, viewModel.PlaybackRates);
     }
 
     [Fact]
@@ -227,6 +359,72 @@ public sealed class MainWindowViewModelTests
             IsCompleted = true,
             LastSmokeSucceeded = true,
             LicenseAccepted = true
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSelectedJobCommand_DoesNotRequireReviewModelWhenReviewStageIsDisabled()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.CrispAsrPath);
+        Touch(paths.VibeVoiceAsrModelPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, VibeVoiceCrispAsrEngine.Id, false));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.False(viewModel.EnableReviewStage);
+        Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSelectedJobCommand_AcceptsInstalledUserReviewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "faster-whisper-large-v3"));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
         });
 
         var viewModel = new MainWindowViewModel(paths);

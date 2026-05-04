@@ -106,7 +106,14 @@ public sealed class JobRunCoordinator(
             jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR completed: {result.Segments.Count} segments"));
 
-            await RunReviewAsync(job, result.Segments, report, cancellationToken);
+            if (asrSettings.EnableReviewStage)
+            {
+                await RunReviewAsync(job, result.Segments, report, cancellationToken);
+            }
+            else
+            {
+                SkipReview(job, report);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -175,6 +182,13 @@ public sealed class JobRunCoordinator(
                 "faster-whisper-large-v3-turbo",
                 paths.FasterWhisperScriptPath,
                 "large-v3-turbo"),
+            "faster-whisper-large-v3" => new AsrEngineConfig(
+                "python",
+                ResolveModelPath("faster-whisper-large-v3", paths.FasterWhisperLargeV3ModelPath),
+                outputDirectory,
+                "faster-whisper-large-v3",
+                paths.FasterWhisperScriptPath,
+                "large-v3"),
             "reazonspeech-k2-v3" => new AsrEngineConfig(
                 "python",
                 ResolveModelPath("reazonspeech-k2-v3-ja", paths.ReazonSpeechK2ModelPath),
@@ -221,7 +235,7 @@ public sealed class JobRunCoordinator(
             var result = await reviewWorker.RunAsync(new ReviewRunOptions(
                 job.JobId,
                 paths.LlamaCompletionPath,
-                paths.ReviewModelPath,
+                ResolveModelPath("llm-jp-4-8b-thinking-q4-k-m", paths.ReviewModelPath),
                 outputDirectory,
                 segments,
                 MinConfidence: 0.5,
@@ -302,5 +316,27 @@ public sealed class JobRunCoordinator(
             jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}"));
         }
+    }
+
+    private void SkipReview(JobSummary job, Action<JobRunUpdate> report)
+    {
+        var now = DateTimeOffset.Now;
+        report(new JobRunUpdate(JobRunStage.Review, JobRunStageState.Skipped, 100));
+        stageProgressRepository.Upsert(
+            job.JobId,
+            "review",
+            "skipped",
+            100,
+            now,
+            now,
+            0,
+            errorCategory: "disabled_by_user");
+        jobRepository.MarkReviewSkippedAndClearDrafts(job);
+        jobLogRepository.AddEvent(job.JobId, "review", "info", "Review stage skipped by user setting.");
+        report(new JobRunUpdate(
+            RefreshJobViews: true,
+            RefreshLogs: true,
+            LatestLog: "Review stage skipped. ASR transcript is ready.",
+            ClearReviewPreview: true));
     }
 }

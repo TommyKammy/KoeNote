@@ -86,7 +86,8 @@ public sealed record ModelDownloadJob(
 
 public sealed record ModelCatalogEntry(
     ModelCatalogItem CatalogItem,
-    InstalledModel? InstalledModel)
+    InstalledModel? InstalledModel,
+    ModelDownloadJob? LatestDownloadJob = null)
 {
     public string ModelId => CatalogItem.ModelId;
 
@@ -110,7 +111,84 @@ public sealed record ModelCatalogEntry(
 
     public string RuntimeRequirement => $"{CatalogItem.Runtime.Type}, VRAM {CatalogItem.Requirements.RecommendedVramGb}GB, Python {(CatalogItem.Requirements.PythonRequired ? "required" : "not required")}";
 
-    public string DownloadState => CatalogItem.Download.Type;
+    public string DownloadState => LatestDownloadJob is null
+        ? CatalogItem.Download.Type
+        : LatestDownloadJob.Status;
+
+    public bool IsDirectDownloadSupported
+    {
+        get
+        {
+            var type = CatalogItem.Download.Type;
+            var url = CatalogItem.Download.Url;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            if (type.Equals("huggingface", StringComparison.OrdinalIgnoreCase))
+            {
+                return url.Contains("/resolve/", StringComparison.OrdinalIgnoreCase) ||
+                    IsHuggingFaceRepositoryUrl(url);
+            }
+
+            return type.Equals("https", StringComparison.OrdinalIgnoreCase) ||
+                type.Equals("direct", StringComparison.OrdinalIgnoreCase) ||
+                type.Equals("direct_file", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public string DownloadProgressSummary
+    {
+        get
+        {
+            if (LatestDownloadJob is null)
+            {
+                return string.IsNullOrWhiteSpace(CatalogItem.Download.Url) ? "No URL" : "Ready";
+            }
+
+            if (LatestDownloadJob.BytesTotal is > 0)
+            {
+                var percent = LatestDownloadJob.BytesDownloaded * 100d / LatestDownloadJob.BytesTotal.Value;
+                return $"{LatestDownloadJob.Status} {percent:0}%";
+            }
+
+            return LatestDownloadJob.BytesDownloaded > 0
+                ? $"{LatestDownloadJob.Status} {FormatSize(LatestDownloadJob.BytesDownloaded)}"
+                : LatestDownloadJob.Status;
+        }
+    }
+
+    public double DownloadProgressPercent => LatestDownloadJob?.BytesTotal is > 0
+        ? Math.Clamp(LatestDownloadJob.BytesDownloaded * 100d / LatestDownloadJob.BytesTotal.Value, 0, 100)
+        : 0;
+
+    public bool HasKnownDownloadProgress => LatestDownloadJob?.BytesTotal is > 0;
+
+    public bool IsDownloadActive => LatestDownloadJob is { Status: "running" or "paused" };
+
+    public string DownloadBytesSummary => LatestDownloadJob is null
+        ? string.Empty
+        : LatestDownloadJob.BytesTotal is > 0
+            ? $"{FormatSize(LatestDownloadJob.BytesDownloaded)} / {FormatSize(LatestDownloadJob.BytesTotal.Value)}"
+            : FormatSize(LatestDownloadJob.BytesDownloaded);
+
+    public string? DownloadError => LatestDownloadJob?.ErrorMessage;
+
+    private static bool IsHuggingFaceRepositoryUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            !uri.Host.Equals("huggingface.co", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var segments = uri.AbsolutePath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return segments.Length >= 2 &&
+            !segments[0].Equals("models", StringComparison.OrdinalIgnoreCase) &&
+            !segments.Contains("resolve", StringComparer.OrdinalIgnoreCase);
+    }
 
     private static string FormatSize(long sizeBytes)
     {

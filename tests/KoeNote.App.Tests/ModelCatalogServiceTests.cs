@@ -17,8 +17,8 @@ public sealed class ModelCatalogServiceTests
         var entries = new ModelCatalogService(paths).ListEntries();
 
         Assert.Contains(entries, entry => entry.ModelId == "reazonspeech-k2-v3-ja" && entry.Role == "asr");
-        Assert.Contains(entries, entry => entry.ModelId == "faster-whisper-large-v3-turbo" && entry.Role == "asr");
-        Assert.Contains(entries, entry => entry.Role == "review");
+        Assert.Contains(entries, entry => entry.ModelId == "faster-whisper-large-v3-turbo" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
+        Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
     }
 
     [Fact]
@@ -43,6 +43,38 @@ public sealed class ModelCatalogServiceTests
         Assert.Equal("installed", entry.InstallState);
         Assert.Contains("VRAM", entry.RuntimeRequirement, StringComparison.Ordinal);
         Assert.NotEmpty(entry.LicenseName);
+    }
+
+    [Fact]
+    public void ListEntries_IncludesLatestDownloadState()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogItem = new ModelCatalogService(paths)
+            .LoadBuiltInCatalog()
+            .Models
+            .First(model => model.ModelId == "faster-whisper-large-v3-turbo");
+        var repository = new ModelDownloadJobRepository(paths);
+        var downloadId = repository.Start(
+            catalogItem.ModelId,
+            "https://example.com/model.bin",
+            Path.Combine(paths.UserModels, "asr", "model.bin"),
+            Path.Combine(paths.UserModels, "asr", "model.bin.partial"),
+            null);
+        repository.UpdateProgress(downloadId, 512, 1024);
+        repository.MarkPaused(downloadId);
+
+        var entry = new ModelCatalogService(paths)
+            .ListEntries()
+            .First(entry => entry.ModelId == catalogItem.ModelId);
+
+        Assert.Equal("paused", entry.DownloadState);
+        Assert.Contains("50%", entry.DownloadProgressSummary, StringComparison.Ordinal);
+        Assert.Equal(50, entry.DownloadProgressPercent);
+        Assert.True(entry.HasKnownDownloadProgress);
+        Assert.True(entry.IsDownloadActive);
+        Assert.Contains("512 B / 1 KB", entry.DownloadBytesSummary, StringComparison.Ordinal);
     }
 
     [Fact]

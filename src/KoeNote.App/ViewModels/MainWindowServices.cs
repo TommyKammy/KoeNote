@@ -25,9 +25,12 @@ public sealed record MainWindowServices(
     TranscriptExportService TranscriptExportService,
     ModelCatalogService ModelCatalogService,
     InstalledModelRepository InstalledModelRepository,
+    ModelDownloadJobRepository ModelDownloadJobRepository,
     ModelInstallService ModelInstallService,
+    ModelDownloadService ModelDownloadService,
     ModelLicenseViewer ModelLicenseViewer,
     SetupWizardService SetupWizardService,
+    IAudioPlaybackService AudioPlaybackService,
     ToolStatusService ToolStatusService,
     StatusBarInfoService StatusBarInfoService)
 {
@@ -47,17 +50,19 @@ public sealed record MainWindowServices(
         var transcriptExportService = new TranscriptExportService(paths);
         var modelCatalogService = new ModelCatalogService(paths);
         var installedModelRepository = new InstalledModelRepository(paths);
+        var modelDownloadJobRepository = new ModelDownloadJobRepository(paths);
         var modelVerificationService = new ModelVerificationService();
         var modelInstallService = new ModelInstallService(paths, installedModelRepository, modelVerificationService);
         var modelLicenseViewer = new ModelLicenseViewer(modelCatalogService);
         var modelPackImportService = new ModelPackImportService(paths, modelCatalogService, modelInstallService);
         var modelDownloadService = new ModelDownloadService(
             new HttpClient(),
-            new ModelDownloadJobRepository(paths),
+            modelDownloadJobRepository,
             modelVerificationService,
             modelInstallService);
         var setupStateService = new SetupStateService(paths);
         var toolStatusService = new ToolStatusService(paths);
+        var audioPlaybackService = new AudioPlaybackService();
         var setupWizardService = new SetupWizardService(
             paths,
             setupStateService,
@@ -89,6 +94,15 @@ public sealed record MainWindowServices(
             new ScriptedJsonAsrEngine(
                 "faster-whisper-large-v3-turbo",
                 "faster-whisper large-v3-turbo",
+                "faster-whisper",
+                processRunner,
+                new AsrJsonNormalizer(),
+                new AsrResultStore(),
+                transcriptSegmentRepository,
+                new AsrRunRepository(paths)),
+            new ScriptedJsonAsrEngine(
+                "faster-whisper-large-v3",
+                "faster-whisper large-v3",
                 "faster-whisper",
                 processRunner,
                 new AsrJsonNormalizer(),
@@ -131,9 +145,12 @@ public sealed record MainWindowServices(
             transcriptExportService,
             modelCatalogService,
             installedModelRepository,
+            modelDownloadJobRepository,
             modelInstallService,
+            modelDownloadService,
             modelLicenseViewer,
             setupWizardService,
+            audioPlaybackService,
             toolStatusService,
             statusBarInfoService);
     }

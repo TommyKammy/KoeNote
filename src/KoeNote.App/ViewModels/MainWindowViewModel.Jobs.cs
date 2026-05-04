@@ -1,5 +1,6 @@
 using KoeNote.App.Models;
 using Microsoft.Win32;
+using System.Globalization;
 using System.IO;
 
 namespace KoeNote.App.ViewModels;
@@ -132,9 +133,11 @@ public sealed partial class MainWindowViewModel
     {
         FilteredJobs.Refresh();
         OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
+        OnPropertyChanged(nameof(SelectedJobPlaybackPath));
         OnPropertyChanged(nameof(SelectedJobUpdatedAt));
         OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
         RefreshJobCommandStates();
+        UpdatePlaybackCommandStates();
     }
 
     private void RefreshJobCommandStates()
@@ -148,6 +151,88 @@ public sealed partial class MainWindowViewModel
         {
             deleteCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private Task PlayPauseAudioAsync()
+    {
+        var audioPath = ResolveSelectedJobPlaybackPath();
+        if (audioPath is null)
+        {
+            LatestLog = "No playable audio is available for the selected job.";
+            return Task.CompletedTask;
+        }
+
+        IsAudioPlaying = _audioPlaybackService.Toggle(audioPath);
+        LatestLog = IsAudioPlaying
+            ? $"Playing audio: {audioPath}"
+            : "Audio playback paused.";
+        return Task.CompletedTask;
+    }
+
+    private bool CanPlaySelectedJobAudio()
+    {
+        return ResolveSelectedJobPlaybackPath() is not null;
+    }
+
+    private string? ResolveSelectedJobPlaybackPath()
+    {
+        if (SelectedJob is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedJob.NormalizedAudioPath) && File.Exists(SelectedJob.NormalizedAudioPath))
+        {
+            return SelectedJob.NormalizedAudioPath;
+        }
+
+        return File.Exists(SelectedJob.SourceAudioPath) ? SelectedJob.SourceAudioPath : null;
+    }
+
+    private void StopAudioPlayback()
+    {
+        if (!IsAudioPlaying && _audioPlaybackService.CurrentPath is null)
+        {
+            RefreshPlaybackState();
+            return;
+        }
+
+        _audioPlaybackService.Stop();
+        IsAudioPlaying = false;
+        RefreshPlaybackState();
+    }
+
+    private void UpdatePlaybackCommandStates()
+    {
+        if (PlayPauseAudioCommand is RelayCommand playPauseCommand)
+        {
+            playPauseCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RefreshPlaybackState()
+    {
+        PlaybackDurationSeconds = _audioPlaybackService.Duration.TotalSeconds;
+
+        _isRefreshingPlaybackPosition = true;
+        try
+        {
+            PlaybackPositionSeconds = _audioPlaybackService.Position.TotalSeconds;
+        }
+        finally
+        {
+            _isRefreshingPlaybackPosition = false;
+        }
+    }
+
+    private static string FormatPlaybackTime(TimeSpan value)
+    {
+        if (value.TotalHours >= 1)
+        {
+            return value.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+        }
+
+        return value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
     }
 
     private bool FilterJob(object item)

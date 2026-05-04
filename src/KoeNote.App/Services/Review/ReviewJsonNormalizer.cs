@@ -79,6 +79,11 @@ public sealed class ReviewJsonNormalizer
             return root.EnumerateArray().Where(static element => element.ValueKind == JsonValueKind.Object);
         }
 
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("segment_id", out _))
+        {
+            return [root];
+        }
+
         foreach (var name in new[] { "corrections", "drafts", "items", "results" })
         {
             if (root.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Array)

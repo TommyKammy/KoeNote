@@ -4,6 +4,7 @@ public enum JobRunStageState
 {
     Running,
     Succeeded,
+    Skipped,
     Cancelled,
     Failed
 }

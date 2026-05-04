@@ -74,6 +74,31 @@
                               MinWidth="260" />
                 </Grid>
                 <TextBlock Text="{Binding SetupStorageRoot}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
+                <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding ModelDownloadProgressSummary}" Foreground="#334155" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding ModelDownloadProgressPercent, StringFormat={}{0:0}%}"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="12"
+                                   Margin="12,0,0,0" />
+                        <ProgressBar Grid.Row="1"
+                                     Grid.ColumnSpan="2"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding ModelDownloadProgressPercent, Mode=OneWay}"
+                                     Height="8"
+                                     Margin="0,8,0,0" />
+                    </Grid>
+                </Border>
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="120" />

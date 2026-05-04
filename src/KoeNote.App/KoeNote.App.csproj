@@ -26,6 +26,10 @@
              Link="scripts\asr\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
+    <Content Include="..\..\tools\**\*"
+             Link="tools\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always" />
     <Content Include="catalog\model-catalog.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />

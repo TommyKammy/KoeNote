@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -36,13 +37,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
     private readonly ModelInstallService _modelInstallService;
+    private readonly ModelDownloadService _modelDownloadService;
     private readonly ModelLicenseViewer _modelLicenseViewer;
     private readonly SetupWizardService _setupWizardService;
+    private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
     private readonly DispatcherTimer _statusRefreshTimer;
+    private readonly DispatcherTimer _playbackRefreshTimer;
     private StatusBarInfo _statusBarInfo;
     private bool _isStatusRefreshInProgress;
+    private bool _isRefreshingPlaybackPosition;
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
@@ -53,18 +58,33 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _setupLocalModelPath = string.Empty;
     private string _setupOfflineModelPackPath = string.Empty;
     private CancellationTokenSource? _runCancellation;
+    private CancellationTokenSource? _modelDownloadCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
     private bool _isReviewOperationInProgress;
+    private bool _isAudioPlaying;
     private bool _rememberCorrection = true;
+    private double _playbackPositionSeconds;
+    private double _playbackDurationSeconds;
+    private double _playbackRate = 1.0;
     private string _exportWarning = string.Empty;
     private string _lastExportFolder = string.Empty;
+    private bool _includeExportTimestamps = true;
     private string _latestLog;
+    private string _modelDownloadProgressSummary = "No active model download.";
+    private string _modelDownloadNotification = string.Empty;
+    private double _modelDownloadProgressPercent;
+    private bool _isModelDownloadInProgress;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
+    private int _selectedLogPanelTabIndex;
+    private int _selectedDetailPanelTabIndex;
+    private bool _isDetailPanelOpen;
+    private string? _activeModelDownloadModelId;
     private string _selectedSpeakerFilter = "全話者";
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
     private string _selectedAsrEngineId = VibeVoiceCrispAsrEngine.Id;
+    private bool _enableReviewStage = true;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isRunInProgress;
@@ -98,8 +118,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
         _modelInstallService = services.ModelInstallService;
+        _modelDownloadService = services.ModelDownloadService;
         _modelLicenseViewer = services.ModelLicenseViewer;
         _setupWizardService = services.SetupWizardService;
+        _audioPlaybackService = services.AudioPlaybackService;
+        _audioPlaybackService.PlaybackStateChanged += (_, _) =>
+        {
+            IsAudioPlaying = _audioPlaybackService.IsPlaying;
+            RefreshPlaybackState();
+        };
         _setupState = _setupWizardService.LoadState();
         _transcriptSegmentRepository = services.TranscriptSegmentRepository;
         _asrEngineRegistry = services.AsrEngineRegistry;
@@ -112,6 +139,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         };
         _statusRefreshTimer.Tick += async (_, _) => await RefreshStatusBarInfoAsync();
         _statusRefreshTimer.Start();
+        _playbackRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        _playbackRefreshTimer.Tick += (_, _) => RefreshPlaybackState();
+        _playbackRefreshTimer.Start();
 
         foreach (var item in services.ToolStatusService.GetStatusItems())
         {
@@ -132,6 +165,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         var asrSettings = _asrSettingsRepository.Load();
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
+        _enableReviewStage = asrSettings.EnableReviewStage;
         _selectedAsrEngineId = _asrEngineRegistry.Contains(asrSettings.EngineId)
             ? asrSettings.EngineId
             : VibeVoiceCrispAsrEngine.Id;
@@ -165,7 +199,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
+        PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
+        OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
+        OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
+        CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
         SetupBackCommand = new RelayCommand(SetupBackAsync);
         SetupNextCommand = new RelayCommand(SetupNextAsync);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
@@ -179,6 +217,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
         ShowModelCatalogCommand = new RelayCommand(ShowModelCatalogAsync);
         RegisterPreinstalledModelsCommand = new RelayCommand(RegisterPreinstalledModelsAsync);
+        DownloadSelectedModelCommand = new RelayCommand(DownloadSelectedModelAsync, CanDownloadSelectedModel);
+        PauseSelectedModelDownloadCommand = new RelayCommand(PauseSelectedModelDownloadAsync, CanPauseSelectedModelDownload);
+        ResumeSelectedModelDownloadCommand = new RelayCommand(ResumeSelectedModelDownloadAsync, CanResumeSelectedModelDownload);
+        CancelSelectedModelDownloadCommand = new RelayCommand(CancelSelectedModelDownloadAsync, CanCancelSelectedModelDownload);
+        RetrySelectedModelDownloadCommand = new RelayCommand(RetrySelectedModelDownloadAsync, CanRetrySelectedModelDownload);
         UseSelectedModelCommand = new RelayCommand(UseSelectedModelAsync, () => SelectedModelCatalogEntry is not null);
         ShowSelectedModelLicenseCommand = new RelayCommand(ShowSelectedModelLicenseAsync, () => SelectedModelCatalogEntry is not null);
         ForgetSelectedModelCommand = new RelayCommand(ForgetSelectedModelAsync, () => SelectedModelCatalogEntry?.IsInstalled == true);
@@ -191,6 +234,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
         ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
+        ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportSelectedJob);
+        ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json), CanExportSelectedJob);
+        ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt), CanExportSelectedJob);
+        ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
 
         RefreshModelCatalog();
@@ -250,8 +297,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         "Phase 11 の Model Catalog と Phase 12 の Setup Wizard で、ASR / 推敲モデルの導入を案内します。現時点では必要ファイルの配置先を表示します。";
 
     public bool RequiredRuntimeAssetsReady => EnvironmentStatus
-        .Where(static item => item.Name is "ffmpeg" or "llama-completion" or "Review model")
-        .All(static item => item.IsOk) && IsSelectedAsrEngineReady();
+        .Where(item => item.Name == "ffmpeg" || (EnableReviewStage && item.Name == "llama-completion"))
+        .All(static item => item.IsOk) &&
+        IsSelectedAsrEngineReady() &&
+        (!EnableReviewStage || IsReviewModelReady());
 
     public bool IsSetupComplete => _setupState.IsCompleted;
 
@@ -285,6 +334,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SetupModelAudit> SetupModelAudits { get; } = [];
 
+    public ObservableCollection<double> PlaybackRates { get; } = [1.0, 1.25, 1.5, 2.0];
+
     public ObservableCollection<string> SpeakerFilters { get; } = ["全話者"];
 
     public ICollectionView FilteredJobs { get; }
@@ -301,7 +352,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand CancelCommand { get; }
 
+    public ICommand PlayPauseAudioCommand { get; }
+
+    public ICommand OpenSettingsCommand { get; }
+
     public ICommand OpenSetupCommand { get; }
+
+    public ICommand OpenSelectedDetailPanelCommand { get; }
+
+    public ICommand CloseDetailPanelCommand { get; }
 
     public ICommand SetupBackCommand { get; }
 
@@ -329,6 +388,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand RegisterPreinstalledModelsCommand { get; }
 
+    public ICommand DownloadSelectedModelCommand { get; }
+
+    public ICommand PauseSelectedModelDownloadCommand { get; }
+
+    public ICommand ResumeSelectedModelDownloadCommand { get; }
+
+    public ICommand CancelSelectedModelDownloadCommand { get; }
+
+    public ICommand RetrySelectedModelDownloadCommand { get; }
+
     public ICommand UseSelectedModelCommand { get; }
 
     public ICommand ShowSelectedModelLicenseCommand { get; }
@@ -353,6 +422,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportSelectedJobCommand { get; }
 
+    public ICommand ExportTxtCommand { get; }
+
+    public ICommand ExportJsonCommand { get; }
+
+    public ICommand ExportSrtCommand { get; }
+
+    public ICommand ExportDocxCommand { get; }
+
     public ICommand OpenExportFolderCommand { get; }
 
     public JobSummary? SelectedJob
@@ -369,12 +446,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
                 OnPropertyChanged(nameof(SelectedJobSourcePath));
                 OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
+                OnPropertyChanged(nameof(SelectedJobPlaybackPath));
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+                StopAudioPlayback();
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
                 LoadReviewQueue();
                 UpdateExportCommandStates();
+                UpdatePlaybackCommandStates();
             }
         }
     }
@@ -465,6 +545,38 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
 
+    public string ModelDownloadProgressSummary
+    {
+        get => _modelDownloadProgressSummary;
+        private set => SetField(ref _modelDownloadProgressSummary, value);
+    }
+
+    public double ModelDownloadProgressPercent
+    {
+        get => _modelDownloadProgressPercent;
+        private set => SetField(ref _modelDownloadProgressPercent, Math.Clamp(value, 0, 100));
+    }
+
+    public bool IsModelDownloadInProgress
+    {
+        get => _isModelDownloadInProgress;
+        private set => SetField(ref _isModelDownloadInProgress, value);
+    }
+
+    public string ModelDownloadNotification
+    {
+        get => _modelDownloadNotification;
+        private set
+        {
+            if (SetField(ref _modelDownloadNotification, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(HasModelDownloadNotification));
+            }
+        }
+    }
+
+    public bool HasModelDownloadNotification => !string.IsNullOrWhiteSpace(ModelDownloadNotification);
+
     public string SetupLocalModelPath
     {
         get => _setupLocalModelPath;
@@ -521,6 +633,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SelectedJobNormalizedAudioPath => SelectedJob?.NormalizedAudioPath ?? "";
 
+    public string SelectedJobPlaybackPath => ResolveSelectedJobPlaybackPath() ?? "";
+
     public string SelectedJobUpdatedAt => SelectedJob?.UpdatedAtDisplay ?? "";
 
     public int SelectedJobUnreviewedDrafts => SelectedJob?.UnreviewedDrafts ?? 0;
@@ -550,6 +664,46 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public int SelectedLogPanelTabIndex
+    {
+        get => _selectedLogPanelTabIndex;
+        set
+        {
+            if (SetField(ref _selectedLogPanelTabIndex, Math.Clamp(value, 0, 3)) &&
+                OpenSelectedDetailPanelCommand is RelayCommand openWideCommand)
+            {
+                openWideCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public int SelectedDetailPanelTabIndex
+    {
+        get => _selectedDetailPanelTabIndex;
+        set
+        {
+            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 2)))
+            {
+                OnPropertyChanged(nameof(DetailPanelTitle));
+                SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex + 1;
+            }
+        }
+    }
+
+    public bool IsDetailPanelOpen
+    {
+        get => _isDetailPanelOpen;
+        private set => SetField(ref _isDetailPanelOpen, value);
+    }
+
+    public string DetailPanelTitle => SelectedDetailPanelTabIndex switch
+    {
+        0 => "Settings",
+        1 => "Setup / Model Install",
+        2 => "Models",
+        _ => "Details"
+    };
 
     public string SelectedSpeakerFilter
     {
@@ -596,6 +750,77 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IsAudioPlaying
+    {
+        get => _isAudioPlaying;
+        private set
+        {
+            if (SetField(ref _isAudioPlaying, value))
+            {
+                OnPropertyChanged(nameof(PlayPauseAudioIcon));
+            }
+        }
+    }
+
+    public string PlayPauseAudioIcon => IsAudioPlaying ? "\uE769" : "\uE768";
+
+    public double PlaybackPositionSeconds
+    {
+        get => _playbackPositionSeconds;
+        set
+        {
+            var nextValue = Math.Clamp(value, 0, PlaybackDurationSeconds > 0 ? PlaybackDurationSeconds : double.MaxValue);
+            if (Math.Abs(_playbackPositionSeconds - nextValue) < 0.05)
+            {
+                return;
+            }
+
+            _playbackPositionSeconds = nextValue;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PlaybackTimeDisplay));
+
+            if (!_isRefreshingPlaybackPosition)
+            {
+                _audioPlaybackService.Seek(TimeSpan.FromSeconds(nextValue));
+            }
+        }
+    }
+
+    public double PlaybackDurationSeconds
+    {
+        get => _playbackDurationSeconds;
+        private set
+        {
+            if (Math.Abs(_playbackDurationSeconds - value) < 0.05)
+            {
+                return;
+            }
+
+            _playbackDurationSeconds = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PlaybackTimeDisplay));
+        }
+    }
+
+    public double PlaybackRate
+    {
+        get => _playbackRate;
+        set
+        {
+            if (Math.Abs(_playbackRate - value) < 0.001)
+            {
+                return;
+            }
+
+            _playbackRate = value > 0 ? value : 1.0;
+            OnPropertyChanged();
+            _audioPlaybackService.SetPlaybackRate(_playbackRate);
+        }
+    }
+
+    public string PlaybackTimeDisplay =>
+        $"{FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackPositionSeconds))} / {FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackDurationSeconds))}";
+
     public bool IsReviewOperationInProgress
     {
         get => _isReviewOperationInProgress;
@@ -632,6 +857,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IncludeExportTimestamps
+    {
+        get => _includeExportTimestamps;
+        set => SetField(ref _includeExportTimestamps, value);
+    }
+
     public string AsrContextText
     {
         get => _asrContextText;
@@ -665,6 +896,25 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _selectedAsrEngineId, engineId))
             {
                 OnPropertyChanged(nameof(AsrModel));
+                OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+                OnPropertyChanged(nameof(CanRunSelectedJob));
+                if (RunSelectedJobCommand is RelayCommand runCommand)
+                {
+                    runCommand.RaiseCanExecuteChanged();
+                }
+
+                ScheduleSaveAsrSettings();
+            }
+        }
+    }
+
+    public bool EnableReviewStage
+    {
+        get => _enableReviewStage;
+        set
+        {
+            if (SetField(ref _enableReviewStage, value))
+            {
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
                 if (RunSelectedJobCommand is RelayCommand runCommand)
@@ -730,8 +980,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    private Task OpenSettingsAsync()
+    {
+        OpenDetailPanel(1);
+        LatestLog = "Settings opened. ASR engine, context, hotwords, storage path, and runtime readiness are available in the wide panel.";
+        return Task.CompletedTask;
+    }
+
     private Task OpenSetupAsync()
     {
+        OpenDetailPanel(2);
         RefreshModelCatalog();
         RefreshSetupWizard();
         LatestLog = $"{SetupPlaceholderText}{Environment.NewLine}Setup step: {SetupCurrentStep}. Model catalog: {ModelCatalogEntries.Count} entries.";
@@ -740,10 +998,36 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private Task ShowModelCatalogAsync()
     {
+        OpenDetailPanel(3);
         RefreshModelCatalog();
         var installedCount = ModelCatalogEntries.Count(static entry => entry.IsInstalled);
         LatestLog = $"Model catalog loaded: {ModelCatalogEntries.Count} entries, {installedCount} installed. Select a model in the Models tab for use/license/forget actions.";
         return Task.CompletedTask;
+    }
+
+    private Task OpenSelectedDetailPanelAsync()
+    {
+        OpenDetailPanel(SelectedLogPanelTabIndex == 0 ? 2 : SelectedLogPanelTabIndex);
+        return Task.CompletedTask;
+    }
+
+    private bool CanOpenSelectedDetailPanel()
+    {
+        return SelectedLogPanelTabIndex > 0;
+    }
+
+    private Task CloseDetailPanelAsync()
+    {
+        IsDetailPanelOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private void OpenDetailPanel(int logPanelTabIndex)
+    {
+        SelectedLogPanelTabIndex = Math.Clamp(logPanelTabIndex, 1, 3);
+        SelectedDetailPanelTabIndex = SelectedLogPanelTabIndex - 1;
+        OnPropertyChanged(nameof(DetailPanelTitle));
+        IsDetailPanelOpen = true;
     }
 
     private Task RegisterPreinstalledModelsAsync()
@@ -754,6 +1038,166 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RefreshModelCatalog();
         LatestLog = "Preinstalled model scan completed.";
         return Task.CompletedTask;
+    }
+
+    private async Task DownloadSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(SelectedModelCatalogEntry, resumeDownloadId: null);
+    }
+
+    private Task PauseSelectedModelDownloadAsync()
+    {
+        var job = SelectedModelCatalogEntry?.LatestDownloadJob;
+        if (job is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _modelDownloadService.Pause(job.DownloadId);
+        CancelActiveModelDownloadFor(SelectedModelCatalogEntry);
+        RefreshModelCatalog();
+        LatestLog = $"Model download paused: {SelectedModelCatalogEntry?.DisplayName}";
+        return Task.CompletedTask;
+    }
+
+    private async Task ResumeSelectedModelDownloadAsync()
+    {
+        var entry = SelectedModelCatalogEntry;
+        var job = entry?.LatestDownloadJob;
+        if (entry is null || job is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(entry, job.DownloadId);
+    }
+
+    private Task CancelSelectedModelDownloadAsync()
+    {
+        var job = SelectedModelCatalogEntry?.LatestDownloadJob;
+        if (job is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _modelDownloadService.Cancel(job.DownloadId);
+        CancelActiveModelDownloadFor(SelectedModelCatalogEntry);
+        RefreshModelCatalog();
+        LatestLog = $"Model download cancelled: {SelectedModelCatalogEntry?.DisplayName}";
+        return Task.CompletedTask;
+    }
+
+    private async Task RetrySelectedModelDownloadAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(SelectedModelCatalogEntry, resumeDownloadId: null);
+    }
+
+    private async Task DownloadModelAsync(ModelCatalogEntry entry, string? resumeDownloadId)
+    {
+        _modelDownloadCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _modelDownloadCancellation = cancellation;
+        _activeModelDownloadModelId = entry.ModelId;
+        BeginModelDownloadProgress(entry.DisplayName);
+        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            UpdateModelDownloadProgress(entry.DisplayName, downloadProgress);
+        });
+
+        try
+        {
+            LatestLog = $"Model download started: {entry.DisplayName}";
+            if (resumeDownloadId is null)
+            {
+                var targetPath = _modelInstallService.GetDefaultInstallPath(entry.CatalogItem);
+                await _modelDownloadService.DownloadAndInstallAsync(entry.CatalogItem, targetPath, progress, cancellation.Token);
+            }
+            else
+            {
+                await _modelDownloadService.ResumeDownloadAndInstallAsync(entry.CatalogItem, resumeDownloadId, progress, cancellation.Token);
+            }
+
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: true);
+        }
+        catch (OperationCanceledException)
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, "Model download cancelled.");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or HttpRequestException or UnauthorizedAccessException)
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, $"Model download failed: {entry.DisplayName}: {exception.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(_modelDownloadCancellation, cancellation))
+            {
+                _modelDownloadCancellation = null;
+                _activeModelDownloadModelId = null;
+            }
+
+            UpdateModelCatalogCommandStates();
+        }
+    }
+
+    private void BeginModelDownloadProgress(string displayName)
+    {
+        IsModelDownloadInProgress = true;
+        ModelDownloadProgressPercent = 0;
+        ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
+        ModelDownloadNotification = string.Empty;
+    }
+
+    private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
+    {
+        if (progress.BytesTotal is > 0)
+        {
+            ModelDownloadProgressPercent = progress.BytesDownloaded * 100d / progress.BytesTotal.Value;
+        }
+
+        ModelDownloadProgressSummary = $"Downloading {displayName}: {FormatDownloadProgress(progress)}";
+        LatestLog = ModelDownloadProgressSummary;
+    }
+
+    private void CompleteModelDownloadProgress(string displayName, bool succeeded, string? message = null)
+    {
+        IsModelDownloadInProgress = false;
+        if (succeeded)
+        {
+            ModelDownloadProgressPercent = 100;
+            ModelDownloadProgressSummary = $"Completed {displayName}: 100%";
+            ModelDownloadNotification = $"Download completed: {displayName}";
+            LatestLog = $"Model installed and verified: {displayName}";
+            return;
+        }
+
+        ModelDownloadProgressSummary = message ?? $"Download stopped: {displayName}";
+        ModelDownloadNotification = ModelDownloadProgressSummary;
+        LatestLog = ModelDownloadProgressSummary;
+    }
+
+    private void CancelActiveModelDownloadFor(ModelCatalogEntry? entry)
+    {
+        if (entry is null ||
+            !string.Equals(_activeModelDownloadModelId, entry.ModelId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _modelDownloadCancellation?.Cancel();
     }
 
     private Task UseSelectedModelAsync()
@@ -806,14 +1250,52 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private void RefreshModelCatalog()
     {
+        var selectedModelId = SelectedModelCatalogEntry?.ModelId;
         ModelCatalogEntries.Clear();
         foreach (var entry in _modelCatalogService.ListEntries())
         {
             ModelCatalogEntries.Add(entry);
         }
 
-        SelectedModelCatalogEntry ??= ModelCatalogEntries.FirstOrDefault();
+        SelectedModelCatalogEntry = selectedModelId is null
+            ? ModelCatalogEntries.FirstOrDefault()
+            : ModelCatalogEntries.FirstOrDefault(entry =>
+                entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
+        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+        OnPropertyChanged(nameof(CanRunSelectedJob));
         UpdateModelCatalogCommandStates();
+    }
+
+    private void RefreshModelCatalogKeepingSelection(string modelId)
+    {
+        RefreshModelCatalog();
+        SelectedModelCatalogEntry = ModelCatalogEntries.FirstOrDefault(entry =>
+            entry.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase)) ?? SelectedModelCatalogEntry;
+    }
+
+    private static string FormatDownloadProgress(ModelDownloadProgress progress)
+    {
+        if (progress.BytesTotal is > 0)
+        {
+            var percent = progress.BytesDownloaded * 100d / progress.BytesTotal.Value;
+            return $"{percent:0}% ({FormatBytes(progress.BytesDownloaded)} / {FormatBytes(progress.BytesTotal.Value)})";
+        }
+
+        return FormatBytes(progress.BytesDownloaded);
+    }
+
+    private static string FormatBytes(long sizeBytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)sizeBytes;
+        var index = 0;
+        while (value >= 1024 && index < units.Length - 1)
+        {
+            value /= 1024;
+            index++;
+        }
+
+        return $"{value:0.#} {units[index]}";
     }
 
     private void RegisterIfPresent(ModelCatalog catalog, string modelId, string path, string sourceType)
@@ -832,10 +1314,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             VibeVoiceCrispAsrEngine.Id => File.Exists(Paths.CrispAsrPath) && File.Exists(Paths.VibeVoiceAsrModelPath),
             "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
+            "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("faster-whisper-large-v3", Paths.FasterWhisperLargeV3ModelPath),
             "reazonspeech-k2-v3" => File.Exists(Paths.ReazonSpeechK2ScriptPath) &&
                 ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),
             _ => false
         };
+    }
+
+    private bool IsReviewModelReady()
+    {
+        return ModelPathExists("llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath);
     }
 
     private bool ModelPathExists(string modelId, string fallbackPath)
@@ -853,6 +1342,31 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private void UpdateModelCatalogCommandStates()
     {
+        if (DownloadSelectedModelCommand is RelayCommand downloadCommand)
+        {
+            downloadCommand.RaiseCanExecuteChanged();
+        }
+
+        if (PauseSelectedModelDownloadCommand is RelayCommand pauseCommand)
+        {
+            pauseCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ResumeSelectedModelDownloadCommand is RelayCommand resumeCommand)
+        {
+            resumeCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CancelSelectedModelDownloadCommand is RelayCommand cancelCommand)
+        {
+            cancelCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RetrySelectedModelDownloadCommand is RelayCommand retryCommand)
+        {
+            retryCommand.RaiseCanExecuteChanged();
+        }
+
         if (UseSelectedModelCommand is RelayCommand useCommand)
         {
             useCommand.RaiseCanExecuteChanged();
@@ -867,6 +1381,39 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             forgetCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private bool CanDownloadSelectedModel()
+    {
+        return SelectedModelCatalogEntry is { IsInstalled: false } entry &&
+            entry.IsDirectDownloadSupported &&
+            !IsDownloadRunning(entry.LatestDownloadJob);
+    }
+
+    private bool CanPauseSelectedModelDownload()
+    {
+        return IsDownloadRunning(SelectedModelCatalogEntry?.LatestDownloadJob);
+    }
+
+    private bool CanResumeSelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "paused" };
+    }
+
+    private bool CanCancelSelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "running" or "paused" };
+    }
+
+    private bool CanRetrySelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry is { IsInstalled: false, LatestDownloadJob.Status: "failed" or "cancelled" } entry &&
+            entry.IsDirectDownloadSupported;
+    }
+
+    private static bool IsDownloadRunning(ModelDownloadJob? job)
+    {
+        return string.Equals(job?.Status, "running", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task RefreshStatusBarInfoAsync()

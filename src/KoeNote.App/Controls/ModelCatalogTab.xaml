@@ -2,34 +2,83 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DockPanel Margin="0,8,0,0">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button Command="{Binding RegisterPreinstalledModelsCommand}" Padding="10,5" Margin="0,0,8,0">
-                <TextBlock Text="Scan" FontSize="12" />
-            </Button>
-            <Button Command="{Binding UseSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
-                <TextBlock Text="Use" FontSize="12" />
-            </Button>
-            <Button Command="{Binding ShowSelectedModelLicenseCommand}" Padding="10,5" Margin="0,0,8,0">
-                <TextBlock Text="License" FontSize="12" />
-            </Button>
-            <Button Command="{Binding ForgetSelectedModelCommand}" Padding="10,5">
-                <TextBlock Text="Forget" FontSize="12" />
-            </Button>
-        </StackPanel>
+        <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button Command="{Binding RegisterPreinstalledModelsCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Scan" FontSize="12" />
+                </Button>
+                <Button Command="{Binding DownloadSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Download" FontSize="12" />
+                </Button>
+                <Button Command="{Binding PauseSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Pause" FontSize="12" />
+                </Button>
+                <Button Command="{Binding ResumeSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Resume" FontSize="12" />
+                </Button>
+                <Button Command="{Binding CancelSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Cancel" FontSize="12" />
+                </Button>
+                <Button Command="{Binding RetrySelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Retry" FontSize="12" />
+                </Button>
+                <Button Command="{Binding UseSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="Use" FontSize="12" />
+                </Button>
+                <Button Command="{Binding ShowSelectedModelLicenseCommand}" Padding="10,5" Margin="0,0,8,0">
+                    <TextBlock Text="License" FontSize="12" />
+                </Button>
+                <Button Command="{Binding ForgetSelectedModelCommand}" Padding="10,5">
+                    <TextBlock Text="Forget" FontSize="12" />
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
+        <TextBlock DockPanel.Dock="Bottom"
+                   Text="{Binding SelectedModelCatalogEntry.DownloadError}"
+                   Foreground="{StaticResource DangerBrush}"
+                   FontSize="12"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0" />
+        <Border DockPanel.Dock="Bottom" Background="#F8FAFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding SelectedModelCatalogEntry.DisplayName}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding SelectedModelCatalogEntry.DownloadProgressSummary}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="12,0,0,0" />
+                <ProgressBar Grid.Row="1"
+                             Grid.ColumnSpan="2"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding SelectedModelCatalogEntry.DownloadProgressPercent, Mode=OneWay}"
+                             Height="8"
+                             Margin="0,8,0,0" />
+            </Grid>
+        </Border>
         <ListBox ItemsSource="{Binding ModelCatalogEntries}"
                  SelectedItem="{Binding SelectedModelCatalogEntry, Mode=TwoWay}"
                  BorderThickness="0"
                  Background="Transparent">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Grid Margin="0,2,0,3">
+                    <Grid Margin="0,3,0,4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="72" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="92" />
                             <ColumnDefinition Width="130" />
                             <ColumnDefinition Width="92" />
-                            <ColumnDefinition Width="94" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="128" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Role}" Foreground="#64748B" FontSize="12" />
                         <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="#334155" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -37,6 +86,15 @@
                         <TextBlock Grid.Column="3" Text="{Binding RuntimeRequirement}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="4" Text="{Binding LicenseName}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="5" Text="{Binding InstallState}" Foreground="{StaticResource AccentBrush}" FontSize="12" TextAlignment="Right" />
+                        <TextBlock Grid.Column="6" Text="{Binding DownloadProgressSummary}" Foreground="#64748B" FontSize="12" TextAlignment="Right" TextTrimming="CharacterEllipsis" />
+                        <ProgressBar Grid.Row="1"
+                                     Grid.Column="1"
+                                     Grid.ColumnSpan="6"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding DownloadProgressPercent, Mode=OneWay}"
+                                     Height="4"
+                                     Margin="0,4,0,0" />
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>

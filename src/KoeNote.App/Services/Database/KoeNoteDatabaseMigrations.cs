@@ -9,7 +9,9 @@ internal static class KoeNoteDatabaseMigrations
         new(3, "editing and undo", ApplyEditingAndUndoSchema),
         new(4, "correction memory", ApplyCorrectionMemorySchema),
         new(5, "ASR adapter", ApplyAsrAdapterSchema),
-        new(6, "model catalog", ApplyModelCatalogSchema)
+        new(6, "model catalog", ApplyModelCatalogSchema),
+        new(7, "repair ASR settings engine id", ApplyAsrSettingsEngineIdRepair),
+        new(8, "review stage toggle", ApplyReviewStageToggle)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -108,10 +110,12 @@ internal static class KoeNoteDatabaseMigrations
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                enable_review_stage INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'vibevoice-crispasr'");
+        migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
     }
 
     private static void ApplyEditingAndUndoSchema(DatabaseMigrationContext migration)
@@ -273,5 +277,36 @@ internal static class KoeNoteDatabaseMigrations
                 updated_at TEXT NOT NULL
             );
             """);
+    }
+
+    private static void ApplyAsrSettingsEngineIdRepair(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL
+            );
+            """);
+        migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'vibevoice-crispasr'");
+        migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
+    }
+
+    private static void ApplyReviewStageToggle(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL
+            );
+            """);
+        migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
     }
 }

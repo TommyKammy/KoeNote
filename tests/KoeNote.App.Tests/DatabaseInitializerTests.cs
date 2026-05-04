@@ -43,8 +43,10 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("installed_runtimes", tables);
         Assert.Contains("model_download_jobs", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
+        Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("source_ref_id", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("asr_run_id", ReadColumnNames(connection, "transcript_segments"));
@@ -67,9 +69,11 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
+        Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("speaker_aliases", ReadTableNames(connection));
         Assert.Contains("review_operation_history", ReadTableNames(connection));
         Assert.Contains("user_terms", ReadTableNames(connection));
@@ -101,7 +105,29 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+    }
+
+    [Fact]
+    public void EnsureCreated_RepairsVersionSixDatabaseMissingAsrSettingsEngineId()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateVersionSixDatabaseMissingAsrSettingsEngineId(paths);
+
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+        Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
     }
 
     private static string CreateTempDirectory()
@@ -255,6 +281,41 @@ public sealed class DatabaseInitializerTests
                 level TEXT NOT NULL,
                 message TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    private static void CreateVersionSixDatabaseMissingAsrSettingsEngineId(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Execute(connection, """
+            CREATE TABLE schema_version (
+                version INTEGER NOT NULL PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
+            """);
+        for (var version = 1; version <= 6; version++)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO schema_version (version, applied_at)
+                VALUES ($version, datetime('now'));
+                """;
+            command.Parameters.AddWithValue("$version", version);
+            command.ExecuteNonQuery();
+        }
+
+        Execute(connection, """
+            CREATE TABLE asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
             );
             """);
     }

@@ -16,7 +16,7 @@ public sealed class ReviewCommandBuilder
             "--file",
             promptFilePath,
             "--ctx-size",
-            "4096",
+            "16384",
             "--n-gpu-layers",
             "999",
             "--n-predict",

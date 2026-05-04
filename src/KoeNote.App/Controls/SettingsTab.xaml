@@ -1,0 +1,51 @@
+<UserControl x:Class="KoeNote.App.Controls.SettingsTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="ASR" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                <TextBlock Text="Engine" Style="{StaticResource MutedText}" />
+                <ComboBox ItemsSource="{Binding AvailableAsrEngines}"
+                          SelectedValue="{Binding SelectedAsrEngineId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          SelectedValuePath="EngineId"
+                          DisplayMemberPath="DisplayName"
+                          MinHeight="30"
+                          Margin="0,4,0,10" />
+                <TextBlock Text="Context" Style="{StaticResource MutedText}" />
+                <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         MinHeight="78"
+                         Margin="0,4,0,10" />
+                <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
+                <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         MinHeight="58"
+                         Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Runtime" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                <TextBlock Text="{Binding FirstRunSummary}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FirstRunDetail}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                <TextBlock Text="Storage" Style="{StaticResource MutedText}" />
+                <TextBlock Text="{Binding StoragePath}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,10" />
+                <TextBlock Text="Setup" Style="{StaticResource MutedText}" />
+                <TextBlock Text="{Binding SetupStatusSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,14" />
+                <TextBlock Text="Review" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                <CheckBox Content="Enable review stage"
+                          IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Margin="0,0,0,6" />
+                <TextBlock Text="Turn this off when ASR quality is sufficient and you want to skip the LLM review pass."
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

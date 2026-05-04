@@ -48,12 +48,14 @@ public sealed class ModelCatalogService(AppPaths paths)
         var installed = new InstalledModelRepository(paths)
             .ListInstalledModels()
             .ToDictionary(model => model.ModelId, StringComparer.OrdinalIgnoreCase);
+        var downloadJobs = new ModelDownloadJobRepository(paths);
 
         return LoadBuiltInCatalog()
             .Models
             .Select(model => new ModelCatalogEntry(
                 model,
-                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null))
+                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
+                downloadJobs.FindLatestForModel(model.ModelId)))
             .OrderBy(static entry => entry.Role, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -64,11 +66,13 @@ public sealed class ModelCatalogService(AppPaths paths)
         var installed = new InstalledModelRepository(paths)
             .ListInstalledModels()
             .ToDictionary(model => model.ModelId, StringComparer.OrdinalIgnoreCase);
+        var downloadJobs = new ModelDownloadJobRepository(paths);
 
         return catalog.Models
             .Select(model => new ModelCatalogEntry(
                 model,
-                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null))
+                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
+                downloadJobs.FindLatestForModel(model.ModelId)))
             .OrderBy(static entry => entry.Role, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();

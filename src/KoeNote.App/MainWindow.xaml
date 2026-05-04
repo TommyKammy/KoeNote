@@ -5,45 +5,134 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:KoeNote.App.Controls"
         mc:Ignorable="d"
-        Title="KoeNote" Height="860" Width="1440" MinHeight="760" MinWidth="1180"
+        Title="KoeNote" Height="820" Width="1360" MinHeight="720" MinWidth="1080"
         Icon="pack://application:,,,/Resources/AppIcon.ico"
         Background="#F8F9FA"
         FontFamily="Yu Gothic UI"
         AllowDrop="True"
         DragOver="OnDragOverAudioFiles"
         Drop="OnDropAudioFiles">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
     <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="104" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="176" />
+            <RowDefinition Height="*" MinHeight="320" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="220" MinHeight="150" />
             <RowDefinition Height="28" />
         </Grid.RowDefinitions>
 
         <controls:HeaderToolbar Grid.Row="0" />
 
-        <Grid Grid.Row="1" Margin="18">
+        <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="310" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="370" />
+                <ColumnDefinition Width="260" MinWidth="220" />
+                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="300" MinWidth="260" />
             </Grid.ColumnDefinitions>
 
-            <controls:JobListPanel Grid.Column="0" Margin="0,0,14,0" />
-            <controls:TranscriptPanel Grid.Column="1" Margin="0,0,14,0" />
+            <controls:JobListPanel Grid.Column="0" Margin="0,0,8,0" />
+            <controls:TranscriptPanel Grid.Column="1" Margin="0,0,8,0" />
             <controls:ReviewPanel Grid.Column="2" />
         </Grid>
 
-        <Grid Grid.Row="2" Margin="18,0,18,12">
+        <GridSplitter Grid.Row="2"
+                      Height="8"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Center"
+                      Background="{StaticResource BorderBrushSoft}"
+                      ResizeDirection="Rows"
+                      ResizeBehavior="PreviousAndNext"
+                      ShowsPreview="True"
+                      ToolTip="Drag to resize logs, models, and setup" />
+
+        <Grid Grid.Row="3" Margin="10,0,10,10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="510" />
+                <ColumnDefinition Width="360" MinWidth="300" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <controls:StageProgressPanel Grid.Column="0" Margin="0,0,14,0" />
+            <controls:StageProgressPanel Grid.Column="0" Margin="0,0,8,0" />
             <controls:LogPanel Grid.Column="1" />
         </Grid>
 
-        <controls:StatusBarPanel Grid.Row="3" />
+        <controls:StatusBarPanel Grid.Row="4" />
+
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Panel.ZIndex="20"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Width="380"
+                Margin="0,14,18,0"
+                Background="#ECFDF5"
+                BorderBrush="#22C55E"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12"
+                Visibility="{Binding HasModelDownloadNotification, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="&#xE930;"
+                           FontFamily="Segoe MDL2 Assets"
+                           Foreground="#15803D"
+                           FontSize="16"
+                           VerticalAlignment="Top"
+                           Margin="0,0,8,0" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ModelDownloadNotification}"
+                           Foreground="#14532D"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Grid.RowSpan="3"
+              Panel.ZIndex="10"
+              Visibility="{Binding IsDetailPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border Background="#66000000" />
+            <Border Width="780"
+                    MaxWidth="980"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,18,12"
+                    Background="#FFFFFF"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="18">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding DetailPanelTitle}" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Command="{Binding CloseDetailPanelCommand}" Padding="9,7" MinWidth="0" ToolTip="Close">
+                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" />
+                        </Button>
+                    </Grid>
+                    <TabControl BorderThickness="0"
+                                Background="Transparent"
+                                SelectedIndex="{Binding SelectedDetailPanelTabIndex, Mode=TwoWay}">
+                        <TabItem Header="Settings">
+                            <controls:SettingsTab />
+                        </TabItem>
+                        <TabItem Header="Setup">
+                            <controls:SetupWizardTab />
+                        </TabItem>
+                        <TabItem Header="Models">
+                            <controls:ModelCatalogTab />
+                        </TabItem>
+                    </TabControl>
+                </DockPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

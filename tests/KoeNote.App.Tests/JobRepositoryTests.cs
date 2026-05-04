@@ -1,4 +1,7 @@
+using KoeNote.App.Models;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Tests;
 
@@ -129,6 +132,49 @@ public sealed class JobRepositoryTests
         Assert.Equal("キャンセル済み", reader.GetString(0));
         Assert.Equal("asr_cancelled", reader.GetString(1));
         Assert.Equal("cancelled", reader.GetString(2));
+    }
+
+    [Fact]
+    public void MarkReviewSkippedAndClearDrafts_ClearsPendingReviewState()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw", "fixed", "reason", 0.8)
+        ]);
+
+        repository.MarkReviewSkippedAndClearDrafts(job);
+
+        using var connection = fixture.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                j.current_stage,
+                j.progress_percent,
+                j.unreviewed_draft_count,
+                d.status,
+                s.review_state
+            FROM jobs j
+            JOIN correction_drafts d ON d.job_id = j.job_id
+            JOIN transcript_segments s ON s.job_id = j.job_id AND s.segment_id = d.segment_id
+            WHERE j.job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("review_skipped", reader.GetString(0));
+        Assert.Equal(100, reader.GetInt32(1));
+        Assert.Equal(0, reader.GetInt32(2));
+        Assert.Equal("skipped", reader.GetString(3));
+        Assert.Equal("none", reader.GetString(4));
+        Assert.False(reader.Read());
+        Assert.Equal(0, job.UnreviewedDrafts);
     }
 
 }

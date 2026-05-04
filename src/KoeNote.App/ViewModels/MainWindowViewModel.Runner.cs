@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId);
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, EnableReviewStage);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
         }
         finally
@@ -58,7 +58,10 @@ public sealed partial class MainWindowViewModel
         }
         else if (update.ClearReviewPreview)
         {
+            ReviewQueue.Clear();
+            SelectedCorrectionDraft = null;
             ClearReviewPreview();
+            UpdateReviewCommandStates();
         }
 
         if (update.RefreshJobViews)
@@ -90,6 +93,11 @@ public sealed partial class MainWindowViewModel
 
     private static string GetStageStatusText(JobRunStageState state, string? errorCategory)
     {
+        if (state == JobRunStageState.Skipped)
+        {
+            return "Skipped";
+        }
+
         return state switch
         {
             JobRunStageState.Running => "実行中",

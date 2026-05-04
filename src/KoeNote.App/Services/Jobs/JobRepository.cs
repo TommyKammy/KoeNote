@@ -188,6 +188,64 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, draftCount > 0 ? "レビュー待ち" : "推敲候補なし", "review_ready", 90, job.NormalizedAudioPath);
     }
 
+    public void MarkReviewSkippedAndClearDrafts(JobSummary job)
+    {
+        job.Status = "Review skipped";
+        job.ProgressPercent = 100;
+        job.UnreviewedDrafts = 0;
+        job.UpdatedAt = DateTimeOffset.Now;
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        using (var jobCommand = connection.CreateCommand())
+        {
+            jobCommand.Transaction = transaction;
+            jobCommand.CommandText = """
+                UPDATE jobs
+                SET status = $status,
+                    current_stage = 'review_skipped',
+                    progress_percent = 100,
+                    normalized_audio_path = $normalized_audio_path,
+                    unreviewed_draft_count = 0,
+                    updated_at = $updated_at,
+                    last_error_category = NULL
+                WHERE job_id = $job_id;
+                """;
+            jobCommand.Parameters.AddWithValue("$status", job.Status);
+            jobCommand.Parameters.AddWithValue("$normalized_audio_path", (object?)job.NormalizedAudioPath ?? DBNull.Value);
+            jobCommand.Parameters.AddWithValue("$updated_at", job.UpdatedAt.ToString("o"));
+            jobCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            jobCommand.ExecuteNonQuery();
+        }
+
+        using (var draftCommand = connection.CreateCommand())
+        {
+            draftCommand.Transaction = transaction;
+            draftCommand.CommandText = """
+                UPDATE correction_drafts
+                SET status = 'skipped'
+                WHERE job_id = $job_id AND status = 'pending';
+                """;
+            draftCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            draftCommand.ExecuteNonQuery();
+        }
+
+        using (var segmentCommand = connection.CreateCommand())
+        {
+            segmentCommand.Transaction = transaction;
+            segmentCommand.CommandText = """
+                UPDATE transcript_segments
+                SET review_state = 'none'
+                WHERE job_id = $job_id AND review_state = 'has_draft';
+                """;
+            segmentCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            segmentCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
     public void MarkReviewFailed(JobSummary job, string errorCategory)
     {
         UpdatePreprocessResult(job, $"推敲失敗: {errorCategory}", "review_failed", 90, job.NormalizedAudioPath, errorCategory);

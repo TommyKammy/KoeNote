@@ -1,3 +1,4 @@
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.ViewModels;
@@ -38,16 +39,48 @@ public sealed partial class MainWindowViewModel
 
     private async Task SetupDownloadAsrAsync()
     {
-        var result = await _setupWizardService.DownloadSelectedModelAsync("asr");
+        var displayName = SelectedSetupAsrModel?.DisplayName ?? "ASR model";
+        BeginModelDownloadProgress(displayName);
+        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            RefreshModelCatalogKeepingSelection(downloadProgress.ModelId);
+            UpdateModelDownloadProgress(displayName, downloadProgress);
+        });
+        var result = await _setupWizardService.DownloadSelectedModelAsync("asr", progress);
         RefreshSetupWizard();
-        LatestLog = result.Message;
+        CompleteSetupModelDownload(displayName, result);
     }
 
     private async Task SetupDownloadReviewAsync()
     {
-        var result = await _setupWizardService.DownloadSelectedModelAsync("review");
+        var displayName = SelectedSetupReviewModel?.DisplayName ?? "Review LLM model";
+        BeginModelDownloadProgress(displayName);
+        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            RefreshModelCatalogKeepingSelection(downloadProgress.ModelId);
+            UpdateModelDownloadProgress(displayName, downloadProgress);
+        });
+        var result = await _setupWizardService.DownloadSelectedModelAsync("review", progress);
         RefreshSetupWizard();
-        LatestLog = result.Message;
+        CompleteSetupModelDownload(displayName, result);
+    }
+
+    private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
+    {
+        if (result.IsSucceeded)
+        {
+            CompleteModelDownloadProgress(displayName, succeeded: true);
+            if (result.Message.StartsWith("Already installed", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelDownloadProgressSummary = result.Message;
+                ModelDownloadNotification = result.Message;
+                LatestLog = result.Message;
+            }
+
+            return;
+        }
+
+        CompleteModelDownloadProgress(displayName, succeeded: false, result.Message);
     }
 
     private Task SetupRegisterLocalAsrAsync()
@@ -166,6 +199,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));
         OnPropertyChanged(nameof(IsSetupComplete));
+        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
         SetupModelAudits.Clear();
         foreach (var audit in _setupWizardService.GetSelectedModelAudit())

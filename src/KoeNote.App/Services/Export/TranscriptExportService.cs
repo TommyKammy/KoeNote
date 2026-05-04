@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.IO;
+using System.IO.Compression;
+using System.Security;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Transcript;
 using Microsoft.Data.Sqlite;
@@ -20,6 +22,15 @@ public sealed class TranscriptExportService(AppPaths paths)
         string jobId,
         string outputDirectory,
         IReadOnlyCollection<TranscriptExportFormat>? formats = null)
+    {
+        return ExportJob(jobId, outputDirectory, formats, new TranscriptExportOptions());
+    }
+
+    public TranscriptExportResult ExportJob(
+        string jobId,
+        string outputDirectory,
+        IReadOnlyCollection<TranscriptExportFormat>? formats,
+        TranscriptExportOptions? options)
     {
         if (string.IsNullOrWhiteSpace(jobId))
         {
@@ -42,12 +53,15 @@ public sealed class TranscriptExportService(AppPaths paths)
             ? formats
             : [TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Json, TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt];
         var filePaths = new List<string>();
-        var baseName = SanitizeFileName(snapshot.Title);
+        var exportOptions = options ?? new TranscriptExportOptions();
+        var baseName = SanitizeFileName(string.IsNullOrWhiteSpace(exportOptions.BaseFileName)
+            ? snapshot.Title
+            : exportOptions.BaseFileName);
 
         foreach (var format in selectedFormats.Distinct())
         {
             var path = Path.Combine(outputDirectory, $"{baseName}.{GetExtension(format)}");
-            File.WriteAllText(path, Render(snapshot, format), Encoding.UTF8);
+            WriteFormat(path, snapshot, format, exportOptions);
             filePaths.Add(path);
         }
 
@@ -62,6 +76,52 @@ public sealed class TranscriptExportService(AppPaths paths)
         var level = result.HasUnresolvedDrafts ? "warning" : "info";
         var warning = result.HasUnresolvedDrafts ? $" ({result.PendingDraftCount} unresolved drafts)" : "";
         new JobLogRepository(paths).AddEvent(jobId, "export", level, $"Exported transcript files to {outputDirectory}{warning}");
+        return result;
+    }
+
+    public TranscriptExportResult ExportJobToFile(
+        string jobId,
+        string outputPath,
+        TranscriptExportFormat format,
+        TranscriptExportOptions? options = null)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("Job id is required.", nameof(jobId));
+        }
+
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            throw new ArgumentException("Output path is required.", nameof(outputPath));
+        }
+
+        var outputDirectory = Path.GetDirectoryName(outputPath);
+        if (string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            throw new ArgumentException("Output path must include a directory.", nameof(outputPath));
+        }
+
+        var snapshot = LoadSnapshot(jobId);
+        if (snapshot.Segments.Count == 0)
+        {
+            throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
+        }
+
+        Directory.CreateDirectory(outputDirectory);
+        var exportOptions = options ?? new TranscriptExportOptions();
+        WriteFormat(outputPath, snapshot, format, exportOptions);
+
+        var result = new TranscriptExportResult(
+            jobId,
+            outputDirectory,
+            [outputPath],
+            snapshot.Segments.Count,
+            snapshot.PendingDraftCount,
+            snapshot.PendingDraftCount > 0);
+
+        var level = result.HasUnresolvedDrafts ? "warning" : "info";
+        var warning = result.HasUnresolvedDrafts ? $" ({result.PendingDraftCount} unresolved drafts)" : "";
+        new JobLogRepository(paths).AddEvent(jobId, "export", level, $"Exported transcript file to {outputPath}{warning}");
         return result;
     }
 
@@ -102,29 +162,37 @@ public sealed class TranscriptExportService(AppPaths paths)
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
-    private static string Render(ExportSnapshot snapshot, TranscriptExportFormat format)
+    private static string Render(ExportSnapshot snapshot, TranscriptExportFormat format, TranscriptExportOptions options)
     {
         return format switch
         {
-            TranscriptExportFormat.Text => RenderText(snapshot),
-            TranscriptExportFormat.Markdown => RenderMarkdown(snapshot),
+            TranscriptExportFormat.Text => RenderText(snapshot, options),
+            TranscriptExportFormat.Markdown => RenderMarkdown(snapshot, options),
             TranscriptExportFormat.Json => RenderJson(snapshot),
             TranscriptExportFormat.Srt => RenderSrt(snapshot),
             TranscriptExportFormat.Vtt => RenderVtt(snapshot),
+            TranscriptExportFormat.Docx => RenderText(snapshot, options),
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
     }
 
-    private static string RenderText(ExportSnapshot snapshot)
+    private static void WriteFormat(string path, ExportSnapshot snapshot, TranscriptExportFormat format, TranscriptExportOptions options)
+    {
+        if (format == TranscriptExportFormat.Docx)
+        {
+            WriteDocx(path, snapshot, options);
+            return;
+        }
+
+        File.WriteAllText(path, Render(snapshot, format, options), Encoding.UTF8);
+    }
+
+    private static string RenderText(ExportSnapshot snapshot, TranscriptExportOptions options)
     {
         var builder = new StringBuilder();
         foreach (var segment in snapshot.Segments)
         {
-            builder.Append('[')
-                .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
-                .Append(" - ")
-                .Append(TimestampFormatter.FormatDisplay(segment.EndSeconds))
-                .Append("] ");
+            AppendDisplayTimestamp(builder, segment, options);
             if (!string.IsNullOrWhiteSpace(segment.Speaker))
             {
                 builder.Append(segment.Speaker).Append(": ");
@@ -136,7 +204,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         return builder.ToString();
     }
 
-    private static string RenderMarkdown(ExportSnapshot snapshot)
+    private static string RenderMarkdown(ExportSnapshot snapshot, TranscriptExportOptions options)
     {
         var builder = new StringBuilder()
             .Append("# ")
@@ -152,9 +220,14 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         foreach (var segment in snapshot.Segments)
         {
-            builder.Append("- `")
-                .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
-                .Append("` ");
+            builder.Append("- ");
+            if (options.IncludeTimestamps)
+            {
+                builder.Append('`')
+                    .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
+                    .Append("` ");
+            }
+
             if (!string.IsNullOrWhiteSpace(segment.Speaker))
             {
                 builder.Append("**").Append(segment.Speaker).Append("**: ");
@@ -242,8 +315,94 @@ public sealed class TranscriptExportService(AppPaths paths)
             TranscriptExportFormat.Json => "json",
             TranscriptExportFormat.Srt => "srt",
             TranscriptExportFormat.Vtt => "vtt",
+            TranscriptExportFormat.Docx => "docx",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
+    }
+
+    private static void WriteDocx(string path, ExportSnapshot snapshot, TranscriptExportOptions options)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        WriteZipEntry(archive, "[Content_Types].xml", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+              <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+              <Default Extension="xml" ContentType="application/xml"/>
+              <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+            </Types>
+            """);
+        WriteZipEntry(archive, "_rels/.rels", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+            </Relationships>
+            """);
+        WriteZipEntry(archive, "word/document.xml", RenderDocxDocument(snapshot, options));
+    }
+
+    private static void WriteZipEntry(ZipArchive archive, string entryName, string content)
+    {
+        var entry = archive.CreateEntry(entryName);
+        using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+        writer.Write(content);
+    }
+
+    private static string RenderDocxDocument(ExportSnapshot snapshot, TranscriptExportOptions options)
+    {
+        var builder = new StringBuilder()
+            .AppendLine("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
+            .AppendLine("""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">""")
+            .AppendLine("<w:body>")
+            .Append("<w:p><w:r><w:t>")
+            .Append(SecurityElement.Escape(snapshot.Title))
+            .AppendLine("</w:t></w:r></w:p>");
+
+        if (snapshot.PendingDraftCount > 0)
+        {
+            builder.Append("<w:p><w:r><w:t>")
+                .Append(SecurityElement.Escape($"{snapshot.PendingDraftCount} unresolved correction drafts remain."))
+                .AppendLine("</w:t></w:r></w:p>");
+        }
+
+        foreach (var segment in snapshot.Segments)
+        {
+            var prefix = options.IncludeTimestamps
+                ? $"[{TimestampFormatter.FormatDisplay(segment.StartSeconds)} - {TimestampFormatter.FormatDisplay(segment.EndSeconds)}] "
+                : string.Empty;
+            if (!string.IsNullOrWhiteSpace(segment.Speaker))
+            {
+                prefix += $"{segment.Speaker}: ";
+            }
+
+            builder.Append("<w:p><w:r><w:t>")
+                .Append(SecurityElement.Escape(prefix + segment.Text))
+                .AppendLine("</w:t></w:r></w:p>");
+        }
+
+        return builder
+            .AppendLine("<w:sectPr/>")
+            .AppendLine("</w:body>")
+            .AppendLine("</w:document>")
+            .ToString();
+    }
+
+    private static void AppendDisplayTimestamp(StringBuilder builder, TranscriptExportSegment segment, TranscriptExportOptions options)
+    {
+        if (!options.IncludeTimestamps)
+        {
+            return;
+        }
+
+        builder.Append('[')
+            .Append(TimestampFormatter.FormatDisplay(segment.StartSeconds))
+            .Append(" - ")
+            .Append(TimestampFormatter.FormatDisplay(segment.EndSeconds))
+            .Append("] ");
     }
 
     private static string SanitizeFileName(string value)

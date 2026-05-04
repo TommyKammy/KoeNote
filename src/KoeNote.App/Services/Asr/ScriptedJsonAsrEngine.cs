@@ -57,13 +57,16 @@ public sealed class ScriptedJsonAsrEngine(
             var processResult = await processRunner.RunAsync(config.RuntimePath, arguments, timeout, cancellationToken);
             if (processResult.ExitCode != 0)
             {
-                throw new AsrWorkerException(
-                    AsrFailureCategory.ProcessFailed,
-                    $"{DisplayName} exited with code {processResult.ExitCode}: {processResult.StandardError}");
+                if (!File.Exists(scriptJsonPath))
+                {
+                    throw new AsrWorkerException(
+                        AsrFailureCategory.ProcessFailed,
+                        $"{DisplayName} exited with code {processResult.ExitCode}: {processResult.StandardError}");
+                }
             }
 
             var rawOutput = File.Exists(scriptJsonPath)
-                ? File.ReadAllText(scriptJsonPath)
+                ? File.ReadAllText(scriptJsonPath, System.Text.Encoding.UTF8)
                 : AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
             var rawOutputPath = resultStore.SaveRawOutput(config.OutputDirectory, rawOutput);
             var segments = normalizer.Normalize(input.JobId, rawOutput)

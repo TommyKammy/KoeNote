@@ -17,6 +17,9 @@ public sealed class MainWindowServicesTests
         Assert.True(services.AsrEngineRegistry.Contains("vibevoice-crispasr"));
         Assert.True(services.AsrEngineRegistry.Contains("faster-whisper-large-v3-turbo"));
         Assert.True(services.AsrEngineRegistry.Contains("reazonspeech-k2-v3"));
+        Assert.NotNull(services.AudioPlaybackService);
+        Assert.NotNull(services.ModelDownloadJobRepository);
+        Assert.NotNull(services.ModelDownloadService);
         Assert.NotEmpty(services.ToolStatusService.GetStatusItems());
     }
 }

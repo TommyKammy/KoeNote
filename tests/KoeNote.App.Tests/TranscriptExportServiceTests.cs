@@ -4,6 +4,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
+using System.IO.Compression;
 
 namespace KoeNote.App.Tests;
 
@@ -66,6 +67,73 @@ public sealed class TranscriptExportServiceTests
         Assert.Equal(Path.Combine(output, "selected.txt"), file);
         Assert.True(File.Exists(file));
         Assert.False(File.Exists(Path.Combine(output, "selected.json")));
+    }
+
+    [Fact]
+    public void ExportJob_UsesCustomBaseFileNameAndCanHideDisplayTimestamps()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "selected");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 9.8, "", "hello")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Text, TranscriptExportFormat.Docx],
+            new TranscriptExportOptions("custom name", IncludeTimestamps: false));
+
+        Assert.Contains(Path.Combine(output, "custom name.txt"), result.FilePaths);
+        Assert.Contains(Path.Combine(output, "custom name.docx"), result.FilePaths);
+        var text = File.ReadAllText(Path.Combine(output, "custom name.txt"));
+        Assert.Equal($"hello{Environment.NewLine}", text);
+        Assert.DoesNotContain("[00:00:00.000 - 00:00:09.800]", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportJobToFile_WritesRequestedFormatToExactPath()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "selected");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 9.8, "", "hello")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports", "custom-title.txt");
+
+        var result = new TranscriptExportService(paths).ExportJobToFile(
+            "job-001",
+            output,
+            TranscriptExportFormat.Text,
+            new TranscriptExportOptions(IncludeTimestamps: false));
+
+        var file = Assert.Single(result.FilePaths);
+        Assert.Equal(output, file);
+        Assert.Equal($"hello{Environment.NewLine}", File.ReadAllText(output));
+    }
+
+    [Fact]
+    public void ExportJob_CanWriteDocx()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "docx-export");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "hello docx")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Docx]);
+
+        var file = Assert.Single(result.FilePaths);
+        Assert.Equal(Path.Combine(output, "docx-export.docx"), file);
+        using var archive = ZipFile.OpenRead(file);
+        Assert.NotNull(archive.GetEntry("[Content_Types].xml"));
+        var document = archive.GetEntry("word/document.xml");
+        Assert.NotNull(document);
+        using var reader = new StreamReader(document.Open());
+        var xml = reader.ReadToEnd();
+        Assert.Contains("hello docx", xml, StringComparison.Ordinal);
     }
 
     [Fact]

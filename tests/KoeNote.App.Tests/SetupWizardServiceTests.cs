@@ -219,6 +219,28 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void ModelInstallService_DefaultInstallPath_PutsReviewModelUnderModelDirectory()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogItem = new ModelCatalogService(paths)
+            .LoadBuiltInCatalog()
+            .Models
+            .First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        var service = new ModelInstallService(
+            paths,
+            new InstalledModelRepository(paths),
+            new ModelVerificationService());
+
+        var installPath = service.GetDefaultInstallPath(catalogItem);
+
+        Assert.Equal(
+            Path.Combine(paths.UserModels, "review", catalogItem.ModelId, "llm-jp-4-8B-thinking-Q4_K_M.gguf"),
+            installPath);
+    }
+
+    [Fact]
     public async Task SetupWizard_DownloadFailure_ReturnsFailureAndKeepsSetupIncomplete()
     {
         var paths = CreatePaths();

@@ -24,6 +24,7 @@ public sealed class SetupWizardService
         _installService = new SetupModelInstallService(
             stateService,
             _selectionService,
+            installedModelRepository,
             modelInstallService,
             modelPackImportService,
             modelDownloadService);
@@ -86,6 +87,14 @@ public sealed class SetupWizardService
     public Task<SetupInstallResult> DownloadSelectedModelAsync(string role, CancellationToken cancellationToken = default)
     {
         return _installService.DownloadSelectedModelAsync(role, cancellationToken);
+    }
+
+    public Task<SetupInstallResult> DownloadSelectedModelAsync(
+        string role,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken = default)
+    {
+        return _installService.DownloadSelectedModelAsync(role, progress, cancellationToken);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

@@ -14,43 +14,43 @@ public sealed class ReviewWorker(
     CorrectionDraftRepository repository,
     CorrectionMemoryService? correctionMemoryService = null)
 {
+    private const int ReviewChunkSegmentCount = 80;
+
     public async Task<ReviewRunResult> RunAsync(ReviewRunOptions options, CancellationToken cancellationToken = default)
     {
         ValidateInputs(options);
 
         var timeout = options.Timeout ?? TimeSpan.FromHours(2);
-        var prompt = promptBuilder.Build(options.Segments);
-        var promptPath = WritePrompt(options.OutputDirectory, "review.prompt.txt", prompt);
         var schemaPath = WriteJsonSchema(options.OutputDirectory);
-        var processResult = await RunRuntimeAsync(options, promptPath, schemaPath, timeout, cancellationToken);
+        var chunks = ChunkSegments(options.Segments, ReviewChunkSegmentCount).ToArray();
+        var allDrafts = new List<CorrectionDraft>();
+        var rawOutputs = new List<ReviewChunkRawOutput>();
+        var totalDuration = TimeSpan.Zero;
+        var chunkIndex = 1;
 
-        var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
-        var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput);
-        IReadOnlyList<CorrectionDraft> drafts;
-        try
+        foreach (var chunk in chunks)
         {
-            drafts = normalizer.Normalize(options.JobId, options.Segments, rawOutput, options.MinConfidence);
-        }
-        catch (ReviewWorkerException exception) when (exception.Category == ReviewFailureCategory.JsonParseFailed)
-        {
-            var repairPrompt = promptBuilder.BuildRepairPrompt(rawOutput);
-            var repairPromptPath = WritePrompt(options.OutputDirectory, "review.repair.prompt.txt", repairPrompt);
-            var repairResult = await RunRuntimeAsync(options, repairPromptPath, schemaPath, timeout, cancellationToken);
-            rawOutput = AsrOutputExtractor.ExtractJson(repairResult.StandardOutput, repairResult.StandardError);
-            rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, "review.repair.raw.json");
-            try
-            {
-                drafts = normalizer.Normalize(options.JobId, options.Segments, rawOutput, options.MinConfidence);
-            }
-            catch (ReviewWorkerException repairException) when (repairException.Category == ReviewFailureCategory.JsonParseFailed)
-            {
-                drafts = [];
-            }
-
-            processResult = repairResult;
+            var chunkResult = await RunChunkAsync(
+                options,
+                chunk,
+                chunkIndex,
+                chunks.Length,
+                schemaPath,
+                timeout,
+                cancellationToken);
+            allDrafts.AddRange(chunkResult.Drafts);
+            rawOutputs.Add(new ReviewChunkRawOutput(
+                chunkIndex,
+                chunk.First().SegmentId,
+                chunk.Last().SegmentId,
+                chunkResult.RawOutputPath,
+                chunkResult.RawOutput));
+            totalDuration += chunkResult.Duration;
+            chunkIndex++;
         }
 
-        drafts = MergeMemoryDrafts(options.JobId, options.Segments, drafts);
+        var rawOutputPath = SaveCombinedRawOutput(options.OutputDirectory, rawOutputs);
+        var drafts = MergeMemoryDrafts(options.JobId, options.Segments, allDrafts);
         var normalizedDraftsPath = resultStore.SaveNormalizedDrafts(options.OutputDirectory, drafts);
         repository.ReplaceDrafts(options.JobId, drafts);
 
@@ -59,7 +59,49 @@ public sealed class ReviewWorker(
             rawOutputPath,
             normalizedDraftsPath,
             drafts,
-            processResult.Duration);
+            totalDuration);
+    }
+
+    private async Task<ReviewChunkResult> RunChunkAsync(
+        ReviewRunOptions options,
+        IReadOnlyList<TranscriptSegment> segments,
+        int chunkIndex,
+        int chunkCount,
+        string schemaPath,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var suffix = chunkCount == 1 ? "" : $".chunk-{chunkIndex:D3}";
+        var prompt = promptBuilder.Build(segments);
+        var promptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.prompt.txt", prompt);
+        var processResult = await RunRuntimeAsync(options, promptPath, schemaPath, timeout, cancellationToken);
+        var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
+        var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.raw.json");
+        IReadOnlyList<CorrectionDraft> drafts;
+        try
+        {
+            drafts = normalizer.Normalize(options.JobId, segments, rawOutput, options.MinConfidence);
+        }
+        catch (ReviewWorkerException exception) when (exception.Category == ReviewFailureCategory.JsonParseFailed)
+        {
+            var repairPrompt = promptBuilder.BuildRepairPrompt(rawOutput);
+            var repairPromptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.repair.prompt.txt", repairPrompt);
+            var repairResult = await RunRuntimeAsync(options, repairPromptPath, schemaPath, timeout, cancellationToken);
+            rawOutput = AsrOutputExtractor.ExtractJson(repairResult.StandardOutput, repairResult.StandardError);
+            rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.repair.raw.json");
+            try
+            {
+                drafts = normalizer.Normalize(options.JobId, segments, rawOutput, options.MinConfidence);
+            }
+            catch (ReviewWorkerException repairException) when (repairException.Category == ReviewFailureCategory.JsonParseFailed)
+            {
+                drafts = [];
+            }
+
+            return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, repairResult.Duration);
+        }
+
+        return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration);
     }
 
     private async Task<ProcessRunResult> RunRuntimeAsync(
@@ -115,6 +157,31 @@ public sealed class ReviewWorker(
         return schemaPath;
     }
 
+    private string SaveCombinedRawOutput(string outputDirectory, IReadOnlyList<ReviewChunkRawOutput> rawOutputs)
+    {
+        if (rawOutputs.Count == 1)
+        {
+            return rawOutputs[0].RawOutputPath;
+        }
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(rawOutputs, new System.Text.Json.JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            WriteIndented = true
+        });
+        return resultStore.SaveRawOutput(outputDirectory, payload);
+    }
+
+    private static IEnumerable<IReadOnlyList<TranscriptSegment>> ChunkSegments(
+        IReadOnlyList<TranscriptSegment> segments,
+        int chunkSize)
+    {
+        for (var index = 0; index < segments.Count; index += chunkSize)
+        {
+            yield return segments.Skip(index).Take(chunkSize).ToArray();
+        }
+    }
+
     private IReadOnlyList<CorrectionDraft> MergeMemoryDrafts(
         string jobId,
         IReadOnlyList<TranscriptSegment> segments,
@@ -162,4 +229,17 @@ public sealed class ReviewWorker(
             throw new ReviewWorkerException(ReviewFailureCategory.MissingSegments, "No transcript segments were available for review.");
         }
     }
+
+    private sealed record ReviewChunkResult(
+        string RawOutput,
+        string RawOutputPath,
+        IReadOnlyList<CorrectionDraft> Drafts,
+        TimeSpan Duration);
+
+    private sealed record ReviewChunkRawOutput(
+        int ChunkIndex,
+        string FirstSegmentId,
+        string LastSegmentId,
+        string RawOutputPath,
+        string RawOutput);
 }
