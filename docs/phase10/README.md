@@ -1,74 +1,71 @@
-# Phase 10 - Packaging and First Run
+# Phase 10 - Lightweight Core Packaging
 
-Phase 10 prepares KoeNote for external beta distribution after the review, memory, evaluation, and export paths are proven.
+Phase 10 prepares KoeNote for external beta distribution as a lightweight Windows desktop app.
 
 ## Goal
 
-Create a local-first Windows distribution that can be installed and smoke-tested without hand-copying app files.
-
-## Pre-Implementation Gate
-
-Before starting packaging work, keep the UI and runtime surface beta-readable:
-
-- main navigation, stage labels, and operation labels are not mojibake
-- review/export/edit flows keep their current regression coverage green
-- `origin/main` is clean and tests pass
-- Phase 10 changes stay focused on packaging, first-run checks, and smoke-testability
+Create a self-contained KoeNote Core package that can launch without bundled ASR or review LLM model binaries.
 
 ## Scope
 
-- choose installer shape
-- support self-contained app distribution
-- define model pack layout
-- add license manifest for app, tools, and models
-- add first-run runtime checks
-- add first-run model/tool location checks
-- add offline smoke test
-- document preview .NET runtime implications
-
-## Runtime Policy
-
-Development may continue on .NET 11 preview. For external beta, prefer self-contained distribution to reduce runtime setup friction. Revisit .NET 10 LTS fallback or .NET 11 stable once release timing is clear.
+- self-contained `win-x64` app publish
+- lightweight core setup payload
+- distribution layout documentation
+- license manifest for the core package
+- first-run status summary for missing runtime/model assets
+- offline layout smoke test
 
 ## Out Of Scope
 
+- ASR adapter architecture
+- Model Catalog / Download Manager
+- first-run setup wizard
+- MSI / Windows Apps uninstaller
 - beta feedback workflow
-- quality benchmark expansion
-- new model support
+- full offline model bundle
 
-## Completion Criteria
+Those move to Phase 10.5 through Phase 14.
 
-- A clean Windows machine can launch the packaged app.
-- Missing tools/models are reported with actionable UI.
-- License manifest is included.
-- Offline smoke test covers startup, sample import, review screen, and export path.
+## Core Package Layout
 
-## Initial Implementation Slices
+```text
+KoeNote.App.exe
+README.distribution.md
+licenses/license-manifest.json
+tools/ffmpeg.exe
+tools/README-runtime-tools-not-included.txt
+models/README-models-not-included.txt
+models/asr/README-ASR-models-not-included.txt
+models/review/README-review-models-not-included.txt
+samples/README-sample-audio.txt
+samples/koenote-smoke-1s.wav
+```
 
-1. Packaging shape and publish profile
-2. First-run runtime/tool/model checks
-3. License manifest and distribution layout docs
-4. Offline smoke-test command/script
-5. Final UI pass for first-run messages
+ASR and review model binaries are intentionally excluded. ASR/review runtimes are also excluded by default, except for `ffmpeg.exe` when it is available on the build machine.
 
-## Implementation Start
+For local developer checks that need the legacy ASR/review native tools copied into the publish folder, pass `-IncludeLegacyRuntimeTools` to the publish script.
 
-Added the first Phase 10 packaging and first-run slice:
-
-- `win-x64-self-contained` publish profile
-- `scripts/phase10/Publish-KoeNote.ps1`
-- `scripts/phase10/Test-OfflineSmoke.ps1`
-- preview distribution README
-- preview license manifest
-- publish output placeholders for `tools`, `models/asr`, and `models/review`
-- first-run status summary in the app status bar
-- required runtime asset checks for ASR/review tools and models
-- optional .NET CLI check because the beta app is published self-contained
-
-Validated with:
+## Commands
 
 ```powershell
 dotnet test
 powershell -ExecutionPolicy Bypass -File scripts\phase10\Publish-KoeNote.ps1
 powershell -ExecutionPolicy Bypass -File scripts\phase10\Test-OfflineSmoke.ps1
+powershell -ExecutionPolicy Bypass -File scripts\phase10\New-InstallerPackages.ps1
+powershell -ExecutionPolicy Bypass -File scripts\phase10\Test-CoreUiSmoke.ps1
 ```
+
+See `docs/phase10/UI_SMOKE.md` for the manual clean-environment UI checklist.
+
+## Runtime Policy
+
+Development may continue on .NET 11 preview. For external beta, keep the app self-contained to reduce runtime setup friction. Revisit .NET 10 LTS fallback or .NET 11 stable once release timing is clear.
+
+## Completion Criteria
+
+- A clean Windows machine can launch the packaged app.
+- Missing ASR/review runtimes and models are reported with actionable status.
+- The run command is disabled until required runtime/model assets exist.
+- License manifest is included.
+- Core setup does not include ASR or review model binaries.
+- Offline smoke test validates the core package layout.

@@ -178,6 +178,39 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("初回チェック:", viewModel.FirstRunSummary, StringComparison.Ordinal);
         Assert.Contains("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.Contains(paths.VibeVoiceAsrModelPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("セットアップを開く / モデル導入へ", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.False(viewModel.RequiredRuntimeAssetsReady);
+        Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void OpenSetupCommand_ReportsPlaceholderGuidance()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.OpenSetupCommand.Execute(null);
+
+        Assert.Contains("Model Catalog", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains("Setup Wizard", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunSelectedJobCommand_IsEnabledWhenJobAndRuntimeAssetsAreReady()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        Touch(paths.FfmpegPath);
+        Touch(paths.CrispAsrPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.VibeVoiceAsrModelPath);
+        Touch(paths.ReviewModelPath);
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
     }
 
     private static MainWindowViewModel CreateViewModel()
@@ -189,5 +222,11 @@ public sealed class MainWindowViewModelTests
     private static List<T> ViewItems<T>(IEnumerable view)
     {
         return view.Cast<T>().ToList();
+    }
+
+    private static void Touch(string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, string.Empty);
     }
 }

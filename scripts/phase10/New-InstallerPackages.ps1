@@ -14,6 +14,9 @@ $payloadFooterMagic = [Text.Encoding]::UTF8.GetBytes("KOENOTE_PAYLOAD_FOOTER_V2"
 $embeddedPayloadLimitBytes = 3500000000
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier
+if ($LASTEXITCODE -ne 0) {
+    throw "Publish-KoeNote.ps1 failed with exit code $LASTEXITCODE."
+}
 
 Remove-Item -LiteralPath $outputDir -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -55,25 +58,6 @@ function Get-PayloadRelativePath {
     $rootUri = [Uri]$rootFull
     $pathUri = [Uri]([IO.Path]::GetFullPath($Path))
     return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString())
-}
-
-function New-ModelPayload {
-    param(
-        [Parameter(Mandatory = $true)][string]$PayloadRoot,
-        [Parameter(Mandatory = $true)][string]$ModelSourcePath,
-        [Parameter(Mandatory = $true)][string]$RelativeTargetPath,
-        [Parameter(Mandatory = $true)][string]$MissingMessage
-    )
-
-    $targetPath = Join-Path $PayloadRoot $RelativeTargetPath
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $targetPath) | Out-Null
-    if (Test-Path -LiteralPath $ModelSourcePath) {
-        Copy-Item -LiteralPath $ModelSourcePath -Destination $targetPath -Force
-        return $true
-    }
-
-    Write-TextFile (Join-Path (Split-Path -Parent $targetPath) "README-MISSING-MODEL.txt") $MissingMessage
-    return $false
 }
 
 function New-InstallerStubSource {
@@ -440,31 +424,8 @@ function Copy-InstallerPayload {
 $corePayload = Join-Path $workRoot "core-payload"
 Copy-DirectoryContents -SourceDir $publishDir -DestinationDir $corePayload
 
-$asrPayload = Join-Path $workRoot "asr-model-payload"
-$asrIncluded = New-ModelPayload `
-    -PayloadRoot $asrPayload `
-    -ModelSourcePath (Join-Path $repoRoot "models\asr\vibevoice-asr-q4_k.gguf") `
-    -RelativeTargetPath "models\asr\vibevoice-asr-q4_k.gguf" `
-    -MissingMessage "vibevoice-asr-q4_k.gguf was not present on the build host. Place the licensed model at models\asr\vibevoice-asr-q4_k.gguf before running KoeNote ASR."
-
-$reviewPayload = Join-Path $workRoot "review-model-payload"
-$reviewIncluded = New-ModelPayload `
-    -PayloadRoot $reviewPayload `
-    -ModelSourcePath (Join-Path $repoRoot "models\review\llm-jp-4-8B-thinking-Q4_K_M.gguf") `
-    -RelativeTargetPath "models\review\llm-jp-4-8B-thinking-Q4_K_M.gguf" `
-    -MissingMessage "llm-jp-4-8B-thinking-Q4_K_M.gguf was not present on the build host. Place the licensed model at models\review\llm-jp-4-8B-thinking-Q4_K_M.gguf before running KoeNote review."
-
-$fullPayload = Join-Path $workRoot "full-offline-payload"
-New-Item -ItemType Directory -Force -Path $fullPayload | Out-Null
-Copy-DirectoryContents -SourceDir $publishDir -DestinationDir $fullPayload
-Copy-DirectoryContents -SourceDir $asrPayload -DestinationDir $fullPayload
-Copy-DirectoryContents -SourceDir $reviewPayload -DestinationDir $fullPayload
-
 $created = @(
-    (New-InstallerExe -Name "KoeNote-Core-Setup" -Title "KoeNote Core" -Mode "core" -PayloadDir $corePayload),
-    (New-InstallerExe -Name "KoeNote-Models-ASR-VibeVoice-Q4" -Title "KoeNote ASR Model Pack" -Mode "model" -PayloadDir $asrPayload),
-    (New-InstallerExe -Name "KoeNote-Models-Review-llm-jp-Q4KM" -Title "KoeNote Review Model Pack" -Mode "model" -PayloadDir $reviewPayload),
-    (New-InstallerExe -Name "KoeNote-Full-Offline-Setup" -Title "KoeNote Full Offline" -Mode "full" -PayloadDir $fullPayload)
+    (New-InstallerExe -Name "KoeNote-Core-Setup" -Title "KoeNote Core" -Mode "core" -PayloadDir $corePayload)
 )
 
 $manifest = [ordered]@{
@@ -472,14 +433,10 @@ $manifest = [ordered]@{
     outputDirectory = $outputDir
     installTarget = "%LOCALAPPDATA%\Programs\KoeNote"
     smokeTestOverride = "Set KOENOTE_INSTALL_TARGET to install into a temporary directory without creating a Start Menu shortcut."
+    packageRole = "lightweight-core"
     modelPayloads = [ordered]@{
-        asrModelIncluded = $asrIncluded
-        reviewModelIncluded = $reviewIncluded
-        asrModelSource = "https://huggingface.co/cstr/vibevoice-asr-GGUF"
-        reviewModelSource = "https://huggingface.co/alfredplpl/llm-jp-4-8b-thinking-gguf"
-        asrModelSha256 = if ($asrIncluded) { (Get-FileHash -LiteralPath (Join-Path $repoRoot "models\asr\vibevoice-asr-q4_k.gguf") -Algorithm SHA256).Hash } else { $null }
-        reviewModelSha256 = if ($reviewIncluded) { (Get-FileHash -LiteralPath (Join-Path $repoRoot "models\review\llm-jp-4-8B-thinking-Q4_K_M.gguf") -Algorithm SHA256).Hash } else { $null }
-        note = if ($asrIncluded -and $reviewIncluded) { "Model binaries included. Large model/full packages use adjacent .payload files because Windows cannot launch 4GB+ .exe files reliably." } else { "One or more model binaries were not present on the build host; model installers include target directories and README-MISSING-MODEL.txt." }
+        included = $false
+        note = "Phase 10 core setup intentionally excludes ASR and review model binaries. Model installation moves to Phase 11 Model Catalog / Download Manager and Phase 12 Setup Wizard."
     }
     installers = $created | ForEach-Object {
         $sidecar = [IO.Path]::ChangeExtension($_, ".payload")

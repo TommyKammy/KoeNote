@@ -85,6 +85,12 @@
                                 <TextBlock Text="設定" />
                             </StackPanel>
                         </Button>
+                        <Button Command="{Binding OpenSetupCommand}" ToolTip="{Binding SetupPlaceholderText}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="セットアップ / モデル導入へ" />
+                            </StackPanel>
+                        </Button>
                         <TextBlock Text="音声ファイルをこの画面へドロップして登録できます" Style="{StaticResource MutedText}" Margin="18,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </ScrollViewer>

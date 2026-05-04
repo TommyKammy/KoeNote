@@ -160,8 +160,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
-        RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null && !IsRunInProgress);
+        RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
+        OpenSetupCommand = new RelayCommand(OpenSetupAsync);
         AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
         RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
         ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
@@ -216,9 +217,20 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             var missingItems = EnvironmentStatus.Where(static item => !item.IsOk).ToArray();
             return missingItems.Length == 0
                 ? "必要なランタイム、ツール、モデルを確認済みです。"
-                : string.Join(Environment.NewLine, missingItems.Select(static item => $"{item.Name}: {item.Detail}"));
+                : string.Join(Environment.NewLine, missingItems.Select(static item => $"{item.Name}: {item.Detail}"))
+                    + Environment.NewLine
+                    + "セットアップを開く / モデル導入へ から Phase 11 Model Catalog / Phase 12 Setup Wizard に進む予定です。";
         }
     }
+
+    public string SetupPlaceholderText =>
+        "Phase 11 の Model Catalog と Phase 12 の Setup Wizard で、ASR / 推敲モデルの導入を案内します。現時点では必要ファイルの配置先を表示します。";
+
+    public bool RequiredRuntimeAssetsReady => EnvironmentStatus
+        .Where(static item => item.Name is "ffmpeg" or "crispasr" or "llama-completion" or "ASR model" or "Review model")
+        .All(static item => item.IsOk);
+
+    public bool CanRunSelectedJob => SelectedJob is not null && !IsRunInProgress && RequiredRuntimeAssetsReady;
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
@@ -249,6 +261,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunSelectedJobCommand { get; }
 
     public ICommand CancelCommand { get; }
+
+    public ICommand OpenSetupCommand { get; }
 
     public ICommand AcceptDraftCommand { get; }
 
@@ -562,6 +576,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private Task OpenSetupAsync()
+    {
+        LatestLog = SetupPlaceholderText;
+        return Task.CompletedTask;
     }
 
     private async Task RefreshStatusBarInfoAsync()
