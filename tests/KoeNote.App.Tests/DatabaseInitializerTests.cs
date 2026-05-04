@@ -43,13 +43,17 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("installed_runtimes", tables);
         Assert.Contains("model_download_jobs", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("source_ref_id", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("asr_run_id", ReadColumnNames(connection, "transcript_segments"));
+        Assert.Contains("idx_job_log_events_job_created", ReadIndexNames(connection));
+        Assert.Contains("idx_correction_drafts_job_status", ReadIndexNames(connection));
+        Assert.Contains("idx_review_operation_history_job_created", ReadIndexNames(connection));
+        Assert.Contains("idx_review_operation_history_created", ReadIndexNames(connection));
     }
 
     [Fact]
@@ -69,7 +73,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
@@ -105,7 +109,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9], ReadSchemaVersions(connection));
     }
 
     [Fact]
@@ -125,7 +129,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9], ReadSchemaVersions(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
     }
@@ -180,6 +184,21 @@ public sealed class DatabaseInitializerTests
         }
 
         return columns;
+    }
+
+    private static HashSet<string> ReadIndexNames(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index';";
+
+        using var reader = command.ExecuteReader();
+        var indexes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read())
+        {
+            indexes.Add(reader.GetString(0));
+        }
+
+        return indexes;
     }
 
     private static void CreateVersionOneDatabase(AppPaths paths)

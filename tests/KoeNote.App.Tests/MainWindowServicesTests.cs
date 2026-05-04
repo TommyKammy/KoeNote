@@ -20,6 +20,7 @@ public sealed class MainWindowServicesTests
         Assert.NotNull(services.AudioPlaybackService);
         Assert.NotNull(services.ModelDownloadJobRepository);
         Assert.NotNull(services.ModelDownloadService);
+        Assert.NotNull(services.DatabaseMaintenanceService);
         Assert.NotEmpty(services.ToolStatusService.GetStatusItems());
     }
 }

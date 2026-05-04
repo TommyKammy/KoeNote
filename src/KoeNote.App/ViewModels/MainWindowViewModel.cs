@@ -43,6 +43,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
+    private readonly DatabaseMaintenanceService _databaseMaintenanceService;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private StatusBarInfo _statusBarInfo;
@@ -72,6 +73,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
     private string _modelDownloadNotification = string.Empty;
+    private string _databaseMaintenanceSummary = string.Empty;
+    private bool _isDatabaseMaintenanceInProgress;
     private double _modelDownloadProgressPercent;
     private bool _isModelDownloadInProgress;
     private string _jobSearchText = string.Empty;
@@ -132,6 +135,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrEngineRegistry = services.AsrEngineRegistry;
         _jobRunCoordinator = services.JobRunCoordinator;
         _statusBarInfoService = services.StatusBarInfoService;
+        _databaseMaintenanceService = services.DatabaseMaintenanceService;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -239,10 +243,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt), CanExportSelectedJob);
         ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
+        RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
 
         RefreshModelCatalog();
         RefreshSetupWizard();
         RefreshSpeakerFilters();
+        RefreshDatabaseMaintenanceSummary();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -431,6 +437,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ExportDocxCommand { get; }
 
     public ICommand OpenExportFolderCommand { get; }
+
+    public ICommand RunDatabaseMaintenanceCommand { get; }
 
     public JobSummary? SelectedJob
     {
@@ -744,6 +752,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                     clearAllCommand.RaiseCanExecuteChanged();
                 }
 
+                if (RunDatabaseMaintenanceCommand is RelayCommand maintenanceCommand)
+                {
+                    maintenanceCommand.RaiseCanExecuteChanged();
+                }
+
                 UpdateReviewCommandStates();
                 UpdateSegmentEditCommandStates();
             }
@@ -973,6 +986,25 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _latestLog;
         private set => SetField(ref _latestLog, value);
+    }
+
+    public string DatabaseMaintenanceSummary
+    {
+        get => _databaseMaintenanceSummary;
+        private set => SetField(ref _databaseMaintenanceSummary, value);
+    }
+
+    public bool IsDatabaseMaintenanceInProgress
+    {
+        get => _isDatabaseMaintenanceInProgress;
+        private set
+        {
+            if (SetField(ref _isDatabaseMaintenanceInProgress, value) &&
+                RunDatabaseMaintenanceCommand is RelayCommand command)
+            {
+                command.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

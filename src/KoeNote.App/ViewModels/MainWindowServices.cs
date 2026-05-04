@@ -32,7 +32,8 @@ public sealed record MainWindowServices(
     SetupWizardService SetupWizardService,
     IAudioPlaybackService AudioPlaybackService,
     ToolStatusService ToolStatusService,
-    StatusBarInfoService StatusBarInfoService)
+    StatusBarInfoService StatusBarInfoService,
+    DatabaseMaintenanceService DatabaseMaintenanceService)
 {
     public static MainWindowServices Create(AppPaths paths)
     {
@@ -130,6 +131,7 @@ public sealed record MainWindowServices(
             reviewWorker,
             correctionMemoryService);
         var statusBarInfoService = new StatusBarInfoService(paths);
+        var databaseMaintenanceService = new DatabaseMaintenanceService(paths);
 
         return new MainWindowServices(
             jobRepository,
@@ -152,6 +154,7 @@ public sealed record MainWindowServices(
             setupWizardService,
             audioPlaybackService,
             toolStatusService,
-            statusBarInfoService);
+            statusBarInfoService,
+            databaseMaintenanceService);
     }
 }

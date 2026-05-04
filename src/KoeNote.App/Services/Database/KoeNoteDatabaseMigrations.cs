@@ -11,7 +11,8 @@ internal static class KoeNoteDatabaseMigrations
         new(5, "ASR adapter", ApplyAsrAdapterSchema),
         new(6, "model catalog", ApplyModelCatalogSchema),
         new(7, "repair ASR settings engine id", ApplyAsrSettingsEngineIdRepair),
-        new(8, "review stage toggle", ApplyReviewStageToggle)
+        new(8, "review stage toggle", ApplyReviewStageToggle),
+        new(9, "maintenance indexes", ApplyMaintenanceIndexes)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -308,5 +309,53 @@ internal static class KoeNoteDatabaseMigrations
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
+    }
+
+    private static void ApplyMaintenanceIndexes(DatabaseMigrationContext migration)
+    {
+        migration.ExecuteIfTableExists("jobs", """
+            CREATE INDEX IF NOT EXISTS idx_jobs_updated_at
+            ON jobs(updated_at DESC);
+            """);
+        migration.ExecuteIfTableExists("job_log_events", """
+            CREATE INDEX IF NOT EXISTS idx_job_log_events_job_created
+            ON job_log_events(job_id, created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("job_log_events", """
+            CREATE INDEX IF NOT EXISTS idx_job_log_events_created
+            ON job_log_events(created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("transcript_segments", """
+            CREATE INDEX IF NOT EXISTS idx_transcript_segments_job_start
+            ON transcript_segments(job_id, start_seconds);
+            """);
+        migration.ExecuteIfTableExists("correction_drafts", """
+            CREATE INDEX IF NOT EXISTS idx_correction_drafts_job_status
+            ON correction_drafts(job_id, status);
+            """);
+        migration.ExecuteIfTableExists("correction_drafts", """
+            CREATE INDEX IF NOT EXISTS idx_correction_drafts_job_segment
+            ON correction_drafts(job_id, segment_id);
+            """);
+        migration.ExecuteIfTableExists("review_operation_history", """
+            CREATE INDEX IF NOT EXISTS idx_review_operation_history_job_created
+            ON review_operation_history(job_id, created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("review_operation_history", """
+            CREATE INDEX IF NOT EXISTS idx_review_operation_history_created
+            ON review_operation_history(created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("correction_memory_events", """
+            CREATE INDEX IF NOT EXISTS idx_correction_memory_events_job_created
+            ON correction_memory_events(job_id, created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("asr_runs", """
+            CREATE INDEX IF NOT EXISTS idx_asr_runs_job_created
+            ON asr_runs(job_id, created_at DESC);
+            """);
+        migration.ExecuteIfTableExists("model_download_jobs", """
+            CREATE INDEX IF NOT EXISTS idx_model_download_jobs_model_updated
+            ON model_download_jobs(model_id, updated_at DESC);
+            """);
     }
 }

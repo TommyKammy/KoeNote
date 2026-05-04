@@ -240,14 +240,14 @@ public sealed class TranscriptEditService(AppPaths paths)
             ? """
               SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
               FROM review_operation_history
-              ORDER BY rowid DESC
+              ORDER BY created_at DESC, operation_id DESC
               LIMIT 1;
               """
             : """
               SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
               FROM review_operation_history
               WHERE job_id = $job_id
-              ORDER BY rowid DESC
+              ORDER BY created_at DESC, operation_id DESC
               LIMIT 1;
               """;
         if (!string.IsNullOrWhiteSpace(jobId))

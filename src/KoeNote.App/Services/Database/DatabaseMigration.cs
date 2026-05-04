@@ -29,6 +29,14 @@ internal sealed class DatabaseMigrationContext(
         Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition};");
     }
 
+    public void ExecuteIfTableExists(string table, string sql)
+    {
+        if (TableExists(table))
+        {
+            Execute(sql);
+        }
+    }
+
     private bool ColumnExists(string table, string column)
     {
         using var command = connection.CreateCommand();
@@ -45,5 +53,18 @@ internal sealed class DatabaseMigrationContext(
         }
 
         return false;
+    }
+
+    private bool TableExists(string table)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = $table;
+            """;
+        command.Parameters.AddWithValue("$table", table);
+        return command.ExecuteScalar() is not null;
     }
 }

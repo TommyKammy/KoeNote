@@ -36,6 +36,14 @@
                 <TextBlock Text="{Binding FirstRunDetail}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,10" />
                 <TextBlock Text="Storage" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding StoragePath}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,10" />
+                <TextBlock Text="Database" Style="{StaticResource MutedText}" />
+                <TextBlock Text="{Binding DatabaseMaintenanceSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
+                <Button Content="Optimize database"
+                        Command="{Binding RunDatabaseMaintenanceCommand}"
+                        MinHeight="30"
+                        HorizontalAlignment="Left"
+                        Padding="12,4"
+                        Margin="0,0,0,10" />
                 <TextBlock Text="Setup" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding SetupStatusSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,14" />
                 <TextBlock Text="Review" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
