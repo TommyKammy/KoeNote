@@ -22,6 +22,11 @@ public sealed class ReviewJsonNormalizer
 
             foreach (var element in elements)
             {
+                if (element.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
                 var segmentId = ReadString(element, "segment_id", "segmentId");
                 if (string.IsNullOrWhiteSpace(segmentId) || !segmentsById.TryGetValue(segmentId, out var sourceSegment))
                 {
@@ -71,14 +76,14 @@ public sealed class ReviewJsonNormalizer
     {
         if (root.ValueKind == JsonValueKind.Array)
         {
-            return root.EnumerateArray();
+            return root.EnumerateArray().Where(static element => element.ValueKind == JsonValueKind.Object);
         }
 
         foreach (var name in new[] { "corrections", "drafts", "items", "results" })
         {
             if (root.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.Array)
             {
-                return property.EnumerateArray();
+                return property.EnumerateArray().Where(static element => element.ValueKind == JsonValueKind.Object);
             }
         }
 

@@ -68,6 +68,14 @@ public sealed class ReviewJsonNormalizerTests
     }
 
     [Fact]
+    public void Normalize_IgnoresNonObjectArrayItems()
+    {
+        var drafts = new ReviewJsonNormalizer().Normalize("job-001", [], """["text-generation"]""", minConfidence: 0.5);
+
+        Assert.Empty(drafts);
+    }
+
+    [Fact]
     public void Normalize_ProcessesTwentySegmentsWithNineteenUsableDrafts()
     {
         var segments = Enumerable.Range(1, 20)

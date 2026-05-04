@@ -45,4 +45,24 @@ public sealed class AsrOutputExtractorTests
 
         Assert.Equal("""{"segments":[{"text":"actual json"}]}""", json);
     }
+
+    [Fact]
+    public void ExtractJson_SkipsModelMetadataArraysFromStderr()
+    {
+        var json = AsrOutputExtractor.ExtractJson("""
+            <|channel|> final<|message|> [{"segment_id":"000001"}] [end of text]
+            """, """
+            llama_model_loader: general.tags arr[str,1] = ["text-generation"]
+            """);
+
+        Assert.Equal("""[{"segment_id":"000001"}]""", json);
+    }
+
+    [Fact]
+    public void ExtractJson_DoesNotTreatScalarArrayAsDomainJson()
+    {
+        var json = AsrOutputExtractor.ExtractJson("""["text-generation"]""", "");
+
+        Assert.Equal("""["text-generation"]""", json);
+    }
 }

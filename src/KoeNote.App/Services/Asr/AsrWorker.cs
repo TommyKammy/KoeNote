@@ -14,6 +14,7 @@ public sealed class AsrWorker(
         ValidateInputs(options);
 
         var timeout = options.Timeout ?? TimeSpan.FromHours(2);
+        Directory.CreateDirectory(options.OutputDirectory);
         var arguments = commandBuilder.BuildArgumentList(options);
         var processResult = await processRunner.RunAsync(options.CrispAsrPath, arguments, timeout, cancellationToken);
 
@@ -24,7 +25,10 @@ public sealed class AsrWorker(
                 $"ASR runtime exited with code {processResult.ExitCode}: {processResult.StandardError}");
         }
 
-        var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
+        var runtimeJsonPath = AsrCommandBuilder.GetJsonOutputPath(options);
+        var rawOutput = File.Exists(runtimeJsonPath)
+            ? File.ReadAllText(runtimeJsonPath)
+            : AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
         var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput);
         var segments = normalizer.Normalize(options.JobId, rawOutput);
         var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(options.OutputDirectory, segments);

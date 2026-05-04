@@ -14,6 +14,7 @@ public sealed class ToolStatusServiceTests
 
         var items = new ToolStatusService(paths).GetStatusItems();
 
+        AssertMissing(items, "ffmpeg", paths.FfmpegPath);
         AssertMissing(items, "crispasr", paths.CrispAsrPath);
         AssertMissing(items, "llama-completion", paths.LlamaCompletionPath);
         AssertMissing(items, "ASR model", paths.VibeVoiceAsrModelPath);
@@ -27,6 +28,7 @@ public sealed class ToolStatusServiceTests
         var baseDirectory = Path.Combine(root, "app");
         var paths = new AppPaths(root, root, baseDirectory);
         paths.EnsureCreated();
+        Touch(paths.FfmpegPath);
         Touch(paths.CrispAsrPath);
         Touch(paths.LlamaCompletionPath);
         Touch(paths.VibeVoiceAsrModelPath);

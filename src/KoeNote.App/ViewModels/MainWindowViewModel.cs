@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
+using System.Windows.Threading;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
@@ -31,7 +32,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly CorrectionMemoryService _correctionMemoryService;
     private readonly TranscriptExportService _transcriptExportService;
     private readonly TextDiffService _textDiffService = new();
-    private readonly StatusBarInfo _statusBarInfo;
+    private readonly StatusBarInfoService _statusBarInfoService;
+    private readonly DispatcherTimer _statusRefreshTimer;
+    private StatusBarInfo _statusBarInfo;
+    private bool _isStatusRefreshInProgress;
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
@@ -104,7 +108,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             _asrWorker,
             _reviewWorker,
             _correctionMemoryService);
-        _statusBarInfo = new StatusBarInfoService(Paths).GetStatusBarInfo();
+        _statusBarInfoService = new StatusBarInfoService(Paths);
+        _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
+        _statusRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _statusRefreshTimer.Tick += async (_, _) => await RefreshStatusBarInfoAsync();
+        _statusRefreshTimer.Start();
 
         var toolStatus = new ToolStatusService(Paths);
         foreach (var item in toolStatus.GetStatusItems())
@@ -147,6 +158,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
 
         AddAudioCommand = new RelayCommand(AddAudioAsync);
+        DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
+        ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => SelectedJob is not null && !IsRunInProgress);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
@@ -228,6 +241,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICollectionView FilteredSegments { get; }
 
     public ICommand AddAudioCommand { get; }
+
+    public ICommand DeleteJobCommand { get; }
+
+    public ICommand ClearAllJobsCommand { get; }
 
     public ICommand RunSelectedJobCommand { get; }
 
@@ -418,6 +435,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                     runCommand.RaiseCanExecuteChanged();
                 }
 
+                if (DeleteJobCommand is RelayCommand<JobSummary> deleteCommand)
+                {
+                    deleteCommand.RaiseCanExecuteChanged();
+                }
+
+                if (ClearAllJobsCommand is RelayCommand clearAllCommand)
+                {
+                    clearAllCommand.RaiseCanExecuteChanged();
+                }
+
                 UpdateReviewCommandStates();
                 UpdateSegmentEditCommandStates();
             }
@@ -535,6 +562,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private async Task RefreshStatusBarInfoAsync()
+    {
+        if (_isStatusRefreshInProgress)
+        {
+            return;
+        }
+
+        try
+        {
+            _isStatusRefreshInProgress = true;
+            _statusBarInfo = await Task.Run(_statusBarInfoService.GetStatusBarInfo);
+            OnPropertyChanged(nameof(DiskFreeSummary));
+            OnPropertyChanged(nameof(MemorySummary));
+            OnPropertyChanged(nameof(CpuSummary));
+            OnPropertyChanged(nameof(GpuUsageSummary));
+        }
+        finally
+        {
+            _isStatusRefreshInProgress = false;
+        }
     }
 
     private static IEnumerable<StageStatus> CreateStageStatuses()

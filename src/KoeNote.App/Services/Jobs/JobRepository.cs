@@ -198,4 +198,76 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, "キャンセル済み", $"{currentStage}_cancelled", job.ProgressPercent, job.NormalizedAudioPath, "cancelled");
     }
 
+    public void DeleteJob(string jobId)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var sql in DeleteStatements("WHERE job_id = $job_id"))
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("$job_id", jobId);
+            command.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        DeleteJobDirectory(jobId);
+    }
+
+    public void DeleteAllJobs()
+    {
+        var jobIds = LoadRecent(int.MaxValue).Select(static job => job.JobId).ToArray();
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var sql in DeleteStatements(string.Empty))
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+
+        foreach (var jobId in jobIds)
+        {
+            DeleteJobDirectory(jobId);
+        }
+    }
+
+    private static IEnumerable<string> DeleteStatements(string whereClause)
+    {
+        var suffix = string.IsNullOrWhiteSpace(whereClause) ? string.Empty : $" {whereClause}";
+        yield return $"DELETE FROM correction_memory_events{suffix};";
+        yield return $"DELETE FROM review_operation_history{suffix};";
+        yield return $"DELETE FROM review_decisions WHERE draft_id IN (SELECT draft_id FROM correction_drafts{suffix});";
+        yield return $"DELETE FROM correction_drafts{suffix};";
+        yield return $"DELETE FROM speaker_aliases{suffix};";
+        yield return $"DELETE FROM transcript_segments{suffix};";
+        yield return $"DELETE FROM stage_progress{suffix};";
+        yield return $"DELETE FROM job_log_events{suffix};";
+        yield return $"DELETE FROM jobs{suffix};";
+    }
+
+    private void DeleteJobDirectory(string jobId)
+    {
+        var jobDirectory = Path.Combine(paths.Jobs, jobId);
+        try
+        {
+            if (Directory.Exists(jobDirectory))
+            {
+                Directory.Delete(jobDirectory, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 }

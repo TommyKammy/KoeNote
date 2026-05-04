@@ -3,10 +3,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
             <Border Style="{StaticResource PanelBorder}" Padding="16">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="ジョブ一覧" Style="{StaticResource SectionTitle}" />
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#x30B8;&#x30E7;&#x30D6;&#x4E00;&#x89A7;" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Content="&#x30AF;&#x30EA;&#x30A2;"
+                                Command="{Binding ClearAllJobsCommand}"
+                                Padding="10,4"
+                                MinHeight="30"
+                                ToolTip="&#x30B8;&#x30E7;&#x30D6;&#x4E00;&#x89A7;&#x3092;&#x30AF;&#x30EA;&#x30A2;" />
+                    </Grid>
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                         <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" Margin="12,0,0,0" VerticalAlignment="Center" Panel.ZIndex="1" />
-                        <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Padding="32,7,10,7" MinHeight="34" ToolTip="ジョブ名で検索" />
+                        <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Padding="32,7,10,7" MinHeight="34" ToolTip="&#x30B8;&#x30E7;&#x30D6;&#x540D;&#x3067;&#x691C;&#x7D22;" />
                     </Grid>
                     <TextBlock DockPanel.Dock="Top" Text="{Binding JobCountSummary}" Style="{StaticResource MutedText}" Margin="0,0,0,12" />
 
@@ -24,9 +36,20 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
-                                            <Button Grid.Column="1" Padding="6,2" MinWidth="0">
-                                                <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" />
-                                            </Button>
+                                            <Menu Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="0">
+                                                <MenuItem Padding="6,2"
+                                                          MinWidth="0"
+                                                          ToolTip="&#x30B8;&#x30E7;&#x30D6;&#x64CD;&#x4F5C;"
+                                                          Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Header>
+                                                        <TextBlock Text="&#xE712;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" />
+                                                    </MenuItem.Header>
+                                                    <MenuItem Header="&#x3053;&#x306E;&#x30B8;&#x30E7;&#x30D6;&#x3092;&#x524A;&#x9664;"
+                                                              Command="{Binding Parent.Tag.DeleteJobCommand, RelativeSource={RelativeSource Self}}"
+                                                              CommandParameter="{Binding Parent.CommandParameter, RelativeSource={RelativeSource Self}}" />
+                                                </MenuItem>
+                                            </Menu>
                                         </Grid>
                                         <TextBlock Text="{Binding FileName}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,12" />
                                         <Grid Margin="0,0,0,8">
@@ -47,7 +70,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding UpdatedAtDisplay}" Style="{StaticResource MutedText}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}" Style="{StaticResource MutedText}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding UnreviewedDrafts, StringFormat=&#x672A;&#x30EC;&#x30D3;&#x30E5;&#x30FC; {0}}" Style="{StaticResource MutedText}" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>

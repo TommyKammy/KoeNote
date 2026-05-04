@@ -57,10 +57,55 @@ public sealed class AsrJsonNormalizerTests
     }
 
     [Fact]
+    public void Normalize_ReadsCrispAsrTranscriptionShape()
+    {
+        const string rawJson = """
+            {
+              "crispasr": {
+                "backend": "vibevoice",
+                "language": "ja"
+              },
+              "transcription": [
+                {
+                  "timestamps": { "from": "00:00:00,000", "to": "00:00:03,000" },
+                  "offsets": { "from": 0, "to": 3000 },
+                  "text": "Start0End30Speaker0Contentインタビュアー、今日は産後ケアの話です"
+                }
+              ]
+            }
+            """;
+
+        var segments = new AsrJsonNormalizer().Normalize("job-001", rawJson);
+
+        var segment = Assert.Single(segments);
+        Assert.Equal(0.0, segment.StartSeconds);
+        Assert.Equal(3.0, segment.EndSeconds);
+        Assert.Equal("インタビュアー、今日は産後ケアの話です", segment.RawText);
+    }
+
+    [Fact]
     public void Normalize_ThrowsForInvalidJson()
     {
         var exception = Assert.Throws<AsrWorkerException>(() => new AsrJsonNormalizer().Normalize("job-001", "not-json"));
 
         Assert.Equal(AsrFailureCategory.JsonParseFailed, exception.Category);
+    }
+
+    [Fact]
+    public void Normalize_RemovesInlineCrispAsrTimingMarkers()
+    {
+        const string rawJson = """
+            {
+              "transcription": [
+                {
+                  "text": "今日はStart1253End1903Speaker0Content佐藤さんにStart1903End2072ContentSilence伺います"
+                }
+              ]
+            }
+            """;
+
+        var segment = Assert.Single(new AsrJsonNormalizer().Normalize("job-001", rawJson));
+
+        Assert.Equal("今日は佐藤さんに伺います", segment.RawText);
     }
 }

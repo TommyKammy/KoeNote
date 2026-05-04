@@ -29,7 +29,7 @@ public static class AsrOutputExtractor
         }
 
         var trimmed = text.Trim();
-        if (LooksLikeJson(trimmed) && IsValidJson(trimmed))
+        if (LooksLikeJson(trimmed) && IsValidJson(trimmed) && LooksLikeDomainJson(trimmed))
         {
             return trimmed;
         }
@@ -43,7 +43,7 @@ public static class AsrOutputExtractor
             }
 
             var candidate = text[start..(end + 1)];
-            if (IsValidJson(candidate))
+            if (IsValidJson(candidate) && LooksLikeDomainJson(candidate))
             {
                 return candidate;
             }
@@ -127,6 +127,24 @@ public static class AsrOutputExtractor
         {
             using var _ = JsonDocument.Parse(candidate);
             return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool LooksLikeDomainJson(string candidate)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(candidate);
+            return document.RootElement.ValueKind switch
+            {
+                JsonValueKind.Object => true,
+                JsonValueKind.Array => document.RootElement.EnumerateArray().Any(static item => item.ValueKind == JsonValueKind.Object),
+                _ => false
+            };
         }
         catch (JsonException)
         {

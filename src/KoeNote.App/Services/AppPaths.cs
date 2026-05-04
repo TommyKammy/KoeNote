@@ -17,8 +17,9 @@ public sealed class AppPaths
         Logs = Path.Combine(localAppData, "KoeNote", "logs");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         Models = Path.Combine(baseDirectory, "models");
-        CrispAsrPath = Path.Combine(RuntimeTools, "crispasr.exe");
-        LlamaCompletionPath = Path.Combine(RuntimeTools, "llama-completion.exe");
+        FfmpegPath = Path.Combine(RuntimeTools, "ffmpeg.exe");
+        CrispAsrPath = Path.Combine(RuntimeTools, "asr", "crispasr.exe");
+        LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
         VibeVoiceAsrModelPath = Path.Combine(Models, "asr", "vibevoice-asr-q4_k.gguf");
         ReviewModelPath = Path.Combine(Models, "review", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
     }
@@ -36,6 +37,8 @@ public sealed class AppPaths
     public string RuntimeTools { get; }
 
     public string Models { get; }
+
+    public string FfmpegPath { get; }
 
     public string CrispAsrPath { get; }
 

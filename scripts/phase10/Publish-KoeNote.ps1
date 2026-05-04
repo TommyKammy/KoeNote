@@ -26,4 +26,9 @@ New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "tools") | Out-
 New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "models\asr") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "models\review") | Out-Null
 
+$toolsSource = Join-Path $repoRoot "tools"
+if (Test-Path -LiteralPath $toolsSource) {
+    Copy-Item -Path (Join-Path $toolsSource "*") -Destination (Join-Path $publishDir "tools") -Recurse -Force
+}
+
 Write-Host "Published KoeNote to $publishDir"

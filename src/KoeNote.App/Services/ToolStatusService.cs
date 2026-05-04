@@ -11,8 +11,8 @@ public sealed class ToolStatusService(AppPaths paths)
         return
         [
             CheckCommand("dotnet", "dotnet", "--version", required: false),
-            CheckCommand("ffmpeg", "ffmpeg", "-version", required: true),
-            CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: true),
+            CheckFile("ffmpeg", paths.FfmpegPath, required: true),
+            CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: false),
             CheckFile("crispasr", paths.CrispAsrPath, required: true),
             CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
             CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: true),

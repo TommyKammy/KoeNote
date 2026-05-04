@@ -2,26 +2,38 @@ namespace KoeNote.App.Services.Review;
 
 public sealed class ReviewCommandBuilder
 {
-    public string BuildArguments(ReviewRunOptions options, string prompt)
+    public string BuildArguments(ReviewRunOptions options, string promptFilePath, string? jsonSchemaFilePath = null)
     {
-        return string.Join(" ", BuildArgumentList(options, prompt).Select(QuoteForDisplay));
+        return string.Join(" ", BuildArgumentList(options, promptFilePath, jsonSchemaFilePath).Select(QuoteForDisplay));
     }
 
-    public IReadOnlyList<string> BuildArgumentList(ReviewRunOptions options, string prompt)
+    public IReadOnlyList<string> BuildArgumentList(ReviewRunOptions options, string promptFilePath, string? jsonSchemaFilePath = null)
     {
-        return
-        [
+        var arguments = new List<string>
+        {
             "--model",
             options.ModelPath,
-            "--prompt",
-            prompt,
+            "--file",
+            promptFilePath,
             "--ctx-size",
             "4096",
+            "--n-gpu-layers",
+            "999",
             "--n-predict",
-            "1024",
+            "4096",
             "--temp",
-            "0.1"
-        ];
+            "0.1",
+            "--single-turn",
+            "--no-display-prompt"
+        };
+
+        if (!string.IsNullOrWhiteSpace(jsonSchemaFilePath))
+        {
+            arguments.Add("--json-schema-file");
+            arguments.Add(jsonSchemaFilePath);
+        }
+
+        return arguments;
     }
 
     private static string QuoteForDisplay(string value)

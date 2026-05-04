@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 
@@ -19,7 +20,9 @@ public sealed class ReviewWorker(
 
         var timeout = options.Timeout ?? TimeSpan.FromHours(2);
         var prompt = promptBuilder.Build(options.Segments);
-        var processResult = await RunRuntimeAsync(options, prompt, timeout, cancellationToken);
+        var promptPath = WritePrompt(options.OutputDirectory, "review.prompt.txt", prompt);
+        var schemaPath = WriteJsonSchema(options.OutputDirectory);
+        var processResult = await RunRuntimeAsync(options, promptPath, schemaPath, timeout, cancellationToken);
 
         var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
         var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput);
@@ -31,10 +34,19 @@ public sealed class ReviewWorker(
         catch (ReviewWorkerException exception) when (exception.Category == ReviewFailureCategory.JsonParseFailed)
         {
             var repairPrompt = promptBuilder.BuildRepairPrompt(rawOutput);
-            var repairResult = await RunRuntimeAsync(options, repairPrompt, timeout, cancellationToken);
+            var repairPromptPath = WritePrompt(options.OutputDirectory, "review.repair.prompt.txt", repairPrompt);
+            var repairResult = await RunRuntimeAsync(options, repairPromptPath, schemaPath, timeout, cancellationToken);
             rawOutput = AsrOutputExtractor.ExtractJson(repairResult.StandardOutput, repairResult.StandardError);
             rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, "review.repair.raw.json");
-            drafts = normalizer.Normalize(options.JobId, options.Segments, rawOutput, options.MinConfidence);
+            try
+            {
+                drafts = normalizer.Normalize(options.JobId, options.Segments, rawOutput, options.MinConfidence);
+            }
+            catch (ReviewWorkerException repairException) when (repairException.Category == ReviewFailureCategory.JsonParseFailed)
+            {
+                drafts = [];
+            }
+
             processResult = repairResult;
         }
 
@@ -52,11 +64,12 @@ public sealed class ReviewWorker(
 
     private async Task<ProcessRunResult> RunRuntimeAsync(
         ReviewRunOptions options,
-        string prompt,
+        string promptFilePath,
+        string jsonSchemaFilePath,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var arguments = commandBuilder.BuildArgumentList(options, prompt);
+        var arguments = commandBuilder.BuildArgumentList(options, promptFilePath, jsonSchemaFilePath);
         var processResult = await processRunner.RunAsync(options.LlamaCompletionPath, arguments, timeout, cancellationToken);
 
         if (processResult.ExitCode != 0)
@@ -67,6 +80,39 @@ public sealed class ReviewWorker(
         }
 
         return processResult;
+    }
+
+    private static string WritePrompt(string outputDirectory, string fileName, string prompt)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        var promptPath = Path.Combine(outputDirectory, fileName);
+        File.WriteAllText(promptPath, prompt, Encoding.UTF8);
+        return promptPath;
+    }
+
+    private static string WriteJsonSchema(string outputDirectory)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        var schemaPath = Path.Combine(outputDirectory, "review.schema.json");
+        File.WriteAllText(schemaPath, """
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "segment_id": { "type": "string" },
+                  "issue_type": { "type": "string" },
+                  "original_text": { "type": "string" },
+                  "suggested_text": { "type": "string" },
+                  "reason": { "type": "string" },
+                  "confidence": { "type": "number" }
+                },
+                "required": ["segment_id", "issue_type", "original_text", "suggested_text", "reason", "confidence"],
+                "additionalProperties": false
+              }
+            }
+            """, Encoding.UTF8);
+        return schemaPath;
     }
 
     private IReadOnlyList<CorrectionDraft> MergeMemoryDrafts(

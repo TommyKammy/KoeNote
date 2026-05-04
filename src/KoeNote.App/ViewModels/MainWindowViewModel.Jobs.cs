@@ -35,6 +35,7 @@ public sealed partial class MainWindowViewModel
         _jobLogRepository.AddEvent(job.JobId, "created", "info", $"Registered audio file: {job.SourceAudioPath}");
         RefreshLogs();
         OnPropertyChanged(nameof(JobCountSummary));
+        RefreshJobCommandStates();
         return job;
     }
 
@@ -56,6 +57,56 @@ public sealed partial class MainWindowViewModel
         LatestLog = $"{registered}件の音声ファイルを登録しました。";
     }
 
+    private Task DeleteJobAsync(JobSummary? job)
+    {
+        if (job is null || IsRunInProgress)
+        {
+            return Task.CompletedTask;
+        }
+
+        _jobRepository.DeleteJob(job.JobId);
+        Jobs.Remove(job);
+        if (SelectedJob?.JobId == job.JobId)
+        {
+            SelectedJob = Jobs.FirstOrDefault();
+        }
+
+        if (Jobs.Count == 0)
+        {
+            Segments.Clear();
+            ReviewQueue.Clear();
+            Logs.Clear();
+            ClearReviewPreview();
+        }
+
+        FilteredJobs.Refresh();
+        OnPropertyChanged(nameof(JobCountSummary));
+        LatestLog = $"Deleted job: {job.FileName}";
+        RefreshJobCommandStates();
+        return Task.CompletedTask;
+    }
+
+    private Task ClearAllJobsAsync()
+    {
+        if (IsRunInProgress)
+        {
+            return Task.CompletedTask;
+        }
+
+        _jobRepository.DeleteAllJobs();
+        Jobs.Clear();
+        Segments.Clear();
+        ReviewQueue.Clear();
+        Logs.Clear();
+        SelectedJob = null;
+        ClearReviewPreview();
+        FilteredJobs.Refresh();
+        OnPropertyChanged(nameof(JobCountSummary));
+        LatestLog = "Cleared all jobs.";
+        RefreshJobCommandStates();
+        return Task.CompletedTask;
+    }
+
     private void LoadJobs()
     {
         foreach (var job in _jobRepository.LoadRecent())
@@ -65,6 +116,7 @@ public sealed partial class MainWindowViewModel
 
         SelectedJob = Jobs.FirstOrDefault();
         OnPropertyChanged(nameof(JobCountSummary));
+        RefreshJobCommandStates();
     }
 
     private void RefreshLogs()
@@ -82,6 +134,20 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
         OnPropertyChanged(nameof(SelectedJobUpdatedAt));
         OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+        RefreshJobCommandStates();
+    }
+
+    private void RefreshJobCommandStates()
+    {
+        if (ClearAllJobsCommand is RelayCommand clearAllCommand)
+        {
+            clearAllCommand.RaiseCanExecuteChanged();
+        }
+
+        if (DeleteJobCommand is RelayCommand<JobSummary> deleteCommand)
+        {
+            deleteCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private bool FilterJob(object item)

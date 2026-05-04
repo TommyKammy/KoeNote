@@ -19,6 +19,20 @@ public sealed class ExternalProcessRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_DecodesUtf8Output()
+    {
+        var runner = new ExternalProcessRunner();
+
+        var result = await runner.RunAsync(
+            "powershell",
+            "-NoProfile -Command \"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Output '推敲候補'\"",
+            TimeSpan.FromSeconds(10));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("推敲候補", result.StandardOutput);
+    }
+
+    [Fact]
     public async Task RunAsync_TimesOutAndKillsProcess()
     {
         var runner = new ExternalProcessRunner();

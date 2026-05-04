@@ -1,10 +1,16 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace KoeNote.App.Services.SystemStatus;
 
 public sealed class StatusBarInfoService(AppPaths paths)
 {
+    private ulong _lastIdleTime;
+    private ulong _lastKernelTime;
+    private ulong _lastUserTime;
+    private bool _hasCpuSample;
+
     public StatusBarInfo GetStatusBarInfo()
     {
         return new StatusBarInfo(
@@ -66,17 +72,42 @@ public sealed class StatusBarInfoService(AppPaths paths)
         return $"MEM {process.WorkingSet64 / 1024 / 1024:N0} MB";
     }
 
-    private static string GetCpuSummary()
+    private string GetCpuSummary()
     {
-        using var process = Process.GetCurrentProcess();
-        var uptime = DateTimeOffset.Now - process.StartTime;
-        if (uptime <= TimeSpan.Zero)
+        if (!GetSystemTimes(out var idleTime, out var kernelTime, out var userTime))
         {
             return "CPU Unknown";
         }
 
-        var averageUsage = process.TotalProcessorTime.TotalMilliseconds / uptime.TotalMilliseconds / Environment.ProcessorCount * 100;
-        return $"CPU {Math.Clamp(averageUsage, 0, 100):N0}%";
+        var idle = idleTime.ToUInt64();
+        var kernel = kernelTime.ToUInt64();
+        var user = userTime.ToUInt64();
+
+        if (!_hasCpuSample)
+        {
+            _lastIdleTime = idle;
+            _lastKernelTime = kernel;
+            _lastUserTime = user;
+            _hasCpuSample = true;
+            return "CPU --%";
+        }
+
+        var idleDiff = idle - _lastIdleTime;
+        var kernelDiff = kernel - _lastKernelTime;
+        var userDiff = user - _lastUserTime;
+        var total = kernelDiff + userDiff;
+
+        _lastIdleTime = idle;
+        _lastKernelTime = kernel;
+        _lastUserTime = user;
+
+        if (total == 0)
+        {
+            return "CPU 0%";
+        }
+
+        var usage = (1 - idleDiff / (double)total) * 100;
+        return $"CPU {Math.Clamp(usage, 0, 100):N0}%";
     }
 
     private static string GetGpuUsageSummary()
@@ -109,6 +140,21 @@ public sealed class StatusBarInfoService(AppPaths paths)
         catch
         {
             return "GPU Unknown";
+        }
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetSystemTimes(out FileTime idleTime, out FileTime kernelTime, out FileTime userTime);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct FileTime
+    {
+        private readonly uint _lowDateTime;
+        private readonly uint _highDateTime;
+
+        public ulong ToUInt64()
+        {
+            return ((ulong)_highDateTime << 32) | _lowDateTime;
         }
     }
 }
