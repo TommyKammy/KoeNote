@@ -3,6 +3,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
 using KoeNote.App.ViewModels;
 using Microsoft.Data.Sqlite;
@@ -11,6 +12,23 @@ namespace KoeNote.App.Tests;
 
 public sealed class MainWindowViewModelTests
 {
+    [Fact]
+    public async Task SelectedAsrEngine_RestoresAfterRecreatingViewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        var first = new MainWindowViewModel(paths)
+        {
+            SelectedAsrEngineId = "faster-whisper-large-v3-turbo"
+        };
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        var second = new MainWindowViewModel(paths);
+
+        Assert.Equal(first.SelectedAsrEngineId, second.SelectedAsrEngineId);
+        Assert.Contains(second.AvailableAsrEngines, engine => engine.EngineId == "reazonspeech-k2-v3");
+    }
+
     [Fact]
     public void JobSearchText_FiltersJobsByTitleFileNameAndStatus()
     {
@@ -204,6 +222,12 @@ public sealed class MainWindowViewModelTests
         Touch(paths.LlamaCompletionPath);
         Touch(paths.VibeVoiceAsrModelPath);
         Touch(paths.ReviewModelPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true
+        });
 
         var viewModel = new MainWindowViewModel(paths);
         viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));

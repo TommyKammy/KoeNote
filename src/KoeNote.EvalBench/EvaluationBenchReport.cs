@@ -5,7 +5,9 @@ public sealed record EvaluationBenchReport(
     DateTimeOffset GeneratedAt,
     HostMetadata Host,
     EvaluationSummary Summary,
-    IReadOnlyList<EvaluationCaseResult> Cases);
+    IReadOnlyList<EvaluationCaseResult> Cases,
+    IReadOnlyList<AsrBenchmarkResult> AsrBenchmarks,
+    DefaultAsrRecommendation? DefaultAsrRecommendation);
 
 public sealed record HostMetadata(
     string MachineName,
@@ -34,3 +36,18 @@ public sealed record EvaluationCaseResult(
     bool ReviewJsonParseFailed,
     int MemoryDraftCount,
     TimeSpan Duration);
+
+public sealed record AsrBenchmarkResult(
+    string EngineId,
+    string DurationBucket,
+    int CaseCount,
+    int FailureCount,
+    double FailureRate,
+    double CharacterErrorRate,
+    double AverageProcessingSeconds,
+    double RealTimeFactor);
+
+public sealed record DefaultAsrRecommendation(
+    string V01EngineId,
+    string V02EngineId,
+    string Rationale);

@@ -56,7 +56,8 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
                     raw_text,
                     normalized_text,
                     asr_confidence,
-                    source
+                    source,
+                    asr_run_id
                 )
                 VALUES (
                     $segment_id,
@@ -67,7 +68,8 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
                     $raw_text,
                     $normalized_text,
                     $asr_confidence,
-                    $source
+                    $source,
+                    $asr_run_id
                 )
                 ON CONFLICT(job_id, segment_id) DO UPDATE SET
                     start_seconds = excluded.start_seconds,
@@ -76,7 +78,8 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
                     raw_text = excluded.raw_text,
                     normalized_text = excluded.normalized_text,
                     asr_confidence = excluded.asr_confidence,
-                    source = excluded.source;
+                    source = excluded.source,
+                    asr_run_id = excluded.asr_run_id;
                 """;
             command.Parameters.AddWithValue("$segment_id", segment.SegmentId);
             command.Parameters.AddWithValue("$job_id", segment.JobId);
@@ -87,6 +90,7 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
             command.Parameters.AddWithValue("$normalized_text", (object?)segment.NormalizedText ?? DBNull.Value);
             command.Parameters.AddWithValue("$asr_confidence", (object?)segment.AsrConfidence ?? DBNull.Value);
             command.Parameters.AddWithValue("$source", segment.Source);
+            command.Parameters.AddWithValue("$asr_run_id", (object?)segment.AsrRunId ?? DBNull.Value);
             command.ExecuteNonQuery();
         }
 

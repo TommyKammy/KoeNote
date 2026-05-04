@@ -38,11 +38,16 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("user_terms", tables);
         Assert.Contains("correction_memory", tables);
         Assert.Contains("correction_memory_events", tables);
+        Assert.Contains("asr_runs", tables);
+        Assert.Contains("installed_models", tables);
+        Assert.Contains("installed_runtimes", tables);
+        Assert.Contains("model_download_jobs", tables);
 
-        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("source_ref_id", ReadColumnNames(connection, "correction_drafts"));
+        Assert.Contains("asr_run_id", ReadColumnNames(connection, "transcript_segments"));
     }
 
     [Fact]
@@ -62,7 +67,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("speaker_aliases", ReadTableNames(connection));
@@ -71,6 +76,11 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("correction_memory", ReadTableNames(connection));
         Assert.Contains("correction_memory_events", ReadTableNames(connection));
         Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
+        Assert.Contains("asr_runs", ReadTableNames(connection));
+        Assert.Contains("asr_run_id", ReadColumnNames(connection, "transcript_segments"));
+        Assert.Contains("installed_models", ReadTableNames(connection));
+        Assert.Contains("installed_runtimes", ReadTableNames(connection));
+        Assert.Contains("model_download_jobs", ReadTableNames(connection));
     }
 
     [Fact]
@@ -91,7 +101,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6], ReadSchemaVersions(connection));
     }
 
     private static string CreateTempDirectory()

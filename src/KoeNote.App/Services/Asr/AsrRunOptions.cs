@@ -8,4 +8,5 @@ public sealed record AsrRunOptions(
     string OutputDirectory,
     IReadOnlyList<string>? Hotwords = null,
     string? Context = null,
-    TimeSpan? Timeout = null);
+    TimeSpan? Timeout = null,
+    string? AsrRunId = null);

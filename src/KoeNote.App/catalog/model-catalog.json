@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026-05-04",
+  "models": [
+    {
+      "model_id": "reazonspeech-k2-v3-ja",
+      "family": "reazonspeech",
+      "role": "asr",
+      "engine_id": "reazonspeech-k2-v3",
+      "display_name": "ReazonSpeech v3 k2 Japanese",
+      "language": ["ja"],
+      "recommended_for": ["japanese_general", "business_meeting", "lightweight_default_candidate"],
+      "runtime": {
+        "type": "reazonspeech-k2",
+        "package_id": "runtime-reazonspeech-k2"
+      },
+      "size_bytes": null,
+      "download": {
+        "type": "manual",
+        "url": "https://research.reazon.jp/projects/ReazonSpeech/",
+        "sha256": null
+      },
+      "license": {
+        "name": "Apache-2.0",
+        "url": "https://research.reazon.jp/projects/ReazonSpeech/"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 0,
+        "python_required": true
+      },
+      "status": "available"
+    },
+    {
+      "model_id": "faster-whisper-large-v3-turbo",
+      "family": "whisper",
+      "role": "asr",
+      "engine_id": "faster-whisper-large-v3-turbo",
+      "display_name": "faster-whisper large-v3-turbo",
+      "language": ["ja", "multi"],
+      "recommended_for": ["fast_baseline", "general_transcription"],
+      "runtime": {
+        "type": "python-ctranslate2",
+        "package_id": "runtime-faster-whisper"
+      },
+      "size_bytes": null,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/models?search=faster-whisper-large-v3-turbo",
+        "sha256": null
+      },
+      "license": {
+        "name": "MIT / Whisper model license to be confirmed",
+        "url": "https://github.com/SYSTRAN/faster-whisper"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 6,
+        "python_required": true
+      },
+      "status": "available"
+    },
+    {
+      "model_id": "faster-whisper-large-v3",
+      "family": "whisper",
+      "role": "asr",
+      "engine_id": "faster-whisper-large-v3-turbo",
+      "display_name": "faster-whisper large-v3",
+      "language": ["ja", "multi"],
+      "recommended_for": ["high_accuracy_baseline", "general_transcription"],
+      "runtime": {
+        "type": "python-ctranslate2",
+        "package_id": "runtime-faster-whisper"
+      },
+      "size_bytes": null,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/Systran/faster-whisper-large-v3",
+        "sha256": null
+      },
+      "license": {
+        "name": "MIT / Whisper model license to be confirmed",
+        "url": "https://github.com/SYSTRAN/faster-whisper"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 8,
+        "python_required": true
+      },
+      "status": "available"
+    },
+    {
+      "model_id": "vibevoice-asr-q4-k",
+      "family": "vibevoice",
+      "role": "asr",
+      "engine_id": "vibevoice-crispasr",
+      "display_name": "VibeVoice ASR Q4_K",
+      "language": ["ja", "multi"],
+      "recommended_for": ["preinstalled_compatibility"],
+      "runtime": {
+        "type": "crispasr",
+        "package_id": "runtime-crispasr"
+      },
+      "size_bytes": 4811829376,
+      "download": {
+        "type": "none",
+        "url": null,
+        "sha256": null
+      },
+      "license": {
+        "name": "See distribution license manifest",
+        "url": null
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 6,
+        "python_required": false
+      },
+      "status": "preinstalled-compatible"
+    },
+    {
+      "model_id": "llm-jp-4-8b-thinking-q4-k-m",
+      "family": "llm-jp",
+      "role": "review",
+      "engine_id": "llama-cpp",
+      "display_name": "llm-jp 4 8B thinking Q4_K_M",
+      "language": ["ja"],
+      "recommended_for": ["review_default"],
+      "runtime": {
+        "type": "llama-cpp",
+        "package_id": "runtime-llama-cpp"
+      },
+      "size_bytes": 5304881888,
+      "download": {
+        "type": "none",
+        "url": null,
+        "sha256": null
+      },
+      "license": {
+        "name": "See distribution license manifest",
+        "url": null
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 6,
+        "python_required": false
+      },
+      "status": "preinstalled-compatible"
+    }
+  ]
+}

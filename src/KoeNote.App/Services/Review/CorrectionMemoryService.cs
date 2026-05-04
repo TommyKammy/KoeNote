@@ -24,7 +24,7 @@ public sealed class CorrectionMemoryService(AppPaths paths)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new AsrSettings(settings.ContextText, string.Join(Environment.NewLine, hotwords));
+        return new AsrSettings(settings.ContextText, string.Join(Environment.NewLine, hotwords), settings.EngineId);
     }
 
     public IReadOnlyList<CorrectionDraft> BuildMemoryDrafts(string jobId, IReadOnlyList<TranscriptSegment> segments)

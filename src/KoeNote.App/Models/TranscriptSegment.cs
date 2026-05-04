@@ -9,4 +9,5 @@ public sealed record TranscriptSegment(
     string RawText,
     string? NormalizedText = null,
     double? AsrConfidence = null,
-    string Source = "asr");
+    string Source = "asr",
+    string? AsrRunId = null);

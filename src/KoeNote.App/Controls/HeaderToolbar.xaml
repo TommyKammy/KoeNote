@@ -25,7 +25,15 @@
                         <TextBlock Text="GPU" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                         <TextBlock Text="{Binding GpuSummary}" FontSize="12" MaxWidth="230" Margin="0,0,22,0" />
                         <TextBlock Text="ASR" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding AsrModel}" FontSize="12" Margin="0,0,22,0" />
+                        <ComboBox ItemsSource="{Binding AvailableAsrEngines}"
+                                  SelectedValue="{Binding SelectedAsrEngineId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectedValuePath="EngineId"
+                                  DisplayMemberPath="DisplayName"
+                                  MinWidth="190"
+                                  MaxWidth="260"
+                                  Height="28"
+                                  FontSize="12"
+                                  Margin="0,0,22,0" />
                         <TextBlock Text="推敲" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                         <TextBlock Text="{Binding ReviewModel}" FontSize="12" />
                     </StackPanel>
@@ -89,6 +97,12 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE9D9;" Style="{StaticResource IconText}" />
                                 <TextBlock Text="セットアップ / モデル導入へ" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ShowModelCatalogCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="Models" />
                             </StackPanel>
                         </Button>
                         <TextBlock Text="音声ファイルをこの画面へドロップして登録できます" Style="{StaticResource MutedText}" Margin="18,0,0,0" VerticalAlignment="Center" />

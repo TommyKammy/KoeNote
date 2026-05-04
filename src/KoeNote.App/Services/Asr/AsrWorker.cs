@@ -31,6 +31,13 @@ public sealed class AsrWorker(
             : AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
         var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput);
         var segments = normalizer.Normalize(options.JobId, rawOutput);
+        if (!string.IsNullOrWhiteSpace(options.AsrRunId))
+        {
+            segments = segments
+                .Select(segment => segment with { AsrRunId = options.AsrRunId })
+                .ToArray();
+        }
+
         var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(options.OutputDirectory, segments);
         repository.SaveSegments(segments);
 

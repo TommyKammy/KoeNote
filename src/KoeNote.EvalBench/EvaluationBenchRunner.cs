@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using KoeNote.App.Models;
 using KoeNote.App.Services;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.EvalBench;
@@ -13,7 +14,8 @@ public sealed class EvaluationBenchRunner
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        WriteIndented = true
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true
     };
 
     public EvaluationBenchReport Run(EvaluationBenchOptions options)
@@ -25,6 +27,9 @@ public sealed class EvaluationBenchRunner
         Directory.CreateDirectory(runDirectory);
 
         var cases = RunFixtureCases();
+        var asrBenchmarks = string.IsNullOrWhiteSpace(options.AsrManifestPath)
+            ? []
+            : RunAsrManifest(options.AsrManifestPath);
         var summary = BuildSummary(cases, stopwatch.Elapsed);
         var reportPath = Path.Combine(runDirectory, "report.json");
         var report = new EvaluationBenchReport(
@@ -32,12 +37,115 @@ public sealed class EvaluationBenchRunner
             runStarted,
             CreateHostMetadata(),
             summary,
-            cases);
+            cases,
+            asrBenchmarks,
+            RecommendDefaultAsr(asrBenchmarks));
 
         var json = JsonSerializer.Serialize(report, JsonOptions);
         File.WriteAllText(reportPath, json);
         File.WriteAllText(Path.Combine(options.OutputRoot, "latest.json"), json);
         return report;
+    }
+
+    private static IReadOnlyList<AsrBenchmarkResult> RunAsrManifest(string manifestPath)
+    {
+        var manifestJson = File.ReadAllText(manifestPath);
+        var manifest = JsonSerializer.Deserialize<AsrBenchmarkManifest>(manifestJson, JsonOptions)
+            ?? throw new InvalidOperationException($"ASR benchmark manifest could not be read: {manifestPath}");
+        var normalizer = new AsrJsonNormalizer();
+
+        return manifest.Cases
+            .SelectMany(testCase => testCase.Results.Select(result => EvaluateAsrResult(testCase, result, normalizer)))
+            .GroupBy(static item => (EngineId: item.EngineId.ToUpperInvariant(), DurationBucket: item.DurationBucket.ToUpperInvariant()))
+            .Select(static group =>
+            {
+                var caseCount = group.Count();
+                var failed = group.Count(static item => !item.Succeeded);
+                var succeeded = group.Where(static item => item.Succeeded).ToArray();
+                var referenceCharacters = succeeded.Sum(static item => item.ReferenceCharacterCount);
+                var editDistance = succeeded.Sum(static item => item.EditDistance);
+                var audioSeconds = succeeded.Sum(static item => item.AudioDurationSeconds);
+                var processingSeconds = succeeded.Select(static item => item.ProcessingSeconds).ToArray();
+                var averageProcessingSeconds = processingSeconds.Length == 0 ? 0 : processingSeconds.Average();
+                var first = group.First();
+                return new AsrBenchmarkResult(
+                    first.EngineId,
+                    first.DurationBucket,
+                    caseCount,
+                    failed,
+                    caseCount == 0 ? 0 : failed / (double)caseCount,
+                    referenceCharacters == 0 ? 1 : editDistance / (double)referenceCharacters,
+                    averageProcessingSeconds,
+                    audioSeconds <= 0 ? 0 : processingSeconds.Sum() / audioSeconds);
+            })
+            .OrderBy(static item => item.EngineId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static item => item.DurationBucket, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static AsrManifestEvaluation EvaluateAsrResult(
+        AsrBenchmarkCase testCase,
+        AsrBenchmarkOutput result,
+        AsrJsonNormalizer normalizer)
+    {
+        if (!result.Succeeded || string.IsNullOrWhiteSpace(result.OutputJsonPath) || !File.Exists(result.OutputJsonPath))
+        {
+            return new AsrManifestEvaluation(
+                result.EngineId,
+                testCase.DurationBucket,
+                false,
+                0,
+                testCase.ReferenceText.Length,
+                testCase.AudioDurationSeconds,
+                result.ProcessingSeconds);
+        }
+
+        var outputJson = File.ReadAllText(result.OutputJsonPath);
+        var hypothesis = string.Concat(normalizer
+            .Normalize(testCase.CaseId, outputJson)
+            .Select(static segment => segment.NormalizedText ?? segment.RawText));
+        return new AsrManifestEvaluation(
+            result.EngineId,
+            testCase.DurationBucket,
+            true,
+            TextMetrics.EditDistance(testCase.ReferenceText, hypothesis),
+            testCase.ReferenceText.Length,
+            testCase.AudioDurationSeconds,
+            result.ProcessingSeconds);
+    }
+
+    private static DefaultAsrRecommendation? RecommendDefaultAsr(IReadOnlyList<AsrBenchmarkResult> benchmarks)
+    {
+        if (benchmarks.Count == 0)
+        {
+            return null;
+        }
+
+        var ranked = benchmarks
+            .GroupBy(static item => item.EngineId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group =>
+            {
+                var totalCases = group.Sum(static item => item.CaseCount);
+                var failures = group.Sum(static item => item.FailureCount);
+                var averageCer = group.Average(static item => item.CharacterErrorRate);
+                var averageRtf = group.Average(static item => item.RealTimeFactor);
+                return new
+                {
+                    EngineId = group.Key,
+                    Score = averageCer + (failures / (double)Math.Max(totalCases, 1)) + Math.Min(averageRtf, 10) * 0.01,
+                    AverageCer = averageCer,
+                    AverageRtf = averageRtf
+                };
+            })
+            .OrderBy(static item => item.Score)
+            .ToArray();
+
+        var best = ranked[0];
+        var second = ranked.Length > 1 ? ranked[1] : best;
+        return new DefaultAsrRecommendation(
+            best.EngineId,
+            second.EngineId,
+            $"v0.1 prioritizes lowest CER/failure score ({best.EngineId}: CER {best.AverageCer:P2}, RTF {best.AverageRtf:F2}); v0.2 keeps the next candidate for adapter hardening.");
     }
 
     private static IReadOnlyList<EvaluationCaseResult> RunFixtureCases()
@@ -176,3 +284,27 @@ public sealed class EvaluationBenchRunner
 }
 
 public sealed record ReviewJsonEvaluation(int DraftCount, bool JsonParseFailed);
+
+public sealed record AsrBenchmarkManifest(IReadOnlyList<AsrBenchmarkCase> Cases);
+
+public sealed record AsrBenchmarkCase(
+    string CaseId,
+    string DurationBucket,
+    double AudioDurationSeconds,
+    string ReferenceText,
+    IReadOnlyList<AsrBenchmarkOutput> Results);
+
+public sealed record AsrBenchmarkOutput(
+    string EngineId,
+    string OutputJsonPath,
+    double ProcessingSeconds,
+    bool Succeeded = true);
+
+internal sealed record AsrManifestEvaluation(
+    string EngineId,
+    string DurationBucket,
+    bool Succeeded,
+    int EditDistance,
+    int ReferenceCharacterCount,
+    double AudioDurationSeconds,
+    double ProcessingSeconds);

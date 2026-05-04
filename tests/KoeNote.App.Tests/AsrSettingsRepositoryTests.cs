@@ -6,23 +6,24 @@ namespace KoeNote.App.Tests;
 public sealed class AsrSettingsRepositoryTests
 {
     [Fact]
-    public void SaveAndLoad_RestoresContextAndHotwords()
+    public void SaveAndLoad_RestoresContextHotwordsAndEngineId()
     {
         var paths = CreatePaths();
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var repository = new AsrSettingsRepository(paths);
 
-        repository.Save(new AsrSettings("製品開発会議", "KoeNote\r\nRTX 3060,Whisper"));
+        repository.Save(new AsrSettings("product meeting", "KoeNote\r\nRTX 3060,Whisper", "faster-whisper-large-v3-turbo"));
 
         var restored = repository.Load();
-        Assert.Equal("製品開発会議", restored.ContextText);
+        Assert.Equal("product meeting", restored.ContextText);
         Assert.Equal("KoeNote\r\nRTX 3060,Whisper", restored.HotwordsText);
+        Assert.Equal("faster-whisper-large-v3-turbo", restored.EngineId);
         Assert.Equal(["KoeNote", "RTX 3060", "Whisper"], restored.Hotwords);
     }
 
     [Fact]
-    public void Load_ReturnsEmptySettingsWhenNotSaved()
+    public void Load_ReturnsDefaultSettingsWhenNotSaved()
     {
         var paths = CreatePaths();
         paths.EnsureCreated();
@@ -32,6 +33,7 @@ public sealed class AsrSettingsRepositoryTests
 
         Assert.Equal("", restored.ContextText);
         Assert.Equal("", restored.HotwordsText);
+        Assert.Equal(VibeVoiceCrispAsrEngine.Id, restored.EngineId);
         Assert.Empty(restored.Hotwords);
     }
 

@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -10,10 +12,14 @@ using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
 
 namespace KoeNote.App.ViewModels;
+
+public sealed record AsrEngineOption(string EngineId, string DisplayName);
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
@@ -24,6 +30,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly AudioPreprocessWorker _audioPreprocessWorker;
     private readonly TranscriptSegmentRepository _transcriptSegmentRepository;
     private readonly AsrWorker _asrWorker;
+    private readonly AsrEngineRegistry _asrEngineRegistry;
     private readonly ReviewWorker _reviewWorker;
     private readonly JobRunCoordinator _jobRunCoordinator;
     private readonly CorrectionDraftRepository _correctionDraftRepository;
@@ -31,6 +38,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptEditService _transcriptEditService;
     private readonly CorrectionMemoryService _correctionMemoryService;
     private readonly TranscriptExportService _transcriptExportService;
+    private readonly ModelCatalogService _modelCatalogService;
+    private readonly InstalledModelRepository _installedModelRepository;
+    private readonly ModelInstallService _modelInstallService;
+    private readonly ModelLicenseViewer _modelLicenseViewer;
+    private readonly SetupStateService _setupStateService;
+    private readonly SetupWizardService _setupWizardService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
     private readonly DispatcherTimer _statusRefreshTimer;
@@ -39,6 +52,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
+    private ModelCatalogEntry? _selectedModelCatalogEntry;
+    private ModelCatalogEntry? _selectedSetupAsrModel;
+    private ModelCatalogEntry? _selectedSetupReviewModel;
+    private SetupState _setupState;
+    private string _setupLocalModelPath = string.Empty;
+    private string _setupOfflineModelPackPath = string.Empty;
     private CancellationTokenSource? _runCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
     private bool _isReviewOperationInProgress;
@@ -51,6 +70,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSpeakerFilter = "全話者";
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
+    private string _selectedAsrEngineId = VibeVoiceCrispAsrEngine.Id;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isRunInProgress;
@@ -82,6 +102,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptEditService = new TranscriptEditService(Paths);
         _correctionMemoryService = new CorrectionMemoryService(Paths);
         _transcriptExportService = new TranscriptExportService(Paths);
+        _modelCatalogService = new ModelCatalogService(Paths);
+        _installedModelRepository = new InstalledModelRepository(Paths);
+        var modelVerificationService = new ModelVerificationService();
+        _modelInstallService = new ModelInstallService(Paths, _installedModelRepository, modelVerificationService);
+        _modelLicenseViewer = new ModelLicenseViewer(_modelCatalogService);
+        var modelPackImportService = new ModelPackImportService(Paths, _modelCatalogService, _modelInstallService);
+        var modelDownloadService = new ModelDownloadService(
+            new HttpClient(),
+            new ModelDownloadJobRepository(Paths),
+            modelVerificationService,
+            _modelInstallService);
+        _setupStateService = new SetupStateService(Paths);
+        _setupWizardService = new SetupWizardService(
+            Paths,
+            _setupStateService,
+            new ToolStatusService(Paths),
+            _modelCatalogService,
+            _installedModelRepository,
+            _modelInstallService,
+            modelPackImportService,
+            modelDownloadService);
+        _setupState = _setupWizardService.LoadState();
         _transcriptSegmentRepository = new TranscriptSegmentRepository(Paths);
         var processRunner = new ExternalProcessRunner();
         _audioPreprocessWorker = new AudioPreprocessWorker(processRunner, _stageProgressRepository, _jobLogRepository);
@@ -99,13 +141,35 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             new ReviewResultStore(),
             new CorrectionDraftRepository(Paths),
             _correctionMemoryService);
+        _asrEngineRegistry = new AsrEngineRegistry([
+            new VibeVoiceCrispAsrEngine(_asrWorker, new AsrRunRepository(Paths)),
+            new ScriptedJsonAsrEngine(
+                "faster-whisper-large-v3-turbo",
+                "faster-whisper large-v3-turbo",
+                "faster-whisper",
+                processRunner,
+                new AsrJsonNormalizer(),
+                new AsrResultStore(),
+                _transcriptSegmentRepository,
+                new AsrRunRepository(Paths)),
+            new ScriptedJsonAsrEngine(
+                "reazonspeech-k2-v3",
+                "ReazonSpeech v3 k2",
+                "reazonspeech-k2",
+                processRunner,
+                new AsrJsonNormalizer(),
+                new AsrResultStore(),
+                _transcriptSegmentRepository,
+                new AsrRunRepository(Paths))
+        ]);
         _jobRunCoordinator = new JobRunCoordinator(
             Paths,
             _jobRepository,
             _stageProgressRepository,
             _jobLogRepository,
             _audioPreprocessWorker,
-            _asrWorker,
+            _asrEngineRegistry,
+            _installedModelRepository,
             _reviewWorker,
             _correctionMemoryService);
         _statusBarInfoService = new StatusBarInfoService(Paths);
@@ -129,9 +193,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
+        foreach (var engine in _asrEngineRegistry.Engines)
+        {
+            AvailableAsrEngines.Add(new AsrEngineOption(engine.EngineId, engine.DisplayName));
+        }
+
         var asrSettings = _asrSettingsRepository.Load();
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
+        _selectedAsrEngineId = _asrEngineRegistry.Contains(asrSettings.EngineId)
+            ? asrSettings.EngineId
+            : VibeVoiceCrispAsrEngine.Id;
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
         FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
@@ -163,6 +235,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
+        SetupBackCommand = new RelayCommand(SetupBackAsync);
+        SetupNextCommand = new RelayCommand(SetupNextAsync);
+        SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
+        SetupAcceptLicensesCommand = new RelayCommand(SetupAcceptLicensesAsync);
+        SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync);
+        SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync);
+        SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
+        SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
+        SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
+        SetupRunSmokeCommand = new RelayCommand(SetupRunSmokeAsync);
+        SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
+        ShowModelCatalogCommand = new RelayCommand(ShowModelCatalogAsync);
+        RegisterPreinstalledModelsCommand = new RelayCommand(RegisterPreinstalledModelsAsync);
+        UseSelectedModelCommand = new RelayCommand(UseSelectedModelAsync, () => SelectedModelCatalogEntry is not null);
+        ShowSelectedModelLicenseCommand = new RelayCommand(ShowSelectedModelLicenseAsync, () => SelectedModelCatalogEntry is not null);
+        ForgetSelectedModelCommand = new RelayCommand(ForgetSelectedModelAsync, () => SelectedModelCatalogEntry?.IsInstalled == true);
         AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
         RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
         ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
@@ -174,6 +262,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
 
+        RefreshModelCatalog();
+        RefreshSetupWizard();
         RefreshSpeakerFilters();
     }
 
@@ -185,7 +275,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string GpuSummary => EnvironmentStatus.FirstOrDefault(item => item.Name == "nvidia-smi")?.Detail ?? "Unknown";
 
-    public string AsrModel => "VibeVoice ASR Q4";
+    public string AsrModel => AvailableAsrEngines
+        .FirstOrDefault(engine => string.Equals(engine.EngineId, SelectedAsrEngineId, StringComparison.OrdinalIgnoreCase))
+        ?.DisplayName ?? "VibeVoice ASR Q4";
 
     public string ReviewModel => "llm-jp Q4_K_M";
 
@@ -227,12 +319,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         "Phase 11 の Model Catalog と Phase 12 の Setup Wizard で、ASR / 推敲モデルの導入を案内します。現時点では必要ファイルの配置先を表示します。";
 
     public bool RequiredRuntimeAssetsReady => EnvironmentStatus
-        .Where(static item => item.Name is "ffmpeg" or "crispasr" or "llama-completion" or "ASR model" or "Review model")
-        .All(static item => item.IsOk);
+        .Where(static item => item.Name is "ffmpeg" or "llama-completion" or "Review model")
+        .All(static item => item.IsOk) && IsSelectedAsrEngineReady();
 
-    public bool CanRunSelectedJob => SelectedJob is not null && !IsRunInProgress && RequiredRuntimeAssetsReady;
+    public bool IsSetupComplete => _setupState.IsCompleted;
+
+    public bool CanRunSelectedJob => SelectedJob is not null && !IsRunInProgress && RequiredRuntimeAssetsReady && IsSetupComplete;
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
+
+    public ObservableCollection<AsrEngineOption> AvailableAsrEngines { get; } = [];
 
     public ObservableCollection<JobSummary> Jobs { get; } = [];
 
@@ -245,6 +341,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<CorrectionDraft> ReviewQueue { get; } = [];
 
     public ObservableCollection<DiffToken> DiffTokens { get; } = [];
+
+    public ObservableCollection<ModelCatalogEntry> ModelCatalogEntries { get; } = [];
+
+    public ObservableCollection<SetupStepItem> SetupSteps { get; } = [];
+
+    public ObservableCollection<ModelCatalogEntry> SetupAsrModelChoices { get; } = [];
+
+    public ObservableCollection<ModelCatalogEntry> SetupReviewModelChoices { get; } = [];
+
+    public ObservableCollection<SetupSmokeCheck> SetupSmokeChecks { get; } = [];
+
+    public ObservableCollection<SetupModelAudit> SetupModelAudits { get; } = [];
 
     public ObservableCollection<string> SpeakerFilters { get; } = ["全話者"];
 
@@ -263,6 +371,38 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand CancelCommand { get; }
 
     public ICommand OpenSetupCommand { get; }
+
+    public ICommand SetupBackCommand { get; }
+
+    public ICommand SetupNextCommand { get; }
+
+    public ICommand SetupUseRecommendedCommand { get; }
+
+    public ICommand SetupAcceptLicensesCommand { get; }
+
+    public ICommand SetupDownloadAsrCommand { get; }
+
+    public ICommand SetupDownloadReviewCommand { get; }
+
+    public ICommand SetupRegisterLocalAsrCommand { get; }
+
+    public ICommand SetupRegisterLocalReviewCommand { get; }
+
+    public ICommand SetupImportOfflinePackCommand { get; }
+
+    public ICommand SetupRunSmokeCommand { get; }
+
+    public ICommand SetupCompleteCommand { get; }
+
+    public ICommand ShowModelCatalogCommand { get; }
+
+    public ICommand RegisterPreinstalledModelsCommand { get; }
+
+    public ICommand UseSelectedModelCommand { get; }
+
+    public ICommand ShowSelectedModelLicenseCommand { get; }
+
+    public ICommand ForgetSelectedModelCommand { get; }
 
     public ICommand AcceptDraftCommand { get; }
 
@@ -344,6 +484,66 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 ApplySelectedDraftToReviewPane();
             }
         }
+    }
+
+    public ModelCatalogEntry? SelectedModelCatalogEntry
+    {
+        get => _selectedModelCatalogEntry;
+        set
+        {
+            if (SetField(ref _selectedModelCatalogEntry, value))
+            {
+                UpdateModelCatalogCommandStates();
+            }
+        }
+    }
+
+    public ModelCatalogEntry? SelectedSetupAsrModel
+    {
+        get => _selectedSetupAsrModel;
+        set
+        {
+            if (SetField(ref _selectedSetupAsrModel, value) && value is not null)
+            {
+                ApplySetupModelSelection("asr", value.ModelId);
+            }
+        }
+    }
+
+    public ModelCatalogEntry? SelectedSetupReviewModel
+    {
+        get => _selectedSetupReviewModel;
+        set
+        {
+            if (SetField(ref _selectedSetupReviewModel, value) && value is not null)
+            {
+                ApplySetupModelSelection("review", value.ModelId);
+            }
+        }
+    }
+
+    public string SetupCurrentStep => _setupState.CurrentStep.ToString();
+
+    public string SetupStatusSummary => _setupState.IsCompleted
+        ? "Setup complete. Run is enabled when runtime assets are ready."
+        : $"Setup incomplete. Current step: {_setupState.CurrentStep}. Run is disabled until smoke test and completion pass.";
+
+    public string SetupMode => _setupState.SetupMode;
+
+    public string SetupStorageRoot => _setupState.StorageRoot ?? Paths.UserModels;
+
+    public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
+
+    public string SetupLocalModelPath
+    {
+        get => _setupLocalModelPath;
+        set => SetField(ref _setupLocalModelPath, value ?? string.Empty);
+    }
+
+    public string SetupOfflineModelPackPath
+    {
+        get => _setupOfflineModelPackPath;
+        set => SetField(ref _setupOfflineModelPackPath, value ?? string.Empty);
     }
 
     public string SelectedCorrectionDraftId => SelectedCorrectionDraft?.DraftId ?? string.Empty;
@@ -525,6 +725,27 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public string SelectedAsrEngineId
+    {
+        get => _selectedAsrEngineId;
+        set
+        {
+            var engineId = string.IsNullOrWhiteSpace(value) ? VibeVoiceCrispAsrEngine.Id : value;
+            if (SetField(ref _selectedAsrEngineId, engineId))
+            {
+                OnPropertyChanged(nameof(AsrModel));
+                OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+                OnPropertyChanged(nameof(CanRunSelectedJob));
+                if (RunSelectedJobCommand is RelayCommand runCommand)
+                {
+                    runCommand.RaiseCanExecuteChanged();
+                }
+
+                ScheduleSaveAsrSettings();
+            }
+        }
+    }
+
     public string ReviewIssueType
     {
         get => _reviewIssueType;
@@ -580,8 +801,141 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private Task OpenSetupAsync()
     {
-        LatestLog = SetupPlaceholderText;
+        RefreshModelCatalog();
+        RefreshSetupWizard();
+        LatestLog = $"{SetupPlaceholderText}{Environment.NewLine}Setup step: {SetupCurrentStep}. Model catalog: {ModelCatalogEntries.Count} entries.";
         return Task.CompletedTask;
+    }
+
+    private Task ShowModelCatalogAsync()
+    {
+        RefreshModelCatalog();
+        var installedCount = ModelCatalogEntries.Count(static entry => entry.IsInstalled);
+        LatestLog = $"Model catalog loaded: {ModelCatalogEntries.Count} entries, {installedCount} installed. Select a model in the Models tab for use/license/forget actions.";
+        return Task.CompletedTask;
+    }
+
+    private Task RegisterPreinstalledModelsAsync()
+    {
+        var catalog = _modelCatalogService.LoadBuiltInCatalog();
+        RegisterIfPresent(catalog, "vibevoice-asr-q4-k", Paths.VibeVoiceAsrModelPath, "preinstalled");
+        RegisterIfPresent(catalog, "llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath, "preinstalled");
+        RefreshModelCatalog();
+        LatestLog = "Preinstalled model scan completed.";
+        return Task.CompletedTask;
+    }
+
+    private Task UseSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (SelectedModelCatalogEntry.Role.Equals("asr", StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedAsrEngineId = SelectedModelCatalogEntry.EngineId;
+            LatestLog = $"ASR model selected: {SelectedModelCatalogEntry.DisplayName} ({SelectedModelCatalogEntry.EngineId})";
+        }
+        else
+        {
+            LatestLog = $"Review model selected for Phase 12 setup: {SelectedModelCatalogEntry.DisplayName}";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ShowSelectedModelLicenseAsync()
+    {
+        if (SelectedModelCatalogEntry is not null)
+        {
+            LatestLog = $"""
+                {_modelLicenseViewer.BuildLicenseSummary(SelectedModelCatalogEntry.ModelId)}
+                Size: {SelectedModelCatalogEntry.SizeSummary}
+                Requirements: {SelectedModelCatalogEntry.RuntimeRequirement}
+                Install: {SelectedModelCatalogEntry.InstallState}
+                Download: {SelectedModelCatalogEntry.DownloadState}
+                """;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ForgetSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is not null &&
+            _modelInstallService.DeleteRegistration(SelectedModelCatalogEntry.ModelId))
+        {
+            LatestLog = $"Model registration removed: {SelectedModelCatalogEntry.DisplayName}";
+            RefreshModelCatalog();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void RefreshModelCatalog()
+    {
+        ModelCatalogEntries.Clear();
+        foreach (var entry in _modelCatalogService.ListEntries())
+        {
+            ModelCatalogEntries.Add(entry);
+        }
+
+        SelectedModelCatalogEntry ??= ModelCatalogEntries.FirstOrDefault();
+        UpdateModelCatalogCommandStates();
+    }
+
+    private void RegisterIfPresent(ModelCatalog catalog, string modelId, string path, string sourceType)
+    {
+        var item = catalog.Models.FirstOrDefault(model => string.Equals(model.ModelId, modelId, StringComparison.OrdinalIgnoreCase));
+        if (item is not null && (File.Exists(path) || Directory.Exists(path)))
+        {
+            _modelInstallService.RegisterLocalModel(item, path, sourceType);
+        }
+    }
+
+    private bool IsSelectedAsrEngineReady()
+    {
+        return SelectedAsrEngineId switch
+        {
+            VibeVoiceCrispAsrEngine.Id => File.Exists(Paths.CrispAsrPath) && File.Exists(Paths.VibeVoiceAsrModelPath),
+            "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
+            "reazonspeech-k2-v3" => File.Exists(Paths.ReazonSpeechK2ScriptPath) &&
+                ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),
+            _ => false
+        };
+    }
+
+    private bool ModelPathExists(string modelId, string fallbackPath)
+    {
+        var installed = _installedModelRepository.FindInstalledModel(modelId);
+        if (installed is not null &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+        {
+            return true;
+        }
+
+        return File.Exists(fallbackPath) || Directory.Exists(fallbackPath);
+    }
+
+    private void UpdateModelCatalogCommandStates()
+    {
+        if (UseSelectedModelCommand is RelayCommand useCommand)
+        {
+            useCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ShowSelectedModelLicenseCommand is RelayCommand licenseCommand)
+        {
+            licenseCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ForgetSelectedModelCommand is RelayCommand forgetCommand)
+        {
+            forgetCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private async Task RefreshStatusBarInfoAsync()

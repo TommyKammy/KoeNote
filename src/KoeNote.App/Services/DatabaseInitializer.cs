@@ -9,7 +9,9 @@ public sealed class DatabaseInitializer(AppPaths paths)
         new(1, ApplyInitialSchema),
         new(2, ApplyStatusAndAsrSettingsSchema),
         new(3, ApplyEditingAndUndoSchema),
-        new(4, ApplyCorrectionMemorySchema)
+        new(4, ApplyCorrectionMemorySchema),
+        new(5, ApplyAsrAdapterSchema),
+        new(6, ApplyModelCatalogSchema)
     ];
 
     public void EnsureCreated()
@@ -164,9 +166,11 @@ public sealed class DatabaseInitializer(AppPaths paths)
                 settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
+                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
                 updated_at TEXT NOT NULL
             );
             """);
+        AddColumnIfMissing(connection, transaction, "asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'vibevoice-crispasr'");
     }
 
     private static void ApplyEditingAndUndoSchema(SqliteConnection connection, SqliteTransaction transaction)
@@ -246,6 +250,86 @@ public sealed class DatabaseInitializer(AppPaths paths)
                 segment_id TEXT,
                 event_type TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    private static void ApplyAsrAdapterSchema(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS asr_runs (
+                asr_run_id TEXT NOT NULL PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                engine_id TEXT NOT NULL,
+                model_id TEXT NOT NULL,
+                model_version TEXT,
+                status TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT,
+                duration_seconds REAL,
+                peak_vram_mb INTEGER,
+                raw_output_path TEXT,
+                normalized_output_path TEXT,
+                error_category TEXT,
+                created_at TEXT NOT NULL
+            );
+            """);
+
+        AddColumnIfMissing(connection, transaction, "transcript_segments", "asr_run_id", "TEXT");
+    }
+
+    private static void ApplyModelCatalogSchema(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS installed_models (
+                model_id TEXT NOT NULL PRIMARY KEY,
+                role TEXT NOT NULL,
+                engine_id TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                family TEXT,
+                version TEXT,
+                file_path TEXT NOT NULL,
+                manifest_path TEXT,
+                size_bytes INTEGER,
+                sha256 TEXT,
+                verified INTEGER NOT NULL DEFAULT 0,
+                license_name TEXT,
+                source_type TEXT NOT NULL,
+                installed_at TEXT NOT NULL,
+                last_verified_at TEXT,
+                status TEXT NOT NULL
+            );
+            """);
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS installed_runtimes (
+                runtime_id TEXT NOT NULL PRIMARY KEY,
+                runtime_type TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                version TEXT,
+                install_path TEXT NOT NULL,
+                verified INTEGER NOT NULL DEFAULT 0,
+                source_type TEXT NOT NULL,
+                installed_at TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+            """);
+
+        Execute(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS model_download_jobs (
+                download_id TEXT NOT NULL PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                target_path TEXT NOT NULL,
+                temp_path TEXT NOT NULL,
+                status TEXT NOT NULL,
+                bytes_total INTEGER,
+                bytes_downloaded INTEGER NOT NULL DEFAULT 0,
+                sha256_expected TEXT,
+                sha256_actual TEXT,
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """);
     }

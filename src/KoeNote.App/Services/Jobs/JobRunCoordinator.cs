@@ -2,6 +2,7 @@ using System.IO;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Audio;
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Jobs;
@@ -12,7 +13,8 @@ public sealed class JobRunCoordinator(
     StageProgressRepository stageProgressRepository,
     JobLogRepository jobLogRepository,
     AudioPreprocessWorker audioPreprocessWorker,
-    AsrWorker asrWorker,
+    AsrEngineRegistry asrEngineRegistry,
+    InstalledModelRepository installedModelRepository,
     ReviewWorker reviewWorker,
     CorrectionMemoryService correctionMemoryService)
 {
@@ -71,15 +73,17 @@ public sealed class JobRunCoordinator(
         {
             var effectiveAsrSettings = correctionMemoryService.EnrichAsrSettings(asrSettings);
             var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
-            var result = await asrWorker.RunAsync(new AsrRunOptions(
-                job.JobId,
-                normalizedAudioPath,
-                paths.CrispAsrPath,
-                paths.VibeVoiceAsrModelPath,
-                outputDirectory,
-                effectiveAsrSettings.Hotwords,
-                string.IsNullOrWhiteSpace(effectiveAsrSettings.ContextText) ? null : effectiveAsrSettings.ContextText,
-                Timeout: TimeSpan.FromHours(2)),
+            var engineId = asrEngineRegistry.Contains(effectiveAsrSettings.EngineId)
+                ? effectiveAsrSettings.EngineId
+                : VibeVoiceCrispAsrEngine.Id;
+            var engine = asrEngineRegistry.GetRequired(engineId);
+            var result = await engine.TranscribeAsync(
+                new AsrInput(job.JobId, normalizedAudioPath),
+                CreateAsrConfig(engineId, outputDirectory),
+                new AsrOptions(
+                    effectiveAsrSettings.Hotwords,
+                    string.IsNullOrWhiteSpace(effectiveAsrSettings.ContextText) ? null : effectiveAsrSettings.ContextText,
+                    TimeSpan.FromHours(2)),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
@@ -158,6 +162,44 @@ public sealed class JobRunCoordinator(
             jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{AsrFailureCategory.Unknown}: {exception.Message}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}"));
         }
+    }
+
+    private AsrEngineConfig CreateAsrConfig(string engineId, string outputDirectory)
+    {
+        return engineId switch
+        {
+            "faster-whisper-large-v3-turbo" => new AsrEngineConfig(
+                "python",
+                ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),
+                outputDirectory,
+                "faster-whisper-large-v3-turbo",
+                paths.FasterWhisperScriptPath,
+                "large-v3-turbo"),
+            "reazonspeech-k2-v3" => new AsrEngineConfig(
+                "python",
+                ResolveModelPath("reazonspeech-k2-v3-ja", paths.ReazonSpeechK2ModelPath),
+                outputDirectory,
+                "reazonspeech-k2-v3",
+                paths.ReazonSpeechK2ScriptPath,
+                "v3-k2"),
+            _ => new AsrEngineConfig(
+                paths.CrispAsrPath,
+                ResolveModelPath("vibevoice-asr-q4-k", paths.VibeVoiceAsrModelPath),
+                outputDirectory,
+                "vibevoice-asr-q4_k")
+        };
+    }
+
+    private string ResolveModelPath(string modelId, string fallbackPath)
+    {
+        var installed = installedModelRepository.FindInstalledModel(modelId);
+        if (installed is not null &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+        {
+            return installed.FilePath;
+        }
+
+        return fallbackPath;
     }
 
     private async Task RunReviewAsync(

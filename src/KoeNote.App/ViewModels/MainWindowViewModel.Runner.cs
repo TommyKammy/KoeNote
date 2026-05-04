@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText);
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
         }
         finally
