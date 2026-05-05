@@ -134,5 +134,90 @@
                 </DockPanel>
             </Border>
         </Grid>
+
+        <Grid Grid.Row="0"
+              Grid.RowSpan="5"
+              Panel.ZIndex="30"
+              Visibility="{Binding IsSetupWizardModalOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border Background="#990F172A" />
+            <Border Width="960"
+                    MaxWidth="1120"
+                    MaxHeight="720"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#FFFFFF"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="22">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SetupWizardModalTitle}"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding SetupWizardModalGuide}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="13"
+                                       LineHeight="20"
+                                       TextWrapping="Wrap"
+                                       Margin="0,7,22,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Command="{Binding CloseSetupWizardModalCommand}"
+                                Padding="9,7"
+                                MinWidth="0"
+                                VerticalAlignment="Top"
+                                ToolTip="あとで設定する">
+                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" />
+                        </Button>
+                    </Grid>
+
+                    <Border DockPanel.Dock="Bottom"
+                            Background="#F8FAFC"
+                            BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="0,1,0,0"
+                            Padding="0,14,0,0"
+                            Margin="0,16,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SetupStatusSummary}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0">
+                                <Button Command="{Binding CloseSetupWizardModalCommand}" Padding="12,8">
+                                    <TextBlock Text="あとで" />
+                                </Button>
+                                <Button Command="{Binding SetupCompleteCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Padding="13,8"
+                                        Margin="8,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                        <TextBlock Text="完了" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <controls:SetupWizardTab />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

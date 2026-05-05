@@ -281,14 +281,15 @@ public sealed class MainWindowViewModelTests
     public void OpenSetupCommand_ReportsPlaceholderGuidance()
     {
         var viewModel = CreateViewModel();
+        viewModel.CloseSetupWizardModalCommand.Execute(null);
 
         viewModel.OpenSetupCommand.Execute(null);
 
         Assert.Contains("Model Catalog", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.Contains("Setup Wizard", viewModel.LatestLog, StringComparison.Ordinal);
-        Assert.Equal(2, viewModel.SelectedLogPanelTabIndex);
-        Assert.Equal(1, viewModel.SelectedDetailPanelTabIndex);
-        Assert.True(viewModel.IsDetailPanelOpen);
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+        Assert.False(viewModel.IsDetailPanelOpen);
+        Assert.Contains("KoeNote", viewModel.SetupWizardModalTitle, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -306,8 +307,45 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
 
         viewModel.OpenSetupCommand.Execute(null);
-        Assert.Equal(2, viewModel.SelectedLogPanelTabIndex);
-        Assert.Equal(1, viewModel.SelectedDetailPanelTabIndex);
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+    }
+
+    [Fact]
+    public void SetupWizardModal_OpensOnIncompleteSetupAndCanBeDismissed()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.IsSetupComplete);
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+
+        viewModel.CloseSetupWizardModalCommand.Execute(null);
+
+        Assert.False(viewModel.IsSetupWizardModalOpen);
+        Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SetupWizardModal_DoesNotAutoOpenAfterSetupIsComplete()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            CurrentStep = SetupStep.Complete,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.IsSetupComplete);
+        Assert.False(viewModel.IsSetupWizardModalOpen);
+
+        viewModel.OpenSetupCommand.Execute(null);
+
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+        Assert.False(viewModel.IsDetailPanelOpen);
     }
 
     [Fact]

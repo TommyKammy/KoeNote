@@ -128,6 +128,11 @@ public sealed partial class MainWindowViewModel
     {
         _setupState = _setupWizardService.CompleteIfReady();
         RefreshSetupWizard();
+        if (_setupState.IsCompleted)
+        {
+            IsSetupWizardModalOpen = false;
+        }
+
         LatestLog = _setupState.IsCompleted
             ? "Setup completed. Run is now available when runtime assets are ready."
             : "Setup is still incomplete. Run smoke check after installing/importing selected models.";
@@ -195,6 +200,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
         OnPropertyChanged(nameof(SetupCurrentStep));
         OnPropertyChanged(nameof(SetupStatusSummary));
+        OnPropertyChanged(nameof(SetupWizardModalTitle));
+        OnPropertyChanged(nameof(SetupWizardModalGuide));
         OnPropertyChanged(nameof(SetupMode));
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));

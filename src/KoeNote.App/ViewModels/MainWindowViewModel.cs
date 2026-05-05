@@ -83,6 +83,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private int _selectedLogPanelTabIndex;
     private int _selectedDetailPanelTabIndex;
     private bool _isDetailPanelOpen;
+    private bool _isSetupWizardModalOpen;
     private string? _activeModelDownloadModelId;
     private string _selectedSpeakerFilter = "全話者";
     private string _asrContextText = string.Empty;
@@ -208,6 +209,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
+        CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync);
         OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
         CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
         SetupBackCommand = new RelayCommand(SetupBackAsync);
@@ -250,6 +252,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
         RefreshModelCatalog();
         RefreshSetupWizard();
+        IsSetupWizardModalOpen = !IsSetupComplete;
         RefreshSpeakerFilters();
         RefreshDatabaseMaintenanceSummary();
     }
@@ -313,6 +316,42 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool IsSetupComplete => _setupState.IsCompleted;
 
+    public bool IsSetupWizardModalOpen
+    {
+        get => _isSetupWizardModalOpen;
+        private set => SetField(ref _isSetupWizardModalOpen, value);
+    }
+
+    public string SetupWizardModalTitle => _setupState.CurrentStep switch
+    {
+        SetupStep.Welcome => "KoeNote へようこそ",
+        SetupStep.EnvironmentCheck => "まず動作環境を確認します",
+        SetupStep.SetupMode => "使い方に合わせて準備します",
+        SetupStep.AsrModel => "文字起こしモデルを選びます",
+        SetupStep.ReviewModel => "推敲モデルを選びます",
+        SetupStep.Storage => "モデルの保存先を確認します",
+        SetupStep.License => "ライセンスを確認します",
+        SetupStep.Install => "モデルを導入します",
+        SetupStep.SmokeTest => "最後に動作確認します",
+        SetupStep.Complete => "準備完了です",
+        _ => "初回セットアップ"
+    };
+
+    public string SetupWizardModalGuide => _setupState.CurrentStep switch
+    {
+        SetupStep.Welcome => "KoeNote は本体だけ先に起動し、ASR / 推敲モデルはあとから導入します。ここでは最初の文字起こしに必要な準備を順番に案内します。",
+        SetupStep.EnvironmentCheck => "足りない runtime やモデルがあってもアプリ本体は壊れません。ここで次に必要な導入操作を確認できます。",
+        SetupStep.SetupMode => "迷ったら Recommended を選んでください。高精度 ASR だけで始めたい場合は、あとから推敲をオフにできます。",
+        SetupStep.AsrModel => "日本語文字起こしには faster-whisper large-v3-turbo を推奨します。精度優先なら large-v3 も選べます。",
+        SetupStep.ReviewModel => "推敲は文字起こし結果の確認を助ける追加ステージです。不要な場合は Settings でいつでもスキップできます。",
+        SetupStep.Storage => "オンラインダウンロード、ローカルファイル、offline model pack のどれでも導入できます。",
+        SetupStep.License => "モデルごとの license / size / runtime requirement を確認してから導入します。",
+        SetupStep.Install => "ダウンロード中は進捗を表示します。失敗しても本体は起動したままで、別経路から再試行できます。",
+        SetupStep.SmokeTest => "ネットワークなしで startup、sample import、review screen、export path を確認します。",
+        SetupStep.Complete => "セットアップが完了すると Run が有効になります。通常画面からいつでも Setup / Models を開けます。",
+        _ => "KoeNote の初回利用に必要な準備を案内します。"
+    };
+
     public bool CanRunSelectedJob => SelectedJob is not null && !IsRunInProgress && RequiredRuntimeAssetsReady && IsSetupComplete;
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
@@ -366,6 +405,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand OpenSettingsCommand { get; }
 
     public ICommand OpenSetupCommand { get; }
+
+    public ICommand CloseSetupWizardModalCommand { get; }
 
     public ICommand OpenSelectedDetailPanelCommand { get; }
 
@@ -1040,10 +1081,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private Task OpenSetupAsync()
     {
-        OpenDetailPanel(2);
         RefreshModelCatalog();
         RefreshSetupWizard();
+        IsSetupWizardModalOpen = true;
         LatestLog = $"{SetupPlaceholderText}{Environment.NewLine}Setup step: {SetupCurrentStep}. Model catalog: {ModelCatalogEntries.Count} entries.";
+        return Task.CompletedTask;
+    }
+
+    private Task CloseSetupWizardModalAsync()
+    {
+        IsSetupWizardModalOpen = false;
+        LatestLog = IsSetupComplete
+            ? "Setup wizard closed."
+            : "Setup wizard closed for now. Run remains disabled until setup is completed.";
         return Task.CompletedTask;
     }
 
