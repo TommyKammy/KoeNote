@@ -190,6 +190,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
+        FilteredDeletedJobs = CollectionViewSource.GetDefaultView(DeletedJobs);
+        FilteredDeletedJobs.Filter = FilterJob;
         FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
         FilteredSegments.Filter = FilterSegment;
         LoadJobs();
@@ -198,6 +200,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
+        RestoreJobCommand = new RelayCommand<JobSummary>(RestoreJobAsync, job => job is not null && !IsRunInProgress);
+        PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);
+        PermanentlyDeleteAllDeletedJobsCommand = new RelayCommand(PermanentlyDeleteAllDeletedJobsAsync, () => DeletedJobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
@@ -360,6 +365,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<JobSummary> Jobs { get; } = [];
 
+    public ObservableCollection<JobSummary> DeletedJobs { get; } = [];
+
     public ObservableCollection<StageStatus> StageStatuses { get; } = [];
 
     public ObservableCollection<TranscriptSegmentPreview> Segments { get; } = [];
@@ -392,6 +399,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICollectionView FilteredJobs { get; }
 
+    public ICollectionView FilteredDeletedJobs { get; }
+
     public ICollectionView FilteredSegments { get; }
 
     public ICommand AddAudioCommand { get; }
@@ -399,6 +408,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand DeleteJobCommand { get; }
 
     public ICommand ClearAllJobsCommand { get; }
+
+    public ICommand RestoreJobCommand { get; }
+
+    public ICommand PermanentlyDeleteJobCommand { get; }
+
+    public ICommand PermanentlyDeleteAllDeletedJobsCommand { get; }
 
     public ICommand RunSelectedJobCommand { get; }
 
@@ -761,6 +776,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string JobCountSummary => $"合計 {Jobs.Count} 件のジョブ";
 
+    public string DeletedJobCountSummary => $"履歴 {DeletedJobs.Count} 件 / {FormatByteSize(DeletedJobs.Sum(static job => job.StorageBytes))}";
+
     public string JobSearchText
     {
         get => _jobSearchText;
@@ -769,6 +786,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _jobSearchText, value))
             {
                 FilteredJobs.Refresh();
+                FilteredDeletedJobs.Refresh();
             }
         }
     }
@@ -862,6 +880,21 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 if (ClearAllJobsCommand is RelayCommand clearAllCommand)
                 {
                     clearAllCommand.RaiseCanExecuteChanged();
+                }
+
+                if (RestoreJobCommand is RelayCommand<JobSummary> restoreCommand)
+                {
+                    restoreCommand.RaiseCanExecuteChanged();
+                }
+
+                if (PermanentlyDeleteJobCommand is RelayCommand<JobSummary> purgeCommand)
+                {
+                    purgeCommand.RaiseCanExecuteChanged();
+                }
+
+                if (PermanentlyDeleteAllDeletedJobsCommand is RelayCommand purgeAllCommand)
+                {
+                    purgeAllCommand.RaiseCanExecuteChanged();
                 }
 
                 if (RunDatabaseMaintenanceCommand is RelayCommand maintenanceCommand)

@@ -12,7 +12,8 @@ internal static class KoeNoteDatabaseMigrations
         new(6, "model catalog", ApplyModelCatalogSchema),
         new(7, "repair ASR settings engine id", ApplyAsrSettingsEngineIdRepair),
         new(8, "review stage toggle", ApplyReviewStageToggle),
-        new(9, "maintenance indexes", ApplyMaintenanceIndexes)
+        new(9, "maintenance indexes", ApplyMaintenanceIndexes),
+        new(10, "job recycle bin", ApplyJobRecycleBinSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -356,6 +357,23 @@ internal static class KoeNoteDatabaseMigrations
         migration.ExecuteIfTableExists("model_download_jobs", """
             CREATE INDEX IF NOT EXISTS idx_model_download_jobs_model_updated
             ON model_download_jobs(model_id, updated_at DESC);
+            """);
+    }
+
+    private static void ApplyJobRecycleBinSchema(DatabaseMigrationContext migration)
+    {
+        migration.AddColumnIfTableExistsAndMissing("jobs", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
+        migration.AddColumnIfTableExistsAndMissing("jobs", "deleted_at", "TEXT");
+        migration.AddColumnIfTableExistsAndMissing("jobs", "delete_reason", "TEXT NOT NULL DEFAULT ''");
+
+        migration.ExecuteIfTableExists("jobs", """
+            CREATE INDEX IF NOT EXISTS idx_jobs_deleted_updated
+            ON jobs(is_deleted, updated_at DESC);
+            """);
+
+        migration.ExecuteIfTableExists("jobs", """
+            CREATE INDEX IF NOT EXISTS idx_jobs_deleted_at
+            ON jobs(deleted_at DESC);
             """);
     }
 }

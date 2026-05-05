@@ -29,6 +29,16 @@ internal sealed class DatabaseMigrationContext(
         Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition};");
     }
 
+    public void AddColumnIfTableExistsAndMissing(string table, string column, string definition)
+    {
+        if (!TableExists(table))
+        {
+            return;
+        }
+
+        AddColumnIfMissing(table, column, definition);
+    }
+
     public void ExecuteIfTableExists(string table, string sql)
     {
         if (TableExists(table))

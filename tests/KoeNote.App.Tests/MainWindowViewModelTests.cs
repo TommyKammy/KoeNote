@@ -104,6 +104,85 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task DeleteAndRestoreJob_UpdatesActiveAndHistoryLists()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+        var job = viewModel.RegisterAudioFile(audioPath);
+        var confirmations = 0;
+        viewModel.ConfirmAction = (_, _) =>
+        {
+            confirmations++;
+            return true;
+        };
+
+        viewModel.DeleteJobCommand.Execute(job);
+        for (var i = 0; i < 20 && viewModel.DeletedJobs.Count == 0; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
+        }
+
+        Assert.Empty(viewModel.Jobs);
+        var deleted = Assert.Single(viewModel.DeletedJobs);
+        Assert.True(deleted.IsDeleted);
+        Assert.StartsWith("履歴 1 件 / ", viewModel.DeletedJobCountSummary, StringComparison.Ordinal);
+
+        viewModel.RestoreJobCommand.Execute(deleted);
+        for (var i = 0; i < 20 && viewModel.Jobs.Count == 0; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
+        }
+
+        Assert.Empty(viewModel.DeletedJobs);
+        Assert.Single(viewModel.Jobs);
+        Assert.Equal(job.JobId, viewModel.SelectedJob?.JobId);
+        Assert.Equal(1, confirmations);
+    }
+
+    [Fact]
+    public async Task DeleteJobCommand_CancelledConfirmationDoesNotMoveJob()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+        var job = viewModel.RegisterAudioFile(audioPath);
+        viewModel.ConfirmAction = (_, _) => false;
+
+        viewModel.DeleteJobCommand.Execute(job);
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+        Assert.Single(viewModel.Jobs);
+        Assert.Empty(viewModel.DeletedJobs);
+    }
+
+    [Fact]
+    public async Task DeleteJobCommand_UpdatesDeletedHistoryStorageSummary()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+        var job = viewModel.RegisterAudioFile(audioPath);
+        var jobDirectory = Path.Combine(viewModel.Paths.Jobs, job.JobId);
+        Directory.CreateDirectory(jobDirectory);
+        File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");
+        viewModel.ConfirmAction = (_, _) => true;
+
+        viewModel.DeleteJobCommand.Execute(job);
+        for (var i = 0; i < 20 && viewModel.DeletedJobs.Count == 0; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(50));
+        }
+
+        var deleted = Assert.Single(viewModel.DeletedJobs);
+        Assert.True(deleted.StorageBytes >= "artifact".Length);
+        Assert.False(viewModel.DeletedJobCountSummary.EndsWith("/ 0 B", StringComparison.Ordinal), viewModel.DeletedJobCountSummary);
+    }
+
+    [Fact]
     public void StageStatuses_StartWithReadablePendingStatus()
     {
         var viewModel = CreateViewModel();

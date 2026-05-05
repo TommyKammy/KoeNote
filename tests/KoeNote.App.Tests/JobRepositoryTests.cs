@@ -217,4 +217,139 @@ public sealed class JobRepositoryTests
         Assert.False(reader.Read());
         Assert.Equal(0, job.UnreviewedDrafts);
     }
+
+    [Fact]
+    public void DeleteJob_MovesJobToDeletedHistoryWithoutDeletingRelatedRows()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+
+        repository.DeleteJob(job.JobId);
+
+        Assert.Empty(repository.LoadRecent());
+        var deleted = Assert.Single(repository.LoadDeleted());
+        Assert.Equal(job.JobId, deleted.JobId);
+        Assert.True(deleted.IsDeleted);
+        Assert.NotNull(deleted.DeletedAt);
+        Assert.Equal("manual", deleted.DeleteReason);
+
+        using var connection = fixture.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM transcript_segments WHERE job_id = $job_id;";
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+        Assert.Equal(1, Convert.ToInt32(command.ExecuteScalar()));
+    }
+
+    [Fact]
+    public void RestoreJob_ReturnsDeletedJobToRecentList()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        repository.DeleteJob(job.JobId);
+        repository.RestoreJob(job.JobId);
+
+        var restored = Assert.Single(repository.LoadRecent());
+        Assert.Equal(job.JobId, restored.JobId);
+        Assert.False(restored.IsDeleted);
+        Assert.Null(restored.DeletedAt);
+        Assert.Empty(repository.LoadDeleted());
+    }
+
+    [Fact]
+    public void PermanentlyDeleteJob_RemovesDeletedJobRowsAndJobDirectory()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        var jobDirectory = Path.Combine(paths.Jobs, job.JobId);
+        Directory.CreateDirectory(jobDirectory);
+        File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        using (var setupConnection = fixture.Open())
+        using (var setupCommand = setupConnection.CreateCommand())
+        {
+            setupCommand.CommandText = """
+                INSERT INTO asr_runs (
+                    asr_run_id,
+                    job_id,
+                    engine_id,
+                    model_id,
+                    status,
+                    created_at
+                )
+                VALUES (
+                    'asr-run-001',
+                    $job_id,
+                    'engine',
+                    'model',
+                    'succeeded',
+                    $created_at
+                );
+                """;
+            setupCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            setupCommand.Parameters.AddWithValue("$created_at", DateTimeOffset.Now.ToString("o"));
+            setupCommand.ExecuteNonQuery();
+        }
+
+        repository.DeleteJob(job.JobId);
+        repository.PermanentlyDeleteJob(job.JobId);
+
+        Assert.Empty(repository.LoadRecent());
+        Assert.Empty(repository.LoadDeleted());
+        Assert.False(Directory.Exists(jobDirectory));
+
+        using var connection = fixture.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                (SELECT COUNT(*) FROM jobs WHERE job_id = $job_id),
+                (SELECT COUNT(*) FROM asr_runs WHERE job_id = $job_id);
+            """;
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(0, reader.GetInt32(0));
+        Assert.Equal(0, reader.GetInt32(1));
+    }
+
+    [Fact]
+    public void PermanentlyDeleteJob_DoesNotRemoveActiveJob()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        repository.PermanentlyDeleteJob(job.JobId);
+
+        var active = Assert.Single(repository.LoadRecent());
+        Assert.Equal(job.JobId, active.JobId);
+        Assert.Empty(repository.LoadDeleted());
+    }
+
+    [Fact]
+    public void LoadDeleted_IncludesJobDirectoryStorageSize()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        var jobDirectory = Path.Combine(paths.Jobs, job.JobId);
+        Directory.CreateDirectory(jobDirectory);
+        File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");
+
+        repository.DeleteJob(job.JobId);
+
+        var deleted = Assert.Single(repository.LoadDeleted());
+        Assert.True(deleted.StorageBytes >= "artifact".Length);
+        Assert.NotEqual("0 B", deleted.StorageSizeDisplay);
+    }
 }

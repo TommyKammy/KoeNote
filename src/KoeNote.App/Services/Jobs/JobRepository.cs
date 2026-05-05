@@ -9,6 +9,17 @@ public sealed class JobRepository(AppPaths paths)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
         NormalizeReviewCompletedJobs(connection);
+        return LoadJobs(connection, paths, isDeleted: false, limit);
+    }
+
+    public IReadOnlyList<JobSummary> LoadDeleted(int limit = 200)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        return LoadJobs(connection, paths, isDeleted: true, limit);
+    }
+
+    private static IReadOnlyList<JobSummary> LoadJobs(Microsoft.Data.Sqlite.SqliteConnection connection, AppPaths paths, bool isDeleted, int limit)
+    {
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -20,11 +31,16 @@ public sealed class JobRepository(AppPaths paths)
                 progress_percent,
                 unreviewed_draft_count,
                 created_at,
-                updated_at
+                updated_at,
+                is_deleted,
+                deleted_at,
+                delete_reason
             FROM jobs
+            WHERE is_deleted = $is_deleted
             ORDER BY updated_at DESC
             LIMIT $limit;
             """;
+        command.Parameters.AddWithValue("$is_deleted", isDeleted ? 1 : 0);
         command.Parameters.AddWithValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
@@ -44,10 +60,19 @@ public sealed class JobRepository(AppPaths paths)
                 reader.GetInt32(6),
                 updatedAt,
                 createdAt,
-                reader.IsDBNull(3) ? null : reader.GetString(3)));
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetInt32(9) != 0,
+                reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                isDeleted ? CalculateDirectorySize(Path.Combine(paths.Jobs, reader.GetString(0))) : 0));
         }
 
         return jobs;
+    }
+
+    public long GetJobStorageBytes(string jobId)
+    {
+        return CalculateDirectorySize(Path.Combine(paths.Jobs, jobId));
     }
 
     private static void NormalizeReviewCompletedJobs(Microsoft.Data.Sqlite.SqliteConnection connection)
@@ -67,6 +92,7 @@ public sealed class JobRepository(AppPaths paths)
                 unreviewed_draft_count = 0,
                 updated_at = $updated_at
             WHERE COALESCE((SELECT value FROM pending WHERE pending.job_id = jobs.job_id), 0) = 0
+                AND is_deleted = 0
                 AND unreviewed_draft_count = 0
                 AND (
                     current_stage = 'review_ready'
@@ -300,35 +326,119 @@ public sealed class JobRepository(AppPaths paths)
 
     public void DeleteJob(string jobId)
     {
-        using var connection = SqliteConnectionFactory.Open(paths);
-        using var transaction = connection.BeginTransaction();
-
-        foreach (var sql in DeleteStatements("WHERE job_id = $job_id"))
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = sql;
-            command.Parameters.AddWithValue("$job_id", jobId);
-            command.ExecuteNonQuery();
-        }
-
-        transaction.Commit();
-        DeleteJobDirectory(jobId);
+        SoftDeleteJob(jobId, "manual");
     }
 
     public void DeleteAllJobs()
     {
-        var jobIds = LoadRecent(int.MaxValue).Select(static job => job.JobId).ToArray();
+        SoftDeleteAllJobs("clear_all");
+    }
+
+    public void RestoreJob(string jobId)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET is_deleted = 0,
+                deleted_at = NULL,
+                delete_reason = '',
+                updated_at = $updated_at
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.ExecuteNonQuery();
+    }
+
+    public void PermanentlyDeleteJob(string jobId)
+    {
+        if (!IsDeletedJob(jobId))
+        {
+            return;
+        }
+
+        PermanentlyDeleteJobs([jobId]);
+    }
+
+    public void PermanentlyDeleteAllDeletedJobs()
+    {
+        var jobIds = LoadDeleted(int.MaxValue).Select(static job => job.JobId).ToArray();
+        PermanentlyDeleteJobs(jobIds);
+    }
+
+    private void SoftDeleteJob(string jobId, string reason)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET is_deleted = 1,
+                deleted_at = $deleted_at,
+                delete_reason = $delete_reason,
+                updated_at = $updated_at
+            WHERE job_id = $job_id;
+            """;
+        var now = DateTimeOffset.Now.ToString("o");
+        command.Parameters.AddWithValue("$deleted_at", now);
+        command.Parameters.AddWithValue("$delete_reason", reason);
+        command.Parameters.AddWithValue("$updated_at", now);
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.ExecuteNonQuery();
+    }
+
+    private bool IsDeletedJob(string jobId)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT 1
+            FROM jobs
+            WHERE job_id = $job_id AND is_deleted = 1;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        return command.ExecuteScalar() is not null;
+    }
+
+    private void SoftDeleteAllJobs(string reason)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET is_deleted = 1,
+                deleted_at = $deleted_at,
+                delete_reason = $delete_reason,
+                updated_at = $updated_at
+            WHERE is_deleted = 0;
+            """;
+        var now = DateTimeOffset.Now.ToString("o");
+        command.Parameters.AddWithValue("$deleted_at", now);
+        command.Parameters.AddWithValue("$delete_reason", reason);
+        command.Parameters.AddWithValue("$updated_at", now);
+        command.ExecuteNonQuery();
+    }
+
+    private void PermanentlyDeleteJobs(IReadOnlyCollection<string> jobIds)
+    {
+        if (jobIds.Count == 0)
+        {
+            return;
+        }
 
         using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
-        foreach (var sql in DeleteStatements(string.Empty))
+        foreach (var jobId in jobIds)
         {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = sql;
-            command.ExecuteNonQuery();
+            foreach (var sql in DeleteStatements("WHERE job_id = $job_id"))
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                command.Parameters.AddWithValue("$job_id", jobId);
+                command.ExecuteNonQuery();
+            }
         }
 
         transaction.Commit();
@@ -350,7 +460,44 @@ public sealed class JobRepository(AppPaths paths)
         yield return $"DELETE FROM transcript_segments{suffix};";
         yield return $"DELETE FROM stage_progress{suffix};";
         yield return $"DELETE FROM job_log_events{suffix};";
+        yield return $"DELETE FROM asr_runs{suffix};";
         yield return $"DELETE FROM jobs{suffix};";
+    }
+
+    private static long CalculateDirectorySize(string directory)
+    {
+        if (!Directory.Exists(directory))
+        {
+            return 0;
+        }
+
+        try
+        {
+            return Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+                .Sum(static file =>
+                {
+                    try
+                    {
+                        return new FileInfo(file).Length;
+                    }
+                    catch (IOException)
+                    {
+                        return 0;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        return 0;
+                    }
+                });
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return 0;
+        }
     }
 
     private void DeleteJobDirectory(string jobId)
