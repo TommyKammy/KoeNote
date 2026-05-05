@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+      Name="$(var.ProductName)"
+      Manufacturer="$(var.Publisher)"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="$(var.UpgradeCode)"
+      Scope="perUser"
+      Language="1041">
+
+    <SummaryInformation Description="$(var.ProductName) lightweight MSI installer" Manufacturer="$(var.Publisher)" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPPRODUCTICON" Value="KoeNoteIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/" />
+    <Icon Id="KoeNoteIcon" SourceFile="$(var.PayloadDir)\KoeNote.App.exe" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="LocalProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="$(var.InstallFolderName)" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="$(var.StartMenuFolderName)" />
+    </StandardDirectory>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcutComponent" Guid="$(var.ShortcutComponentGuid)">
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Name="$(var.ProductName)"
+                  Description="$(var.ProductName)"
+                  Target="[INSTALLFOLDER]KoeNote.App.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="CleanupStartMenuShortcut"
+                  Name="$(var.ProductName) Cleanup"
+                  Description="Remove optional $(var.ProductName) models, logs, jobs, and setup data"
+                  Target="[INSTALLFOLDER]KoeNoteCleanup.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveLocalProgramsFolder" Directory="LocalProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="$(var.ProductRegistryKey)"
+                       Name="Installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="ArpMetadataComponent" Guid="$(var.ArpMetadataComponentGuid)">
+        <RegistryValue Root="HKMU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="InstallLocation"
+                       Type="string"
+                       Value="[INSTALLFOLDER]" />
+        <RegistryValue Root="HKMU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="DisplayIcon"
+                       Type="string"
+                       Value="[INSTALLFOLDER]KoeNote.App.exe" />
+        <RegistryValue Root="HKMU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="QuietUninstallString"
+                       Type="string"
+                       Value="MsiExec.exe /X[ProductCode] /qn"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <CustomAction Id="RunKoeNoteCleanupUi"
+                  FileRef="KoeNoteCleanupExe"
+                  ExeCommand="$(var.CleanupUiCommand)"
+                  Execute="immediate"
+                  Return="ignore" />
+    <CustomAction Id="RunKoeNoteCleanupQuiet"
+                  FileRef="KoeNoteCleanupExe"
+                  ExeCommand="$(var.CleanupQuietCommand)"
+                  Execute="immediate"
+                  Return="ignore" />
+    <CustomAction Id="SetArpMetadata"
+                  FileRef="KoeNoteCleanupExe"
+                  ExeCommand="--set-arp-metadata &quot;[ProductCode]&quot; &quot;[INSTALLFOLDER]&quot; &quot;[INSTALLFOLDER]KoeNote.App.exe&quot;"
+                  Execute="immediate"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="SetArpMetadata" After="InstallFinalize" Condition="NOT REMOVE" />
+      <Custom Action="RunKoeNoteCleanupUi" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &gt; 3" />
+      <Custom Action="RunKoeNoteCleanupQuiet" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3" />
+    </InstallExecuteSequence>
+
+    <Feature Id="MainFeature" Title="KoeNote" Level="1">
+      <ComponentGroupRef Id="PayloadComponents" />
+      <ComponentRef Id="ApplicationShortcutComponent" />
+      <ComponentRef Id="ArpMetadataComponent" />
+    </Feature>
+  </Package>
+</Wix>

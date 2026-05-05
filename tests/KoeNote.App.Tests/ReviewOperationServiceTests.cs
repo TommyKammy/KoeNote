@@ -53,6 +53,35 @@ public sealed class ReviewOperationServiceTests
     }
 
     [Fact]
+    public void AcceptDraft_ReplacesOnlyOneOccurrenceInsideSegment()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "alpha beta alpha")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft(
+                "draft-001",
+                "job-001",
+                "segment-001",
+                "wording",
+                "alpha",
+                "ALPHA",
+                "suggestion",
+                0.75)
+        ]);
+
+        var result = new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        Assert.Equal("ALPHA beta alpha", result.FinalText);
+        AssertDraftDecision(paths, "draft-001", "accepted", "accepted", "ALPHA beta alpha", expectedNote: null);
+        AssertSegment(paths, finalText: "ALPHA beta alpha", reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
     public void RejectDraft_LeavesFinalTextUnsetAndRecordsDecision()
     {
         var paths = CreatePaths();

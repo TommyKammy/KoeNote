@@ -8,6 +8,7 @@
                 <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+
             <StackPanel>
                 <TextBlock Text="ASR" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
                 <TextBlock Text="エンジン" Style="{StaticResource MutedText}" />
@@ -17,12 +18,14 @@
                           DisplayMemberPath="DisplayName"
                           MinHeight="30"
                           Margin="0,4,0,10" />
+
                 <TextBlock Text="コンテキスト" Style="{StaticResource MutedText}" />
                 <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          MinHeight="78"
                          Margin="0,4,0,10" />
+
                 <TextBlock Text="ホットワード" Style="{StaticResource MutedText}" />
                 <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
@@ -30,22 +33,37 @@
                          MinHeight="58"
                          Margin="0,4,0,0" />
             </StackPanel>
+
             <StackPanel Grid.Column="2">
                 <TextBlock Text="実行環境" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
                 <TextBlock Text="{Binding FirstRunSummary}" FontWeight="SemiBold" Margin="0,0,0,4" />
                 <TextBlock Text="{Binding FirstRunDetail}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,10" />
+
                 <TextBlock Text="保存先" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding StoragePath}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,10" />
+
                 <TextBlock Text="データベース" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding DatabaseMaintenanceSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
-                <Button Content="DBを最適化"
-                        Command="{Binding RunDatabaseMaintenanceCommand}"
-                        MinHeight="30"
+                <Button Command="{Binding RunDatabaseMaintenanceCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinHeight="34"
                         HorizontalAlignment="Left"
-                        Padding="12,4"
-                        Margin="0,0,0,10" />
+                        Padding="14,6"
+                        Margin="0,0,0,12"
+                        ToolTip="SQLite データベースを VACUUM / ANALYZE で最適化します">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE777;"
+                                   Style="{StaticResource IconText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="DBを最適化"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+
                 <TextBlock Text="セットアップ" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding SetupStatusSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,14" />
+
                 <TextBlock Text="推敲" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
                 <CheckBox Content="推敲ステージを有効にする"
                           IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

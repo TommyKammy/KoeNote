@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <Resource Include="Resources\AppIcon.ico" />
+    <Resource Include="Resources\KoeNoteLogoMark.png" />
+    <Resource Include="Resources\KoeNoteTitle.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,8 +32,8 @@
              Link="scripts\diarization\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
-    <Content Include="..\..\tools\**\*"
-             Link="tools\%(RecursiveDir)%(Filename)%(Extension)"
+    <Content Include="..\..\tools\ffmpeg.exe"
+             Link="tools\ffmpeg.exe"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
     <Content Include="catalog\model-catalog.json"
@@ -42,5 +44,20 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
   </ItemGroup>
+
+  <Target Name="CopyLocalRuntimeTools" AfterTargets="Build">
+    <ItemGroup>
+      <AsrRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\asr\**\*"
+                      Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\asr')" />
+      <ReviewRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\review\**\*"
+                         Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\review')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AsrRuntimeTool)"
+          DestinationFiles="@(AsrRuntimeTool->'$(TargetDir)tools\asr\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ReviewRuntimeTool)"
+          DestinationFiles="@(ReviewRuntimeTool->'$(TargetDir)tools\review\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

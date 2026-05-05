@@ -8,6 +8,7 @@ public sealed class JobRepository(AppPaths paths)
     public IReadOnlyList<JobSummary> LoadRecent(int limit = 50)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
+        NormalizeReviewCompletedJobs(connection);
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -47,6 +48,33 @@ public sealed class JobRepository(AppPaths paths)
         }
 
         return jobs;
+    }
+
+    private static void NormalizeReviewCompletedJobs(Microsoft.Data.Sqlite.SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH pending(job_id, value) AS (
+                SELECT job_id, COUNT(*)
+                FROM correction_drafts
+                WHERE status = 'pending'
+                GROUP BY job_id
+            )
+            UPDATE jobs
+            SET status = 'レビュー完了',
+                current_stage = 'review_completed',
+                progress_percent = 100,
+                unreviewed_draft_count = 0,
+                updated_at = $updated_at
+            WHERE COALESCE((SELECT value FROM pending WHERE pending.job_id = jobs.job_id), 0) = 0
+                AND unreviewed_draft_count = 0
+                AND (
+                    current_stage = 'review_ready'
+                    OR status = '推敲候補なし'
+                );
+            """;
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.ExecuteNonQuery();
     }
 
     public JobSummary CreateFromAudio(string sourceAudioPath)
@@ -119,11 +147,17 @@ public sealed class JobRepository(AppPaths paths)
         string currentStage,
         int progressPercent,
         string? normalizedAudioPath,
-        string? errorCategory = null)
+        string? errorCategory = null,
+        int? unreviewedDraftCount = null)
     {
         job.Status = status;
         job.ProgressPercent = progressPercent;
         job.NormalizedAudioPath = normalizedAudioPath;
+        if (unreviewedDraftCount is not null)
+        {
+            job.UnreviewedDrafts = unreviewedDraftCount.Value;
+        }
+
         job.UpdatedAt = DateTimeOffset.Now;
 
         using var connection = SqliteConnectionFactory.Open(paths);
@@ -134,6 +168,7 @@ public sealed class JobRepository(AppPaths paths)
                 current_stage = $current_stage,
                 progress_percent = $progress_percent,
                 normalized_audio_path = $normalized_audio_path,
+                unreviewed_draft_count = COALESCE($unreviewed_draft_count, unreviewed_draft_count),
                 updated_at = $updated_at,
                 last_error_category = $last_error_category
             WHERE job_id = $job_id;
@@ -142,6 +177,7 @@ public sealed class JobRepository(AppPaths paths)
         command.Parameters.AddWithValue("$current_stage", currentStage);
         command.Parameters.AddWithValue("$progress_percent", progressPercent);
         command.Parameters.AddWithValue("$normalized_audio_path", (object?)normalizedAudioPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$unreviewed_draft_count", (object?)unreviewedDraftCount ?? DBNull.Value);
         command.Parameters.AddWithValue("$updated_at", job.UpdatedAt.ToString("o"));
         command.Parameters.AddWithValue("$last_error_category", (object?)errorCategory ?? DBNull.Value);
         command.Parameters.AddWithValue("$job_id", job.JobId);
@@ -185,12 +221,18 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkReviewSucceeded(JobSummary job, int draftCount)
     {
-        UpdatePreprocessResult(job, draftCount > 0 ? "レビュー待ち" : "推敲候補なし", "review_ready", 90, job.NormalizedAudioPath);
+        UpdatePreprocessResult(
+            job,
+            draftCount > 0 ? "レビュー待ち" : "レビュー完了",
+            draftCount > 0 ? "review_ready" : "review_completed",
+            draftCount > 0 ? 90 : 100,
+            job.NormalizedAudioPath,
+            unreviewedDraftCount: draftCount);
     }
 
     public void MarkReviewSkippedAndClearDrafts(JobSummary job)
     {
-        job.Status = "Review skipped";
+        job.Status = "レビュー完了";
         job.ProgressPercent = 100;
         job.UnreviewedDrafts = 0;
         job.UpdatedAt = DateTimeOffset.Now;

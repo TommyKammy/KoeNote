@@ -99,6 +99,25 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_ExistingDataSummary_DetectsReinstallReusableData()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Directory.CreateDirectory(Path.Combine(paths.Jobs, "job-1"));
+        Directory.CreateDirectory(Path.Combine(paths.UserModels, "asr", "model-1"));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels));
+        var wizard = CreateWizard(paths);
+
+        var summary = wizard.GetExistingDataSummary();
+
+        Assert.Contains(summary, item => item.Name == "setup state" && item.Exists);
+        Assert.Contains(summary, item => item.Name == "jobs database" && item.Exists);
+        Assert.Contains(summary, item => item.Name == "job folders" && item.Exists);
+        Assert.Contains(summary, item => item.Name == "user model storage" && item.Exists);
+    }
+
+    [Fact]
     public void SetupWizard_CompletesAfterVerifiedModelsAndSmokePass()
     {
         var paths = CreatePaths();

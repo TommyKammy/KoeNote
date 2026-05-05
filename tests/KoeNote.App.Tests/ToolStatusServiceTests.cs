@@ -15,10 +15,10 @@ public sealed class ToolStatusServiceTests
         var items = new ToolStatusService(paths).GetStatusItems();
 
         AssertMissing(items, "ffmpeg", paths.FfmpegPath);
-        AssertMissing(items, "crispasr", paths.CrispAsrPath);
+        AssertOptionalMissing(items, "crispasr", paths.CrispAsrPath);
         AssertMissing(items, "llama-completion", paths.LlamaCompletionPath);
-        AssertMissing(items, "ASR model", paths.VibeVoiceAsrModelPath);
-        AssertMissing(items, "Review model", paths.ReviewModelPath);
+        Assert.DoesNotContain(items, item => item.Name == "ASR model");
+        Assert.DoesNotContain(items, item => item.Name == "Review model");
     }
 
     [Fact]
@@ -31,15 +31,11 @@ public sealed class ToolStatusServiceTests
         Touch(paths.FfmpegPath);
         Touch(paths.CrispAsrPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.VibeVoiceAsrModelPath);
-        Touch(paths.ReviewModelPath);
 
         var items = new ToolStatusService(paths).GetStatusItems();
 
         AssertFound(items, "crispasr", paths.CrispAsrPath);
         AssertFound(items, "llama-completion", paths.LlamaCompletionPath);
-        AssertFound(items, "ASR model", paths.VibeVoiceAsrModelPath);
-        AssertFound(items, "Review model", paths.ReviewModelPath);
     }
 
     [Fact]
@@ -84,6 +80,14 @@ public sealed class ToolStatusServiceTests
         Assert.True(item.IsOk);
         Assert.Equal("Found", item.Value);
         Assert.Equal(expectedPath, item.Detail);
+    }
+
+    private static void AssertOptionalMissing(IReadOnlyList<Models.StatusItem> items, string name, string expectedPath)
+    {
+        var item = Assert.Single(items, item => item.Name == name);
+        Assert.True(item.IsOk);
+        Assert.Equal("Not installed yet", item.Value);
+        Assert.Contains(expectedPath, item.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void Touch(string path)

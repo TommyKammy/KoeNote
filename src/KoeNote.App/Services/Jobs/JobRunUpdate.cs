@@ -6,6 +6,7 @@ public sealed record JobRunUpdate(
     JobRunStage? Stage = null,
     JobRunStageState? StageState = null,
     int? ProgressPercent = null,
+    TimeSpan? Duration = null,
     string? ErrorCategory = null,
     string? LatestLog = null,
     bool RefreshJobViews = false,

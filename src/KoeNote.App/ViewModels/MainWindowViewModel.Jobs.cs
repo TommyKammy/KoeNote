@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Audio;
 using Microsoft.Win32;
 using System.Globalization;
 using System.IO;
@@ -136,6 +137,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedJobPlaybackPath));
         OnPropertyChanged(nameof(SelectedJobUpdatedAt));
         OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+        RefreshPlaybackWaveform();
         RefreshJobCommandStates();
         UpdatePlaybackCommandStates();
     }
@@ -219,6 +221,21 @@ public sealed partial class MainWindowViewModel
         if (PlayPauseAudioCommand is RelayCommand playPauseCommand)
         {
             playPauseCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RefreshPlaybackWaveform()
+    {
+        PlaybackWaveformSamples.Clear();
+        var audioPath = ResolveSelectedJobPlaybackPath();
+        if (audioPath is null)
+        {
+            return;
+        }
+
+        foreach (var peak in AudioWaveformReader.ReadPeaks(audioPath))
+        {
+            PlaybackWaveformSamples.Add(peak);
         }
     }
 

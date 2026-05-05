@@ -16,7 +16,7 @@ public sealed class JobRepositoryTests
         var repository = new JobRepository(paths);
         var sourcePath = Path.Combine(
             Path.GetTempPath(),
-            "これは非常に長い日本語ファイル名の会議録音サンプルです株式会社テスト開発定例2026年05月03日.m4a");
+            "これは非常に長い日本語ファイル名の会議録音サンプルです株式会社テスト開発室2026年05月03日.m4a");
 
         var job = repository.CreateFromAudio(sourcePath);
 
@@ -110,6 +110,45 @@ public sealed class JobRepositoryTests
         Assert.Equal("レビュー待ち", restored.Status);
         Assert.Equal(@"C:\audio\meeting.wav", restored.SourceAudioPath);
         Assert.Equal(90, restored.ProgressPercent);
+        Assert.Equal(2, restored.UnreviewedDrafts);
+    }
+
+    [Fact]
+    public void MarkReviewSucceeded_WithNoDrafts_CompletesJob()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkReviewSucceeded(created, draftCount: 0);
+
+        var restored = Assert.Single(repository.LoadRecent());
+
+        Assert.Equal("レビュー完了", restored.Status);
+        Assert.Equal(100, restored.ProgressPercent);
+        Assert.Equal(0, restored.UnreviewedDrafts);
+    }
+
+    [Fact]
+    public void LoadRecent_NormalizesLegacyNoCandidateReviewJob()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.UpdatePreprocessResult(
+            created,
+            "推敲候補なし",
+            "review_ready",
+            90,
+            created.NormalizedAudioPath,
+            unreviewedDraftCount: 0);
+
+        var restored = Assert.Single(repository.LoadRecent());
+
+        Assert.Equal("レビュー完了", restored.Status);
+        Assert.Equal(100, restored.ProgressPercent);
+        Assert.Equal(0, restored.UnreviewedDrafts);
     }
 
     [Fact]
@@ -154,6 +193,7 @@ public sealed class JobRepositoryTests
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
+                j.status,
                 j.current_stage,
                 j.progress_percent,
                 j.unreviewed_draft_count,
@@ -168,13 +208,13 @@ public sealed class JobRepositoryTests
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal("review_skipped", reader.GetString(0));
-        Assert.Equal(100, reader.GetInt32(1));
-        Assert.Equal(0, reader.GetInt32(2));
-        Assert.Equal("skipped", reader.GetString(3));
-        Assert.Equal("none", reader.GetString(4));
+        Assert.Equal("レビュー完了", reader.GetString(0));
+        Assert.Equal("review_skipped", reader.GetString(1));
+        Assert.Equal(100, reader.GetInt32(2));
+        Assert.Equal(0, reader.GetInt32(3));
+        Assert.Equal("skipped", reader.GetString(4));
+        Assert.Equal("none", reader.GetString(5));
         Assert.False(reader.Read());
         Assert.Equal(0, job.UnreviewedDrafts);
     }
-
 }

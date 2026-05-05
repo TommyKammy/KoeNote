@@ -18,7 +18,7 @@
     </Window.Resources>
     <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="104" />
+            <RowDefinition Height="48" />
             <RowDefinition Height="*" MinHeight="320" />
             <RowDefinition Height="8" />
             <RowDefinition Height="220" MinHeight="150" />

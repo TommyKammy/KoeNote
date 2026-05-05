@@ -46,6 +46,28 @@ internal sealed class SetupReadinessService(
             .ToArray();
     }
 
+    public IReadOnlyList<SetupExistingDataItem> GetExistingDataSummary()
+    {
+        var installedModels = File.Exists(paths.DatabasePath)
+            ? installedModelRepository.ListInstalledModels()
+                .Where(static model => File.Exists(model.FilePath) || Directory.Exists(model.FilePath))
+                .ToArray()
+            : [];
+        var jobCount = Directory.Exists(paths.Jobs)
+            ? Directory.EnumerateDirectories(paths.Jobs).Count()
+            : 0;
+
+        return
+        [
+            new("setup state", File.Exists(paths.SetupStatePath), paths.SetupStatePath),
+            new("jobs database", File.Exists(paths.DatabasePath), paths.DatabasePath),
+            new("job folders", jobCount > 0, $"{jobCount} folder(s) under {paths.Jobs}"),
+            new("registered models", installedModels.Length > 0, $"{installedModels.Length} model(s) recorded in installed_models"),
+            new("user model storage", Directory.Exists(paths.UserModels), paths.UserModels),
+            new("machine model storage", Directory.Exists(paths.MachineModels), paths.MachineModels)
+        ];
+    }
+
     public SetupSmokeResult RunSmokeCheck()
     {
         var state = stateService.Load();
@@ -146,6 +168,7 @@ internal sealed class SetupReadinessService(
             DateTimeOffset.Now,
             state,
             toolStatusService.GetStatusItems(),
+            GetExistingDataSummary(),
             GetSelectedInstalledModels(state),
             checks,
             state.IsCompleted || checks.All(static check => check.IsOk),

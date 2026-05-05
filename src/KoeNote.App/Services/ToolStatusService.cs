@@ -14,11 +14,9 @@ public sealed class ToolStatusService(AppPaths paths)
             CheckCommand("dotnet", "dotnet", "--version", required: false),
             CheckFile("ffmpeg", paths.FfmpegPath, required: true),
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: false),
-            CheckFile("crispasr", paths.CrispAsrPath, required: true),
+            CheckFile("crispasr", paths.CrispAsrPath, required: false),
             CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
             CheckDiarizationRuntime(required: false),
-            CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: true),
-            CheckFile("Review model", paths.ReviewModelPath, required: true),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),
             new("SQLite", paths.DatabasePath, File.Exists(paths.DatabasePath))
         ];

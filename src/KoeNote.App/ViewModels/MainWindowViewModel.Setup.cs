@@ -277,6 +277,12 @@ public sealed partial class MainWindowViewModel
             SetupModelAudits.Add(audit);
         }
 
+        SetupExistingData.Clear();
+        foreach (var item in _setupWizardService.GetExistingDataSummary())
+        {
+            SetupExistingData.Add(item);
+        }
+
         if (RunSelectedJobCommand is RelayCommand runCommand)
         {
             runCommand.RaiseCanExecuteChanged();

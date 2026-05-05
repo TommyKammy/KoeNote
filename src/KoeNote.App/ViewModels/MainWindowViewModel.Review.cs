@@ -18,7 +18,32 @@ public sealed partial class MainWindowViewModel
         }
 
         SelectedCorrectionDraft = ReviewQueue.FirstOrDefault();
+        RefreshManualReviewStageFromQueue();
         UpdateReviewCommandStates();
+    }
+
+    private void RefreshManualReviewStageFromQueue()
+    {
+        if (SelectedJob is null)
+        {
+            ResetManualReviewStage();
+            return;
+        }
+
+        if (ReviewQueue.Count > 0)
+        {
+            MarkManualReviewStageWaiting(ReviewQueue.Count);
+            return;
+        }
+
+        if (SelectedJob.ProgressPercent >= 100 &&
+            string.Equals(SelectedJob.Status, "レビュー完了", StringComparison.Ordinal))
+        {
+            MarkManualReviewStageCompleted();
+            return;
+        }
+
+        ResetManualReviewStage();
     }
 
     private void SelectFirstDraftForSegment(string segmentId)
@@ -190,6 +215,16 @@ public sealed partial class MainWindowViewModel
         if (SelectedJob is not null && SelectedJob.JobId == result.JobId)
         {
             SelectedJob.UnreviewedDrafts = result.PendingDraftCount;
+            if (result.PendingDraftCount == 0)
+            {
+                SelectedJob.Status = "レビュー完了";
+                SelectedJob.ProgressPercent = 100;
+                MarkManualReviewStageCompleted();
+            }
+            else
+            {
+                MarkManualReviewStageWaiting(result.PendingDraftCount);
+            }
         }
 
         RefreshJobViews();

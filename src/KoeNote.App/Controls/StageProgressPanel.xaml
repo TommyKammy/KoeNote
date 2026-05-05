@@ -5,6 +5,9 @@
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="処理ステージ" Style="{StaticResource SectionTitle}" />
                     <ItemsControl ItemsSource="{Binding StageStatuses}">
+                        <ItemsControl.Resources>
+                            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+                        </ItemsControl.Resources>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Rows="1" />
@@ -16,41 +19,45 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <Grid Height="48">
-                                        <Border Height="2" Background="{StaticResource BorderBrushSoft}" VerticalAlignment="Center" Margin="0" />
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0"
+                                                Height="2"
+                                                Background="{StaticResource BorderBrushSoft}"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding ShowConnectorBefore, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <Border Grid.Column="2"
+                                                Height="2"
+                                                Background="{StaticResource BorderBrushSoft}"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding ShowConnectorAfter, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Border HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
+                                                VerticalAlignment="Center"
+                                                Grid.Column="1">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="CornerRadius" Value="20" />
                                                     <Setter Property="Width" Value="40" />
                                                     <Setter Property="Height" Value="40" />
-                                                    <Setter Property="BorderThickness" Value="2" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+                                                    <Setter Property="BorderThickness" Value="1.5" />
+                                                    <Setter Property="BorderBrush" Value="#E5E7EB" />
                                                     <Setter Property="Background" Value="#FFFFFF" />
-                                                    <Setter Property="Opacity" Value="0.72" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
+                                                        <DataTrigger Binding="{Binding IsDone}" Value="True">
                                                             <Setter Property="Background" Value="{Binding IconStroke}" />
                                                             <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
-                                                            <Setter Property="Opacity" Value="1" />
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
+                                                        <DataTrigger Binding="{Binding IsDoing}" Value="True">
                                                             <Setter Property="Background" Value="{Binding IconSoftBackground}" />
                                                             <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
-                                                            <Setter Property="Opacity" Value="1" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
-                                                            <Setter Property="Background" Value="{Binding IconSoftBackground}" />
-                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
-                                                            <Setter Property="Opacity" Value="1" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
-                                                            <Setter Property="Background" Value="{Binding IconSoftBackground}" />
-                                                            <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
-                                                            <Setter Property="Opacity" Value="1" />
+                                                            <Setter Property="BorderThickness" Value="2.5" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -62,9 +69,9 @@
                                                 <Border Margin="4"
                                                         CornerRadius="16"
                                                         BorderThickness="1"
-                                                        BorderBrush="#33FFFFFF"
-                                                        Background="#22FFFFFF" />
-                                                <Viewbox Width="22" Height="22" Stretch="Uniform"
+                                                        BorderBrush="#24FFFFFF"
+                                                        Background="#18FFFFFF" />
+                                                <Viewbox Width="21" Height="21" Stretch="Uniform"
                                                          HorizontalAlignment="Center"
                                                          VerticalAlignment="Center">
                                                     <Grid Width="24" Height="24">
@@ -78,20 +85,15 @@
                                                               VerticalAlignment="Center">
                                                             <Path.Style>
                                                                 <Style TargetType="Path">
-                                                                    <Setter Property="Stroke" Value="{Binding IconStroke}" />
-                                                                    <Setter Property="Opacity" Value="0.75" />
+                                                                    <Setter Property="Stroke" Value="#CBD5E1" />
+                                                                    <Setter Property="Opacity" Value="0.72" />
                                                                     <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="100">
+                                                                        <DataTrigger Binding="{Binding IsDone}" Value="True">
                                                                             <Setter Property="Stroke" Value="#FFFFFF" />
                                                                             <Setter Property="Opacity" Value="1" />
                                                                         </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="10">
-                                                                            <Setter Property="Opacity" Value="1" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="45">
-                                                                            <Setter Property="Opacity" Value="1" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding ProgressPercent}" Value="82">
+                                                                        <DataTrigger Binding="{Binding IsDoing}" Value="True">
+                                                                            <Setter Property="Stroke" Value="{Binding IconStroke}" />
                                                                             <Setter Property="Opacity" Value="1" />
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
@@ -103,8 +105,25 @@
                                             </Grid>
                                         </Border>
                                     </Grid>
-                                    <TextBlock Grid.Row="1" Text="{Binding Name}" TextAlignment="Center" FontSize="12" FontWeight="SemiBold" Margin="0,5,0,2" />
-                                    <TextBlock Grid.Row="2" Text="{Binding Status}" TextAlignment="Center" Style="{StaticResource MutedText}" />
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}"
+                                               TextAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="Bold"
+                                               Margin="0,6,0,2" />
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding Status}"
+                                               TextAlignment="Center"
+                                               Style="{StaticResource MutedText}"
+                                               FontSize="10.5"
+                                               FontWeight="Normal" />
+                                    <TextBlock Grid.Row="3"
+                                               Text="{Binding DurationText}"
+                                               TextAlignment="Center"
+                                               Foreground="#888888"
+                                               FontSize="10"
+                                               FontWeight="Light"
+                                               Margin="0,2,0,0" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

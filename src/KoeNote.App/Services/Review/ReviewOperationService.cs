@@ -120,9 +120,16 @@ public sealed class ReviewOperationService(AppPaths paths)
             return selectedText;
         }
 
-        return draft.CurrentSegmentText.Contains(draft.OriginalText, StringComparison.Ordinal)
-            ? draft.CurrentSegmentText.Replace(draft.OriginalText, selectedText, StringComparison.Ordinal)
-            : selectedText;
+        var index = draft.CurrentSegmentText.IndexOf(draft.OriginalText, StringComparison.Ordinal);
+        if (index < 0)
+        {
+            return selectedText;
+        }
+
+        return string.Concat(
+            draft.CurrentSegmentText.AsSpan(0, index),
+            selectedText,
+            draft.CurrentSegmentText.AsSpan(index + draft.OriginalText.Length));
     }
 
     private static void UpdateDraftStatus(SqliteConnection connection, SqliteTransaction transaction, string draftId, string status)
@@ -244,12 +251,25 @@ public sealed class ReviewOperationService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
+            WITH pending(value) AS (
+                SELECT COUNT(*)
+                FROM correction_drafts
+                WHERE job_id = $job_id AND status = 'pending'
+            )
             UPDATE jobs
-            SET unreviewed_draft_count = (
-                    SELECT COUNT(*)
-                    FROM correction_drafts
-                    WHERE job_id = $job_id AND status = 'pending'
-                ),
+            SET unreviewed_draft_count = (SELECT value FROM pending),
+                status = CASE
+                    WHEN (SELECT value FROM pending) = 0 THEN 'レビュー完了'
+                    ELSE status
+                END,
+                current_stage = CASE
+                    WHEN (SELECT value FROM pending) = 0 THEN 'review_completed'
+                    ELSE current_stage
+                END,
+                progress_percent = CASE
+                    WHEN (SELECT value FROM pending) = 0 THEN 100
+                    ELSE progress_percent
+                END,
                 updated_at = $updated_at
             WHERE job_id = $job_id;
             """;

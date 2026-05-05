@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/KoeNote.App/KoeNote.App.csproj" />
+    <Project Path="src/KoeNote.Cleanup/KoeNote.Cleanup.csproj" />
     <Project Path="src/KoeNote.EvalBench/KoeNote.EvalBench.csproj" />
   </Folder>
   <Folder Name="/tests/">

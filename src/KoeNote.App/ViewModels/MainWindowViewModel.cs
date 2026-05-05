@@ -69,6 +69,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private double _playbackPositionSeconds;
     private double _playbackDurationSeconds;
     private double _playbackRate = 1.0;
+    private double _playbackVolume = 1.0;
     private string _exportWarning = string.Empty;
     private string _lastExportFolder = string.Empty;
     private bool _includeExportTimestamps = true;
@@ -256,8 +257,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public AppPaths Paths { get; }
 
-    public string AppMode => "Offline";
-
     public string GpuSummary => EnvironmentStatus.FirstOrDefault(item => item.Name == "nvidia-smi")?.Detail ?? "Unknown";
 
     public string AsrModel => AvailableAsrEngines
@@ -383,7 +382,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SetupModelAudit> SetupModelAudits { get; } = [];
 
+    public ObservableCollection<SetupExistingDataItem> SetupExistingData { get; } = [];
+
     public ObservableCollection<double> PlaybackRates { get; } = [1.0, 1.25, 1.5, 2.0];
+
+    public ObservableCollection<double> PlaybackWaveformSamples { get; } = [];
 
     public ObservableCollection<string> SpeakerFilters { get; } = ["全話者"];
 
@@ -508,6 +511,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobPlaybackPath));
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+                RefreshPlaybackWaveform();
                 StopAudioPlayback();
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
@@ -938,6 +942,26 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             _audioPlaybackService.SetPlaybackRate(_playbackRate);
         }
     }
+
+    public double PlaybackVolume
+    {
+        get => _playbackVolume;
+        set
+        {
+            var nextValue = Math.Clamp(value, 0, 1);
+            if (Math.Abs(_playbackVolume - nextValue) < 0.001)
+            {
+                return;
+            }
+
+            _playbackVolume = nextValue;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PlaybackVolumeIcon));
+            _audioPlaybackService.SetVolume(_playbackVolume);
+        }
+    }
+
+    public string PlaybackVolumeIcon => PlaybackVolume <= 0.001 ? "\uE74F" : "\uE767";
 
     public string PlaybackTimeDisplay =>
         $"{FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackPositionSeconds))} / {FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackDurationSeconds))}";

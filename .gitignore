@@ -85,6 +85,9 @@ data/private/
 *.review.json
 *.raw.json
 
+# Generated WiX payload manifest
+src/KoeNote.Installer/PayloadFiles.wxs
+
 # OS files
 Thumbs.db
 ehthumbs.db

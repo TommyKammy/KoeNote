@@ -23,6 +23,8 @@ public interface IAudioPlaybackService
 
     void SetPlaybackRate(double rate);
 
+    void SetVolume(double volume);
+
     void Stop();
 }
 
@@ -99,6 +101,12 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
     public void SetPlaybackRate(double rate)
     {
         _player.SpeedRatio = rate > 0 ? rate : 1.0;
+    }
+
+    public void SetVolume(double volume)
+    {
+        _player.Volume = Math.Clamp(volume, 0, 1);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Stop()

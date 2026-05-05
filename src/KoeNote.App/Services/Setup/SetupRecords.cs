@@ -63,10 +63,16 @@ public sealed record SetupModelAudit(
     bool LicenseKnown,
     string LicenseDetail);
 
+public sealed record SetupExistingDataItem(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("exists")] bool Exists,
+    [property: JsonPropertyName("detail")] string Detail);
+
 public sealed record SetupReport(
     [property: JsonPropertyName("generated_at")] DateTimeOffset GeneratedAt,
     [property: JsonPropertyName("setup_state")] SetupState SetupState,
     [property: JsonPropertyName("environment")] IReadOnlyList<StatusItem> Environment,
+    [property: JsonPropertyName("existing_data")] IReadOnlyList<SetupExistingDataItem> ExistingData,
     [property: JsonPropertyName("selected_models")] IReadOnlyList<InstalledModel> SelectedModels,
     [property: JsonPropertyName("checks")] IReadOnlyList<SetupSmokeCheck> Checks,
     [property: JsonPropertyName("is_complete")] bool IsComplete,

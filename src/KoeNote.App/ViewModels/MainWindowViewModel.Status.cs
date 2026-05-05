@@ -32,7 +32,8 @@ public sealed partial class MainWindowViewModel
             "音声変換",
             "M4,12 C5.1,12 5.1,7 6.2,7 C7.4,7 7.3,17 8.5,17 C9.7,17 9.7,9 10.9,9 C12.1,9 12.1,15 13.3,15 C14.5,15 14.5,10 15.7,10 C16.9,10 16.9,14 18.1,14 C19.1,14 19.3,12 20,12 M4,5 L7,5 M5.5,3.5 L5.5,6.5 M17,5 L20,5 M18.5,3.5 L18.5,6.5",
             "#2F8F5B",
-            "#EAF6EF");
+            "#EAF6EF",
+            showConnectorBefore: false);
 
         yield return new StageStatus(
             "ASR",
@@ -50,12 +51,7 @@ public sealed partial class MainWindowViewModel
             "レビュー",
             "M6,3.5 L15,3.5 L19,7.5 L19,20.5 L6,20.5 Z M15,3.5 L15,7.5 L19,7.5 M8.5,13 L11,15.5 L15.8,10.7 M8.5,18 L15.5,18",
             "#D97706",
-            "#FEF3C7");
-
-        yield return new StageStatus(
-            "出力",
-            "M5,5 L13.5,5 M13.5,5 L13.5,9.5 M13.5,5 L4.5,14 M8,10 L8,20 L20,20 L20,8 L16,8 M13,15 L17,15 M17,15 L15,13 M17,15 L15,17",
-            "#0F766E",
-            "#CCFBF1");
+            "#FEF3C7",
+            showConnectorAfter: false);
     }
 }

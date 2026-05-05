@@ -45,6 +45,14 @@ public sealed partial class MainWindowViewModel
             var stageStatus = GetStageStatus(stage);
             stageStatus.Status = GetStageStatusText(state, update.ErrorCategory);
             stageStatus.ProgressPercent = progressPercent;
+            if (state == JobRunStageState.Running)
+            {
+                stageStatus.DurationText = "00:00:00";
+            }
+            else if (update.Duration is { } duration)
+            {
+                stageStatus.DurationText = FormatStageDuration(duration);
+            }
         }
 
         if (update.Segments is not null)
@@ -61,6 +69,7 @@ public sealed partial class MainWindowViewModel
             ReviewQueue.Clear();
             SelectedCorrectionDraft = null;
             ClearReviewPreview();
+            MarkManualReviewStageCompleted();
             UpdateReviewCommandStates();
         }
 
@@ -100,13 +109,23 @@ public sealed partial class MainWindowViewModel
 
         return state switch
         {
-            JobRunStageState.Running => "実行中",
+            JobRunStageState.Running => "進行中",
             JobRunStageState.Succeeded => "完了",
             JobRunStageState.Cancelled => "中止",
             JobRunStageState.Failed when !string.IsNullOrWhiteSpace(errorCategory) => $"失敗: {errorCategory}",
             JobRunStageState.Failed => "失敗",
             _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
         };
+    }
+
+    private static string FormatStageDuration(TimeSpan duration)
+    {
+        if (duration < TimeSpan.Zero)
+        {
+            duration = TimeSpan.Zero;
+        }
+
+        return duration.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private void ReplaceSegments(IReadOnlyList<TranscriptSegment> segments)
@@ -143,12 +162,38 @@ public sealed partial class MainWindowViewModel
 
         if (ReviewQueue.Count == 0)
         {
+            MarkManualReviewStageCompleted();
             ClearReviewPreview();
             UpdateReviewCommandStates();
             return;
         }
 
+        MarkManualReviewStageWaiting(ReviewQueue.Count);
         SelectedCorrectionDraft = ReviewQueue[0];
         UpdateSegmentReviewStates(drafts);
+    }
+
+    private void MarkManualReviewStageWaiting(int pendingCount)
+    {
+        var stage = StageStatuses[3];
+        stage.Status = $"確認待ち {pendingCount}";
+        stage.ProgressPercent = 0;
+        stage.DurationText = "00:00:00";
+    }
+
+    private void MarkManualReviewStageCompleted()
+    {
+        var stage = StageStatuses[3];
+        stage.Status = "完了";
+        stage.ProgressPercent = 100;
+        stage.DurationText = "00:00:00";
+    }
+
+    private void ResetManualReviewStage()
+    {
+        var stage = StageStatuses[3];
+        stage.Status = "未開始";
+        stage.ProgressPercent = 0;
+        stage.DurationText = "00:00:00";
     }
 }

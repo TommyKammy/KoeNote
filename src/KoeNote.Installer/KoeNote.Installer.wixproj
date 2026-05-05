@@ -1,0 +1,26 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputName>KoeNote</OutputName>
+    <OutputType>Package</OutputType>
+    <ProductName Condition="'$(ProductName)' == ''">KoeNote</ProductName>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.13.0</ProductVersion>
+    <Publisher Condition="'$(Publisher)' == ''">KoeNote Project</Publisher>
+    <UpgradeCode Condition="'$(UpgradeCode)' == ''">{C73B4C12-0F3B-4B7A-8F4C-43D1C8C5EB1D}</UpgradeCode>
+    <InstallFolderName Condition="'$(InstallFolderName)' == ''">KoeNote</InstallFolderName>
+    <StartMenuFolderName Condition="'$(StartMenuFolderName)' == ''">KoeNote</StartMenuFolderName>
+    <ShortcutComponentGuid Condition="'$(ShortcutComponentGuid)' == ''">{4CC8E09B-7104-4D95-A5D3-3682E68BD080}</ShortcutComponentGuid>
+    <ArpMetadataComponentGuid Condition="'$(ArpMetadataComponentGuid)' == ''">{39818D14-4A4F-4B12-A29D-67E13FC97FD3}</ArpMetadataComponentGuid>
+    <ProductRegistryKey Condition="'$(ProductRegistryKey)' == ''">Software\KoeNote\KoeNote</ProductRegistryKey>
+    <CleanupUiCommand Condition="'$(CleanupUiCommand)' == ''"></CleanupUiCommand>
+    <CleanupQuietCommand Condition="'$(CleanupQuietCommand)' == ''">--quiet</CleanupQuietCommand>
+    <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\publish\KoeNote-win-x64\</PayloadDir>
+    <DefineConstants>ProductName=$(ProductName);ProductVersion=$(ProductVersion);Publisher=$(Publisher);UpgradeCode=$(UpgradeCode);InstallFolderName=$(InstallFolderName);StartMenuFolderName=$(StartMenuFolderName);ShortcutComponentGuid=$(ShortcutComponentGuid);ArpMetadataComponentGuid=$(ArpMetadataComponentGuid);ProductRegistryKey=$(ProductRegistryKey);CleanupUiCommand=$(CleanupUiCommand);CleanupQuietCommand=$(CleanupQuietCommand);PayloadDir=$(PayloadDir)</DefineConstants>
+    <SuppressIces>ICE91</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

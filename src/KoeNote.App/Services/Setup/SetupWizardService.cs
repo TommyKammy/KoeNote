@@ -126,6 +126,11 @@ public sealed class SetupWizardService
         return _readinessService.GetSelectedModelAudit();
     }
 
+    public IReadOnlyList<SetupExistingDataItem> GetExistingDataSummary()
+    {
+        return _readinessService.GetExistingDataSummary();
+    }
+
     public SetupState MoveNext()
     {
         var state = _stateService.Load();

@@ -104,6 +104,14 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void StageStatuses_StartWithReadablePendingStatus()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.All(viewModel.StageStatuses, stage => Assert.Equal("未開始", stage.Status));
+    }
+
+    [Fact]
     public void SegmentSearchAndSpeakerFilter_CombinePredicates()
     {
         var viewModel = CreateViewModel();
@@ -199,6 +207,19 @@ public sealed class MainWindowViewModelTests
         Assert.True(
             viewModel.SelectedJobUnreviewedDrafts == 1,
             $"Expected one pending draft but saw {viewModel.SelectedJobUnreviewedDrafts}. LatestLog: {viewModel.LatestLog}");
+
+        viewModel.AcceptDraftCommand.Execute(null);
+        for (var i = 0; i < 20 && viewModel.SelectedCorrectionDraftId == "draft-002"; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        Assert.Empty(viewModel.SelectedCorrectionDraftId);
+        Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
+        Assert.Equal("レビュー完了", viewModel.SelectedJob?.Status);
+        Assert.Equal(100, viewModel.SelectedJob?.ProgressPercent);
+        Assert.Equal("完了", viewModel.StageStatuses[3].Status);
+        Assert.Equal(100, viewModel.StageStatuses[3].ProgressPercent);
     }
 
     [Fact]
@@ -314,8 +335,9 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(paths);
 
         Assert.Contains("初回チェック:", viewModel.FirstRunSummary, StringComparison.Ordinal);
-        Assert.Contains("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
-        Assert.Contains(paths.VibeVoiceAsrModelPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("llama-completion", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.Contains(paths.LlamaCompletionPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.Contains("セットアップを開く / モデル導入へ", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.False(viewModel.RequiredRuntimeAssetsReady);
         Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));

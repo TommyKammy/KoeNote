@@ -36,6 +36,31 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
+                <TextBlock Text="再インストール時に再利用できるデータ"
+                           FontWeight="SemiBold"
+                           Foreground="#334155"
+                           Margin="0,0,0,8" />
+                <ListBox ItemsSource="{Binding SetupExistingData}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         MaxHeight="120"
+                         Margin="0,0,0,16">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="54" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Name}" Foreground="#334155" FontSize="12" />
+                                <TextBlock Grid.Column="1" Text="{Binding Exists}" Foreground="{StaticResource AccentBrush}" FontSize="12" />
+                                <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
                 <TextBlock Text="環境チェック"
                            FontWeight="SemiBold"
                            Foreground="#334155"

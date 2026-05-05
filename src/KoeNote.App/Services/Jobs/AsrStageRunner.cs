@@ -63,6 +63,7 @@ public sealed class AsrStageRunner(
                 JobRunStage.Asr,
                 JobRunStageState.Succeeded,
                 100,
+                result.Duration,
                 Segments: segments));
             stageProgressRepository.Upsert(
                 job.JobId,
@@ -82,7 +83,7 @@ public sealed class AsrStageRunner(
         catch (OperationCanceledException)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Cancelled, 100));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Cancelled, 100, finishedAt - startedAt));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
@@ -101,7 +102,7 @@ public sealed class AsrStageRunner(
         catch (AsrWorkerException exception)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, exception.Category.ToString()));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, finishedAt - startedAt, exception.Category.ToString()));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
@@ -120,7 +121,7 @@ public sealed class AsrStageRunner(
         catch (Exception exception)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, AsrFailureCategory.Unknown.ToString()));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, finishedAt - startedAt, AsrFailureCategory.Unknown.ToString()));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",

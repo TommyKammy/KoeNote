@@ -21,7 +21,7 @@ public sealed class PreprocessStageRunner(
         try
         {
             var result = await audioPreprocessWorker.NormalizeAsync(job, paths.FfmpegPath, paths, cancellationToken);
-            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Succeeded, 100));
+            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Succeeded, 100, result.Duration));
             jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             report(new JobRunUpdate(RefreshJobViews: true, LatestLog: $"Generated normalized WAV: {result.NormalizedAudioPath}"));
             return result.NormalizedAudioPath;
