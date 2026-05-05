@@ -1,0 +1,48 @@
+<UserControl x:Class="KoeNote.App.Controls.TranscriptSegmentList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <Border DockPanel.Dock="Top"
+                Background="#FAFBFC"
+                BorderBrush="#E2E8F0"
+                BorderThickness="0,0,0,1"
+                Padding="12,8"
+                Margin="0,0,0,2">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92" />
+                    <ColumnDefinition Width="96" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="時間" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="1" Text="話者" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="発話内容" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+            </Grid>
+        </Border>
+
+        <ListBox x:Name="SegmentList"
+                 ItemsSource="{Binding FilteredSegments}"
+                 SelectedItem="{Binding SelectedSegment, Mode=TwoWay}"
+                 Style="{StaticResource CardListBox}"
+                 ItemContainerStyle="{StaticResource SegmentListBoxItem}">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Padding="12,17" Background="Transparent" BorderBrush="#EEF1F3" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="92" />
+                                <ColumnDefinition Width="96" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Start}" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Top" />
+                            <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="12" Padding="9,4" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
+                            </Border>
+                            <TextBlock Grid.Column="2" Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None" FontSize="14" LineHeight="22" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</UserControl>

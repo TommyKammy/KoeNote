@@ -95,9 +95,30 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Constructor_DoesNotInjectSampleSegments()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Empty(viewModel.Segments);
+        Assert.Empty(ViewItems<TranscriptSegmentPreview>(viewModel.FilteredSegments));
+    }
+
+    [Fact]
     public void SegmentSearchAndSpeakerFilter_CombinePredicates()
     {
         var viewModel = CreateViewModel();
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.810",
+            "Speaker_0",
+            "今日は会議の議事録を作成するために音声認識をテストしています。",
+            "候補なし"));
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:03:21.400",
+            "00:03:27.800",
+            "Speaker_1",
+            "この仕様はサーバーの右側で処理します。",
+            "候補なし"));
 
         viewModel.SegmentSearchText = "サーバー";
         viewModel.SelectedSpeakerFilter = "Speaker_1";

@@ -1,0 +1,160 @@
+<UserControl x:Class="KoeNote.App.Controls.SetupModelSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="#FFFFFF"
+            BorderBrush="{StaticResource BorderBrushSoft}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16"
+            Margin="0,0,0,14">
+        <StackPanel>
+            <TextBlock Text="モデル設定"
+                       Style="{StaticResource SectionTitle}"
+                       Margin="0,0,0,12" />
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="112" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="ASR"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding SetupAsrModelChoices}"
+                          SelectedItem="{Binding SelectedSetupAsrModel, Mode=TwoWay}"
+                          DisplayMemberPath="DisplayName"
+                          MinWidth="260"
+                          MinHeight="34" />
+                <Button Grid.Column="2"
+                        Command="{Binding SetupDownloadAsrCommand}"
+                        Padding="10,7"
+                        Margin="12,0,0,0">
+                    <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="112" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="話者識別"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SetupDiarizationRuntimeSummary}"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding SetupDiarizationRuntimeSummary}" />
+                <Button Grid.Column="2"
+                        Command="{Binding SetupInstallDiarizationRuntimeCommand}"
+                        Padding="10,7"
+                        Margin="12,0,0,0">
+                    <TextBlock Text="追加導入" FontSize="12" FontWeight="SemiBold" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="112" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="推敲 LLM"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding SetupReviewModelChoices}"
+                          SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
+                          DisplayMemberPath="DisplayName"
+                          MinWidth="260"
+                          MinHeight="34" />
+                <Button Grid.Column="2"
+                        Command="{Binding SetupDownloadReviewCommand}"
+                        Padding="10,7"
+                        Margin="12,0,0,0">
+                    <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="112" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="保存先"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SetupStorageRoot}"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding SetupStorageRoot}" />
+                <Button Grid.Column="2"
+                        Command="{Binding SetupChooseStorageRootCommand}"
+                        Padding="10,7"
+                        Margin="12,0,0,0">
+                    <TextBlock Text="変更" FontSize="12" />
+                </Button>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="120,0,0,14">
+                <Button Command="{Binding SetupAcceptLicensesCommand}"
+                        Padding="12,7"
+                        Margin="0,0,10,0">
+                    <TextBlock Text="ライセンスに同意" FontSize="12" />
+                </Button>
+                <Button Command="{Binding SetupRunSmokeCommand}"
+                        Padding="12,7">
+                    <TextBlock Text="最終確認を実行" FontSize="12" />
+                </Button>
+            </StackPanel>
+
+            <Border Background="#F8FAFC"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ModelDownloadProgressSummary}"
+                               Foreground="#64748B"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding ModelDownloadProgressText}"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="12"
+                               Margin="12,0,0,0" />
+                    <ProgressBar Grid.Row="1"
+                                 Grid.ColumnSpan="2"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ModelDownloadProgressPercent, Mode=OneWay}"
+                                 IsIndeterminate="{Binding IsModelDownloadProgressIndeterminate}"
+                                 Height="8"
+                                 Margin="0,10,0,0" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,4 +1,3 @@
-using System.Net.Http;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Audio;
@@ -42,142 +41,53 @@ public sealed record MainWindowServices(
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
 
-        var jobRepository = new JobRepository(paths);
-        var stageProgressRepository = new StageProgressRepository(paths);
-        var jobLogRepository = new JobLogRepository(paths);
-        var asrSettingsRepository = new AsrSettingsRepository(paths);
-        var correctionDraftRepository = new CorrectionDraftRepository(paths);
-        var reviewOperationService = new ReviewOperationService(paths);
-        var transcriptEditService = new TranscriptEditService(paths);
-        var correctionMemoryService = new CorrectionMemoryService(paths);
-        var transcriptExportService = new TranscriptExportService(paths);
-        var modelCatalogService = new ModelCatalogService(paths);
-        var installedModelRepository = new InstalledModelRepository(paths);
-        var modelDownloadJobRepository = new ModelDownloadJobRepository(paths);
-        var modelVerificationService = new ModelVerificationService();
-        var modelInstallService = new ModelInstallService(paths, installedModelRepository, modelVerificationService);
-        var modelLicenseViewer = new ModelLicenseViewer(modelCatalogService);
-        var modelPackImportService = new ModelPackImportService(paths, modelCatalogService, modelInstallService);
-        var modelDownloadService = new ModelDownloadService(
-            new HttpClient(),
-            modelDownloadJobRepository,
-            modelVerificationService,
-            modelInstallService);
-        var setupStateService = new SetupStateService(paths);
-        var toolStatusService = new ToolStatusService(paths);
-        var audioPlaybackService = new AudioPlaybackService();
-        var processRunner = new ExternalProcessRunner();
-        var diarizationRuntimeService = new DiarizationRuntimeService(paths, processRunner);
-        var setupWizardService = new SetupWizardService(
+        var repositories = MainWindowRepositoryComposition.Create(paths);
+        var runtime = MainWindowRuntimeComposition.Create(paths);
+        var model = MainWindowModelComposition.Create(paths);
+        var review = MainWindowReviewComposition.Create(paths);
+        var setupWizardService = MainWindowSetupComposition.Create(paths, runtime, model);
+        var workers = MainWindowWorkerComposition.Create(
+            runtime.ProcessRunner,
+            repositories,
+            review.CorrectionMemoryService);
+        var asrEngineRegistry = MainWindowAsrEngineComposition.Create(
             paths,
-            setupStateService,
-            toolStatusService,
-            modelCatalogService,
-            installedModelRepository,
-            modelInstallService,
-            modelPackImportService,
-            modelDownloadService,
-            diarizationRuntimeService);
-        var transcriptSegmentRepository = new TranscriptSegmentRepository(paths);
-        var audioPreprocessWorker = new AudioPreprocessWorker(processRunner, stageProgressRepository, jobLogRepository);
-        var asrResultStore = new AsrResultStore();
-        var asrWorker = new AsrWorker(
-            processRunner,
-            new AsrCommandBuilder(),
-            new AsrJsonNormalizer(),
-            asrResultStore,
-            transcriptSegmentRepository);
-        var reviewWorker = new ReviewWorker(
-            processRunner,
-            new ReviewCommandBuilder(),
-            new ReviewPromptBuilder(),
-            new ReviewJsonNormalizer(),
-            new ReviewResultStore(),
-            correctionDraftRepository,
-            correctionMemoryService);
-        var asrEngineRegistry = new AsrEngineRegistry([
-            new VibeVoiceCrispAsrEngine(asrWorker, new AsrRunRepository(paths)),
-            new ScriptedJsonAsrEngine(
-                "kotoba-whisper-v2.2-faster",
-                "kotoba-whisper v2.2 faster",
-                "faster-whisper",
-                processRunner,
-                new AsrJsonNormalizer(),
-                asrResultStore,
-                transcriptSegmentRepository,
-                new AsrRunRepository(paths)),
-            new ScriptedJsonAsrEngine(
-                "faster-whisper-large-v3-turbo",
-                "faster-whisper large-v3-turbo",
-                "faster-whisper",
-                processRunner,
-                new AsrJsonNormalizer(),
-                asrResultStore,
-                transcriptSegmentRepository,
-                new AsrRunRepository(paths)),
-            new ScriptedJsonAsrEngine(
-                "faster-whisper-large-v3",
-                "faster-whisper large-v3",
-                "faster-whisper",
-                processRunner,
-                new AsrJsonNormalizer(),
-                asrResultStore,
-                transcriptSegmentRepository,
-                new AsrRunRepository(paths)),
-            new ScriptedJsonAsrEngine(
-                "reazonspeech-k2-v3",
-                "ReazonSpeech v3 k2",
-                "reazonspeech-k2",
-                processRunner,
-                new AsrJsonNormalizer(),
-                asrResultStore,
-                transcriptSegmentRepository,
-                new AsrRunRepository(paths))
-        ]);
-        var diarizationService = new ScriptedDiarizationService(
+            runtime.ProcessRunner,
+            workers.AsrWorker,
+            workers.AsrResultStore,
+            repositories.TranscriptSegmentRepository);
+        var jobRunCoordinator = MainWindowJobRunComposition.Create(
             paths,
-            processRunner,
-            new DiarizationJsonNormalizer(),
-            new DiarizationSegmentAssigner(),
-            transcriptSegmentRepository,
-            asrResultStore);
-        var jobRunCoordinator = new JobRunCoordinator(
-            paths,
-            jobRepository,
-            stageProgressRepository,
-            jobLogRepository,
-            audioPreprocessWorker,
+            repositories,
+            model,
+            review,
+            workers,
             asrEngineRegistry,
-            installedModelRepository,
-            diarizationService,
-            reviewWorker,
-            correctionMemoryService);
-        var statusBarInfoService = new StatusBarInfoService(paths);
-        var databaseMaintenanceService = new DatabaseMaintenanceService(paths);
+            runtime.ProcessRunner);
 
         return new MainWindowServices(
-            jobRepository,
-            jobLogRepository,
-            asrSettingsRepository,
-            transcriptSegmentRepository,
+            repositories.JobRepository,
+            repositories.JobLogRepository,
+            repositories.AsrSettingsRepository,
+            repositories.TranscriptSegmentRepository,
             asrEngineRegistry,
             jobRunCoordinator,
-            correctionDraftRepository,
-            reviewOperationService,
-            transcriptEditService,
-            correctionMemoryService,
-            transcriptExportService,
-            modelCatalogService,
-            installedModelRepository,
-            modelDownloadJobRepository,
-            modelInstallService,
-            modelDownloadService,
-            modelLicenseViewer,
+            repositories.CorrectionDraftRepository,
+            review.ReviewOperationService,
+            review.TranscriptEditService,
+            review.CorrectionMemoryService,
+            review.TranscriptExportService,
+            model.ModelCatalogService,
+            model.InstalledModelRepository,
+            model.ModelDownloadJobRepository,
+            model.ModelInstallService,
+            model.ModelDownloadService,
+            model.ModelLicenseViewer,
             setupWizardService,
-            diarizationRuntimeService,
-            audioPlaybackService,
-            toolStatusService,
-            statusBarInfoService,
-            databaseMaintenanceService);
+            runtime.DiarizationRuntimeService,
+            runtime.AudioPlaybackService,
+            runtime.ToolStatusService,
+            runtime.StatusBarInfoService,
+            runtime.DatabaseMaintenanceService);
     }
 }

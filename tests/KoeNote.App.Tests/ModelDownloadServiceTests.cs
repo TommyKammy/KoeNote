@@ -140,6 +140,31 @@ public sealed class ModelDownloadServiceTests
     }
 
     [Fact]
+    public async Task DownloadAndInstallAsync_ReplacesPartialHuggingFaceFilesWithoutDoubleCountingProgress()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null) with
+        {
+            ModelId = "hf-repo-model",
+            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/org/repo-model", null)
+        };
+        var targetPath = Path.Combine(paths.UserModels, "asr", "repo-model");
+        var partialPath = $"{targetPath}.partial";
+        Directory.CreateDirectory(partialPath);
+        File.WriteAllText(Path.Combine(partialPath, "model.bin"), "mo");
+        var reports = new List<ModelDownloadProgress>();
+        var service = CreateService(paths, new HuggingFaceRepositoryHandler());
+
+        await service.DownloadAndInstallAsync(catalogItem, targetPath, new Progress<ModelDownloadProgress>(reports.Add));
+
+        Assert.True(Directory.Exists(targetPath));
+        Assert.DoesNotContain(reports, report => report.BytesTotal is { } total && report.BytesDownloaded > total);
+        var latest = new ModelDownloadJobRepository(paths).FindLatestForModel(catalogItem.ModelId);
+        Assert.Equal(11, latest?.BytesDownloaded);
+        Assert.Equal(11, latest?.BytesTotal);
+    }
+
+    [Fact]
     public async Task ResumeDownloadAndInstallAsync_ContinuesPartialFile()
     {
         var paths = CreatePaths();

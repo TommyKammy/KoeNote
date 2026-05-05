@@ -1,0 +1,383 @@
+using System.IO;
+using System.Net.Http;
+using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Models;
+
+namespace KoeNote.App.ViewModels;
+
+public sealed partial class MainWindowViewModel
+{
+    private Task ShowModelCatalogAsync()
+    {
+        OpenDetailPanel(3);
+        RefreshModelCatalog();
+        var installedCount = ModelCatalogEntries.Count(static entry => entry.IsInstalled);
+        LatestLog = $"Model catalog loaded: {ModelCatalogEntries.Count} entries, {installedCount} installed. Select a model in the Models tab for use/license/forget actions.";
+        return Task.CompletedTask;
+    }
+
+    private Task RegisterPreinstalledModelsAsync()
+    {
+        var catalog = _modelCatalogService.LoadBuiltInCatalog();
+        RegisterIfPresent(catalog, "vibevoice-asr-q4-k", Paths.VibeVoiceAsrModelPath, "preinstalled");
+        RegisterIfPresent(catalog, "llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath, "preinstalled");
+        RefreshModelCatalog();
+        LatestLog = "Preinstalled model scan completed.";
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(SelectedModelCatalogEntry, resumeDownloadId: null);
+    }
+
+    private Task PauseSelectedModelDownloadAsync()
+    {
+        var job = SelectedModelCatalogEntry?.LatestDownloadJob;
+        if (job is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _modelDownloadService.Pause(job.DownloadId);
+        CancelActiveModelDownloadFor(SelectedModelCatalogEntry);
+        RefreshModelCatalog();
+        LatestLog = $"Model download paused: {SelectedModelCatalogEntry?.DisplayName}";
+        return Task.CompletedTask;
+    }
+
+    private async Task ResumeSelectedModelDownloadAsync()
+    {
+        var entry = SelectedModelCatalogEntry;
+        var job = entry?.LatestDownloadJob;
+        if (entry is null || job is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(entry, job.DownloadId);
+    }
+
+    private Task CancelSelectedModelDownloadAsync()
+    {
+        var job = SelectedModelCatalogEntry?.LatestDownloadJob;
+        if (job is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _modelDownloadService.Cancel(job.DownloadId);
+        CancelActiveModelDownloadFor(SelectedModelCatalogEntry);
+        RefreshModelCatalog();
+        LatestLog = $"Model download cancelled: {SelectedModelCatalogEntry?.DisplayName}";
+        return Task.CompletedTask;
+    }
+
+    private async Task RetrySelectedModelDownloadAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return;
+        }
+
+        await DownloadModelAsync(SelectedModelCatalogEntry, resumeDownloadId: null);
+    }
+
+    private async Task DownloadModelAsync(ModelCatalogEntry entry, string? resumeDownloadId)
+    {
+        _modelDownloadCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _modelDownloadCancellation = cancellation;
+        _activeModelDownloadModelId = entry.ModelId;
+        BeginModelDownloadProgress(entry.DisplayName);
+        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            UpdateModelDownloadProgress(entry.DisplayName, downloadProgress);
+        });
+
+        try
+        {
+            LatestLog = $"Model download started: {entry.DisplayName}";
+            if (resumeDownloadId is null)
+            {
+                var targetPath = _modelInstallService.GetDefaultInstallPath(entry.CatalogItem);
+                await _modelDownloadService.DownloadAndInstallAsync(entry.CatalogItem, targetPath, progress, cancellation.Token);
+            }
+            else
+            {
+                await _modelDownloadService.ResumeDownloadAndInstallAsync(entry.CatalogItem, resumeDownloadId, progress, cancellation.Token);
+            }
+
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: true);
+        }
+        catch (OperationCanceledException)
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, "Model download cancelled.");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or HttpRequestException or UnauthorizedAccessException)
+        {
+            RefreshModelCatalogKeepingSelection(entry.ModelId);
+            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, $"Model download failed: {entry.DisplayName}: {exception.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(_modelDownloadCancellation, cancellation))
+            {
+                _modelDownloadCancellation = null;
+                _activeModelDownloadModelId = null;
+            }
+
+            UpdateModelCatalogCommandStates();
+        }
+    }
+
+    private void CancelActiveModelDownloadFor(ModelCatalogEntry? entry)
+    {
+        if (entry is null ||
+            !string.Equals(_activeModelDownloadModelId, entry.ModelId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _modelDownloadCancellation?.Cancel();
+    }
+
+    private Task UseSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (SelectedModelCatalogEntry.Role.Equals("asr", StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedAsrEngineId = SelectedModelCatalogEntry.EngineId;
+            LatestLog = $"ASR model selected: {SelectedModelCatalogEntry.DisplayName} ({SelectedModelCatalogEntry.EngineId})";
+        }
+        else
+        {
+            LatestLog = $"Review model selected for Phase 12 setup: {SelectedModelCatalogEntry.DisplayName}";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ShowSelectedModelLicenseAsync()
+    {
+        if (SelectedModelCatalogEntry is not null)
+        {
+            LatestLog = $"""
+                {_modelLicenseViewer.BuildLicenseSummary(SelectedModelCatalogEntry.ModelId)}
+                Size: {SelectedModelCatalogEntry.SizeSummary}
+                Requirements: {SelectedModelCatalogEntry.RuntimeRequirement}
+                Install: {SelectedModelCatalogEntry.InstallState}
+                Download: {SelectedModelCatalogEntry.DownloadState}
+                """;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ForgetSelectedModelAsync()
+    {
+        if (SelectedModelCatalogEntry is not null &&
+            _modelInstallService.DeleteRegistration(SelectedModelCatalogEntry.ModelId))
+        {
+            LatestLog = $"Model registration removed: {SelectedModelCatalogEntry.DisplayName}";
+            RefreshModelCatalog();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void RefreshModelCatalog()
+    {
+        var selectedModelId = SelectedModelCatalogEntry?.ModelId;
+        ModelCatalogEntries.Clear();
+        foreach (var entry in _modelCatalogService.ListEntries())
+        {
+            ModelCatalogEntries.Add(entry);
+        }
+
+        SelectedModelCatalogEntry = selectedModelId is null
+            ? ModelCatalogEntries.FirstOrDefault()
+            : ModelCatalogEntries.FirstOrDefault(entry =>
+                entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
+        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+        OnPropertyChanged(nameof(CanRunSelectedJob));
+        UpdateModelCatalogCommandStates();
+    }
+
+    private void RefreshModelCatalogKeepingSelection(string modelId)
+    {
+        RefreshModelCatalog();
+        SelectedModelCatalogEntry = ModelCatalogEntries.FirstOrDefault(entry =>
+            entry.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase)) ?? SelectedModelCatalogEntry;
+    }
+
+    private void RegisterIfPresent(ModelCatalog catalog, string modelId, string path, string sourceType)
+    {
+        var item = catalog.Models.FirstOrDefault(model => string.Equals(model.ModelId, modelId, StringComparison.OrdinalIgnoreCase));
+        if (item is not null && (File.Exists(path) || Directory.Exists(path)))
+        {
+            _modelInstallService.RegisterLocalModel(item, path, sourceType);
+        }
+    }
+
+    private bool IsSelectedAsrEngineReady()
+    {
+        return SelectedAsrEngineId switch
+        {
+            VibeVoiceCrispAsrEngine.Id => File.Exists(Paths.CrispAsrPath) && File.Exists(Paths.VibeVoiceAsrModelPath),
+            "kotoba-whisper-v2.2-faster" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("kotoba-whisper-v2.2-faster", Paths.KotobaWhisperFasterModelPath),
+            "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
+            "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("faster-whisper-large-v3", Paths.FasterWhisperLargeV3ModelPath),
+            "reazonspeech-k2-v3" => File.Exists(Paths.ReazonSpeechK2ScriptPath) &&
+                ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),
+            _ => false
+        };
+    }
+
+    private static bool IsUserSelectableAsrEngine(string? engineId)
+    {
+        return engineId is "kotoba-whisper-v2.2-faster"
+            or "faster-whisper-large-v3-turbo"
+            or "faster-whisper-large-v3";
+    }
+
+    private string ResolveInitialAsrEngineId(string? savedEngineId)
+    {
+        if (IsUserSelectableAsrEngine(savedEngineId))
+        {
+            return savedEngineId!;
+        }
+
+        if (IsUserSelectableAsrEngine(_setupState.SelectedAsrModelId))
+        {
+            return _setupState.SelectedAsrModelId!;
+        }
+
+        foreach (var candidate in new[]
+        {
+            "kotoba-whisper-v2.2-faster",
+            "faster-whisper-large-v3-turbo",
+            "faster-whisper-large-v3"
+        })
+        {
+            var installed = _installedModelRepository.FindInstalledModel(candidate);
+            if (installed is not null &&
+                installed.Verified &&
+                (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+            {
+                return candidate;
+            }
+        }
+
+        return DefaultSelectableAsrEngineId;
+    }
+
+    private bool IsReviewModelReady()
+    {
+        return ModelPathExists("llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath);
+    }
+
+    private bool ModelPathExists(string modelId, string fallbackPath)
+    {
+        var installed = _installedModelRepository.FindInstalledModel(modelId);
+        if (installed is not null &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+        {
+            return true;
+        }
+
+        return File.Exists(fallbackPath) || Directory.Exists(fallbackPath);
+    }
+
+    private void UpdateModelCatalogCommandStates()
+    {
+        if (DownloadSelectedModelCommand is RelayCommand downloadCommand)
+        {
+            downloadCommand.RaiseCanExecuteChanged();
+        }
+
+        if (PauseSelectedModelDownloadCommand is RelayCommand pauseCommand)
+        {
+            pauseCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ResumeSelectedModelDownloadCommand is RelayCommand resumeCommand)
+        {
+            resumeCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CancelSelectedModelDownloadCommand is RelayCommand cancelCommand)
+        {
+            cancelCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RetrySelectedModelDownloadCommand is RelayCommand retryCommand)
+        {
+            retryCommand.RaiseCanExecuteChanged();
+        }
+
+        if (UseSelectedModelCommand is RelayCommand useCommand)
+        {
+            useCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ShowSelectedModelLicenseCommand is RelayCommand licenseCommand)
+        {
+            licenseCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ForgetSelectedModelCommand is RelayCommand forgetCommand)
+        {
+            forgetCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private bool CanDownloadSelectedModel()
+    {
+        return SelectedModelCatalogEntry is { IsInstalled: false } entry &&
+            entry.IsDirectDownloadSupported &&
+            !IsDownloadRunning(entry.LatestDownloadJob);
+    }
+
+    private bool CanPauseSelectedModelDownload()
+    {
+        return IsDownloadRunning(SelectedModelCatalogEntry?.LatestDownloadJob);
+    }
+
+    private bool CanResumeSelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "paused" };
+    }
+
+    private bool CanCancelSelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "running" or "paused" };
+    }
+
+    private bool CanRetrySelectedModelDownload()
+    {
+        return SelectedModelCatalogEntry is { IsInstalled: false, LatestDownloadJob.Status: "failed" or "cancelled" } entry &&
+            entry.IsDirectDownloadSupported;
+    }
+
+    private static bool IsDownloadRunning(ModelDownloadJob? job)
+    {
+        return string.Equals(job?.Status, "running", StringComparison.OrdinalIgnoreCase);
+    }
+}

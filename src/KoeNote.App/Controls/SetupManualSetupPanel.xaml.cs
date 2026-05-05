@@ -2,9 +2,9 @@ using System.Windows.Controls;
 
 namespace KoeNote.App.Controls;
 
-public partial class TranscriptPanel : UserControl
+public partial class SetupManualSetupPanel : UserControl
 {
-    public TranscriptPanel()
+    public SetupManualSetupPanel()
     {
         InitializeComponent();
     }
