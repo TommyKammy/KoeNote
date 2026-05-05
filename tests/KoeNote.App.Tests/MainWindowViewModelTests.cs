@@ -129,6 +129,14 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
         Assert.Equal(viewModel.SelectedSegment?.Text, viewModel.SelectedSegmentEditText);
         Assert.True(viewModel.AcceptDraftCommand.CanExecute(null));
+        var initialFocusRequest = viewModel.ReviewSegmentFocusRequestId;
+        viewModel.SegmentSearchText = "hidden-segment";
+        Assert.Empty(ViewItems<TranscriptSegmentPreview>(viewModel.FilteredSegments));
+
+        viewModel.FocusSelectedDraftSegmentCommand.Execute(null);
+
+        Assert.Empty(viewModel.SegmentSearchText);
+        Assert.Contains(viewModel.SelectedSegment, ViewItems<TranscriptSegmentPreview>(viewModel.FilteredSegments));
 
         viewModel.AcceptDraftCommand.Execute(null);
         Assert.False(viewModel.SelectNextDraftCommand.CanExecute(null));
@@ -143,6 +151,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("1 / 1", viewModel.DraftPositionText);
         Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
         Assert.Equal(viewModel.SelectedSegment?.Text, viewModel.SelectedSegmentEditText);
+        Assert.True(viewModel.ReviewSegmentFocusRequestId > initialFocusRequest);
         Assert.True(
             viewModel.SelectedJobUnreviewedDrafts == 1,
             $"Expected one pending draft but saw {viewModel.SelectedJobUnreviewedDrafts}. LatestLog: {viewModel.LatestLog}");
@@ -356,6 +365,25 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(1.5, viewModel.PlaybackRate);
         Assert.Contains(2.0, viewModel.PlaybackRates);
+    }
+
+    [Fact]
+    public void SelectingSegment_SeeksPlaybackPositionToSegmentStart()
+    {
+        var viewModel = CreateViewModel();
+        var segment = new TranscriptSegmentPreview(
+            "00:01:12.340",
+            "00:01:20.000",
+            "Speaker_0",
+            "target",
+            "",
+            "segment-001",
+            StartSeconds: 72.34,
+            EndSeconds: 80);
+
+        viewModel.SelectedSegment = segment;
+
+        Assert.Equal(72.34, viewModel.PlaybackPositionSeconds, 2);
     }
 
     [Fact]

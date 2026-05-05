@@ -161,7 +161,8 @@
                         </Grid>
                     </Border>
 
-                    <ListBox ItemsSource="{Binding FilteredSegments}"
+                    <ListBox x:Name="SegmentList"
+                             ItemsSource="{Binding FilteredSegments}"
                              SelectedItem="{Binding SelectedSegment, Mode=TwoWay}"
                              Style="{StaticResource CardListBox}"
                              ItemContainerStyle="{StaticResource SegmentListBoxItem}">

@@ -7,6 +7,7 @@ namespace KoeNote.App.Services.Review;
 public sealed class CorrectionMemoryService(AppPaths paths)
 {
     private const int MaxStoredTextLength = 120;
+    private const int MaxAsrHotwordLength = 24;
 
     public AsrSettings EnrichAsrSettings(AsrSettings settings)
     {
@@ -19,12 +20,12 @@ public sealed class CorrectionMemoryService(AppPaths paths)
         var hotwords = settings.Hotwords
             .Concat(terms
                 .Select(static term => term.Surface)
-                .Where(static surface => surface.Length <= 40))
+                .Where(IsAsrHotwordCandidate))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new AsrSettings(settings.ContextText, string.Join(Environment.NewLine, hotwords), settings.EngineId);
+        return new AsrSettings(settings.ContextText, string.Join(Environment.NewLine, hotwords), settings.EngineId, settings.EnableReviewStage);
     }
 
     public IReadOnlyList<CorrectionDraft> BuildMemoryDrafts(string jobId, IReadOnlyList<TranscriptSegment> segments)
@@ -97,7 +98,11 @@ public sealed class CorrectionMemoryService(AppPaths paths)
         using var transaction = connection.BeginTransaction();
         var now = DateTimeOffset.Now.ToString("o");
         var memoryId = UpsertMemory(connection, transaction, draft.OriginalText, finalText, draft.IssueType, now);
-        UpsertUserTerm(connection, transaction, finalText, now);
+        if (IsAsrHotwordCandidate(finalText))
+        {
+            UpsertUserTerm(connection, transaction, finalText, now);
+        }
+
         InsertEvent(connection, transaction, memoryId, draft.DraftId, draft.JobId, draft.SegmentId, "remembered", now);
         transaction.Commit();
     }
@@ -331,6 +336,25 @@ public sealed class CorrectionMemoryService(AppPaths paths)
         }
 
         return Math.Clamp(0.62 + (memory.AcceptedCount / (double)total) * 0.28, 0.62, 0.90);
+    }
+
+    private static bool IsAsrHotwordCandidate(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > MaxAsrHotwordLength)
+        {
+            return false;
+        }
+
+        return !trimmed.Any(static character =>
+            char.IsWhiteSpace(character) ||
+            char.IsPunctuation(character) ||
+            char.IsSymbol(character));
     }
 
     private sealed record UserTermRow(string Surface);

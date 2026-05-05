@@ -17,6 +17,8 @@ public interface IAudioPlaybackService
 
     bool Toggle(string audioPath);
 
+    bool Open(string audioPath);
+
     void Seek(TimeSpan position);
 
     void SetPlaybackRate(double rate);
@@ -49,6 +51,16 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
 
     public bool Toggle(string audioPath)
     {
+        if (!Open(audioPath))
+        {
+            return false;
+        }
+
+        return IsPlaying ? Pause() : Play();
+    }
+
+    public bool Open(string audioPath)
+    {
         if (string.IsNullOrWhiteSpace(audioPath) || !File.Exists(audioPath))
         {
             Stop();
@@ -56,14 +68,16 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
         }
 
         var fullPath = Path.GetFullPath(audioPath);
-        if (!string.Equals(CurrentPath, fullPath, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(CurrentPath, fullPath, StringComparison.OrdinalIgnoreCase))
         {
-            _player.Open(new Uri(fullPath, UriKind.Absolute));
-            CurrentPath = fullPath;
-            return Play();
+            return true;
         }
 
-        return IsPlaying ? Pause() : Play();
+        _player.Open(new Uri(fullPath, UriKind.Absolute));
+        CurrentPath = fullPath;
+        SetIsPlaying(false);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 
     public void Seek(TimeSpan position)

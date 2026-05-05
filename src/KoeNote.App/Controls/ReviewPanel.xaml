@@ -106,7 +106,8 @@
                              TextWrapping="Wrap"
                              MinHeight="82"
                              Margin="0,5,0,14"
-                             Background="#FAFBFC" />
+                             Background="#FAFBFC"
+                             PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick" />
 
                     <TextBlock Text="提案文" Style="{StaticResource MutedText}" Margin="0,0,0,7" />
                     <TextBox Text="{Binding SuggestedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -122,7 +123,8 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="10"
-                            Margin="0,5,0,14">
+                            Margin="0,5,0,14"
+                            PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick">
                         <ItemsControl ItemsSource="{Binding DiffTokens}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>

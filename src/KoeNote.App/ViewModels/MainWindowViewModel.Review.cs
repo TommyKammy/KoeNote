@@ -59,10 +59,49 @@ public sealed partial class MainWindowViewModel
     private void SelectSegmentForDraft(CorrectionDraft draft)
     {
         var segment = Segments.FirstOrDefault(item => item.SegmentId == draft.SegmentId);
-        if (segment is not null && !EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment))
+        if (segment is null)
         {
-            SelectedSegment = segment;
+            return;
         }
+
+        EnsureSegmentVisibleForReviewFocus(segment);
+
+        _isSelectingSegmentForDraft = true;
+        try
+        {
+            if (!EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment))
+            {
+                SelectedSegment = segment;
+            }
+        }
+        finally
+        {
+            _isSelectingSegmentForDraft = false;
+        }
+
+        ReviewSegmentFocusRequestId++;
+    }
+
+    private void EnsureSegmentVisibleForReviewFocus(TranscriptSegmentPreview segment)
+    {
+        if (FilteredSegments.Contains(segment))
+        {
+            return;
+        }
+
+        SegmentSearchText = string.Empty;
+        SelectedSpeakerFilter = SpeakerFilters.FirstOrDefault() ?? SelectedSpeakerFilter;
+        FilteredSegments.Refresh();
+    }
+
+    private Task FocusSelectedDraftSegmentAsync()
+    {
+        if (SelectedCorrectionDraft is not null)
+        {
+            SelectSegmentForDraft(SelectedCorrectionDraft);
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task AcceptSelectedDraftAsync()
@@ -272,6 +311,11 @@ public sealed partial class MainWindowViewModel
         if (SelectNextDraftCommand is RelayCommand nextCommand)
         {
             nextCommand.RaiseCanExecuteChanged();
+        }
+
+        if (FocusSelectedDraftSegmentCommand is RelayCommand focusCommand)
+        {
+            focusCommand.RaiseCanExecuteChanged();
         }
     }
 }

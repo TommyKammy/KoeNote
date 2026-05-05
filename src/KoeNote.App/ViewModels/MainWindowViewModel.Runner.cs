@@ -123,7 +123,10 @@ public sealed partial class MainWindowViewModel
                 segment.SegmentId,
                 segment.SpeakerId ?? "",
                 segment.RawText,
-                segment.NormalizedText));
+                segment.NormalizedText,
+                null,
+                segment.StartSeconds,
+                segment.EndSeconds));
         }
 
         RefreshSpeakerFilters();

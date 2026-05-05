@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--language", default="ja")
     parser.add_argument("--context", default=None)
     parser.add_argument("--hotword", action="append", default=[])
-    parser.add_argument("--chunk-length", type=int, default=30)
+    parser.add_argument("--chunk-length", type=int, default=None)
     parser.add_argument("--diarization", choices=["auto", "off", "pyannote"], default="auto")
     parser.add_argument("--diarization-model", default="pyannote/speaker-diarization-3.1")
     parser.add_argument("--hf-token", default=None)
@@ -111,13 +111,15 @@ def main() -> int:
     initial_prompt = "\n".join(prompt_parts) if prompt_parts else None
 
     model = WhisperModel(args.model, device="auto", compute_type="auto")
-    segments, info = model.transcribe(
-        args.audio,
-        language=args.language,
-        initial_prompt=initial_prompt,
-        vad_filter=True,
-        chunk_length=args.chunk_length,
-    )
+    transcribe_options = {
+        "language": args.language,
+        "initial_prompt": initial_prompt,
+        "vad_filter": True,
+    }
+    if args.chunk_length is not None and args.chunk_length > 0:
+        transcribe_options["chunk_length"] = args.chunk_length
+
+    segments, info = model.transcribe(args.audio, **transcribe_options)
 
     segment_items = [
         {

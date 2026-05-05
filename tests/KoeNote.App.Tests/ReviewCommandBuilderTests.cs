@@ -26,7 +26,7 @@ public sealed class ReviewCommandBuilderTests
         Assert.Contains(@"C:\out\review.prompt.txt", arguments);
         Assert.Contains("--temp", arguments);
         Assert.Contains("0.1", arguments);
-        Assert.Contains("16384", arguments);
+        Assert.Contains("8192", arguments);
         Assert.Contains("4096", arguments);
         Assert.Contains("--n-gpu-layers", arguments);
         Assert.Contains("999", arguments);

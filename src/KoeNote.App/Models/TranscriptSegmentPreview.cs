@@ -10,4 +10,6 @@ public sealed record TranscriptSegmentPreview(
     string SpeakerId = "",
     string RawText = "",
     string? NormalizedText = null,
-    string? FinalText = null);
+    string? FinalText = null,
+    double StartSeconds = 0,
+    double EndSeconds = 0);

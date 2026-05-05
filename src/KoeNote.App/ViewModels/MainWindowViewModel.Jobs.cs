@@ -189,6 +189,18 @@ public sealed partial class MainWindowViewModel
         return File.Exists(SelectedJob.SourceAudioPath) ? SelectedJob.SourceAudioPath : null;
     }
 
+    private void SeekPlaybackToSelectedSegment(TranscriptSegmentPreview segment)
+    {
+        var audioPath = ResolveSelectedJobPlaybackPath();
+        if (audioPath is not null)
+        {
+            _audioPlaybackService.Open(audioPath);
+            IsAudioPlaying = _audioPlaybackService.IsPlaying;
+        }
+
+        PlaybackPositionSeconds = segment.StartSeconds;
+    }
+
     private void StopAudioPlayback()
     {
         if (!IsAudioPlaying && _audioPlaybackService.CurrentPath is null)

@@ -26,7 +26,9 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
                 segment.SpeakerId,
                 segment.RawText,
                 segment.NormalizedText,
-                segment.FinalText));
+                segment.FinalText,
+                segment.StartSeconds,
+                segment.EndSeconds));
         }
 
         return previews;

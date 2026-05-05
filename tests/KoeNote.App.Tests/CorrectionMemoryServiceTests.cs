@@ -75,6 +75,29 @@ public sealed class CorrectionMemoryServiceTests
     }
 
     [Fact]
+    public void EnrichAsrSettings_DoesNotAddSentenceCorrectionsToHotwords()
+    {
+        var paths = CreateReadyPaths();
+        var service = new CorrectionMemoryService(paths);
+        var sentence = "体重が少し減ったり、衛生状態がゆっくりに見えたりします。";
+        service.RememberCorrection(new CorrectionDraft(
+            "draft-001",
+            "job-001",
+            "segment-001",
+            "term",
+            "old",
+            sentence,
+            "reason",
+            0.82), sentence);
+
+        var settings = service.EnrichAsrSettings(new AsrSettings("context", "KoeNote", EnableReviewStage: false));
+
+        Assert.Contains("KoeNote", settings.Hotwords);
+        Assert.DoesNotContain(sentence, settings.Hotwords);
+        Assert.False(settings.EnableReviewStage);
+    }
+
+    [Fact]
     public void BuildMemoryDrafts_CreatesPastCorrectionCandidate()
     {
         var paths = CreateReadyPaths();

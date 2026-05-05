@@ -188,6 +188,12 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="RowChrome" Property="Background" Value="{StaticResource BlueLightBrush}" />
                             <Setter TargetName="RowChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="RowChrome" Property="BorderThickness" Value="5,1,1,1" />
+                            <Setter TargetName="RowChrome" Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect Color="#2F8F5B" BlurRadius="16" ShadowDepth="0" Opacity="0.18" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

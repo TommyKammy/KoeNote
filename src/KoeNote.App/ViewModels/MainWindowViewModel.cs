@@ -62,6 +62,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _modelDownloadCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
     private bool _isReviewOperationInProgress;
+    private bool _isSelectingSegmentForDraft;
     private bool _isAudioPlaying;
     private bool _rememberCorrection = true;
     private double _playbackPositionSeconds;
@@ -96,6 +97,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _suggestedText = string.Empty;
     private string _reviewReason = "推敲候補はありません。";
     private double _confidence;
+    private int _reviewSegmentFocusRequestId;
 
     public MainWindowViewModel()
         : this(new AppPaths())
@@ -234,6 +236,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
         SelectPreviousDraftCommand = new RelayCommand(SelectPreviousDraftAsync, CanSelectPreviousDraft);
         SelectNextDraftCommand = new RelayCommand(SelectNextDraftAsync, CanSelectNextDraft);
+        FocusSelectedDraftSegmentCommand = new RelayCommand(FocusSelectedDraftSegmentAsync, () => SelectedCorrectionDraft is not null);
         SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
@@ -420,6 +423,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand SelectNextDraftCommand { get; }
 
+    public ICommand FocusSelectedDraftSegmentCommand { get; }
+
     public ICommand SaveSegmentEditCommand { get; }
 
     public ICommand SaveSpeakerAliasCommand { get; }
@@ -487,8 +492,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 SelectedSegmentEditText = value.Text;
                 SelectedSpeakerAlias = value.Speaker;
-                SelectFirstDraftForSegment(value.SegmentId);
+                if (!_isSelectingSegmentForDraft)
+                {
+                    SelectFirstDraftForSegment(value.SegmentId);
+                }
+
                 UpdateSegmentEditCommandStates();
+                SeekPlaybackToSelectedSegment(value);
             }
         }
     }
@@ -601,6 +611,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string SelectedCorrectionDraftId => SelectedCorrectionDraft?.DraftId ?? string.Empty;
 
     public bool HasReviewDraft => SelectedCorrectionDraft is not null;
+
+    public int ReviewSegmentFocusRequestId
+    {
+        get => _reviewSegmentFocusRequestId;
+        private set => SetField(ref _reviewSegmentFocusRequestId, value);
+    }
 
     public string SelectedSegmentEditText
     {
