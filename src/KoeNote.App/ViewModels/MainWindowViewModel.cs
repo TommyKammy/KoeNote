@@ -91,11 +91,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isRunInProgress;
-    private string _reviewIssueType = "意味不明語の疑い";
-    private string _originalText = "この仕様はサーバーのミギワで処理します。";
-    private string _suggestedText = "この仕様はサーバーの右側で処理します。";
-    private string _reviewReason = "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になる。";
-    private double _confidence = 0.62;
+    private string _reviewIssueType = "候補なし";
+    private string _originalText = string.Empty;
+    private string _suggestedText = string.Empty;
+    private string _reviewReason = "推敲候補はありません。";
+    private double _confidence;
 
     public MainWindowViewModel()
         : this(new AppPaths())
@@ -500,6 +500,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _selectedCorrectionDraft, value))
             {
+                OnPropertyChanged(nameof(HasReviewDraft));
                 ApplySelectedDraftToReviewPane();
             }
         }
@@ -598,6 +599,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public string SelectedCorrectionDraftId => SelectedCorrectionDraft?.DraftId ?? string.Empty;
+
+    public bool HasReviewDraft => SelectedCorrectionDraft is not null;
 
     public string SelectedSegmentEditText
     {

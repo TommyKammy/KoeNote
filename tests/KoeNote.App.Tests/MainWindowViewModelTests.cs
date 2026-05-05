@@ -149,6 +149,20 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ReviewPane_StartsEmptyWhenThereAreNoDrafts()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.HasReviewDraft);
+        Assert.Equal("候補なし", viewModel.ReviewIssueType);
+        Assert.Empty(viewModel.OriginalText);
+        Assert.Empty(viewModel.SuggestedText);
+        Assert.Equal("推敲候補はありません。", viewModel.ReviewReason);
+        Assert.Equal(0, viewModel.Confidence);
+        Assert.Equal("0 / 0", viewModel.DraftPositionText);
+    }
+
+    [Fact]
     public async Task AcceptDraft_RemembersSuggestedFragmentInsteadOfWholeSegment()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

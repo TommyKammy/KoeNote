@@ -29,11 +29,12 @@ public sealed partial class MainWindowViewModel
         ReviewIssueType = "候補なし";
         OriginalText = string.Empty;
         SuggestedText = string.Empty;
-        ReviewReason = "推敲候補は生成されませんでした。";
+        ReviewReason = "推敲候補はありません。";
         Confidence = 0;
         DiffTokens.Clear();
         OnPropertyChanged(nameof(SelectedCorrectionDraftId));
         OnPropertyChanged(nameof(DraftPositionText));
+        OnPropertyChanged(nameof(HasReviewDraft));
     }
 
     private bool FilterSegment(object item)
