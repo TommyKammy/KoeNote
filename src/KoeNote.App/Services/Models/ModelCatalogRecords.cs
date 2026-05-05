@@ -93,6 +93,10 @@ public sealed record ModelCatalogEntry(
 
     public string DisplayName => CatalogItem.DisplayName;
 
+    public string SetupDisplayName => IsInstalled
+        ? $"{DisplayName} (導入済み)"
+        : DisplayName;
+
     public string Role => CatalogItem.Role;
 
     public string EngineId => CatalogItem.EngineId;
@@ -176,6 +180,11 @@ public sealed record ModelCatalogEntry(
             : FormatSize(LatestDownloadJob.BytesDownloaded);
 
     public string? DownloadError => LatestDownloadJob?.ErrorMessage;
+
+    public override string ToString()
+    {
+        return SetupDisplayName;
+    }
 
     private long? UsableDownloadTotal => LatestDownloadJob is { BytesTotal: > 0 } job &&
         job.BytesDownloaded <= job.BytesTotal.Value

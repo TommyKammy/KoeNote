@@ -25,9 +25,10 @@
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding SetupAsrModelChoices}"
                           SelectedItem="{Binding SelectedSetupAsrModel, Mode=TwoWay}"
-                          DisplayMemberPath="DisplayName"
+                          DisplayMemberPath="SetupDisplayName"
                           MinWidth="260"
-                          MinHeight="34" />
+                          MinHeight="34"
+                          TextSearch.TextPath="SetupDisplayName" />
                 <Button Grid.Column="2"
                         Command="{Binding SetupDownloadAsrCommand}"
                         Padding="10,7"
@@ -74,9 +75,10 @@
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding SetupReviewModelChoices}"
                           SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
-                          DisplayMemberPath="DisplayName"
+                          DisplayMemberPath="SetupDisplayName"
                           MinWidth="260"
-                          MinHeight="34" />
+                          MinHeight="34"
+                          TextSearch.TextPath="SetupDisplayName" />
                 <Button Grid.Column="2"
                         Command="{Binding SetupDownloadReviewCommand}"
                         Padding="10,7"

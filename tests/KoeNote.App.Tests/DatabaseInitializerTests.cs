@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using KoeNote.App.Services;
 
 namespace KoeNote.App.Tests;
@@ -42,8 +42,10 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("installed_models", tables);
         Assert.Contains("installed_runtimes", tables);
         Assert.Contains("model_download_jobs", tables);
+        Assert.Contains("review_guidelines", tables);
+        Assert.Contains("domain_preset_imports", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("is_deleted", ReadColumnNames(connection, "jobs"));
         Assert.Contains("deleted_at", ReadColumnNames(connection, "jobs"));
@@ -58,6 +60,9 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("idx_review_operation_history_job_created", ReadIndexNames(connection));
         Assert.Contains("idx_review_operation_history_created", ReadIndexNames(connection));
         Assert.Contains("idx_jobs_deleted_updated", ReadIndexNames(connection));
+        Assert.Contains("idx_review_guidelines_preset_text", ReadIndexNames(connection));
+        Assert.Contains("idx_domain_preset_imports_imported", ReadIndexNames(connection));
+        Assert.Contains("deactivated_at", ReadColumnNames(connection, "domain_preset_imports"));
     }
 
     [Fact]
@@ -77,7 +82,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
@@ -94,6 +99,8 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("installed_runtimes", ReadTableNames(connection));
         Assert.Contains("model_download_jobs", ReadTableNames(connection));
         Assert.Contains("is_deleted", ReadColumnNames(connection, "jobs"));
+        Assert.Contains("review_guidelines", ReadTableNames(connection));
+        Assert.Contains("domain_preset_imports", ReadTableNames(connection));
     }
 
     [Fact]
@@ -114,7 +121,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ReadSchemaVersions(connection));
     }
 
     [Fact]
@@ -134,7 +141,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ReadSchemaVersions(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
     }
@@ -351,3 +358,4 @@ public sealed class DatabaseInitializerTests
         command.ExecuteNonQuery();
     }
 }
+

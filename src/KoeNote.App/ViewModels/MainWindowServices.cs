@@ -5,6 +5,7 @@ using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
@@ -34,7 +35,8 @@ public sealed record MainWindowServices(
     IAudioPlaybackService AudioPlaybackService,
     ToolStatusService ToolStatusService,
     StatusBarInfoService StatusBarInfoService,
-    DatabaseMaintenanceService DatabaseMaintenanceService)
+    DatabaseMaintenanceService DatabaseMaintenanceService,
+    DomainPresetImportService DomainPresetImportService)
 {
     public static MainWindowServices Create(AppPaths paths)
     {
@@ -47,6 +49,7 @@ public sealed record MainWindowServices(
         var review = MainWindowReviewComposition.Create(paths);
         var setupWizardService = MainWindowSetupComposition.Create(paths, runtime, model);
         var workers = MainWindowWorkerComposition.Create(
+            paths,
             runtime.ProcessRunner,
             repositories,
             review.CorrectionMemoryService);
@@ -88,6 +91,7 @@ public sealed record MainWindowServices(
             runtime.AudioPlaybackService,
             runtime.ToolStatusService,
             runtime.StatusBarInfoService,
-            runtime.DatabaseMaintenanceService);
+            runtime.DatabaseMaintenanceService,
+            new DomainPresetImportService(paths, repositories.AsrSettingsRepository));
     }
 }

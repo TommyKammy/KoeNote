@@ -6,6 +6,7 @@ using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
@@ -139,6 +140,7 @@ internal sealed record MainWindowWorkerServices(
 internal static class MainWindowWorkerComposition
 {
     public static MainWindowWorkerServices Create(
+        AppPaths paths,
         ExternalProcessRunner processRunner,
         MainWindowRepositoryServices repositories,
         CorrectionMemoryService correctionMemoryService)
@@ -156,7 +158,7 @@ internal static class MainWindowWorkerComposition
             new ReviewWorker(
                 processRunner,
                 new ReviewCommandBuilder(),
-                new ReviewPromptBuilder(),
+                new ReviewPromptBuilder(new ReviewGuidelineRepository(paths)),
                 new ReviewJsonNormalizer(),
                 new ReviewResultStore(),
                 repositories.CorrectionDraftRepository,

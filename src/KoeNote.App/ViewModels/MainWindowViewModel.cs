@@ -11,6 +11,7 @@ using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
@@ -44,6 +45,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
     private readonly DatabaseMaintenanceService _databaseMaintenanceService;
+    private readonly DomainPresetImportService _domainPresetImportService;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
@@ -53,6 +55,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
+    private DomainPresetImportHistoryItem? _selectedDomainPresetImport;
     private ModelCatalogEntry? _selectedModelCatalogEntry;
     private ModelCatalogEntry? _selectedSetupAsrModel;
     private ModelCatalogEntry? _selectedSetupReviewModel;
@@ -144,6 +147,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _jobRunCoordinator = services.JobRunCoordinator;
         _statusBarInfoService = services.StatusBarInfoService;
         _databaseMaintenanceService = services.DatabaseMaintenanceService;
+        _domainPresetImportService = services.DomainPresetImportService;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -207,6 +211,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
+        ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
+        ClearDomainPresetCommand = new RelayCommand(ClearSelectedDomainPresetAsync, () => SelectedDomainPresetImport?.DeactivatedAt is null && !IsRunInProgress);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
         CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync);
         OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
@@ -256,6 +262,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         IsSetupWizardModalOpen = !IsSetupComplete;
         RefreshSpeakerFilters();
         RefreshDatabaseMaintenanceSummary();
+        RefreshDomainPresetHistory();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -391,6 +398,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SetupExistingDataItem> SetupExistingData { get; } = [];
 
+    public ObservableCollection<DomainPresetImportHistoryItem> DomainPresetImports { get; } = [];
+
     public ObservableCollection<double> PlaybackRates { get; } = [1.0, 1.25, 1.5, 2.0];
 
     public ObservableCollection<double> PlaybackWaveformSamples { get; } = [];
@@ -422,6 +431,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand PlayPauseAudioCommand { get; }
 
     public ICommand OpenSettingsCommand { get; }
+
+    public ICommand ImportDomainPresetCommand { get; }
+
+    public ICommand ClearDomainPresetCommand { get; }
 
     public ICommand OpenSetupCommand { get; }
 
@@ -577,6 +590,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(HasReviewDraft));
                 ApplySelectedDraftToReviewPane();
+            }
+        }
+    }
+
+    public DomainPresetImportHistoryItem? SelectedDomainPresetImport
+    {
+        get => _selectedDomainPresetImport;
+        set
+        {
+            if (SetField(ref _selectedDomainPresetImport, value) &&
+                ClearDomainPresetCommand is RelayCommand command)
+            {
+                command.RaiseCanExecuteChanged();
             }
         }
     }
@@ -900,6 +926,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 if (RunDatabaseMaintenanceCommand is RelayCommand maintenanceCommand)
                 {
                     maintenanceCommand.RaiseCanExecuteChanged();
+                }
+
+                if (ImportDomainPresetCommand is RelayCommand presetCommand)
+                {
+                    presetCommand.RaiseCanExecuteChanged();
+                }
+
+                if (ClearDomainPresetCommand is RelayCommand clearPresetCommand)
+                {
+                    clearPresetCommand.RaiseCanExecuteChanged();
                 }
 
                 UpdateReviewCommandStates();

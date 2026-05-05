@@ -31,7 +31,50 @@
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          MinHeight="58"
-                         Margin="0,4,0,0" />
+                         Margin="0,4,0,10" />
+
+                <Button Command="{Binding ImportDomainPresetCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        Padding="14,6"
+                        ToolTip="専門領域プリセットJSONからASRコンテキストとホットワードを追加します">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8E5;"
+                                   Style="{StaticResource IconText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="プリセットをインポート"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="標準ビルドは空のまま、個別配布のJSONだけを読み込めます。実患者データは含めないでください。"
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0" />
+                <TextBlock Text="インポート履歴"
+                           Style="{StaticResource MutedText}"
+                           Margin="0,14,0,4" />
+                <ComboBox ItemsSource="{Binding DomainPresetImports}"
+                          SelectedItem="{Binding SelectedDomainPresetImport, Mode=TwoWay}"
+                          DisplayMemberPath="Summary"
+                          MinHeight="30"
+                          Margin="0,0,0,8" />
+                <Button Command="{Binding ClearDomainPresetCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        Padding="14,6"
+                        ToolTip="選択したプリセット由来のレビュー指針や補正メモリを無効化し、ASR欄から該当候補を削除します。">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74D;"
+                                   Style="{StaticResource IconText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="プリセットをクリア"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <StackPanel Grid.Column="2">

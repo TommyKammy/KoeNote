@@ -13,7 +13,9 @@ internal static class KoeNoteDatabaseMigrations
         new(7, "repair ASR settings engine id", ApplyAsrSettingsEngineIdRepair),
         new(8, "review stage toggle", ApplyReviewStageToggle),
         new(9, "maintenance indexes", ApplyMaintenanceIndexes),
-        new(10, "job recycle bin", ApplyJobRecycleBinSchema)
+        new(10, "job recycle bin", ApplyJobRecycleBinSchema),
+        new(11, "domain preset metadata", ApplyDomainPresetMetadataSchema),
+        new(12, "domain preset deactivation", ApplyDomainPresetDeactivationSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -375,5 +377,55 @@ internal static class KoeNoteDatabaseMigrations
             CREATE INDEX IF NOT EXISTS idx_jobs_deleted_at
             ON jobs(deleted_at DESC);
             """);
+    }
+
+    private static void ApplyDomainPresetMetadataSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS review_guidelines (
+                guideline_id TEXT NOT NULL PRIMARY KEY,
+                preset_id TEXT NOT NULL,
+                guideline_text TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        migration.Execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_review_guidelines_preset_text
+            ON review_guidelines(preset_id, guideline_text);
+            """);
+
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS domain_preset_imports (
+                import_id TEXT NOT NULL PRIMARY KEY,
+                preset_id TEXT,
+                display_name TEXT NOT NULL,
+                schema_version INTEGER NOT NULL,
+                source_path TEXT NOT NULL,
+                context_updated INTEGER NOT NULL,
+                added_hotword_count INTEGER NOT NULL,
+                skipped_hotword_count INTEGER NOT NULL,
+                added_correction_memory_count INTEGER NOT NULL,
+                updated_correction_memory_count INTEGER NOT NULL,
+                added_speaker_alias_count INTEGER NOT NULL,
+                updated_speaker_alias_count INTEGER NOT NULL,
+                skipped_speaker_alias_count INTEGER NOT NULL,
+                added_review_guideline_count INTEGER NOT NULL,
+                updated_review_guideline_count INTEGER NOT NULL,
+                imported_at TEXT NOT NULL
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_domain_preset_imports_imported
+            ON domain_preset_imports(imported_at DESC);
+            """);
+    }
+
+    private static void ApplyDomainPresetDeactivationSchema(DatabaseMigrationContext migration)
+    {
+        migration.AddColumnIfTableExistsAndMissing("domain_preset_imports", "deactivated_at", "TEXT");
     }
 }

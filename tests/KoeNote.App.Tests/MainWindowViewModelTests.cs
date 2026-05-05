@@ -237,6 +237,68 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ImportDomainPresetFromFile_UpdatesAsrSettingsInViewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        var presetPath = Path.Combine(root, "preset.json");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "display_name": "産科・産後ケア研究プリセット",
+              "asr_context": "産後ケア研究のインタビューです。",
+              "hotwords": ["産後ケア", "助産師"]
+            }
+            """);
+        var viewModel = new MainWindowViewModel(paths)
+        {
+            AsrContextText = "既存設定",
+            AsrHotwordsText = "産後ケア"
+        };
+
+        viewModel.ImportDomainPresetFromFile(presetPath);
+
+        Assert.Contains("既存設定", viewModel.AsrContextText, StringComparison.Ordinal);
+        Assert.Contains("産後ケア研究のインタビューです。", viewModel.AsrContextText, StringComparison.Ordinal);
+        Assert.Equal(
+            ["産後ケア", "助産師"],
+            viewModel.AsrHotwordsText.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        Assert.Contains("プリセットをインポートしました", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ImportDomainPresetFromFile_AppliesSpeakerAliasesToSelectedJob()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "こんにちは")
+        ]);
+        var presetPath = Path.Combine(root, "preset.json");
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "speaker_aliases": [
+                {
+                  "speaker_id": "Speaker_0",
+                  "display_name": "聞き手"
+                }
+              ]
+            }
+            """);
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.ImportDomainPresetFromFile(presetPath);
+
+        Assert.Equal("聞き手", Assert.Single(viewModel.Segments).Speaker);
+        Assert.Contains("話者別名: 1件追加", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReviewQueue_LoadsSelectedDraftAndAcceptCommandAdvances()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
