@@ -88,14 +88,28 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0"
-                       Text="KoeNote"
-                       FontFamily="Segoe UI"
-                       FontSize="20"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource HeaderTextBrush}"
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,14,0">
+                <Image Source="pack://application:,,,/Resources/KoeNoteBirdMono.png"
+                       Width="23"
+                       Height="23"
+                       Stretch="Uniform"
+                       Opacity="0.82"
+                       RenderOptions.BitmapScalingMode="HighQuality"
                        VerticalAlignment="Center"
-                       Margin="0,0,14,0" />
+                       Margin="0,0,8,0"
+                       ToolTip="KoeNote" />
+                <TextBlock Text="KoeNote"
+                           FontFamily="Segoe UI"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource HeaderTextBrush}"
+                           VerticalAlignment="Center"
+                           LineStackingStrategy="BlockLineHeight"
+                           LineHeight="24" />
+            </StackPanel>
 
             <Border Grid.Column="1"
                     Width="0.5"
