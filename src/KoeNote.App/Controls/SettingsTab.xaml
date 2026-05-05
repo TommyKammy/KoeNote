@@ -10,20 +10,20 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="ASR" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-                <TextBlock Text="Engine" Style="{StaticResource MutedText}" />
+                <TextBlock Text="エンジン" Style="{StaticResource MutedText}" />
                 <ComboBox ItemsSource="{Binding AvailableAsrEngines}"
                           SelectedValue="{Binding SelectedAsrEngineId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           SelectedValuePath="EngineId"
                           DisplayMemberPath="DisplayName"
                           MinHeight="30"
                           Margin="0,4,0,10" />
-                <TextBlock Text="Context" Style="{StaticResource MutedText}" />
+                <TextBlock Text="コンテキスト" Style="{StaticResource MutedText}" />
                 <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          MinHeight="78"
                          Margin="0,4,0,10" />
-                <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
+                <TextBlock Text="ホットワード" Style="{StaticResource MutedText}" />
                 <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
@@ -31,26 +31,26 @@
                          Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="2">
-                <TextBlock Text="Runtime" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                <TextBlock Text="実行環境" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
                 <TextBlock Text="{Binding FirstRunSummary}" FontWeight="SemiBold" Margin="0,0,0,4" />
                 <TextBlock Text="{Binding FirstRunDetail}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,10" />
-                <TextBlock Text="Storage" Style="{StaticResource MutedText}" />
+                <TextBlock Text="保存先" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding StoragePath}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,10" />
-                <TextBlock Text="Database" Style="{StaticResource MutedText}" />
+                <TextBlock Text="データベース" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding DatabaseMaintenanceSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,8" />
-                <Button Content="Optimize database"
+                <Button Content="DBを最適化"
                         Command="{Binding RunDatabaseMaintenanceCommand}"
                         MinHeight="30"
                         HorizontalAlignment="Left"
                         Padding="12,4"
                         Margin="0,0,0,10" />
-                <TextBlock Text="Setup" Style="{StaticResource MutedText}" />
+                <TextBlock Text="セットアップ" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding SetupStatusSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,14" />
-                <TextBlock Text="Review" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-                <CheckBox Content="Enable review stage"
+                <TextBlock Text="推敲" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                <CheckBox Content="推敲ステージを有効にする"
                           IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           Margin="0,0,0,6" />
-                <TextBlock Text="Turn this off when ASR quality is sufficient and you want to skip the LLM review pass."
+                <TextBlock Text="ASRの品質が十分で、LLMによる推敲を省略したい場合はオフにします。"
                            Style="{StaticResource MutedText}"
                            TextWrapping="Wrap" />
             </StackPanel>

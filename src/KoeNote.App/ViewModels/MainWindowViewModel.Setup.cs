@@ -1,5 +1,7 @@
+using System.IO;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
+using Microsoft.Win32;
 
 namespace KoeNote.App.ViewModels;
 
@@ -107,6 +109,28 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
+    private Task SetupChooseStorageRootAsync()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "モデルの保存先フォルダを選択",
+            InitialDirectory = Directory.Exists(SetupStorageRoot)
+                ? SetupStorageRoot
+                : Paths.DefaultModelStorageRoot
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return Task.CompletedTask;
+        }
+
+        Directory.CreateDirectory(dialog.FolderName);
+        _setupState = _setupWizardService.SetStorageRoot(dialog.FolderName);
+        RefreshSetupWizard();
+        LatestLog = $"モデル保存先を変更しました: {dialog.FolderName}";
+        return Task.CompletedTask;
+    }
+
     private Task SetupRunSmokeAsync()
     {
         var result = _setupWizardService.RunSmokeCheck();
@@ -119,23 +143,33 @@ public sealed partial class MainWindowViewModel
         _setupState = _setupWizardService.LoadState();
         RefreshSetupWizard(refreshSmokeChecks: false);
         LatestLog = result.IsSucceeded
-            ? $"Setup smoke check passed. Report: {result.ReportPath}"
-            : $"Setup smoke check found missing items. Report: {result.ReportPath}";
+            ? $"最終確認に成功しました。Report: {result.ReportPath}"
+            : $"最終確認で不足項目が見つかりました。Report: {result.ReportPath}";
         return Task.CompletedTask;
     }
 
     private Task SetupCompleteAsync()
     {
+        var checkResult = _setupWizardService.RunSmokeCheck();
+        SetupSmokeChecks.Clear();
+        foreach (var check in checkResult.Checks)
+        {
+            SetupSmokeChecks.Add(check);
+        }
+
         _setupState = _setupWizardService.CompleteIfReady();
-        RefreshSetupWizard();
+        RefreshSetupWizard(refreshSmokeChecks: false);
         if (_setupState.IsCompleted)
         {
             IsSetupWizardModalOpen = false;
         }
 
+        var firstMissing = checkResult.Checks.FirstOrDefault(static check => !check.IsOk);
         LatestLog = _setupState.IsCompleted
-            ? "Setup completed. Run is now available when runtime assets are ready."
-            : "Setup is still incomplete. Run smoke check after installing/importing selected models.";
+            ? "セットアップが完了しました。必要なモデルと実行環境が揃っていれば実行できます。"
+            : firstMissing is null
+                ? "セットアップはまだ完了していません。モデル導入とライセンス同意を確認してください。"
+                : $"セットアップはまだ完了していません。不足項目: {firstMissing.Name} - {firstMissing.Detail}";
         return Task.CompletedTask;
     }
 
@@ -199,6 +233,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
         OnPropertyChanged(nameof(SetupCurrentStep));
+        OnPropertyChanged(nameof(SetupStepDisplayName));
         OnPropertyChanged(nameof(SetupStatusSummary));
         OnPropertyChanged(nameof(SetupWizardModalTitle));
         OnPropertyChanged(nameof(SetupWizardModalGuide));

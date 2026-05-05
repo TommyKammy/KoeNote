@@ -349,6 +349,59 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SetupSteps_UseCompactStatusMarksInsteadOfStatusWords()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Status == "done");
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Status == "current");
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Status == "pending");
+        Assert.Contains(viewModel.SetupSteps, step => step.Status == "●");
+    }
+
+    [Fact]
+    public void SetupSteps_DoNotMarkReviewModelReadyWhenOnlyLicenseIsAccepted()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.License,
+            LicenseAccepted = true,
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("✓", viewModel.SetupSteps.Single(step => step.Step == SetupStep.AsrModel).Status);
+        Assert.Equal(string.Empty, viewModel.SetupSteps.Single(step => step.Step == SetupStep.ReviewModel).Status);
+        Assert.Equal("✓", viewModel.SetupSteps.Single(step => step.Step == SetupStep.License).Status);
+        Assert.Equal(string.Empty, viewModel.SetupSteps.Single(step => step.Step == SetupStep.Install).Status);
+    }
+
+    [Fact]
+    public void SetupCompleteCommand_ReportsMissingItemWhenFinalCheckFails()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SetupCompleteCommand.Execute(null);
+
+        Assert.False(viewModel.IsSetupComplete);
+        Assert.Contains("不足項目", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DetailPanelCommands_OpenAndCloseWidePanel()
     {
         var viewModel = CreateViewModel();
@@ -361,7 +414,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.IsDetailPanelOpen);
         Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
-        Assert.Equal("Models", viewModel.DetailPanelTitle);
+        Assert.Equal("モデル", viewModel.DetailPanelTitle);
 
         viewModel.CloseDetailPanelCommand.Execute(null);
         Assert.False(viewModel.IsDetailPanelOpen);

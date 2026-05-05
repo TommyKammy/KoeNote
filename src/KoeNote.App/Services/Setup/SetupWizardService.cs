@@ -138,6 +138,6 @@ public sealed class SetupWizardService
 
     public IReadOnlyList<SetupStepItem> BuildStepItems(SetupState state)
     {
-        return SetupStepBuilder.Build(state);
+        return SetupStepBuilder.Build(state, _readinessService.GetStepReadiness(state));
     }
 }

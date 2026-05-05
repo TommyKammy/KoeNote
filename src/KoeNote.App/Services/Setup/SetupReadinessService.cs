@@ -22,6 +22,15 @@ internal sealed class SetupReadinessService(
             .ToArray();
     }
 
+    public SetupStepReadiness GetStepReadiness(SetupState state)
+    {
+        return new SetupStepReadiness(
+            EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
+            AsrModelReady: IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
+            ReviewModelReady: IsSelectedModelReady(state.SelectedReviewModelId, "review"),
+            StorageReady: Directory.Exists(state.StorageRoot ?? paths.DefaultModelStorageRoot));
+    }
+
     public IReadOnlyList<SetupModelAudit> GetSelectedModelAudit()
     {
         var state = stateService.Load();
@@ -109,6 +118,20 @@ internal sealed class SetupReadinessService(
         var exists = File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
         var verified = installed.Verified && exists;
         return new SetupSmokeCheck(name, verified, verified ? installed.FilePath : $"Verification failed or missing: {installed.FilePath}");
+    }
+
+    private bool IsSelectedModelReady(string? modelId, string role)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return false;
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(modelId);
+        return installed is not null &&
+            installed.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
     private void WriteReport(SetupState state, IReadOnlyList<SetupSmokeCheck> checks)

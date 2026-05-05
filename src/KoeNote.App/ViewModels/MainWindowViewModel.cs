@@ -78,6 +78,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isDatabaseMaintenanceInProgress;
     private double _modelDownloadProgressPercent;
     private bool _isModelDownloadInProgress;
+    private bool _isModelDownloadProgressIndeterminate;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private int _selectedLogPanelTabIndex;
@@ -221,6 +222,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
         SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
         SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
+        SetupChooseStorageRootCommand = new RelayCommand(SetupChooseStorageRootAsync);
         SetupRunSmokeCommand = new RelayCommand(SetupRunSmokeAsync);
         SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
         ShowModelCatalogCommand = new RelayCommand(ShowModelCatalogAsync);
@@ -430,6 +432,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand SetupImportOfflinePackCommand { get; }
 
+    public ICommand SetupChooseStorageRootCommand { get; }
+
     public ICommand SetupRunSmokeCommand { get; }
 
     public ICommand SetupCompleteCommand { get; }
@@ -596,8 +600,23 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string SetupCurrentStep => _setupState.CurrentStep.ToString();
 
     public string SetupStatusSummary => _setupState.IsCompleted
-        ? "Setup complete. Run is enabled when runtime assets are ready."
-        : $"Setup incomplete. Current step: {_setupState.CurrentStep}. Run is disabled until smoke test and completion pass.";
+        ? "セットアップは完了しています。必要なモデルと実行環境が揃っていれば実行できます。"
+        : $"セットアップは未完了です。現在のステップ: {SetupStepDisplayName}。モデル導入、ライセンス同意、最終確認を完了すると実行できます。";
+
+    public string SetupStepDisplayName => _setupState.CurrentStep switch
+    {
+        SetupStep.Welcome => "ようこそ",
+        SetupStep.EnvironmentCheck => "環境確認",
+        SetupStep.SetupMode => "セットアップ方式",
+        SetupStep.AsrModel => "ASRモデル",
+        SetupStep.ReviewModel => "推敲LLM",
+        SetupStep.Storage => "保存先",
+        SetupStep.License => "ライセンス",
+        SetupStep.Install => "モデル導入",
+        SetupStep.SmokeTest => "最終確認",
+        SetupStep.Complete => "完了",
+        _ => _setupState.CurrentStep.ToString()
+    };
 
     public string SetupMode => _setupState.SetupMode;
 
@@ -614,7 +633,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public double ModelDownloadProgressPercent
     {
         get => _modelDownloadProgressPercent;
-        private set => SetField(ref _modelDownloadProgressPercent, Math.Clamp(value, 0, 100));
+        private set
+        {
+            if (SetField(ref _modelDownloadProgressPercent, Math.Clamp(value, 0, 100)))
+            {
+                OnPropertyChanged(nameof(ModelDownloadProgressText));
+            }
+        }
     }
 
     public bool IsModelDownloadInProgress
@@ -622,6 +647,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _isModelDownloadInProgress;
         private set => SetField(ref _isModelDownloadInProgress, value);
     }
+
+    public bool IsModelDownloadProgressIndeterminate
+    {
+        get => _isModelDownloadProgressIndeterminate;
+        private set
+        {
+            if (SetField(ref _isModelDownloadProgressIndeterminate, value))
+            {
+                OnPropertyChanged(nameof(ModelDownloadProgressText));
+            }
+        }
+    }
+
+    public string ModelDownloadProgressText => IsModelDownloadProgressIndeterminate
+        ? "計算中"
+        : $"{ModelDownloadProgressPercent:0}%";
 
     public string ModelDownloadNotification
     {
@@ -767,10 +808,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string DetailPanelTitle => SelectedDetailPanelTabIndex switch
     {
-        0 => "Settings",
-        1 => "Setup / Model Install",
-        2 => "Models",
-        _ => "Details"
+        0 => "設定",
+        1 => "セットアップ / モデル導入",
+        2 => "モデル",
+        _ => "詳細"
     };
 
     public string SelectedSpeakerFilter
@@ -1257,6 +1298,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void BeginModelDownloadProgress(string displayName)
     {
         IsModelDownloadInProgress = true;
+        IsModelDownloadProgressIndeterminate = false;
         ModelDownloadProgressPercent = 0;
         ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
         ModelDownloadNotification = string.Empty;
@@ -1264,9 +1306,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
     {
-        if (progress.BytesTotal is > 0)
+        if (GetUsableDownloadTotal(progress) is { } totalBytes)
         {
-            ModelDownloadProgressPercent = progress.BytesDownloaded * 100d / progress.BytesTotal.Value;
+            IsModelDownloadProgressIndeterminate = false;
+            ModelDownloadProgressPercent = progress.BytesDownloaded * 100d / totalBytes;
+        }
+        else
+        {
+            IsModelDownloadProgressIndeterminate = IsModelDownloadInProgress;
+            ModelDownloadProgressPercent = 0;
         }
 
         ModelDownloadProgressSummary = $"Downloading {displayName}: {FormatDownloadProgress(progress)}";
@@ -1276,6 +1324,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private void CompleteModelDownloadProgress(string displayName, bool succeeded, string? message = null)
     {
         IsModelDownloadInProgress = false;
+        IsModelDownloadProgressIndeterminate = false;
         if (succeeded)
         {
             ModelDownloadProgressPercent = 100;
@@ -1376,13 +1425,20 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private static string FormatDownloadProgress(ModelDownloadProgress progress)
     {
-        if (progress.BytesTotal is > 0)
+        if (GetUsableDownloadTotal(progress) is { } totalBytes)
         {
-            var percent = progress.BytesDownloaded * 100d / progress.BytesTotal.Value;
-            return $"{percent:0}% ({FormatBytes(progress.BytesDownloaded)} / {FormatBytes(progress.BytesTotal.Value)})";
+            var percent = progress.BytesDownloaded * 100d / totalBytes;
+            return $"{percent:0}% ({FormatBytes(progress.BytesDownloaded)} / {FormatBytes(totalBytes)})";
         }
 
         return FormatBytes(progress.BytesDownloaded);
+    }
+
+    private static long? GetUsableDownloadTotal(ModelDownloadProgress progress)
+    {
+        return progress.BytesTotal is > 0 && progress.BytesDownloaded <= progress.BytesTotal.Value
+            ? progress.BytesTotal
+            : null;
     }
 
     private static string FormatBytes(long sizeBytes)

@@ -99,6 +99,46 @@ public sealed class ModelDownloadServiceTests
     }
 
     [Fact]
+    public async Task DownloadAndInstallAsync_UsesCatalogSizeWhenHuggingFaceFileSizesAreMissing()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null) with
+        {
+            ModelId = "hf-repo-model",
+            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/org/repo-model", null),
+            SizeBytes = 11
+        };
+        var reports = new List<ModelDownloadProgress>();
+        var targetPath = Path.Combine(paths.UserModels, "asr", "repo-model");
+        var service = CreateService(paths, new HuggingFaceRepositoryHandler(includeSizes: false));
+
+        await service.DownloadAndInstallAsync(catalogItem, targetPath, new Progress<ModelDownloadProgress>(reports.Add));
+
+        Assert.Contains(reports, report => report.BytesDownloaded > 0 && report.BytesTotal == 11);
+        var latest = new ModelDownloadJobRepository(paths).FindLatestForModel(catalogItem.ModelId);
+        Assert.Equal(11, latest?.BytesTotal);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstallAsync_ReportsUnknownTotalWhenDownloadedBytesExceedCatalogSize()
+    {
+        var paths = CreatePaths();
+        var catalogItem = CreateCatalogItem(null) with
+        {
+            ModelId = "hf-repo-model",
+            Download = new ModelDownloadSpec("huggingface", "https://huggingface.co/org/repo-model", null),
+            SizeBytes = 2
+        };
+        var reports = new List<ModelDownloadProgress>();
+        var targetPath = Path.Combine(paths.UserModels, "asr", "repo-model");
+        var service = CreateService(paths, new HuggingFaceRepositoryHandler(includeSizes: false));
+
+        await service.DownloadAndInstallAsync(catalogItem, targetPath, new Progress<ModelDownloadProgress>(reports.Add));
+
+        Assert.Contains(reports, report => report.BytesDownloaded > 2 && report.BytesTotal is null);
+    }
+
+    [Fact]
     public async Task ResumeDownloadAndInstallAsync_ContinuesPartialFile()
     {
         var paths = CreatePaths();
@@ -263,14 +303,13 @@ public sealed class ModelDownloadServiceTests
         }
     }
 
-    private sealed class HuggingFaceRepositoryHandler : HttpMessageHandler
+    private sealed class HuggingFaceRepositoryHandler(bool includeSizes = true) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri?.AbsolutePath ?? string.Empty;
-            var body = path switch
-            {
-                "/api/models/org/repo-model" => """
+            var metadata = includeSizes
+                ? """
                     {
                       "siblings": [
                         { "rfilename": ".gitattributes", "size": 1 },
@@ -278,7 +317,19 @@ public sealed class ModelDownloadServiceTests
                         { "rfilename": "nested/config.json", "size": 6 }
                       ]
                     }
-                    """,
+                    """
+                : """
+                    {
+                      "siblings": [
+                        { "rfilename": ".gitattributes" },
+                        { "rfilename": "model.bin" },
+                        { "rfilename": "nested/config.json" }
+                      ]
+                    }
+                    """;
+            var body = path switch
+            {
+                "/api/models/org/repo-model" => metadata,
                 "/org/repo-model/resolve/main/model.bin" => "model",
                 "/org/repo-model/resolve/main/nested/config.json" => "config",
                 _ => throw new InvalidOperationException($"Unexpected URL: {request.RequestUri}")

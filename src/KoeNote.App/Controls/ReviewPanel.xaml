@@ -217,9 +217,9 @@
                 <Border Background="#FAFBFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8" Padding="14">
                     <StackPanel>
                         <TextBlock Text="ASRコンテキスト" Style="{StaticResource SectionTitle}" FontSize="14" Margin="0,0,0,10" />
-                        <TextBlock Text="Context" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="コンテキスト" Style="{StaticResource MutedText}" />
                         <TextBox Text="{Binding AsrContextText, UpdateSourceTrigger=PropertyChanged}" MinHeight="62" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,5,0,12" />
-                        <TextBlock Text="Hotwords" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="ホットワード" Style="{StaticResource MutedText}" />
                         <TextBox Text="{Binding AsrHotwordsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="38" TextWrapping="Wrap" AcceptsReturn="True" />
                     </StackPanel>
                 </Border>

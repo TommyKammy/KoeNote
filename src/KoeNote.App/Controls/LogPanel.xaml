@@ -11,26 +11,26 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Log / Settings / Setup / Models" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="ログ / 設定 / セットアップ / モデル" Style="{StaticResource SectionTitle}" />
                         <TextBlock Grid.Column="1" Text="{Binding LatestLog}" Style="{StaticResource MutedText}" TextAlignment="Right" VerticalAlignment="Center" />
-                        <Button Grid.Column="2" Margin="12,0,0,0" Padding="10,6" Command="{Binding OpenSelectedDetailPanelCommand}" ToolTip="Open selected tab in a wide side panel">
+                        <Button Grid.Column="2" Margin="12,0,0,0" Padding="10,6" Command="{Binding OpenSelectedDetailPanelCommand}" ToolTip="選択中のタブを広いパネルで開きます">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE740;" Style="{StaticResource IconText}" />
-                                <TextBlock Text="Wide" FontSize="12" />
+                                <TextBlock Text="拡大" FontSize="12" />
                             </StackPanel>
                         </Button>
                     </Grid>
                     <TabControl BorderThickness="0" Background="Transparent" SelectedIndex="{Binding SelectedLogPanelTabIndex, Mode=TwoWay}">
-                        <TabItem Header="Logs">
+                        <TabItem Header="ログ">
                             <controls:LogEntriesTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
-                        <TabItem Header="Settings">
+                        <TabItem Header="設定">
                             <controls:SettingsTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
-                        <TabItem Header="Setup">
+                        <TabItem Header="セットアップ">
                             <controls:SetupWizardTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
-                        <TabItem Header="Models">
+                        <TabItem Header="モデル">
                             <controls:ModelCatalogTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
                     </TabControl>

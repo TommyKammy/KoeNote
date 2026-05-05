@@ -31,7 +31,7 @@
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding AsrModel}"
                                Margin="0,0,18,0" />
-                    <TextBlock Text="Review" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
+                    <TextBlock Text="推敲" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                     <TextBlock Text="{Binding ReviewModel}" FontSize="12" MaxWidth="160" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Grid>
@@ -43,19 +43,19 @@
                     <Button Style="{StaticResource PrimaryButton}" Command="{Binding AddAudioCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                            <TextBlock Text="Import" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="音声追加" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding RunSelectedJobCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="Run" />
+                            <TextBlock Text="実行" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding CancelCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="Cancel" />
+                            <TextBlock Text="中止" />
                         </StackPanel>
                     </Button>
                     <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
@@ -84,29 +84,29 @@
                         </StackPanel>
                     </Button>
                     <CheckBox IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
-                              Content="Time"
+                              Content="時刻"
                               VerticalAlignment="Center"
                               Margin="8,0,0,0"
                               FontSize="12"
                               Foreground="{StaticResource MutedBrush}"
-                              ToolTip="Include timestamps in TXT, Markdown, and DOCX exports" />
+                              ToolTip="TXT / Markdown / DOCX 出力にタイムスタンプを含めます" />
                     <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
                     <Button Command="{Binding OpenSettingsCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="Settings" />
+                            <TextBlock Text="設定" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding OpenSetupCommand}" ToolTip="{Binding SetupPlaceholderText}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE9D9;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="Setup" />
+                            <TextBlock Text="セットアップ" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ShowModelCatalogCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="Models" />
+                            <TextBlock Text="モデル" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

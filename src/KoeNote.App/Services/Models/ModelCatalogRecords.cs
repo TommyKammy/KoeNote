@@ -147,10 +147,10 @@ public sealed record ModelCatalogEntry(
                 return string.IsNullOrWhiteSpace(CatalogItem.Download.Url) ? "No URL" : "Ready";
             }
 
-            if (LatestDownloadJob.BytesTotal is > 0)
+            if (LatestDownloadJob is { } job && UsableDownloadTotal is { } totalBytes)
             {
-                var percent = LatestDownloadJob.BytesDownloaded * 100d / LatestDownloadJob.BytesTotal.Value;
-                return $"{LatestDownloadJob.Status} {percent:0}%";
+                var percent = job.BytesDownloaded * 100d / totalBytes;
+                return $"{job.Status} {percent:0}%";
             }
 
             return LatestDownloadJob.BytesDownloaded > 0
@@ -159,21 +159,28 @@ public sealed record ModelCatalogEntry(
         }
     }
 
-    public double DownloadProgressPercent => LatestDownloadJob?.BytesTotal is > 0
-        ? Math.Clamp(LatestDownloadJob.BytesDownloaded * 100d / LatestDownloadJob.BytesTotal.Value, 0, 100)
+    public double DownloadProgressPercent => LatestDownloadJob is { } job && UsableDownloadTotal is { } totalBytes
+        ? Math.Clamp(job.BytesDownloaded * 100d / totalBytes, 0, 100)
         : 0;
 
-    public bool HasKnownDownloadProgress => LatestDownloadJob?.BytesTotal is > 0;
+    public bool HasKnownDownloadProgress => UsableDownloadTotal is not null;
+
+    public bool IsDownloadProgressIndeterminate => IsDownloadActive && !HasKnownDownloadProgress;
 
     public bool IsDownloadActive => LatestDownloadJob is { Status: "running" or "paused" };
 
     public string DownloadBytesSummary => LatestDownloadJob is null
         ? string.Empty
-        : LatestDownloadJob.BytesTotal is > 0
-            ? $"{FormatSize(LatestDownloadJob.BytesDownloaded)} / {FormatSize(LatestDownloadJob.BytesTotal.Value)}"
+        : UsableDownloadTotal is { } totalBytes
+            ? $"{FormatSize(LatestDownloadJob.BytesDownloaded)} / {FormatSize(totalBytes)}"
             : FormatSize(LatestDownloadJob.BytesDownloaded);
 
     public string? DownloadError => LatestDownloadJob?.ErrorMessage;
+
+    private long? UsableDownloadTotal => LatestDownloadJob is { BytesTotal: > 0 } job &&
+        job.BytesDownloaded <= job.BytesTotal.Value
+            ? job.BytesTotal
+            : null;
 
     private static bool IsHuggingFaceRepositoryUrl(string url)
     {

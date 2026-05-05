@@ -5,31 +5,31 @@
         <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal">
                 <Button Command="{Binding RegisterPreinstalledModelsCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Scan" FontSize="12" />
+                    <TextBlock Text="再検出" FontSize="12" />
                 </Button>
                 <Button Command="{Binding DownloadSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Download" FontSize="12" />
+                    <TextBlock Text="ダウンロード" FontSize="12" />
                 </Button>
                 <Button Command="{Binding PauseSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Pause" FontSize="12" />
+                    <TextBlock Text="一時停止" FontSize="12" />
                 </Button>
                 <Button Command="{Binding ResumeSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Resume" FontSize="12" />
+                    <TextBlock Text="再開" FontSize="12" />
                 </Button>
                 <Button Command="{Binding CancelSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Cancel" FontSize="12" />
+                    <TextBlock Text="中止" FontSize="12" />
                 </Button>
                 <Button Command="{Binding RetrySelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Retry" FontSize="12" />
+                    <TextBlock Text="再試行" FontSize="12" />
                 </Button>
                 <Button Command="{Binding UseSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="Use" FontSize="12" />
+                    <TextBlock Text="使用" FontSize="12" />
                 </Button>
                 <Button Command="{Binding ShowSelectedModelLicenseCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="License" FontSize="12" />
+                    <TextBlock Text="ライセンス" FontSize="12" />
                 </Button>
                 <Button Command="{Binding ForgetSelectedModelCommand}" Padding="10,5">
-                    <TextBlock Text="Forget" FontSize="12" />
+                    <TextBlock Text="登録解除" FontSize="12" />
                 </Button>
             </StackPanel>
         </ScrollViewer>
@@ -56,6 +56,7 @@
                              Minimum="0"
                              Maximum="100"
                              Value="{Binding SelectedModelCatalogEntry.DownloadProgressPercent, Mode=OneWay}"
+                             IsIndeterminate="{Binding SelectedModelCatalogEntry.IsDownloadProgressIndeterminate}"
                              Height="8"
                              Margin="0,8,0,0" />
             </Grid>
@@ -93,6 +94,7 @@
                                      Minimum="0"
                                      Maximum="100"
                                      Value="{Binding DownloadProgressPercent, Mode=OneWay}"
+                                     IsIndeterminate="{Binding IsDownloadProgressIndeterminate}"
                                      Height="4"
                                      Margin="0,4,0,0" />
                     </Grid>

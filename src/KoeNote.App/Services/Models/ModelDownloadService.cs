@@ -196,8 +196,9 @@ public sealed class ModelDownloadService(
         Directory.CreateDirectory(job.TempPath);
         var totalBytes = files.All(static file => file.SizeBytes.HasValue)
             ? files.Sum(static file => file.SizeBytes!.Value)
-            : (long?)null;
+            : catalogItem.SizeBytes;
         var downloadedBytes = CalculateDirectorySize(job.TempPath);
+        totalBytes = NormalizeTotalBytes(downloadedBytes, totalBytes);
         downloadJobRepository.UpdateProgress(downloadId, downloadedBytes, totalBytes);
         progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
 
@@ -215,6 +216,14 @@ public sealed class ModelDownloadService(
             var fileUri = new Uri($"https://huggingface.co/{repoId}/resolve/main/{Uri.EscapeDataString(file.RelativePath).Replace("%2F", "/", StringComparison.Ordinal)}");
             using var response = await httpClient.GetAsync(fileUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
+            if (!file.SizeBytes.HasValue && totalBytes is null && response.Content.Headers.ContentLength is { } contentLength)
+            {
+                totalBytes = downloadedBytes + contentLength;
+                totalBytes = NormalizeTotalBytes(downloadedBytes, totalBytes);
+                downloadJobRepository.UpdateProgress(downloadId, downloadedBytes, totalBytes);
+                progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
+            }
+
             await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
             await using var output = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
             var buffer = new byte[1024 * 128];
@@ -228,6 +237,7 @@ public sealed class ModelDownloadService(
 
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 downloadedBytes += read;
+                totalBytes = NormalizeTotalBytes(downloadedBytes, totalBytes);
                 downloadJobRepository.UpdateProgress(downloadId, downloadedBytes, totalBytes);
                 progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
             }
@@ -293,6 +303,13 @@ public sealed class ModelDownloadService(
         return Directory.Exists(directoryPath)
             ? Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories).Sum(static path => new FileInfo(path).Length)
             : 0;
+    }
+
+    private static long? NormalizeTotalBytes(long downloadedBytes, long? totalBytes)
+    {
+        return totalBytes is > 0 && downloadedBytes <= totalBytes.Value
+            ? totalBytes
+            : null;
     }
 
     private static bool IsSupportedDownload(ModelCatalogItem catalogItem)
