@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using Microsoft.Win32;
@@ -65,6 +66,31 @@ public sealed partial class MainWindowViewModel
         var result = await _setupWizardService.DownloadSelectedModelAsync("review", progress);
         RefreshSetupWizard();
         CompleteSetupModelDownload(displayName, result);
+    }
+
+    private async Task SetupInstallDiarizationRuntimeAsync()
+    {
+        const string displayName = "diarize speaker diarization runtime";
+        BeginModelDownloadProgress(displayName);
+        ModelDownloadProgressSummary = "Installing diarize runtime with pip...";
+        IsModelDownloadProgressIndeterminate = true;
+
+        try
+        {
+            var result = await _setupWizardService.InstallDiarizationRuntimeAsync();
+            SetupDiarizationRuntimeSummary = result.IsSucceeded
+                ? $"話者識別ランタイムを導入しました: {result.InstallPath}"
+                : $"話者識別ランタイムの導入に失敗しました: {result.Message}";
+            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : result.Message);
+            LatestLog = result.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            CompleteModelDownloadProgress(displayName, succeeded: false, "diarize runtime install was cancelled.");
+            LatestLog = "diarize runtime install was cancelled.";
+        }
+
+        RefreshSetupWizard();
     }
 
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
@@ -195,6 +221,7 @@ public sealed partial class MainWindowViewModel
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
         _setupState = _setupWizardService.LoadState();
+        RefreshDiarizationRuntimeSummary();
         SetupSteps.Clear();
         foreach (var step in _setupWizardService.BuildStepItems(_setupState))
         {
@@ -240,6 +267,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupMode));
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));
+        OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
         OnPropertyChanged(nameof(IsSetupComplete));
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
@@ -253,5 +281,13 @@ public sealed partial class MainWindowViewModel
         {
             runCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private void RefreshDiarizationRuntimeSummary()
+    {
+        var isInstalled = DiarizationRuntimeLayout.HasPackage(Paths);
+        SetupDiarizationRuntimeSummary = isInstalled
+            ? $"話者識別ランタイム導入済み: {Paths.PythonPackages}"
+            : "話者識別ランタイムは未導入です。必要な場合だけ追加導入できます。";
     }
 }

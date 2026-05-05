@@ -16,7 +16,11 @@ public sealed class ModelCatalogServiceTests
 
         var entries = new ModelCatalogService(paths).ListEntries();
 
-        Assert.Contains(entries, entry => entry.ModelId == "reazonspeech-k2-v3-ja" && entry.Role == "asr");
+        var asrModels = entries.Where(entry => entry.Role == "asr").Select(entry => entry.ModelId).ToArray();
+        Assert.Equal(
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster"],
+            asrModels.Order(StringComparer.OrdinalIgnoreCase).ToArray());
+        Assert.Contains(entries, entry => entry.ModelId == "kotoba-whisper-v2.2-faster" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "faster-whisper-large-v3-turbo" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
     }
@@ -33,11 +37,11 @@ public sealed class ModelCatalogServiceTests
         var modelPath = Path.Combine(paths.UserModels, "asr", "dummy.gguf");
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
         File.WriteAllText(modelPath, "dummy model");
-        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "vibevoice-asr-q4-k");
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "kotoba-whisper-v2.2-faster");
 
         installService.RegisterLocalModel(catalogItem, modelPath, "local_file");
 
-        var entry = catalogService.ListEntries().First(entry => entry.ModelId == "vibevoice-asr-q4-k");
+        var entry = catalogService.ListEntries().First(entry => entry.ModelId == "kotoba-whisper-v2.2-faster");
         Assert.True(entry.IsInstalled);
         Assert.True(entry.IsVerified);
         Assert.Equal("installed", entry.InstallState);

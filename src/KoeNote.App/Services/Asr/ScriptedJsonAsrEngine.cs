@@ -126,6 +126,19 @@ public sealed class ScriptedJsonAsrEngine(
             arguments.Add(hotword);
         }
 
+        if (config.ModelId.Equals("kotoba-whisper-v2.2-faster", StringComparison.OrdinalIgnoreCase))
+        {
+            arguments.Add("--device");
+            arguments.Add("auto");
+            arguments.Add("--compute-type");
+            arguments.Add("float32");
+            arguments.Add("--local-files-only");
+            arguments.Add("--chunk-length");
+            arguments.Add("5");
+            arguments.Add("--condition-on-previous-text");
+            arguments.Add("false");
+        }
+
         return arguments;
     }
 

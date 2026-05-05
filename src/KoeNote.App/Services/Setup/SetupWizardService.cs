@@ -1,3 +1,4 @@
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 
 namespace KoeNote.App.Services.Setup;
@@ -8,6 +9,7 @@ public sealed class SetupWizardService
     private readonly SetupModelSelectionService _selectionService;
     private readonly SetupModelInstallService _installService;
     private readonly SetupReadinessService _readinessService;
+    private readonly DiarizationRuntimeService _diarizationRuntimeService;
 
     public SetupWizardService(
         AppPaths paths,
@@ -17,8 +19,10 @@ public sealed class SetupWizardService
         InstalledModelRepository installedModelRepository,
         ModelInstallService modelInstallService,
         ModelPackImportService modelPackImportService,
-        ModelDownloadService modelDownloadService)
+        ModelDownloadService modelDownloadService,
+        DiarizationRuntimeService diarizationRuntimeService)
     {
+        _diarizationRuntimeService = diarizationRuntimeService;
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
         _installService = new SetupModelInstallService(
@@ -95,6 +99,16 @@ public sealed class SetupWizardService
         CancellationToken cancellationToken = default)
     {
         return _installService.DownloadSelectedModelAsync(role, progress, cancellationToken);
+    }
+
+    public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _diarizationRuntimeService.InstallAsync(cancellationToken);
+    }
+
+    public Task<DiarizationRuntimeStatus> CheckDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _diarizationRuntimeService.CheckAsync(cancellationToken);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

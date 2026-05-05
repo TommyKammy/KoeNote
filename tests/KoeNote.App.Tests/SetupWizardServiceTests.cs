@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.IO.Compression;
 using System.Net;
 using KoeNote.App.Services;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 
@@ -43,15 +44,16 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_ListsReazonSpeechFasterWhisperAndReviewChoices()
+    public void SetupWizard_ListsThreeSelectableAsrModelsAndReviewChoices()
     {
         var wizard = CreateWizard(CreatePaths());
 
         var asrModels = wizard.GetSelectableModels("asr");
         var reviewModels = wizard.GetSelectableModels("review");
 
-        Assert.Contains(asrModels, entry => entry.DisplayName.Contains("ReazonSpeech", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(asrModels, entry => entry.DisplayName.Contains("faster-whisper", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster"],
+            asrModels.Select(entry => entry.ModelId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
         Assert.NotEmpty(reviewModels);
     }
 
@@ -101,17 +103,16 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths();
         Touch(paths.FfmpegPath);
-        Touch(paths.CrispAsrPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.VibeVoiceAsrModelPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var installedModels = new InstalledModelRepository(paths);
-        UpsertVerified(installedModels, "vibevoice-asr-q4-k", "asr", "vibevoice-asr-gguf", paths.VibeVoiceAsrModelPath);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
         UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
         var wizard = CreateWizard(paths);
-        wizard.SelectModel("asr", "vibevoice-asr-q4-k");
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
         wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
         wizard.AcceptLicenses();
 
@@ -128,17 +129,16 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths();
         Touch(paths.FfmpegPath);
-        Touch(paths.CrispAsrPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.VibeVoiceAsrModelPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var installedModels = new InstalledModelRepository(paths);
-        UpsertVerified(installedModels, "vibevoice-asr-q4-k", "asr", "vibevoice-asr-gguf", paths.VibeVoiceAsrModelPath);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
         UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
         var wizard = CreateWizard(paths);
-        wizard.SelectModel("asr", "vibevoice-asr-q4-k");
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
         wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
         wizard.AcceptLicenses();
         Assert.True(wizard.RunSmokeCheck().IsSucceeded);
@@ -175,13 +175,13 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths);
-        var packPath = CreateOfflinePack(paths, "vibevoice-asr-q4-k", "model.bin");
+        var packPath = CreateOfflinePack(paths, "kotoba-whisper-v2.2-faster", "model.bin");
 
         var result = wizard.ImportOfflineModelPack(packPath);
 
         Assert.True(result.IsSucceeded);
-        Assert.Contains(result.InstalledModels, model => model.ModelId == "vibevoice-asr-q4-k");
-        Assert.NotNull(new InstalledModelRepository(paths).FindInstalledModel("vibevoice-asr-q4-k")?.ManifestPath);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == "kotoba-whisper-v2.2-faster");
+        Assert.NotNull(new InstalledModelRepository(paths).FindInstalledModel("kotoba-whisper-v2.2-faster")?.ManifestPath);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths(InstallScope.AllUsers);
         var wizard = CreateWizard(paths);
-        var packPath = CreateOfflinePack(paths, "vibevoice-asr-q4-k", "model.bin");
+        var packPath = CreateOfflinePack(paths, "kotoba-whisper-v2.2-faster", "model.bin");
 
         var result = wizard.ImportOfflineModelPack(packPath);
 
@@ -274,7 +274,8 @@ public sealed class SetupWizardServiceTests
                 httpClient ?? new HttpClient(),
                 new ModelDownloadJobRepository(paths),
                 verificationService,
-                installService));
+                installService),
+            new DiarizationRuntimeService(paths, new ExternalProcessRunner()));
     }
 
     private static AppPaths CreatePaths(InstallScope installScope = InstallScope.CurrentUser)

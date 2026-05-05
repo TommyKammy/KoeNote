@@ -27,7 +27,9 @@ public sealed class MainWindowViewModelTests
         var second = new MainWindowViewModel(paths);
 
         Assert.Equal(first.SelectedAsrEngineId, second.SelectedAsrEngineId);
-        Assert.Contains(second.AvailableAsrEngines, engine => engine.EngineId == "reazonspeech-k2-v3");
+        Assert.Equal(
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster"],
+            second.AvailableAsrEngines.Select(engine => engine.EngineId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     [Fact]
@@ -48,6 +50,27 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedAsrEngineId = "faster-whisper-large-v3";
 
         Assert.Equal("faster-whisper large-v3", viewModel.AsrModel);
+    }
+
+    [Fact]
+    public void SelectedAsrEngine_FallsBackToInstalledSelectableModelWhenLegacySettingRemains()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, VibeVoiceCrispAsrEngine.Id, true));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("faster-whisper-large-v3", viewModel.SelectedAsrEngineId);
     }
 
     [Fact]
@@ -483,9 +506,9 @@ public sealed class MainWindowViewModelTests
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
         Touch(paths.FfmpegPath);
-        Touch(paths.CrispAsrPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.VibeVoiceAsrModelPath);
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
@@ -510,9 +533,9 @@ public sealed class MainWindowViewModelTests
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
-        Touch(paths.CrispAsrPath);
-        Touch(paths.VibeVoiceAsrModelPath);
-        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, VibeVoiceCrispAsrEngine.Id, false));
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
             IsCompleted = true,

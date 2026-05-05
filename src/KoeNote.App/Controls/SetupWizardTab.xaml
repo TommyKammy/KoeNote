@@ -88,6 +88,31 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="112" />
                                 </Grid.ColumnDefinitions>
+                                <TextBlock Text="話者識別"
+                                           Foreground="#64748B"
+                                           FontSize="12"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding SetupDiarizationRuntimeSummary}"
+                                           Foreground="#64748B"
+                                           FontSize="12"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"
+                                           ToolTip="{Binding SetupDiarizationRuntimeSummary}" />
+                                <Button Grid.Column="2"
+                                        Command="{Binding SetupInstallDiarizationRuntimeCommand}"
+                                        Padding="10,7"
+                                        Margin="12,0,0,0">
+                                    <TextBlock Text="追加導入" FontSize="12" FontWeight="SemiBold" />
+                                </Button>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="112" />
+                                </Grid.ColumnDefinitions>
                                 <TextBlock Text="推敲 LLM"
                                            Foreground="#64748B"
                                            FontSize="12"

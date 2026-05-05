@@ -23,6 +23,8 @@ public sealed record AsrEngineOption(string EngineId, string DisplayName);
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
+    private const string DefaultSelectableAsrEngineId = "kotoba-whisper-v2.2-faster";
+
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
     private readonly AsrSettingsRepository _asrSettingsRepository;
@@ -74,6 +76,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
     private string _modelDownloadNotification = string.Empty;
+    private bool _isModelDownloadNotificationError;
+    private string _setupDiarizationRuntimeSummary = "話者識別ランタイムは未導入です。必要になったらここから追加できます。";
     private string _databaseMaintenanceSummary = string.Empty;
     private bool _isDatabaseMaintenanceInProgress;
     private double _modelDownloadProgressPercent;
@@ -165,7 +169,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
-        foreach (var engine in _asrEngineRegistry.Engines)
+        foreach (var engine in _asrEngineRegistry.Engines.Where(static engine => IsUserSelectableAsrEngine(engine.EngineId)))
         {
             AvailableAsrEngines.Add(new AsrEngineOption(engine.EngineId, engine.DisplayName));
         }
@@ -174,9 +178,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
-        _selectedAsrEngineId = _asrEngineRegistry.Contains(asrSettings.EngineId)
-            ? asrSettings.EngineId
-            : VibeVoiceCrispAsrEngine.Id;
+        _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
         FilteredSegments = CollectionViewSource.GetDefaultView(Segments);
@@ -219,6 +221,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupAcceptLicensesCommand = new RelayCommand(SetupAcceptLicensesAsync);
         SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync);
         SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync);
+        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync);
         SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
         SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
         SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
@@ -309,6 +312,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupPlaceholderText =>
         "Phase 11 の Model Catalog と Phase 12 の Setup Wizard で、ASR / 推敲モデルの導入を案内します。現時点では必要ファイルの配置先を表示します。";
+
+    public string SetupDiarizationRuntimeSummary
+    {
+        get => _setupDiarizationRuntimeSummary;
+        private set => SetField(ref _setupDiarizationRuntimeSummary, value);
+    }
 
     public bool RequiredRuntimeAssetsReady => EnvironmentStatus
         .Where(item => item.Name == "ffmpeg" || (EnableReviewStage && item.Name == "llama-completion"))
@@ -425,6 +434,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SetupDownloadAsrCommand { get; }
 
     public ICommand SetupDownloadReviewCommand { get; }
+
+    public ICommand SetupInstallDiarizationRuntimeCommand { get; }
 
     public ICommand SetupRegisterLocalAsrCommand { get; }
 
@@ -677,6 +688,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public bool HasModelDownloadNotification => !string.IsNullOrWhiteSpace(ModelDownloadNotification);
+
+    public bool IsModelDownloadNotificationError
+    {
+        get => _isModelDownloadNotificationError;
+        private set => SetField(ref _isModelDownloadNotificationError, value);
+    }
 
     public string SetupLocalModelPath
     {
@@ -1006,7 +1023,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedAsrEngineId;
         set
         {
-            var engineId = string.IsNullOrWhiteSpace(value) ? VibeVoiceCrispAsrEngine.Id : value;
+            var engineId = IsUserSelectableAsrEngine(value) ? value : DefaultSelectableAsrEngineId;
             if (SetField(ref _selectedAsrEngineId, engineId))
             {
                 OnPropertyChanged(nameof(AsrModel));
@@ -1301,6 +1318,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         IsModelDownloadProgressIndeterminate = false;
         ModelDownloadProgressPercent = 0;
         ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
+        IsModelDownloadNotificationError = false;
         ModelDownloadNotification = string.Empty;
     }
 
@@ -1330,12 +1348,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             ModelDownloadProgressPercent = 100;
             ModelDownloadProgressSummary = $"Completed {displayName}: 100%";
             ModelDownloadNotification = $"Download completed: {displayName}";
+            IsModelDownloadNotificationError = false;
             LatestLog = $"Model installed and verified: {displayName}";
             return;
         }
 
         ModelDownloadProgressSummary = message ?? $"Download stopped: {displayName}";
         ModelDownloadNotification = ModelDownloadProgressSummary;
+        IsModelDownloadNotificationError = true;
         LatestLog = ModelDownloadProgressSummary;
     }
 
@@ -1469,6 +1489,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         return SelectedAsrEngineId switch
         {
             VibeVoiceCrispAsrEngine.Id => File.Exists(Paths.CrispAsrPath) && File.Exists(Paths.VibeVoiceAsrModelPath),
+            "kotoba-whisper-v2.2-faster" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("kotoba-whisper-v2.2-faster", Paths.KotobaWhisperFasterModelPath),
             "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
             "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
@@ -1477,6 +1499,44 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),
             _ => false
         };
+    }
+
+    private static bool IsUserSelectableAsrEngine(string? engineId)
+    {
+        return engineId is "kotoba-whisper-v2.2-faster"
+            or "faster-whisper-large-v3-turbo"
+            or "faster-whisper-large-v3";
+    }
+
+    private string ResolveInitialAsrEngineId(string? savedEngineId)
+    {
+        if (IsUserSelectableAsrEngine(savedEngineId))
+        {
+            return savedEngineId!;
+        }
+
+        if (IsUserSelectableAsrEngine(_setupState.SelectedAsrModelId))
+        {
+            return _setupState.SelectedAsrModelId!;
+        }
+
+        foreach (var candidate in new[]
+        {
+            "kotoba-whisper-v2.2-faster",
+            "faster-whisper-large-v3-turbo",
+            "faster-whisper-large-v3"
+        })
+        {
+            var installed = _installedModelRepository.FindInstalledModel(candidate);
+            if (installed is not null &&
+                installed.Verified &&
+                (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+            {
+                return candidate;
+            }
+        }
+
+        return DefaultSelectableAsrEngineId;
     }
 
     private bool IsReviewModelReady()

@@ -15,6 +15,7 @@ public sealed class MainWindowServicesTests
 
         Assert.True(File.Exists(paths.DatabasePath));
         Assert.True(services.AsrEngineRegistry.Contains("vibevoice-crispasr"));
+        Assert.True(services.AsrEngineRegistry.Contains("kotoba-whisper-v2.2-faster"));
         Assert.True(services.AsrEngineRegistry.Contains("faster-whisper-large-v3-turbo"));
         Assert.True(services.AsrEngineRegistry.Contains("reazonspeech-k2-v3"));
         Assert.NotNull(services.AudioPlaybackService);

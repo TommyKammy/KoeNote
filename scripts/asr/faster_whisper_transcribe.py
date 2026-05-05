@@ -22,9 +22,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", required=True)
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--language", default="ja")
+    parser.add_argument("--device", default="auto")
+    parser.add_argument("--compute-type", default="auto")
+    parser.add_argument("--local-files-only", action="store_true")
     parser.add_argument("--context", default=None)
     parser.add_argument("--hotword", action="append", default=[])
     parser.add_argument("--chunk-length", type=int, default=None)
+    parser.add_argument("--condition-on-previous-text", choices=["true", "false"], default="true")
     parser.add_argument("--diarization", choices=["auto", "off", "pyannote"], default="auto")
     parser.add_argument("--diarization-model", default="pyannote/speaker-diarization-3.1")
     parser.add_argument("--hf-token", default=None)
@@ -110,11 +114,16 @@ def main() -> int:
         prompt_parts.append(" ".join(args.hotword))
     initial_prompt = "\n".join(prompt_parts) if prompt_parts else None
 
-    model = WhisperModel(args.model, device="auto", compute_type="auto")
+    model = WhisperModel(
+        args.model,
+        device=args.device,
+        compute_type=args.compute_type,
+        local_files_only=args.local_files_only)
     transcribe_options = {
         "language": args.language,
         "initial_prompt": initial_prompt,
         "vad_filter": True,
+        "condition_on_previous_text": args.condition_on_previous_text == "true",
     }
     if args.chunk_length is not None and args.chunk_length > 0:
         transcribe_options["chunk_length"] = args.chunk_length

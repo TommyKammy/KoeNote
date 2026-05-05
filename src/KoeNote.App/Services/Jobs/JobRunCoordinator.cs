@@ -2,6 +2,7 @@ using System.IO;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Audio;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 
@@ -15,6 +16,7 @@ public sealed class JobRunCoordinator(
     AudioPreprocessWorker audioPreprocessWorker,
     AsrEngineRegistry asrEngineRegistry,
     InstalledModelRepository installedModelRepository,
+    ScriptedDiarizationService diarizationService,
     ReviewWorker reviewWorker,
     CorrectionMemoryService correctionMemoryService)
 {
@@ -86,12 +88,37 @@ public sealed class JobRunCoordinator(
                     TimeSpan.FromHours(2)),
                 cancellationToken);
 
+            report(new JobRunUpdate(LatestLog: "Running speaker diarization..."));
+            var diarizationResult = await diarizationService.RunAsync(
+                job.JobId,
+                normalizedAudioPath,
+                result.Segments,
+                cancellationToken);
+            var segments = diarizationResult.Segments;
+
+            if (diarizationResult.AssignedSegmentCount > 0)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "diarization",
+                    "info",
+                    $"Assigned {diarizationResult.SpeakerCount} speakers to {diarizationResult.AssignedSegmentCount} segments with diarize: {diarizationResult.RawOutputPath}");
+            }
+            else
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "diarization",
+                    "warning",
+                    $"Speaker diarization skipped: {diarizationResult.Status}");
+            }
+
             var finishedAt = DateTimeOffset.Now;
             report(new JobRunUpdate(
                 JobRunStage.Asr,
                 JobRunStageState.Succeeded,
                 100,
-                Segments: result.Segments));
+                Segments: segments));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
@@ -103,12 +130,12 @@ public sealed class JobRunCoordinator(
                 logPath: result.RawOutputPath);
             jobRepository.MarkAsrSucceeded(job);
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {result.Segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
-            report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR completed: {result.Segments.Count} segments"));
+            jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
+            report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR completed: {segments.Count} segments"));
 
             if (asrSettings.EnableReviewStage)
             {
-                await RunReviewAsync(job, result.Segments, report, cancellationToken);
+                await RunReviewAsync(job, segments, report, cancellationToken);
             }
             else
             {
@@ -175,6 +202,13 @@ public sealed class JobRunCoordinator(
     {
         return engineId switch
         {
+            "kotoba-whisper-v2.2-faster" => new AsrEngineConfig(
+                "python",
+                ResolveModelPath("kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath),
+                outputDirectory,
+                "kotoba-whisper-v2.2-faster",
+                paths.FasterWhisperScriptPath,
+                "kotoba-whisper-v2.2"),
             "faster-whisper-large-v3-turbo" => new AsrEngineConfig(
                 "python",
                 ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),

@@ -2,6 +2,7 @@ using System.Net.Http;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Audio;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
@@ -30,6 +31,7 @@ public sealed record MainWindowServices(
     ModelDownloadService ModelDownloadService,
     ModelLicenseViewer ModelLicenseViewer,
     SetupWizardService SetupWizardService,
+    DiarizationRuntimeService DiarizationRuntimeService,
     IAudioPlaybackService AudioPlaybackService,
     ToolStatusService ToolStatusService,
     StatusBarInfoService StatusBarInfoService,
@@ -64,6 +66,8 @@ public sealed record MainWindowServices(
         var setupStateService = new SetupStateService(paths);
         var toolStatusService = new ToolStatusService(paths);
         var audioPlaybackService = new AudioPlaybackService();
+        var processRunner = new ExternalProcessRunner();
+        var diarizationRuntimeService = new DiarizationRuntimeService(paths, processRunner);
         var setupWizardService = new SetupWizardService(
             paths,
             setupStateService,
@@ -72,15 +76,16 @@ public sealed record MainWindowServices(
             installedModelRepository,
             modelInstallService,
             modelPackImportService,
-            modelDownloadService);
+            modelDownloadService,
+            diarizationRuntimeService);
         var transcriptSegmentRepository = new TranscriptSegmentRepository(paths);
-        var processRunner = new ExternalProcessRunner();
         var audioPreprocessWorker = new AudioPreprocessWorker(processRunner, stageProgressRepository, jobLogRepository);
+        var asrResultStore = new AsrResultStore();
         var asrWorker = new AsrWorker(
             processRunner,
             new AsrCommandBuilder(),
             new AsrJsonNormalizer(),
-            new AsrResultStore(),
+            asrResultStore,
             transcriptSegmentRepository);
         var reviewWorker = new ReviewWorker(
             processRunner,
@@ -93,12 +98,21 @@ public sealed record MainWindowServices(
         var asrEngineRegistry = new AsrEngineRegistry([
             new VibeVoiceCrispAsrEngine(asrWorker, new AsrRunRepository(paths)),
             new ScriptedJsonAsrEngine(
+                "kotoba-whisper-v2.2-faster",
+                "kotoba-whisper v2.2 faster",
+                "faster-whisper",
+                processRunner,
+                new AsrJsonNormalizer(),
+                asrResultStore,
+                transcriptSegmentRepository,
+                new AsrRunRepository(paths)),
+            new ScriptedJsonAsrEngine(
                 "faster-whisper-large-v3-turbo",
                 "faster-whisper large-v3-turbo",
                 "faster-whisper",
                 processRunner,
                 new AsrJsonNormalizer(),
-                new AsrResultStore(),
+                asrResultStore,
                 transcriptSegmentRepository,
                 new AsrRunRepository(paths)),
             new ScriptedJsonAsrEngine(
@@ -107,7 +121,7 @@ public sealed record MainWindowServices(
                 "faster-whisper",
                 processRunner,
                 new AsrJsonNormalizer(),
-                new AsrResultStore(),
+                asrResultStore,
                 transcriptSegmentRepository,
                 new AsrRunRepository(paths)),
             new ScriptedJsonAsrEngine(
@@ -116,10 +130,17 @@ public sealed record MainWindowServices(
                 "reazonspeech-k2",
                 processRunner,
                 new AsrJsonNormalizer(),
-                new AsrResultStore(),
+                asrResultStore,
                 transcriptSegmentRepository,
                 new AsrRunRepository(paths))
         ]);
+        var diarizationService = new ScriptedDiarizationService(
+            paths,
+            processRunner,
+            new DiarizationJsonNormalizer(),
+            new DiarizationSegmentAssigner(),
+            transcriptSegmentRepository,
+            asrResultStore);
         var jobRunCoordinator = new JobRunCoordinator(
             paths,
             jobRepository,
@@ -128,6 +149,7 @@ public sealed record MainWindowServices(
             audioPreprocessWorker,
             asrEngineRegistry,
             installedModelRepository,
+            diarizationService,
             reviewWorker,
             correctionMemoryService);
         var statusBarInfoService = new StatusBarInfoService(paths);
@@ -152,6 +174,7 @@ public sealed record MainWindowServices(
             modelDownloadService,
             modelLicenseViewer,
             setupWizardService,
+            diarizationRuntimeService,
             audioPlaybackService,
             toolStatusService,
             statusBarInfoService,

@@ -20,7 +20,8 @@ public sealed class ExternalProcessRunner
         string fileName,
         IReadOnlyList<string> arguments,
         TimeSpan timeout,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         using var timeoutCancellation = new CancellationTokenSource(timeout);
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
@@ -49,6 +50,13 @@ public sealed class ExternalProcessRunner
         process.StartInfo.Environment.TryAdd("PYTHONUTF8", "1");
         process.StartInfo.Environment.TryAdd("PYTHONIOENCODING", "utf-8");
         process.StartInfo.Environment.TryAdd("PYTHONUNBUFFERED", "1");
+        if (environment is not null)
+        {
+            foreach (var item in environment)
+            {
+                process.StartInfo.Environment[item.Key] = item.Value;
+            }
+        }
 
         process.Start();
 

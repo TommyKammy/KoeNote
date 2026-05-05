@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Diarization;
 
 namespace KoeNote.App.Services;
 
@@ -15,6 +16,7 @@ public sealed class ToolStatusService(AppPaths paths)
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: false),
             CheckFile("crispasr", paths.CrispAsrPath, required: true),
             CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
+            CheckDiarizationRuntime(required: false),
             CheckFile("ASR model", paths.VibeVoiceAsrModelPath, required: true),
             CheckFile("Review model", paths.ReviewModelPath, required: true),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),
@@ -28,6 +30,14 @@ public sealed class ToolStatusService(AppPaths paths)
         var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
         var detail = exists ? path : $"Place the file here: {path}";
         return new StatusItem(name, value, exists || !required, detail);
+    }
+
+    private StatusItem CheckDiarizationRuntime(bool required)
+    {
+        var exists = DiarizationRuntimeLayout.HasPackage(paths);
+        var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
+        var detail = exists ? paths.PythonPackages : $"Install from Setup Wizard: {paths.PythonPackages}";
+        return new StatusItem("diarize runtime", value, exists || !required, detail);
     }
 
     private static StatusItem CheckCommand(string name, string commandName, string? arguments, bool required)
