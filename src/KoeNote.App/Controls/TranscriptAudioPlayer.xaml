@@ -3,13 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:KoeNote.App.Controls"
              xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework">
-    <Border Background="#FAFBFC"
+    <Border Background="#FFFFFF"
             BorderBrush="{StaticResource BorderBrushSoft}"
             BorderThickness="1"
             CornerRadius="8"
-            MinHeight="82"
-            Padding="14"
-            Margin="0,14,0,0">
+            MinHeight="56"
+            Padding="10,8">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -17,15 +16,15 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                <Button Width="36" Height="36" Padding="0" MinWidth="0" ToolTip="前へ">
-                    <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button Style="{StaticResource PlayerIconButton}" ToolTip="前へ">
+                    <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
                 </Button>
-                <Button Width="42"
-                        Height="42"
+                <Button Width="36"
+                        Height="36"
                         Padding="0"
                         MinWidth="0"
-                        Margin="5,0"
+                        Margin="4,0"
                         Background="{StaticResource AccentLightBrush}"
                         Command="{Binding PlayPauseAudioCommand}"
                         ToolTip="{Binding SelectedJobPlaybackPath}">
@@ -34,42 +33,25 @@
                                FontSize="18"
                                Foreground="{StaticResource AccentBrush}" />
                 </Button>
-                <Button Width="36" Height="36" Padding="0" MinWidth="0" ToolTip="次へ">
-                    <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                <Button Style="{StaticResource PlayerIconButton}" ToolTip="次へ">
+                    <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
                 </Button>
-                <ComboBox Width="78"
-                          Height="38"
-                          Margin="8,0,0,0"
+                <ComboBox Style="{StaticResource ToolbarComboBox}"
+                          Width="74"
+                          Height="34"
+                          Margin="6,0,0,0"
                           ItemsSource="{Binding PlaybackRates}"
                           SelectedItem="{Binding PlaybackRate, Mode=TwoWay}"
                           ItemStringFormat="{}{0:0.##}x" />
             </StackPanel>
 
             <Grid Grid.Column="1" VerticalAlignment="Center" MinWidth="180">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="48" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
                 <controls:AudioWaveformControl Samples="{Binding PlaybackWaveformSamples}"
                                                 PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                 DurationSeconds="{Binding PlaybackDurationSeconds}"
-                                                Height="48"
+                                                Height="34"
                                                 Cursor="Hand"
                                                 ToolTip="{Binding SelectedJobPlaybackPath}" />
-                <Slider Grid.Row="1"
-                        MinHeight="16"
-                        Height="16"
-                        Minimum="0"
-                        Maximum="{Binding PlaybackDurationSeconds}"
-                        Value="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                        IsMoveToPointEnabled="True">
-                    <Slider.Resources>
-                        <Style TargetType="{x:Type primitives:Thumb}">
-                            <Setter Property="Width" Value="14" />
-                            <Setter Property="Height" Value="20" />
-                        </Style>
-                    </Slider.Resources>
-                </Slider>
             </Grid>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
