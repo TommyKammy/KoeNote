@@ -40,75 +40,85 @@
         <Border Grid.Row="1" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrushSoft}" Padding="18,10">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding AddAudioCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                            <TextBlock Text="音声追加" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding RunSelectedJobCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="実行" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding CancelCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="中止" />
-                        </StackPanel>
-                    </Button>
-                    <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
-                    <Button Command="{Binding ExportTxtCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="TXT" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ExportJsonCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE943;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="JSON" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ExportSrtCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="SRT" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ExportDocxCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="DOCX" />
-                        </StackPanel>
-                    </Button>
-                    <CheckBox IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
-                              Content="時刻"
-                              VerticalAlignment="Center"
-                              Margin="8,0,0,0"
-                              FontSize="12"
-                              Foreground="{StaticResource MutedBrush}"
-                              ToolTip="TXT / Markdown / DOCX 出力にタイムスタンプを含めます" />
-                    <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="14,6" />
-                    <Button Command="{Binding OpenSettingsCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="設定" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding OpenSetupCommand}" ToolTip="{Binding SetupPlaceholderText}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE9D9;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="セットアップ" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ShowModelCatalogCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" />
-                            <TextBlock Text="モデル" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <Button Style="{StaticResource PrimaryButton}" Command="{Binding AddAudioCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8E5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                <TextBlock Text="音声追加" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding RunSelectedJobCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="実行" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding CancelCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="中止" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="0,6,18,6" />
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <Button Command="{Binding ExportTxtCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="TXT" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ExportJsonCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE943;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="JSON" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ExportSrtCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="SRT" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ExportDocxCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="DOCX" />
+                            </StackPanel>
+                        </Button>
+                        <CheckBox IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
+                                  Content="時刻"
+                                  VerticalAlignment="Center"
+                                  Margin="12,0,0,0"
+                                  FontSize="12"
+                                  Foreground="{StaticResource MutedBrush}"
+                                  ToolTip="TXT / Markdown / DOCX 出力にタイムスタンプを含めます" />
+                    </StackPanel>
+
+                    <Border Width="1" Background="{StaticResource BorderBrushSoft}" Margin="0,6,18,6" />
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding OpenSettingsCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="設定" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenSetupCommand}" ToolTip="{Binding SetupPlaceholderText}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="セットアップ" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding ShowModelCatalogCommand}" Margin="6,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" />
+                                <TextBlock Text="モデル" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Border>

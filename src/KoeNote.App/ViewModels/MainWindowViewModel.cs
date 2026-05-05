@@ -48,6 +48,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly DatabaseMaintenanceService _databaseMaintenanceService;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
+    private readonly DispatcherTimer _modelDownloadNotificationTimer;
     private StatusBarInfo _statusBarInfo;
     private bool _isStatusRefreshInProgress;
     private bool _isRefreshingPlaybackPosition;
@@ -157,6 +158,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         };
         _playbackRefreshTimer.Tick += (_, _) => RefreshPlaybackState();
         _playbackRefreshTimer.Start();
+        _modelDownloadNotificationTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(5)
+        };
+        _modelDownloadNotificationTimer.Tick += (_, _) =>
+        {
+            _modelDownloadNotificationTimer.Stop();
+            ClearModelDownloadNotification();
+        };
 
         foreach (var item in services.ToolStatusService.GetStatusItems())
         {
@@ -1314,6 +1324,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private void BeginModelDownloadProgress(string displayName)
     {
+        _modelDownloadNotificationTimer.Stop();
         IsModelDownloadInProgress = true;
         IsModelDownloadProgressIndeterminate = false;
         ModelDownloadProgressPercent = 0;
@@ -1350,6 +1361,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             ModelDownloadNotification = $"Download completed: {displayName}";
             IsModelDownloadNotificationError = false;
             LatestLog = $"Model installed and verified: {displayName}";
+            ScheduleModelDownloadNotificationDismiss();
             return;
         }
 
@@ -1357,6 +1369,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ModelDownloadNotification = ModelDownloadProgressSummary;
         IsModelDownloadNotificationError = true;
         LatestLog = ModelDownloadProgressSummary;
+        ScheduleModelDownloadNotificationDismiss();
+    }
+
+    private void ScheduleModelDownloadNotificationDismiss()
+    {
+        _modelDownloadNotificationTimer.Stop();
+        _modelDownloadNotificationTimer.Start();
+    }
+
+    private void ClearModelDownloadNotification()
+    {
+        ModelDownloadNotification = string.Empty;
+        IsModelDownloadNotificationError = false;
     }
 
     private void CancelActiveModelDownloadFor(ModelCatalogEntry? entry)

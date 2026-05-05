@@ -11,7 +11,8 @@
         FontFamily="Yu Gothic UI"
         AllowDrop="True"
         DragOver="OnDragOverAudioFiles"
-        Drop="OnDropAudioFiles">
+        Drop="OnDropAudioFiles"
+        Closing="OnWindowClosing">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>

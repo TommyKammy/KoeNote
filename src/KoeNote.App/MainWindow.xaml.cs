@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using KoeNote.App.ViewModels;
 
@@ -27,5 +28,22 @@ public partial class MainWindow : Window
     {
         e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
+    }
+
+    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        var isRunning = DataContext is MainWindowViewModel { IsRunInProgress: true };
+        var message = isRunning
+            ? "処理が実行中です。KoeNote を終了すると、現在の処理は中断されます。終了しますか？"
+            : "KoeNote を終了しますか？";
+        var result = MessageBox.Show(
+            this,
+            message,
+            "終了の確認",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+
+        e.Cancel = result != MessageBoxResult.Yes;
     }
 }
