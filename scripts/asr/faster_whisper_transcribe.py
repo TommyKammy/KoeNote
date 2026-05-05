@@ -9,6 +9,12 @@ import json
 import os
 import sys
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except AttributeError:
+    pass
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -18,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--language", default="ja")
     parser.add_argument("--context", default=None)
     parser.add_argument("--hotword", action="append", default=[])
+    parser.add_argument("--chunk-length", type=int, default=30)
     parser.add_argument("--diarization", choices=["auto", "off", "pyannote"], default="auto")
     parser.add_argument("--diarization-model", default="pyannote/speaker-diarization-3.1")
     parser.add_argument("--hf-token", default=None)
@@ -109,6 +116,7 @@ def main() -> int:
         language=args.language,
         initial_prompt=initial_prompt,
         vad_filter=True,
+        chunk_length=args.chunk_length,
     )
 
     segment_items = [

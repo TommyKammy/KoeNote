@@ -46,6 +46,10 @@ public sealed class ExternalProcessRunner
             process.StartInfo.ArgumentList.Add(argument);
         }
 
+        process.StartInfo.Environment.TryAdd("PYTHONUTF8", "1");
+        process.StartInfo.Environment.TryAdd("PYTHONIOENCODING", "utf-8");
+        process.StartInfo.Environment.TryAdd("PYTHONUNBUFFERED", "1");
+
         process.Start();
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
