@@ -3,8 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
         <SolidColorBrush x:Key="HeaderTextBrush" Color="#333333" />
-        <SolidColorBrush x:Key="HeaderInfoLabelBrush" Color="#AAAAAA" />
-        <SolidColorBrush x:Key="HeaderInfoValueBrush" Color="#777777" />
+        <SolidColorBrush x:Key="HeaderInfoLabelBrush" Color="#9AA3AF" />
+        <SolidColorBrush x:Key="HeaderInfoValueBrush" Color="#667085" />
         <SolidColorBrush x:Key="HeaderHoverBrush" Color="#F5F6F7" />
         <SolidColorBrush x:Key="HeaderSeparatorBrush" Color="#EEF0F2" />
         <SolidColorBrush x:Key="HeaderPrimaryGreenBrush" Color="#DDF7E8" />
@@ -16,7 +16,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Padding" Value="9,6" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
@@ -47,11 +47,26 @@
             </Setter>
         </Style>
 
+        <Style x:Key="HeaderIconButton" TargetType="Button" BasedOn="{StaticResource HeaderGhostButton}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+        </Style>
+
         <Style x:Key="HeaderToolIcon" TargetType="TextBlock" BasedOn="{StaticResource IconText}">
             <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
+        <Style x:Key="HeaderIconOnlyText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="Foreground" Value="{StaticResource HeaderInfoValueBrush}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="HeaderPrimaryActionButton" TargetType="Button">
@@ -59,7 +74,7 @@
             <Setter Property="Background" Value="{StaticResource HeaderPrimaryGreenBrush}" />
             <Setter Property="BorderBrush" Value="#8DD6AD" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Padding" Value="13,7" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
@@ -99,7 +114,7 @@
         <Style x:Key="HeaderPrimaryToolIcon" TargetType="TextBlock" BasedOn="{StaticResource IconText}">
             <Setter Property="Foreground" Value="#17643C" />
             <Setter Property="FontSize" Value="14" />
-            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Margin" Value="0,0,7,0" />
         </Style>
 
         <Style x:Key="HeaderPrimaryToolText" TargetType="TextBlock">
@@ -111,20 +126,6 @@
 
         <Style x:Key="HeaderToolText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
-            <Setter Property="FontSize" Value="11.5" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <Style x:Key="HeaderAdminToolIcon" TargetType="TextBlock" BasedOn="{StaticResource IconText}">
-            <Setter Property="Foreground" Value="{StaticResource HeaderInfoValueBrush}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Margin" Value="0,0,5,0" />
-            <Setter Property="Opacity" Value="0.85" />
-        </Style>
-
-        <Style x:Key="HeaderAdminToolText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource HeaderInfoValueBrush}" />
             <Setter Property="FontSize" Value="11.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -149,41 +150,43 @@
     <Border Background="#FFFFFF"
             BorderThickness="0,0,0,1"
             BorderBrush="{StaticResource BorderBrushSoft}"
-            Padding="18,4">
+            Padding="16,5">
         <Grid VerticalAlignment="Center">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="0,0,14,0">
-                <Image Source="pack://application:,,,/Resources/KoeNoteBirdMono.png"
-                       Width="23"
-                       Height="23"
-                       Stretch="Uniform"
-                       Opacity="0.82"
-                       RenderOptions.BitmapScalingMode="HighQuality"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0"
-                       ToolTip="KoeNote" />
-                <TextBlock Text="KoeNote"
-                           FontFamily="Segoe UI"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource HeaderTextBrush}"
-                           VerticalAlignment="Center"
-                           LineStackingStrategy="BlockLineHeight"
-                           LineHeight="24" />
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                <Button Style="{StaticResource HeaderPrimaryActionButton}"
+                        Command="{Binding AddAudioCommand}"
+                        ToolTip="音声ファイルを追加します">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8E5;" Style="{StaticResource HeaderPrimaryToolIcon}" />
+                        <TextBlock Text="新規インポート" Style="{StaticResource HeaderPrimaryToolText}" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource HeaderGhostButton}"
+                        Command="{Binding RunSelectedJobCommand}"
+                        ToolTip="選択中のジョブを実行"
+                        Margin="4,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE768;" Style="{StaticResource HeaderToolIcon}" />
+                        <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource HeaderGhostButton}"
+                        Command="{Binding CancelCommand}"
+                        ToolTip="実行中の処理を中止"
+                        Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE711;" Style="{StaticResource HeaderToolIcon}" />
+                        <TextBlock Text="中止" Style="{StaticResource HeaderToolText}" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <Border Grid.Column="1"
@@ -193,135 +196,84 @@
                     VerticalAlignment="Center"
                     Margin="0,0,12,0" />
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                <Button Style="{StaticResource HeaderPrimaryActionButton}"
-                        Command="{Binding AddAudioCommand}"
-                        ToolTip="最初に音声ファイルを追加します">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8E5;" Style="{StaticResource HeaderPrimaryToolIcon}" />
-                        <TextBlock Text="音声追加" Style="{StaticResource HeaderPrimaryToolText}" />
-                    </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Export"
+                           Style="{StaticResource HeaderInfoLabel}"
+                           FontWeight="SemiBold"
+                           Margin="0,0,6,0" />
+                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportTxtCommand}" ToolTip="TXTでエクスポート">
+                    <TextBlock Text="TXT" Style="{StaticResource HeaderToolText}" />
                 </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding RunSelectedJobCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE768;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
+                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportJsonCommand}" ToolTip="JSONでエクスポート" Margin="1,0,0,0">
+                    <TextBlock Text="JSON" Style="{StaticResource HeaderToolText}" />
                 </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding CancelCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE711;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="中止" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
+                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportSrtCommand}" ToolTip="SRTでエクスポート" Margin="1,0,0,0">
+                    <TextBlock Text="SRT" Style="{StaticResource HeaderToolText}" />
                 </Button>
-            </StackPanel>
-
-            <Border Grid.Column="3"
-                    Width="0.5"
-                    Height="24"
-                    Background="{StaticResource HeaderSeparatorBrush}"
-                    VerticalAlignment="Center"
-                    Margin="0,0,12,0" />
-
-            <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportTxtCommand}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="TXT" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportJsonCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE943;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="JSON" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportSrtCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="SRT" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportDocxCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="DOCX" Style="{StaticResource HeaderToolText}" />
-                    </StackPanel>
+                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ExportDocxCommand}" ToolTip="DOCXでエクスポート" Margin="1,0,0,0">
+                    <TextBlock Text="DOCX" Style="{StaticResource HeaderToolText}" />
                 </Button>
                 <CheckBox IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
-                          Content="タイムスタンプ"
+                          Content="時刻"
                           VerticalAlignment="Center"
-                          Margin="6,0,6,0"
+                          Margin="6,0,0,0"
                           FontSize="11"
                           Foreground="{StaticResource HeaderInfoValueBrush}"
-                          ToolTip="TXT / Markdown / DOCX 出力にタイムスタンプを含めます" />
+                          ToolTip="TXT / DOCX 出力にタイムスタンプを含めます" />
             </StackPanel>
 
-            <StackPanel Grid.Column="6"
+            <StackPanel Grid.Column="3"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Right"
-                        Margin="20,0,0,0">
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding OpenSettingsCommand}" Margin="0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE713;" Style="{StaticResource HeaderAdminToolIcon}" />
-                        <TextBlock Text="設定" Style="{StaticResource HeaderAdminToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding OpenSetupCommand}" ToolTip="{Binding SetupPlaceholderText}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE9D9;" Style="{StaticResource HeaderAdminToolIcon}" />
-                        <TextBlock Text="セットアップ" Style="{StaticResource HeaderAdminToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding ShowModelCatalogCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8B7;" Style="{StaticResource HeaderAdminToolIcon}" />
-                        <TextBlock Text="モデル" Style="{StaticResource HeaderAdminToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding OpenLogsCommand}" Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderAdminToolIcon}" />
-                        <TextBlock Text="ログ" Style="{StaticResource HeaderAdminToolText}" />
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource HeaderGhostButton}"
-                        Command="{Binding CheckForUpdatesCommand}"
-                        ToolTip="Check for KoeNote updates"
-                        Margin="2,0,0,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE895;" Style="{StaticResource HeaderAdminToolIcon}" />
-                        <TextBlock Text="Update" Style="{StaticResource HeaderAdminToolText}" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-
-            <Border Grid.Column="7"
-                    Width="0.5"
-                    Height="24"
-                    Background="{StaticResource HeaderSeparatorBrush}"
-                    VerticalAlignment="Center"
-                    Margin="14,0,12,0" />
-
-            <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="GPU" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
-                <TextBlock Text="{Binding GpuSummary}"
-                           Style="{StaticResource HeaderInfoValue}"
-                           MaxWidth="130"
-                           ToolTip="{Binding GpuSummary}"
-                           Margin="0,0,12,0" />
+                        Margin="12,0,12,0">
                 <TextBlock Text="ASR" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
                 <TextBlock Text="{Binding AsrModel}"
                            Style="{StaticResource HeaderInfoValue}"
-                           MaxWidth="145"
+                           MaxWidth="118"
                            ToolTip="{Binding AsrModel}"
                            Margin="0,0,12,0" />
                 <TextBlock Text="REVIEW" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
                 <TextBlock Text="{Binding ReviewModel}"
                            Style="{StaticResource HeaderInfoValue}"
-                           MaxWidth="105"
+                           MaxWidth="96"
                            ToolTip="{Binding ReviewModel}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="4"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right">
+                <Border Width="0.5"
+                        Height="24"
+                        Background="{StaticResource HeaderSeparatorBrush}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0" />
+                <Button Style="{StaticResource HeaderIconButton}"
+                        Command="{Binding OpenSettingsCommand}"
+                        ToolTip="設定">
+                    <TextBlock Text="&#xE713;" Style="{StaticResource HeaderIconOnlyText}" />
+                </Button>
+                <Button Style="{StaticResource HeaderIconButton}"
+                        Command="{Binding OpenSetupCommand}"
+                        ToolTip="{Binding SetupPlaceholderText}">
+                    <TextBlock Text="&#xE9D9;" Style="{StaticResource HeaderIconOnlyText}" />
+                </Button>
+                <Button Style="{StaticResource HeaderIconButton}"
+                        Command="{Binding ShowModelCatalogCommand}"
+                        ToolTip="モデル">
+                    <TextBlock Text="&#xE8B7;" Style="{StaticResource HeaderIconOnlyText}" />
+                </Button>
+                <Button Style="{StaticResource HeaderIconButton}"
+                        Command="{Binding OpenLogsCommand}"
+                        ToolTip="ログ">
+                    <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderIconOnlyText}" />
+                </Button>
+                <Button Style="{StaticResource HeaderIconButton}"
+                        Command="{Binding CheckForUpdatesCommand}"
+                        ToolTip="更新を確認">
+                    <TextBlock Text="&#xE895;" Style="{StaticResource HeaderIconOnlyText}" />
+                </Button>
             </StackPanel>
         </Grid>
     </Border>

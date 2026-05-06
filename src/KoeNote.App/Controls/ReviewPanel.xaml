@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:models="clr-namespace:KoeNote.App.Models">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="VisibleWhenDraftStyle" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
@@ -20,12 +19,32 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="VisibleWhenReviewOperationStyle" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsReviewOperationInProgress}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ReviewApplyButton" TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
+            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style x:Key="ReviewSecondaryButton" TargetType="Button" BasedOn="{StaticResource OutlineNeutralButton}">
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource PanelBorder}" Padding="18">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <Grid Margin="0,0,0,14">
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <Border DockPanel.Dock="Top"
+                    Padding="18,18,18,12"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="0,0,0,1">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -35,12 +54,17 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+
                     <TextBlock Text="推敲レビュー"
                                Style="{StaticResource SectionTitle}"
-                               TextTrimming="CharacterEllipsis"
+                               Margin="0"
                                VerticalAlignment="Center" />
+
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                        <Button Padding="7,4" MinWidth="0" Command="{Binding SelectPreviousDraftCommand}" ToolTip="前の候補">
+                        <Button Padding="7,4"
+                                MinWidth="0"
+                                Command="{Binding SelectPreviousDraftCommand}"
+                                ToolTip="前の候補">
                             <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
                         </Button>
                         <TextBlock Text="{Binding DraftPositionText}"
@@ -49,10 +73,14 @@
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"
                                    Margin="7,0" />
-                        <Button Padding="7,4" MinWidth="0" Command="{Binding SelectNextDraftCommand}" ToolTip="次の候補">
+                        <Button Padding="7,4"
+                                MinWidth="0"
+                                Command="{Binding SelectNextDraftCommand}"
+                                ToolTip="次の候補">
                             <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
                         </Button>
                     </StackPanel>
+
                     <Button Grid.Column="2"
                             Padding="7,4"
                             MinWidth="0"
@@ -65,7 +93,7 @@
 
                     <WrapPanel Grid.Row="1"
                                Grid.ColumnSpan="3"
-                               Margin="0,10,0,0"
+                               Margin="0,12,0,0"
                                Style="{StaticResource VisibleWhenDraftStyle}">
                         <Border Background="#FFF7ED" CornerRadius="12" Padding="9,4" Margin="0,0,8,6">
                             <TextBlock Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}"
@@ -81,140 +109,214 @@
                         </Border>
                     </WrapPanel>
                 </Grid>
+            </Border>
 
-                <Border Style="{StaticResource VisibleWhenNoDraftStyle}"
-                        Background="#FAFBFC"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="16"
-                        Margin="0,0,0,16">
-                    <StackPanel>
-                        <TextBlock Text="推敲候補はありません"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,6" />
-                        <TextBlock Text="ASR結果が十分に自然な場合、ここには候補が表示されません。"
-                                   Style="{StaticResource MutedText}"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-
-                <StackPanel Style="{StaticResource VisibleWhenDraftStyle}">
-                    <TextBlock Text="原文" Style="{StaticResource MutedText}" />
-                    <TextBox Text="{Binding OriginalText, Mode=OneWay}"
-                             IsReadOnly="True"
-                             TextWrapping="Wrap"
-                             MinHeight="82"
-                             Margin="0,5,0,14"
-                             Background="#FAFBFC"
-                             PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick" />
-
-                    <TextBlock Text="提案文" Style="{StaticResource MutedText}" Margin="0,0,0,7" />
-                    <TextBox Text="{Binding SuggestedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             TextWrapping="Wrap"
-                             MinHeight="82"
-                             Margin="0,0,0,14"
-                             Background="#F7FCF9"
-                             BorderBrush="#B7D8C4" />
-
-                    <TextBlock Text="差分" Style="{StaticResource MutedText}" />
-                    <Border Background="#FAFBFC"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="10"
-                            Margin="0,5,0,14"
-                            PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick">
-                        <ItemsControl ItemsSource="{Binding DiffTokens}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="3,1" Margin="0,0,2,2" CornerRadius="4">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="Transparent" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Inserted}">
-                                                        <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Deleted}">
-                                                        <Setter Property="Background" Value="{StaticResource DangerLightBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Replaced}">
-                                                        <Setter Property="Background" Value="#FFF7ED" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None" LineHeight="20">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Inserted}">
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Deleted}">
-                                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
-                                                            <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Replaced}">
-                                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Border>
-
-                    <TextBlock Text="理由" Style="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding ReviewReason}" TextWrapping="Wrap" TextTrimming="None" LineHeight="21" Margin="0,5,0,18" />
-
-                    <CheckBox Content="この修正を今後の候補に使う"
-                              IsChecked="{Binding RememberCorrection}"
-                              Margin="0,0,0,14"
-                              Foreground="{StaticResource MutedBrush}" />
-
-                    <Grid Margin="0,0,0,18">
+            <Border DockPanel.Dock="Bottom"
+                    Padding="14"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="0,1,0,0"
+                    Background="#FFFFFF"
+                    Style="{StaticResource VisibleWhenDraftStyle}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="この候補への操作"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="保存中..."
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource VisibleWhenReviewOperationStyle}" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.35*" />
+                            <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Button Style="{StaticResource OutlineSuccessButton}" Padding="12,13" MinHeight="46" Command="{Binding AcceptDraftCommand}">
+
+                        <Button Style="{StaticResource ReviewApplyButton}"
+                                Command="{Binding AcceptDraftCommand}"
+                                ToolTip="推敲候補を文字起こしへ反映して、次の候補へ進みます">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                <TextBlock Text="採用" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                <StackPanel>
+                                    <TextBlock Text="提案を適用"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="候補を反映"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontSize="11"
+                                               Opacity="0.75"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="2" Style="{StaticResource OutlineDangerButton}" Padding="12,13" MinHeight="46" Command="{Binding RejectDraftCommand}">
+
+                        <Button Grid.Column="2"
+                                Style="{StaticResource ReviewSecondaryButton}"
+                                Command="{Binding RejectDraftCommand}"
+                                ToolTip="この推敲候補を反映せず、次の候補へ進みます">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
-                                <TextBlock Text="却下" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" />
+                                <TextBlock Text="却下"
+                                           Foreground="{StaticResource DangerBrush}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="4" Style="{StaticResource OutlineNeutralButton}" Padding="12,13" MinHeight="46" Command="{Binding ApplyManualEditCommand}">
+
+                        <Button Grid.Column="4"
+                                Style="{StaticResource ReviewSecondaryButton}"
+                                Command="{Binding ApplyManualEditCommand}"
+                                ToolTip="編集欄の内容を手修正として適用します">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}" Foreground="{StaticResource TextBrush}" />
-                                <TextBlock Text="手修正" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                                <TextBlock Text="手修正"
+                                           Foreground="{StaticResource TextBrush}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Button>
                     </Grid>
                 </StackPanel>
+            </Border>
 
-            </StackPanel>
-        </ScrollViewer>
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Padding="18">
+                <StackPanel>
+                    <Border Style="{StaticResource VisibleWhenNoDraftStyle}"
+                            Background="#FAFBFC"
+                            BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="16"
+                            Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="推敲候補はありません"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6" />
+                            <TextBlock Text="ASR結果が自然な場合、ここには候補が表示されません。"
+                                       Style="{StaticResource MutedText}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Style="{StaticResource VisibleWhenDraftStyle}">
+                        <TextBlock Text="原文" Style="{StaticResource MutedText}" />
+                        <TextBox Text="{Binding OriginalText, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="82"
+                                 Margin="0,5,0,14"
+                                 Background="#FAFBFC"
+                                 PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick" />
+
+                        <Grid Margin="0,0,0,7">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="提案文" Style="{StaticResource MutedText}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="ここを直してから手修正できます"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBox Text="{Binding SuggestedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap"
+                                 MinHeight="88"
+                                 Margin="0,0,0,14"
+                                 Background="#F7FCF9"
+                                 BorderBrush="#B7D8C4" />
+
+                        <TextBlock Text="差分" Style="{StaticResource MutedText}" />
+                        <Border Background="#FAFBFC"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10"
+                                Margin="0,5,0,14"
+                                PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick">
+                            <ItemsControl ItemsSource="{Binding DiffTokens}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="3,1" Margin="0,0,2,2" CornerRadius="4">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Inserted}">
+                                                            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Deleted}">
+                                                            <Setter Property="Background" Value="{StaticResource DangerLightBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Replaced}">
+                                                            <Setter Property="Background" Value="#FFF7ED" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None" LineHeight="20">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Inserted}">
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Deleted}">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffKind.Replaced}">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <TextBlock Text="理由" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding ReviewReason}"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="None"
+                                   LineHeight="21"
+                                   Margin="0,5,0,18" />
+
+                        <CheckBox Content="この修正を今後の候補に使う"
+                                  IsChecked="{Binding RememberCorrection}"
+                                  Margin="0,0,0,18"
+                                  Foreground="{StaticResource MutedBrush}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </UserControl>
