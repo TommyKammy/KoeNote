@@ -29,6 +29,9 @@ jobs:
   publish-latest-json:
     name: Publish latest.json to GitHub Pages
     runs-on: windows-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
