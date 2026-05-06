@@ -18,7 +18,27 @@ public sealed partial class MainWindowViewModel
         }
 
         SelectedSegmentEditText = segment!.Text;
+        IsSpeakerInlineEditActive = false;
         IsSegmentInlineEditActive = true;
+        return Task.CompletedTask;
+    }
+
+    private Task BeginSpeakerInlineEditAsync(TranscriptSegmentPreview? segment)
+    {
+        if (!CanBeginSpeakerInlineEdit(segment))
+        {
+            return Task.CompletedTask;
+        }
+
+        SelectedSegment = segment;
+        if (!string.Equals(SelectedSegment?.SegmentId, segment!.SegmentId, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        SelectedSpeakerAlias = segment!.Speaker;
+        IsSegmentInlineEditActive = false;
+        IsSpeakerInlineEditActive = true;
         return Task.CompletedTask;
     }
 
@@ -46,6 +66,17 @@ public sealed partial class MainWindowViewModel
         }
 
         IsSegmentInlineEditActive = false;
+        return Task.CompletedTask;
+    }
+
+    private Task SaveSpeakerInlineEditAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        CommitSpeakerInlineEdit(SelectedSegment, reloadSegments: true);
         return Task.CompletedTask;
     }
 
@@ -111,12 +142,59 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
+    private bool CommitSpeakerInlineEdit(TranscriptSegmentPreview segment, bool reloadSegments)
+    {
+        if (SelectedJob is null ||
+            string.IsNullOrWhiteSpace(segment.SpeakerId) ||
+            string.IsNullOrWhiteSpace(SelectedSpeakerAlias))
+        {
+            return false;
+        }
+
+        if (string.Equals(SelectedSpeakerAlias, segment.Speaker, StringComparison.Ordinal))
+        {
+            IsSpeakerInlineEditActive = false;
+            return true;
+        }
+
+        _transcriptEditService.ApplySpeakerAlias(
+            SelectedJob.JobId,
+            segment.SpeakerId,
+            SelectedSpeakerAlias);
+
+        IsSpeakerInlineEditActive = false;
+        LatestLog = $"話者名を更新しました: {segment.SpeakerId} -> {SelectedSpeakerAlias}";
+        if (reloadSegments)
+        {
+            ReloadSegmentsForSelectedJob(segment.SegmentId);
+        }
+        else
+        {
+            ReplaceEditedSpeakerPreview(segment, SelectedSpeakerAlias);
+            RefreshSpeakerFilters();
+            FilteredSegments.Refresh();
+        }
+
+        return true;
+    }
+
     private void ReplaceEditedSegmentPreview(TranscriptSegmentPreview segment, string text)
     {
         var index = Segments.IndexOf(segment);
         if (index >= 0)
         {
             Segments[index] = segment with { Text = text, FinalText = text };
+        }
+    }
+
+    private void ReplaceEditedSpeakerPreview(TranscriptSegmentPreview segment, string speaker)
+    {
+        for (var i = 0; i < Segments.Count; i++)
+        {
+            if (string.Equals(Segments[i].SpeakerId, segment.SpeakerId, StringComparison.Ordinal))
+            {
+                Segments[i] = Segments[i] with { Speaker = speaker };
+            }
         }
     }
 
@@ -127,13 +205,7 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        _transcriptEditService.ApplySpeakerAlias(
-            SelectedJob.JobId,
-            SelectedSegment.SpeakerId,
-            SelectedSpeakerAlias);
-
-        LatestLog = $"話者名を更新しました: {SelectedSegment.SpeakerId} -> {SelectedSpeakerAlias}";
-        ReloadSegmentsForSelectedJob(SelectedSegment.SegmentId);
+        CommitSpeakerInlineEdit(SelectedSegment, reloadSegments: true);
         return Task.CompletedTask;
     }
 
@@ -217,6 +289,14 @@ public sealed partial class MainWindowViewModel
             && !IsRunInProgress;
     }
 
+    private bool CanBeginSpeakerInlineEdit(TranscriptSegmentPreview? segment)
+    {
+        return SelectedJob is not null
+            && segment is not null
+            && !IsRunInProgress
+            && !string.IsNullOrWhiteSpace(segment.SpeakerId);
+    }
+
     private bool CanRevertSegmentEdit(TranscriptSegmentPreview? segment)
     {
         return SelectedJob is not null
@@ -258,6 +338,16 @@ public sealed partial class MainWindowViewModel
         if (RevertSegmentEditCommand is RelayCommand<TranscriptSegmentPreview> revertSegmentCommand)
         {
             revertSegmentCommand.RaiseCanExecuteChanged();
+        }
+
+        if (BeginSpeakerInlineEditCommand is RelayCommand<TranscriptSegmentPreview> beginSpeakerInlineCommand)
+        {
+            beginSpeakerInlineCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SaveSpeakerInlineEditCommand is RelayCommand saveSpeakerInlineCommand)
+        {
+            saveSpeakerInlineCommand.RaiseCanExecuteChanged();
         }
 
         if (SaveSpeakerAliasCommand is RelayCommand saveSpeakerCommand)

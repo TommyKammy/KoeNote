@@ -43,6 +43,53 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
 
         using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
+        SaveSegments(connection, transaction, segments);
+        transaction.Commit();
+    }
+
+    public void ReplaceSegments(IReadOnlyList<TranscriptSegment> segments)
+    {
+        if (segments.Count == 0)
+        {
+            throw new ArgumentException("Replacement without a job id requires at least one segment.", nameof(segments));
+        }
+
+        var jobIds = segments
+            .Select(static segment => segment.JobId)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (jobIds.Length != 1)
+        {
+            throw new ArgumentException("Replacement requires segments for exactly one job.", nameof(segments));
+        }
+
+        ReplaceSegments(jobIds[0], segments);
+    }
+
+    public void ReplaceSegments(string jobId, IReadOnlyList<TranscriptSegment> segments)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("A job id is required for replacement.", nameof(jobId));
+        }
+
+        if (segments.Any(segment => !string.Equals(segment.JobId, jobId, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException("All replacement segments must belong to the specified job.", nameof(segments));
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+        DeleteExistingTranscriptForJob(connection, transaction, jobId);
+        SaveSegments(connection, transaction, segments);
+        transaction.Commit();
+    }
+
+    private static void SaveSegments(
+        Microsoft.Data.Sqlite.SqliteConnection connection,
+        Microsoft.Data.Sqlite.SqliteTransaction transaction,
+        IReadOnlyList<TranscriptSegment> segments)
+    {
 
         foreach (var segment in segments)
         {
@@ -95,8 +142,39 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
             command.Parameters.AddWithValue("$asr_run_id", (object?)segment.AsrRunId ?? DBNull.Value);
             command.ExecuteNonQuery();
         }
+    }
 
-        transaction.Commit();
+    private static void DeleteExistingTranscriptForJob(
+        Microsoft.Data.Sqlite.SqliteConnection connection,
+        Microsoft.Data.Sqlite.SqliteTransaction transaction,
+        string jobId)
+    {
+        using (var decisionCommand = connection.CreateCommand())
+        {
+            decisionCommand.Transaction = transaction;
+            decisionCommand.CommandText = """
+                DELETE FROM review_decisions
+                WHERE draft_id IN (
+                    SELECT draft_id FROM correction_drafts WHERE job_id = $job_id
+                );
+                """;
+            decisionCommand.Parameters.AddWithValue("$job_id", jobId);
+            decisionCommand.ExecuteNonQuery();
+        }
+
+        foreach (var sql in new[]
+        {
+            "DELETE FROM review_operation_history WHERE job_id = $job_id;",
+            "DELETE FROM correction_drafts WHERE job_id = $job_id;",
+            "DELETE FROM transcript_segments WHERE job_id = $job_id;"
+        })
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("$job_id", jobId);
+            command.ExecuteNonQuery();
+        }
     }
 
     private static string FormatReviewState(string state)

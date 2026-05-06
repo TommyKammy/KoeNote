@@ -73,7 +73,7 @@ public sealed class ScriptedJsonAsrEngine(
                 .Select(segment => segment with { Source = sourceName, AsrRunId = asrRunId })
                 .ToArray();
             var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(config.OutputDirectory, segments);
-            transcriptSegmentRepository.SaveSegments(segments);
+            transcriptSegmentRepository.ReplaceSegments(input.JobId, segments);
             asrRunRepository.MarkSucceeded(asrRunId, processResult.Duration, rawOutputPath, normalizedSegmentsPath);
 
             return new AsrResult(asrRunId, input.JobId, rawOutputPath, normalizedSegmentsPath, segments, processResult.Duration);

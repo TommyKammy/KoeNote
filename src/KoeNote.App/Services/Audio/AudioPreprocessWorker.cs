@@ -21,6 +21,20 @@ public sealed class AudioPreprocessWorker(
 
         var normalizedAudioPath = Path.Combine(normalizedDirectory, "audio.wav");
         stageProgressRepository.Upsert(job.JobId, "preprocess", "running", 10, startedAt: startedAt);
+        if (File.Exists(normalizedAudioPath) && new FileInfo(normalizedAudioPath).Length > 0)
+        {
+            var reusedAt = DateTimeOffset.Now;
+            stageProgressRepository.Upsert(
+                job.JobId,
+                "preprocess",
+                "succeeded",
+                100,
+                startedAt,
+                reusedAt,
+                (reusedAt - startedAt).TotalSeconds);
+            jobLogRepository.AddEvent(job.JobId, "preprocess", "info", $"Reused normalized WAV: {normalizedAudioPath}");
+            return new AudioPreprocessResult(normalizedAudioPath, string.Empty, reusedAt - startedAt, 0);
+        }
 
         ProcessRunResult result;
         try

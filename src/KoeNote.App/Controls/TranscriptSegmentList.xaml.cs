@@ -59,6 +59,10 @@ public partial class TranscriptSegmentList : UserControl
 
             Dispatcher.BeginInvoke(FocusInlineSegmentEditor);
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsSpeakerInlineEditActive))
+        {
+            Dispatcher.BeginInvoke(FocusInlineSpeakerEditor);
+        }
     }
 
     private void OnInlineSegmentEditorLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -77,6 +81,11 @@ public partial class TranscriptSegmentList : UserControl
         _suppressNextInlineAutoSave = DataContext is MainWindowViewModel { IsSegmentInlineEditActive: true };
     }
 
+    private void OnInlineSpeakerEditorLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        SaveInlineSpeakerEdit();
+    }
+
     private void OnSegmentTextMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount < 2)
@@ -93,6 +102,21 @@ public partial class TranscriptSegmentList : UserControl
         if (viewModel.BeginSegmentInlineEditCommand.CanExecute(segment))
         {
             viewModel.BeginSegmentInlineEditCommand.Execute(segment);
+            e.Handled = true;
+        }
+    }
+
+    private void OnSpeakerMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel ||
+            sender is not FrameworkElement { DataContext: TranscriptSegmentPreview segment })
+        {
+            return;
+        }
+
+        if (viewModel.BeginSpeakerInlineEditCommand.CanExecute(segment))
+        {
+            viewModel.BeginSpeakerInlineEditCommand.Execute(segment);
             e.Handled = true;
         }
     }
@@ -126,6 +150,24 @@ public partial class TranscriptSegmentList : UserControl
         }
     }
 
+    private void FocusInlineSpeakerEditor()
+    {
+        if (DataContext is not MainWindowViewModel { IsSpeakerInlineEditActive: true } ||
+            SegmentList.SelectedItem is null)
+        {
+            return;
+        }
+
+        SegmentList.UpdateLayout();
+        SegmentList.ScrollIntoView(SegmentList.SelectedItem);
+        SegmentList.UpdateLayout();
+        if (FindVisualChild<TextBox>(SegmentList, textBox => textBox.IsVisible && Equals(textBox.Tag, "InlineSpeakerEditor")) is { } editor)
+        {
+            editor.Focus();
+            editor.SelectAll();
+        }
+    }
+
     private void SaveInlineSegmentEdit()
     {
         if (DataContext is not MainWindowViewModel { IsSegmentInlineEditActive: true } viewModel)
@@ -136,6 +178,19 @@ public partial class TranscriptSegmentList : UserControl
         if (viewModel.SaveSegmentInlineEditCommand.CanExecute(null))
         {
             viewModel.SaveSegmentInlineEditCommand.Execute(null);
+        }
+    }
+
+    private void SaveInlineSpeakerEdit()
+    {
+        if (DataContext is not MainWindowViewModel { IsSpeakerInlineEditActive: true } viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.SaveSpeakerInlineEditCommand.CanExecute(null))
+        {
+            viewModel.SaveSpeakerInlineEditCommand.Execute(null);
         }
     }
 

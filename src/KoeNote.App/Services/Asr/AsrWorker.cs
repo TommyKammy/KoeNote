@@ -42,7 +42,7 @@ public sealed class AsrWorker(
         }
 
         var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(options.OutputDirectory, segments);
-        repository.SaveSegments(segments);
+        repository.ReplaceSegments(options.JobId, segments);
 
         return new AsrRunResult(
             options.JobId,

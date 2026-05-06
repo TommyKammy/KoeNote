@@ -65,6 +65,30 @@
                                 </MultiDataTrigger>
                             </Style.Triggers>
                         </Style>
+                        <Style x:Key="SpeakerDisplayStyle" TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                        <Style x:Key="SpeakerEditorStyle" TargetType="TextBox">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
                     </DataTemplate.Resources>
 
                     <Border Padding="12,14"
@@ -88,9 +112,25 @@
                                     CornerRadius="12"
                                     Padding="9,4"
                                     HorizontalAlignment="Left"
-                                    VerticalAlignment="Top">
+                                    VerticalAlignment="Top"
+                                    Cursor="IBeam"
+                                    MouseLeftButtonDown="OnSpeakerMouseLeftButtonDown"
+                                    ToolTip="クリックして話者名を編集"
+                                    Style="{StaticResource SpeakerDisplayStyle}">
                                 <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
                             </Border>
+                            <TextBox Grid.Column="1"
+                                     Tag="InlineSpeakerEditor"
+                                     Text="{Binding DataContext.SelectedSpeakerAlias, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Height="30"
+                                     MinWidth="78"
+                                     MaxWidth="92"
+                                     Padding="7,4"
+                                     FontSize="12"
+                                     VerticalAlignment="Top"
+                                     LostKeyboardFocus="OnInlineSpeakerEditorLostKeyboardFocus"
+                                     ToolTip="話者名を編集します。別の場所をクリックすると自動保存されます。"
+                                     Style="{StaticResource SpeakerEditorStyle}" />
 
                             <TextBlock Grid.Column="2"
                                        Text="{Binding Text}"

@@ -1,38 +1,107 @@
 <UserControl x:Class="KoeNote.App.Controls.JobListPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Border Style="{StaticResource PanelBorder}" Padding="16">
+    <Border Style="{StaticResource PanelBorder}" Padding="18">
         <DockPanel>
-            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Grid DockPanel.Dock="Top" MinHeight="38" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="&#x30B8;&#x30E7;&#x30D6;" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                <TextBlock Text="ジョブ"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0"
+                           VerticalAlignment="Center" />
                 <Button Grid.Column="1"
-                        Content="&#x30AF;&#x30EA;&#x30A2;"
+                        Content="クリア"
                         Command="{Binding ClearAllJobsCommand}"
                         Padding="10,4"
                         MinHeight="30"
-                        ToolTip="&#x30B8;&#x30E7;&#x30D6;&#x4E00;&#x89A7;&#x3092;&#x30AF;&#x30EA;&#x30A2;&#x5C65;&#x6B74;&#x3078;&#x79FB;&#x52D5;" />
+                        ToolTip="ジョブ一覧をクリア履歴へ移動" />
             </Grid>
 
             <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
-                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" Foreground="{StaticResource MutedBrush}" Margin="12,0,0,0" VerticalAlignment="Center" Panel.ZIndex="1" />
-                <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}" Padding="32,7,10,7" MinHeight="34" ToolTip="&#x30B8;&#x30E7;&#x30D6;&#x540D;&#x3067;&#x691C;&#x7D22;" />
+                <TextBlock Text="&#xE721;"
+                           FontFamily="Segoe MDL2 Assets"
+                           Foreground="{StaticResource MutedBrush}"
+                           Margin="12,0,0,0"
+                           VerticalAlignment="Center"
+                           Panel.ZIndex="1" />
+                <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="32,7,10,7"
+                         MinHeight="34"
+                         ToolTip="ジョブ名で検索" />
             </Grid>
 
             <TabControl>
-                <TabItem Header="&#x4E00;&#x89A7;">
+                <TabItem Header="一覧">
                     <DockPanel Margin="0,10,0,0">
-                        <TextBlock DockPanel.Dock="Top" Text="{Binding JobCountSummary}" Style="{StaticResource MutedText}" Margin="0,0,0,12" />
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="{Binding JobCountSummary}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,0,0,12" />
+                        <Border Background="#FFFFFF"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="10">
+                            <DockPanel>
+                        <Border DockPanel.Dock="Bottom"
+                                Background="#FFFFFF"
+                                BorderBrush="#D9DEE7"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14"
+                                Margin="0,14,0,0"
+                                Cursor="Hand"
+                                AllowDrop="True"
+                                MouseLeftButtonUp="OnImportDropZoneClick"
+                                ToolTip="音声ファイルをドラッグ&amp;ドロップ、またはクリックして選択">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#FFFFFF" />
+                                    <Setter Property="BorderBrush" Value="#D9DEE7" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#FAFBFC" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid MinHeight="112">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE898;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="24"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,10" />
+                                    <TextBlock Text="ファイルをドラッグ &amp; ドロップ"
+                                               Foreground="{StaticResource TextBrush}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextAlignment="Center"
+                                               Margin="0,0,0,7" />
+                                    <TextBlock Text="または クリックして選択"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               TextAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <ListBox ItemsSource="{Binding FilteredJobs}"
                                  SelectedItem="{Binding SelectedJob, Mode=TwoWay}"
                                  Style="{StaticResource CardListBox}"
                                  ItemContainerStyle="{StaticResource CardListBoxItem}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Padding="14" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8">
+                                    <Border Padding="14"
+                                            Background="#FFFFFF"
+                                            BorderBrush="{StaticResource BorderBrushSoft}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
                                         <StackPanel>
                                             <Grid Margin="0,0,0,8">
                                                 <Grid.ColumnDefinitions>
@@ -47,19 +116,31 @@
                                                         CommandParameter="{Binding}"
                                                         Padding="6,2"
                                                         MinWidth="28"
-                                                        ToolTip="&#x3053;&#x306E;&#x30B8;&#x30E7;&#x30D6;&#x3092;&#x30AF;&#x30EA;&#x30A2;&#x5C65;&#x6B74;&#x3078;&#x79FB;&#x52D5;" />
+                                                        ToolTip="このジョブをクリア履歴へ移動" />
                                             </Grid>
-                                            <TextBlock Text="{Binding FileName}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,12" />
+                                            <TextBlock Text="{Binding FileName}"
+                                                       Style="{StaticResource MutedText}"
+                                                       TextWrapping="Wrap"
+                                                       TextTrimming="None"
+                                                       Margin="0,0,0,12" />
                                             <Grid Margin="0,0,0,8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <Border Width="7" Height="7" CornerRadius="4" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                                    <Border Width="7"
+                                                            Height="7"
+                                                            CornerRadius="4"
+                                                            Background="{StaticResource AccentBrush}"
+                                                            VerticalAlignment="Center"
+                                                            Margin="0,0,7,0" />
                                                     <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding ProgressPercent, StringFormat={}{0}%}"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource MutedBrush}" />
                                             </Grid>
                                             <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Margin="0,0,0,12" />
                                             <Grid>
@@ -68,17 +149,21 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding UpdatedAtDisplay}" Style="{StaticResource MutedText}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding UnreviewedDrafts, StringFormat=&#x672A;&#x30EC;&#x30D3;&#x30E5;&#x30FC; {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}"
+                                                           Style="{StaticResource MutedText}" />
                                             </Grid>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                            </DockPanel>
+                        </Border>
                     </DockPanel>
                 </TabItem>
 
-                <TabItem Header="&#x30AF;&#x30EA;&#x30A2;&#x5C65;&#x6B74;">
+                <TabItem Header="クリア履歴">
                     <DockPanel Margin="0,10,0,0">
                         <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -87,18 +172,22 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{Binding DeletedJobCountSummary}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                             <Button Grid.Column="1"
-                                    Content="&#x5B8C;&#x5168;&#x524A;&#x9664;"
+                                    Content="完全削除"
                                     Command="{Binding PermanentlyDeleteAllDeletedJobsCommand}"
                                     Padding="10,4"
                                     MinHeight="30"
-                                    ToolTip="&#x30AF;&#x30EA;&#x30A2;&#x5C65;&#x6B74;&#x306E;&#x30B8;&#x30E7;&#x30D6;&#x3068;&#x95A2;&#x9023;&#x30D5;&#x30A1;&#x30A4;&#x30EB;&#x3092;&#x5B8C;&#x5168;&#x524A;&#x9664;" />
+                                    ToolTip="クリア履歴のジョブと関連ファイルを完全削除" />
                         </Grid>
                         <ListBox ItemsSource="{Binding FilteredDeletedJobs}"
                                  Style="{StaticResource CardListBox}"
                                  ItemContainerStyle="{StaticResource CardListBoxItem}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Padding="14" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="8">
+                                    <Border Padding="14"
+                                            Background="#FFFFFF"
+                                            BorderBrush="{StaticResource BorderBrushSoft}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
                                         <StackPanel>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,6" />
                                             <TextBlock Text="{Binding FileName}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,10" />
@@ -108,33 +197,33 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding DeletedAtDisplay, StringFormat=&#x30AF;&#x30EA;&#x30A2;&#x65E5;&#x6642; {0}}" Style="{StaticResource MutedText}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding DeleteReason, StringFormat=&#x7406;&#x7531; {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Text="{Binding DeletedAtDisplay, StringFormat=クリア日時 {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding DeleteReason, StringFormat=理由 {0}}" Style="{StaticResource MutedText}" />
                                             </Grid>
                                             <Grid Margin="0,0,0,12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding UpdatedAtDisplay, StringFormat=&#x5143;&#x306E;&#x66F4;&#x65B0; {0}}" Style="{StaticResource MutedText}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding StorageSizeDisplay, StringFormat=&#x4FDD;&#x5B58;&#x5BB9;&#x91CF; {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Text="{Binding UpdatedAtDisplay, StringFormat=元の更新 {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding StorageSizeDisplay, StringFormat=保存容量 {0}}" Style="{StaticResource MutedText}" />
                                             </Grid>
                                             <Grid Margin="0,0,0,12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding UnreviewedDrafts, StringFormat=&#x672A;&#x30EC;&#x30D3;&#x30E5;&#x30FC; {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}" Style="{StaticResource MutedText}" />
                                                 <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" Style="{StaticResource MutedText}" />
                                             </Grid>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button Content="&#x5FA9;&#x5143;"
+                                                <Button Content="復元"
                                                         Command="{Binding DataContext.RestoreJobCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                         CommandParameter="{Binding}"
                                                         Padding="10,4"
                                                         MinHeight="30"
                                                         Margin="0,0,8,0" />
-                                                <Button Content="&#x5B8C;&#x5168;&#x524A;&#x9664;"
+                                                <Button Content="完全削除"
                                                         Command="{Binding DataContext.PermanentlyDeleteJobCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                         CommandParameter="{Binding}"
                                                         Padding="10,4"

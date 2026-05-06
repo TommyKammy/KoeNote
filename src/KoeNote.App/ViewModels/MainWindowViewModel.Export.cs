@@ -35,10 +35,7 @@ public sealed partial class MainWindowViewModel
             DefaultExt = GetExtension(format ?? TranscriptExportFormat.Text)
         };
 
-        if (!string.IsNullOrWhiteSpace(LastExportFolder))
-        {
-            dialog.InitialDirectory = LastExportFolder;
-        }
+        dialog.InitialDirectory = GetOpenableExportFolder();
 
         if (dialog.ShowDialog() != true)
         {
@@ -115,15 +112,13 @@ public sealed partial class MainWindowViewModel
 
     private Task OpenExportFolderAsync()
     {
-        if (string.IsNullOrWhiteSpace(LastExportFolder) || !Directory.Exists(LastExportFolder))
-        {
-            return Task.CompletedTask;
-        }
+        var exportFolder = GetOpenableExportFolder();
+        Directory.CreateDirectory(exportFolder);
 
         Process.Start(new ProcessStartInfo
         {
             FileName = "explorer.exe",
-            Arguments = $"\"{LastExportFolder}\"",
+            Arguments = $"\"{exportFolder}\"",
             UseShellExecute = true
         });
         return Task.CompletedTask;
@@ -136,7 +131,18 @@ public sealed partial class MainWindowViewModel
 
     private bool CanOpenExportFolder()
     {
-        return !string.IsNullOrWhiteSpace(LastExportFolder) && Directory.Exists(LastExportFolder);
+        return true;
+    }
+
+    private string GetOpenableExportFolder()
+    {
+        if (!string.IsNullOrWhiteSpace(LastExportFolder) && Directory.Exists(LastExportFolder))
+        {
+            return LastExportFolder;
+        }
+
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return Path.Combine(documents, "KoeNote", "Exports");
     }
 
     private string GetDefaultExportFileName(TranscriptExportFormat format)

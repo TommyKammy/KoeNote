@@ -122,6 +122,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isSegmentInlineEditActive;
+    private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
     private string _reviewIssueType = "候補なし";
@@ -287,6 +288,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveSegmentInlineEditCommand = new RelayCommand(SaveSegmentInlineEditAsync, CanEditSelectedSegment);
         CancelSegmentInlineEditCommand = new RelayCommand(CancelSegmentInlineEditAsync, () => IsSegmentInlineEditActive);
         RevertSegmentEditCommand = new RelayCommand<TranscriptSegmentPreview>(RevertSegmentEditAsync, CanRevertSegmentEdit);
+        BeginSpeakerInlineEditCommand = new RelayCommand<TranscriptSegmentPreview>(BeginSpeakerInlineEditAsync, CanBeginSpeakerInlineEdit);
+        SaveSpeakerInlineEditCommand = new RelayCommand(SaveSpeakerInlineEditAsync, CanEditSelectedSpeaker);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
         ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
@@ -611,6 +614,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand RevertSegmentEditCommand { get; }
 
+    public ICommand BeginSpeakerInlineEditCommand { get; }
+
+    public ICommand SaveSpeakerInlineEditCommand { get; }
+
     public ICommand SaveSpeakerAliasCommand { get; }
 
     public ICommand UndoLastOperationCommand { get; }
@@ -684,6 +691,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 }
             }
 
+            if (!_isReloadingSegments &&
+                _isSpeakerInlineEditActive &&
+                _selectedSegment is { } previousSpeakerSegment &&
+                value is not null &&
+                !string.Equals(previousSpeakerSegment.SegmentId, value.SegmentId, StringComparison.Ordinal))
+            {
+                if (!CommitSpeakerInlineEdit(previousSpeakerSegment, reloadSegments: false))
+                {
+                    return;
+                }
+            }
+
             if (!SetField(ref _selectedSegment, value))
             {
                 return;
@@ -692,6 +711,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (value is null)
             {
                 IsSegmentInlineEditActive = false;
+                IsSpeakerInlineEditActive = false;
                 SelectedSegmentEditText = string.Empty;
                 SelectedSpeakerAlias = string.Empty;
                 UpdateSegmentEditCommandStates();
@@ -1006,6 +1026,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set
         {
             if (SetField(ref _isSegmentInlineEditActive, value))
+            {
+                UpdateSegmentEditCommandStates();
+            }
+        }
+    }
+
+    public bool IsSpeakerInlineEditActive
+    {
+        get => _isSpeakerInlineEditActive;
+        private set
+        {
+            if (SetField(ref _isSpeakerInlineEditActive, value))
             {
                 UpdateSegmentEditCommandStates();
             }
@@ -1329,6 +1361,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanRunSelectedJob));
                 OnPropertyChanged(nameof(FirstRunSummary));
                 OnPropertyChanged(nameof(FirstRunDetail));
+                OnPropertyChanged(nameof(ReviewStageToggleText));
+                OnPropertyChanged(nameof(ReviewStageToggleToolTip));
                 RefreshReviewStageToggleStatus();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
@@ -1339,6 +1373,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public string ReviewStageToggleText => EnableReviewStage ? "推敲 ON" : "推敲 OFF";
+
+    public string ReviewStageToggleToolTip => EnableReviewStage
+        ? "推敲ステージを実行します。クリックでスキップ"
+        : "推敲ステージをスキップします。クリックで実行";
 
     public string ReviewIssueType
     {
