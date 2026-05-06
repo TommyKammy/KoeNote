@@ -15,6 +15,15 @@ namespace KoeNote.App.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public void AppVersionDisplay_UsesAssemblyVersionForHeader()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Matches(@"^v\d+\.\d+\.\d+", viewModel.AppVersionDisplay);
+        Assert.StartsWith("KoeNote ", viewModel.AppVersionToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SelectedAsrEngine_RestoresAfterRecreatingViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

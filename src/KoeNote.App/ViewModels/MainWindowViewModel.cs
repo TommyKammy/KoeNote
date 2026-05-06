@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -320,6 +321,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public AppPaths Paths { get; }
 
     public Action<Uri> OpenUriAction { get; set; } = OpenUriInShell;
+
+    public string AppVersionDisplay => $"v{GetAppVersion()}";
+
+    public string AppVersionToolTip => $"KoeNote {GetAppInformationalVersion()}";
 
     public string GpuSummary => EnvironmentStatus.FirstOrDefault(item => item.Name == "nvidia-smi")?.Detail ?? "Unknown";
 
@@ -1462,5 +1467,27 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         field = value;
         OnPropertyChanged(propertyName);
         return true;
+    }
+
+    private static string GetAppVersion()
+    {
+        var informationalVersion = GetAppInformationalVersion();
+        var metadataIndex = informationalVersion.IndexOfAny(['+', '-']);
+        if (metadataIndex >= 0)
+        {
+            informationalVersion = informationalVersion[..metadataIndex];
+        }
+
+        return string.IsNullOrWhiteSpace(informationalVersion)
+            ? "0.0.0"
+            : informationalVersion;
+    }
+
+    private static string GetAppInformationalVersion()
+    {
+        var assembly = typeof(MainWindowViewModel).Assembly;
+        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? "0.0.0";
     }
 }
