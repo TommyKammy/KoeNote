@@ -1,5 +1,11 @@
 # KoeNote
 
+## License
+
+KoeNote application source code is licensed under the Apache License 2.0.
+
+Third-party libraries, runtime tools, and models are governed by their respective licenses. See `distribution/license-manifest.json` for distribution details.
+
 KoeNote は、日本語の音声ファイルをローカル環境で文字起こしし、推敲レビュー、手修正、話者名の整理、エクスポートまで行うための Windows デスクトップアプリです。
 
 音声や文字起こしデータをクラウドへ送らず、手元のPC内で処理することを前提に開発しています。

@@ -80,6 +80,45 @@ public sealed class ModelDownloadServiceTests
     }
 
     [Fact]
+    public async Task DownloadAndInstallAsync_ThrottlesProgressReportsForLargeFiles()
+    {
+        var paths = CreatePaths();
+        var payload = new byte[20 * 1024 * 1024];
+        var catalogItem = CreateCatalogItem(null);
+        var targetPath = Path.Combine(paths.UserModels, "asr", "large.bin");
+        var reports = new List<ModelDownloadProgress>();
+        var service = CreateService(paths, new ByteArrayHandler(payload));
+
+        await service.DownloadAndInstallAsync(catalogItem, targetPath, new SynchronousProgress<ModelDownloadProgress>(reports.Add));
+
+        Assert.InRange(reports.Count, 1, 5);
+        Assert.Equal(payload.Length, reports.Last().BytesDownloaded);
+        Assert.Equal(payload.Length, reports.Last().BytesTotal);
+        var latest = new ModelDownloadJobRepository(paths).FindLatestForModel(catalogItem.ModelId);
+        Assert.Equal(payload.Length, latest?.BytesDownloaded);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstallAsync_SavesLatestProgressWhenCancelledBetweenThrottledReports()
+    {
+        var paths = CreatePaths();
+        var totalBytes = 4 * 1024 * 1024;
+        var cancelAfterBytes = 2 * 1024 * 1024;
+        var catalogItem = CreateCatalogItem(null);
+        var targetPath = Path.Combine(paths.UserModels, "asr", "cancelled-large.bin");
+        var reports = new List<ModelDownloadProgress>();
+        var service = CreateService(paths, new CancellingStreamHandler(totalBytes, cancelAfterBytes));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.DownloadAndInstallAsync(catalogItem, targetPath, new SynchronousProgress<ModelDownloadProgress>(reports.Add)));
+
+        var latest = new ModelDownloadJobRepository(paths).FindLatestForModel(catalogItem.ModelId);
+        Assert.Equal("cancelled", latest?.Status);
+        Assert.Equal(cancelAfterBytes, latest?.BytesDownloaded);
+        Assert.Equal(cancelAfterBytes, reports.Last().BytesDownloaded);
+    }
+
+    [Fact]
     public async Task DownloadAndInstallAsync_DownloadsHuggingFaceRepositoryToDirectory()
     {
         var paths = CreatePaths();
@@ -327,6 +366,95 @@ public sealed class ModelDownloadServiceTests
             }
 
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class ByteArrayHandler(byte[] body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(body)
+            });
+        }
+    }
+
+    private sealed class CancellingStreamHandler(long totalBytes, long cancelAfterBytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var content = new StreamContent(new CancellingReadStream(totalBytes, cancelAfterBytes));
+            content.Headers.ContentLength = totalBytes;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = content
+            });
+        }
+    }
+
+    private sealed class CancellingReadStream(long totalBytes, long cancelAfterBytes) : Stream
+    {
+        private long _position;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => totalBytes;
+
+        public override long Position
+        {
+            get => _position;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_position >= cancelAfterBytes)
+            {
+                throw new OperationCanceledException();
+            }
+
+            var remainingBeforeCancel = cancelAfterBytes - _position;
+            var read = (int)Math.Min(count, remainingBeforeCancel);
+            Array.Clear(buffer, offset, read);
+            _position += read;
+            return read;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_position >= cancelAfterBytes)
+            {
+                throw new OperationCanceledException();
+            }
+
+            var remainingBeforeCancel = cancelAfterBytes - _position;
+            var read = (int)Math.Min(buffer.Length, remainingBeforeCancel);
+            buffer.Span[..read].Clear();
+            _position += read;
+            return ValueTask.FromResult(read);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value)
+        {
+            handler(value);
         }
     }
 

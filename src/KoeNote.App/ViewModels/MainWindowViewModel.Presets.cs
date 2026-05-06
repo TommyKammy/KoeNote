@@ -20,27 +20,79 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        ImportDomainPresetFromFile(dialog.FileName);
+        LoadDomainPresetFromFile(dialog.FileName);
         return Task.CompletedTask;
     }
 
     public void ImportDomainPresetFromFile(string presetPath)
     {
+        LoadDomainPresetFromFile(presetPath);
+    }
+
+    public void LoadDomainPresetFromFile(string presetPath)
+    {
+        try
+        {
+            var preview = _domainPresetImportService.LoadPreview(presetPath);
+            _loadedDomainPresetPath = preview.SourcePath;
+            LoadedDomainPresetSummary = preview.Summary;
+            LoadedDomainPresetDetails = preview.Details;
+            OnPropertyChanged(nameof(HasLoadedDomainPreset));
+            if (ApplyLoadedDomainPresetCommand is RelayCommand command)
+            {
+                command.RaiseCanExecuteChanged();
+            }
+
+            LatestLog = $"Preset JSON loaded. Review it, then press import: {preview.DisplayName}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or JsonException or ArgumentException)
+        {
+            _loadedDomainPresetPath = null;
+            LoadedDomainPresetSummary = "プリセットJSONは未読み込みです。";
+            LoadedDomainPresetDetails = string.Empty;
+            OnPropertyChanged(nameof(HasLoadedDomainPreset));
+            if (ApplyLoadedDomainPresetCommand is RelayCommand command)
+            {
+                command.RaiseCanExecuteChanged();
+            }
+
+            LatestLog = $"Preset load failed: {exception.Message}";
+        }
+    }
+
+    private Task ApplyLoadedDomainPresetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_loadedDomainPresetPath))
+        {
+            return Task.CompletedTask;
+        }
+
         try
         {
             SaveAsrSettings();
-            var result = _domainPresetImportService.Import(presetPath, SelectedJob?.JobId);
+            var result = _domainPresetImportService.Import(_loadedDomainPresetPath, SelectedJob?.JobId);
             var settings = _asrSettingsRepository.Load();
             AsrContextText = settings.ContextText;
             AsrHotwordsText = settings.HotwordsText;
             ReloadSegmentsForSelectedJob(SelectedSegment?.SegmentId);
             LatestLog = result.Summary;
+            _loadedDomainPresetPath = null;
+            LoadedDomainPresetSummary = "プリセットJSONは未読み込みです。";
+            LoadedDomainPresetDetails = string.Empty;
+            OnPropertyChanged(nameof(HasLoadedDomainPreset));
+            if (ApplyLoadedDomainPresetCommand is RelayCommand command)
+            {
+                command.RaiseCanExecuteChanged();
+            }
+
             RefreshDomainPresetHistory();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or JsonException or ArgumentException)
         {
             LatestLog = $"Preset import failed: {exception.Message}";
         }
+
+        return Task.CompletedTask;
     }
 
     private Task ClearSelectedDomainPresetAsync()

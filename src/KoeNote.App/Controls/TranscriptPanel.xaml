@@ -17,6 +17,7 @@
                            VerticalAlignment="Center" />
                 <CheckBox Grid.Column="1"
                           Content="自動スクロール"
+                          IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"
                           HorizontalAlignment="Right"
                           VerticalAlignment="Center"
                           Margin="0,0,14,0"

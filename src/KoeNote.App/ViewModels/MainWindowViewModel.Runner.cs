@@ -104,7 +104,7 @@ public sealed partial class MainWindowViewModel
     {
         if (state == JobRunStageState.Skipped)
         {
-            return "Skipped";
+            return "スキップ";
         }
 
         return state switch

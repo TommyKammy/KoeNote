@@ -14,9 +14,9 @@
 
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="92" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="112" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="ASR"
                            Foreground="#64748B"
@@ -26,22 +26,25 @@
                           ItemsSource="{Binding SetupAsrModelChoices}"
                           SelectedItem="{Binding SelectedSetupAsrModel, Mode=TwoWay}"
                           DisplayMemberPath="SetupDisplayName"
-                          MinWidth="260"
+                          MinWidth="0"
                           MinHeight="34"
+                          HorizontalAlignment="Stretch"
+                          ToolTip="{Binding SelectedSetupAsrModel.SetupDisplayName}"
                           TextSearch.TextPath="SetupDisplayName" />
                 <Button Grid.Column="2"
                         Command="{Binding SetupDownloadAsrCommand}"
                         Padding="10,7"
-                        Margin="12,0,0,0">
+                        MinWidth="92"
+                        Margin="10,0,0,0">
                     <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
                 </Button>
             </Grid>
 
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="92" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="112" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="話者識別"
                            Foreground="#64748B"
@@ -57,16 +60,17 @@
                 <Button Grid.Column="2"
                         Command="{Binding SetupInstallDiarizationRuntimeCommand}"
                         Padding="10,7"
-                        Margin="12,0,0,0">
+                        MinWidth="92"
+                        Margin="10,0,0,0">
                     <TextBlock Text="追加導入" FontSize="12" FontWeight="SemiBold" />
                 </Button>
             </Grid>
 
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="92" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="112" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="推敲 LLM"
                            Foreground="#64748B"
@@ -76,22 +80,25 @@
                           ItemsSource="{Binding SetupReviewModelChoices}"
                           SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
                           DisplayMemberPath="SetupDisplayName"
-                          MinWidth="260"
+                          MinWidth="0"
                           MinHeight="34"
+                          HorizontalAlignment="Stretch"
+                          ToolTip="{Binding SelectedSetupReviewModel.SetupDisplayName}"
                           TextSearch.TextPath="SetupDisplayName" />
                 <Button Grid.Column="2"
                         Command="{Binding SetupDownloadReviewCommand}"
                         Padding="10,7"
-                        Margin="12,0,0,0">
+                        MinWidth="92"
+                        Margin="10,0,0,0">
                     <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
                 </Button>
             </Grid>
 
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="92" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="112" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="保存先"
                            Foreground="#64748B"
@@ -107,12 +114,13 @@
                 <Button Grid.Column="2"
                         Command="{Binding SetupChooseStorageRootCommand}"
                         Padding="10,7"
-                        Margin="12,0,0,0">
+                        MinWidth="92"
+                        Margin="10,0,0,0">
                     <TextBlock Text="変更" FontSize="12" />
                 </Button>
             </Grid>
 
-            <StackPanel Orientation="Horizontal" Margin="120,0,0,14">
+            <StackPanel Orientation="Horizontal" Margin="92,0,0,14">
                 <Button Command="{Binding SetupAcceptLicensesCommand}"
                         Padding="12,7"
                         Margin="0,0,10,0">

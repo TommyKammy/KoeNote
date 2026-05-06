@@ -53,6 +53,7 @@ public sealed class DirectModelDownloadStrategy : IModelDownloadStrategy
         using var response = await context.HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
         var totalBytes = response.Content.Headers.ContentRange?.Length ?? response.Content.Headers.ContentLength;
+        var progressReporter = new ModelDownloadProgressReporter(context);
         var buffer = new byte[1024 * 128];
         await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var output = new FileStream(
@@ -62,21 +63,28 @@ public sealed class DirectModelDownloadStrategy : IModelDownloadStrategy
             FileShare.None);
 
         long downloaded = output.Position;
-        while (true)
+        progressReporter.Report(downloaded, totalBytes, force: true);
+        try
         {
-            var read = await input.ReadAsync(buffer, cancellationToken);
-            if (read == 0)
+            while (true)
             {
-                break;
+                var read = await input.ReadAsync(buffer, cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                downloaded += read;
+                progressReporter.Report(downloaded, totalBytes);
             }
 
-            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-            downloaded += read;
-            context.DownloadJobRepository.UpdateProgress(context.DownloadId, downloaded, totalBytes);
-            context.Progress?.Report(new ModelDownloadProgress(context.CatalogItem.ModelId, downloaded, totalBytes));
+            await output.FlushAsync(cancellationToken);
         }
-
-        await output.FlushAsync(cancellationToken);
+        finally
+        {
+            progressReporter.Report(downloaded, totalBytes, force: true);
+        }
     }
 }
 
@@ -123,8 +131,8 @@ public sealed class HuggingFaceRepositoryDownloadStrategy : IModelDownloadStrate
             : catalogItem.SizeBytes;
         var downloadedBytes = CalculateDirectorySize(job.TempPath);
         totalBytes = ModelDownloadProgressMath.NormalizeTotalBytes(downloadedBytes, totalBytes);
-        context.DownloadJobRepository.UpdateProgress(context.DownloadId, downloadedBytes, totalBytes);
-        context.Progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
+        var progressReporter = new ModelDownloadProgressReporter(context);
+        progressReporter.Report(downloadedBytes, totalBytes, force: true);
 
         foreach (var file in files)
         {
@@ -141,8 +149,7 @@ public sealed class HuggingFaceRepositoryDownloadStrategy : IModelDownloadStrate
             {
                 downloadedBytes -= existingBytes;
                 totalBytes = ModelDownloadProgressMath.NormalizeTotalBytes(downloadedBytes, totalBytes);
-                context.DownloadJobRepository.UpdateProgress(context.DownloadId, downloadedBytes, totalBytes);
-                context.Progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
+                progressReporter.Report(downloadedBytes, totalBytes, force: true);
             }
 
             var fileUri = new Uri($"https://huggingface.co/{repoId}/resolve/main/{Uri.EscapeDataString(file.RelativePath).Replace("%2F", "/", StringComparison.Ordinal)}");
@@ -152,26 +159,31 @@ public sealed class HuggingFaceRepositoryDownloadStrategy : IModelDownloadStrate
             {
                 totalBytes = downloadedBytes + contentLength;
                 totalBytes = ModelDownloadProgressMath.NormalizeTotalBytes(downloadedBytes, totalBytes);
-                context.DownloadJobRepository.UpdateProgress(context.DownloadId, downloadedBytes, totalBytes);
-                context.Progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
+                progressReporter.Report(downloadedBytes, totalBytes, force: true);
             }
 
             await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
             await using var output = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
             var buffer = new byte[1024 * 128];
-            while (true)
+            try
             {
-                var read = await input.ReadAsync(buffer, cancellationToken);
-                if (read == 0)
+                while (true)
                 {
-                    break;
-                }
+                    var read = await input.ReadAsync(buffer, cancellationToken);
+                    if (read == 0)
+                    {
+                        break;
+                    }
 
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                downloadedBytes += read;
-                totalBytes = ModelDownloadProgressMath.NormalizeTotalBytes(downloadedBytes, totalBytes);
-                context.DownloadJobRepository.UpdateProgress(context.DownloadId, downloadedBytes, totalBytes);
-                context.Progress?.Report(new ModelDownloadProgress(catalogItem.ModelId, downloadedBytes, totalBytes));
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    downloadedBytes += read;
+                    totalBytes = ModelDownloadProgressMath.NormalizeTotalBytes(downloadedBytes, totalBytes);
+                    progressReporter.Report(downloadedBytes, totalBytes);
+                }
+            }
+            finally
+            {
+                progressReporter.Report(downloadedBytes, totalBytes, force: true);
             }
         }
     }
@@ -215,6 +227,56 @@ public sealed class HuggingFaceRepositoryDownloadStrategy : IModelDownloadStrate
         return Directory.Exists(directoryPath)
             ? Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories).Sum(static path => new FileInfo(path).Length)
             : 0;
+    }
+}
+
+internal sealed class ModelDownloadProgressReporter
+{
+    private const long ByteStep = 8L * 1024 * 1024;
+    private static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
+
+    private readonly ModelDownloadStrategyContext _context;
+    private DateTimeOffset _lastReportedAt = DateTimeOffset.MinValue;
+    private long _lastReportedBytes = -1;
+    private long? _lastReportedTotalBytes;
+
+    public ModelDownloadProgressReporter(ModelDownloadStrategyContext context)
+    {
+        _context = context;
+    }
+
+    public void Report(long downloadedBytes, long? totalBytes, bool force = false)
+    {
+        if (!force && !ShouldReport(downloadedBytes, totalBytes))
+        {
+            return;
+        }
+
+        _lastReportedAt = DateTimeOffset.UtcNow;
+        _lastReportedBytes = downloadedBytes;
+        _lastReportedTotalBytes = totalBytes;
+        _context.DownloadJobRepository.UpdateProgress(_context.DownloadId, downloadedBytes, totalBytes);
+        _context.Progress?.Report(new ModelDownloadProgress(_context.CatalogItem.ModelId, downloadedBytes, totalBytes));
+    }
+
+    private bool ShouldReport(long downloadedBytes, long? totalBytes)
+    {
+        if (_lastReportedBytes < 0)
+        {
+            return true;
+        }
+
+        if (_lastReportedTotalBytes != totalBytes)
+        {
+            return true;
+        }
+
+        if (downloadedBytes - _lastReportedBytes >= ByteStep)
+        {
+            return true;
+        }
+
+        return DateTimeOffset.UtcNow - _lastReportedAt >= ReportInterval;
     }
 }
 

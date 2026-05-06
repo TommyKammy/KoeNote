@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using KoeNote.App.Services.Asr;
@@ -21,6 +22,22 @@ public sealed record DomainPresetImportResult(
 {
     public string Summary =>
         $"プリセットをインポートしました: {DisplayName} (コンテキスト: {(ContextUpdated ? "更新" : "変更なし")}, ホットワード: {AddedHotwordCount}件追加 / {SkippedHotwordCount}件スキップ, 補正メモリ: {AddedCorrectionMemoryCount}件追加 / {UpdatedCorrectionMemoryCount}件更新, 話者別名: {AddedSpeakerAliasCount}件追加 / {UpdatedSpeakerAliasCount}件更新 / {SkippedSpeakerAliasCount}件スキップ, レビュー指針: {AddedReviewGuidelineCount}件追加 / {UpdatedReviewGuidelineCount}件更新)";
+}
+
+public sealed record DomainPresetPreview(
+    string SourcePath,
+    string DisplayName,
+    string? PresetId,
+    int SchemaVersion,
+    string Details,
+    bool HasAsrContext,
+    int HotwordCount,
+    int CorrectionMemoryCount,
+    int SpeakerAliasCount,
+    int ReviewGuidelineCount)
+{
+    public string Summary =>
+        $"読み込み済み: {DisplayName} / ホットワード {HotwordCount}件 / 補正メモリ {CorrectionMemoryCount}件 / 話者別名 {SpeakerAliasCount}件 / レビュー指針 {ReviewGuidelineCount}件";
 }
 
 public sealed record DomainPresetImportHistoryItem(
@@ -67,6 +84,22 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         AllowTrailingCommas = true
     };
 
+    public DomainPresetPreview LoadPreview(string presetPath)
+    {
+        var preset = LoadPreset(presetPath);
+        return new DomainPresetPreview(
+            Path.GetFullPath(presetPath),
+            preset.DisplayName,
+            preset.NormalizedPresetId,
+            preset.SchemaVersion,
+            BuildPreviewDetails(preset),
+            !string.IsNullOrWhiteSpace(preset.AsrContext),
+            preset.Hotwords.Count(static hotword => !string.IsNullOrWhiteSpace(hotword)),
+            preset.CorrectionMemory.Count(static entry => !string.IsNullOrWhiteSpace(entry.WrongText) && !string.IsNullOrWhiteSpace(entry.CorrectText)),
+            preset.SpeakerAliases.Count(static entry => !string.IsNullOrWhiteSpace(entry.SpeakerId) && !string.IsNullOrWhiteSpace(entry.DisplayName)),
+            preset.ReviewGuidelines.Count(static guideline => !string.IsNullOrWhiteSpace(guideline)));
+    }
+
     public DomainPresetImportResult Import(string presetPath, string? defaultJobId = null)
     {
         if (string.IsNullOrWhiteSpace(presetPath))
@@ -94,11 +127,12 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
             current.EngineId,
             current.EnableReviewStage);
 
-        var databaseResult = ImportDatabaseEntries(preset, defaultJobId);
+        var importId = Guid.NewGuid().ToString("N");
+        var databaseResult = ImportDatabaseEntries(preset, importId, defaultJobId);
         asrSettingsRepository.Save(next);
 
         var contextUpdated = !string.Equals(current.ContextText, nextContext, StringComparison.Ordinal);
-        RecordImportHistory(presetPath, preset, contextUpdated, hotwordMerge, databaseResult);
+        RecordImportHistory(importId, presetPath, preset, contextUpdated, hotwordMerge, databaseResult);
 
         return new DomainPresetImportResult(
             preset.DisplayName,
@@ -224,20 +258,11 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
                 }
             }
 
-            foreach (var alias in preset.SpeakerAliases)
-            {
-                if (string.IsNullOrWhiteSpace(alias.JobId) ||
-                    string.IsNullOrWhiteSpace(alias.SpeakerId))
-                {
-                    continue;
-                }
-
-                deletedAliases += DeleteSpeakerAlias(connection, transaction, alias.JobId.Trim(), alias.SpeakerId.Trim());
-            }
         }
 
+        deletedAliases += RevertTrackedSpeakerAliases(connection, transaction, history.ImportId);
         var disabledGuidelines = DisableReviewGuidelines(connection, transaction, presetId);
-        MarkPresetImportsCleared(connection, transaction, presetId, DateTimeOffset.Now.ToString("o"));
+        MarkPresetImportCleared(connection, transaction, history.ImportId, DateTimeOffset.Now.ToString("o"));
         transaction.Commit();
 
         return new DomainPresetClearResult(
@@ -307,6 +332,114 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
         {
             return null;
+        }
+    }
+
+    private static DomainPreset LoadPreset(string presetPath)
+    {
+        if (string.IsNullOrWhiteSpace(presetPath))
+        {
+            throw new ArgumentException("プリセットファイルを指定してください。", nameof(presetPath));
+        }
+
+        if (!File.Exists(presetPath))
+        {
+            throw new FileNotFoundException("プリセットファイルが見つかりません。", presetPath);
+        }
+
+        var preset = JsonSerializer.Deserialize<DomainPreset>(File.ReadAllText(presetPath), JsonOptions)
+            ?? throw new InvalidDataException("プリセットJSONを読み込めませんでした。");
+        preset.Validate();
+        return preset;
+    }
+
+    private static string BuildPreviewDetails(DomainPreset preset)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"表示名: {preset.DisplayName}");
+        if (!string.IsNullOrWhiteSpace(preset.NormalizedPresetId))
+        {
+            builder.AppendLine($"プリセットID: {preset.NormalizedPresetId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(preset.Domain))
+        {
+            builder.AppendLine($"ドメイン: {preset.Domain.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(preset.Description))
+        {
+            builder.AppendLine();
+            builder.AppendLine("説明:");
+            builder.AppendLine(preset.Description.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(preset.AsrContext))
+        {
+            builder.AppendLine();
+            builder.AppendLine("ASRコンテキスト:");
+            builder.AppendLine(preset.AsrContext.Trim());
+        }
+
+        AppendPreviewSection(
+            builder,
+            "ホットワード",
+            preset.Hotwords
+                .Select(static hotword => hotword.Trim())
+                .Where(static hotword => hotword.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+
+        AppendPreviewSection(
+            builder,
+            "補正メモリ",
+            preset.CorrectionMemory
+                .Where(static entry => !string.IsNullOrWhiteSpace(entry.WrongText) && !string.IsNullOrWhiteSpace(entry.CorrectText))
+                .Select(static entry =>
+                {
+                    var issueType = string.IsNullOrWhiteSpace(entry.IssueType) ? "domain_preset" : entry.IssueType.Trim();
+                    var scope = string.IsNullOrWhiteSpace(entry.Scope) ? "global" : entry.Scope.Trim();
+                    return $"{entry.WrongText!.Trim()} -> {entry.CorrectText!.Trim()} ({issueType}, {scope})";
+                }));
+
+        AppendPreviewSection(
+            builder,
+            "話者別名",
+            preset.SpeakerAliases
+                .Where(static entry => !string.IsNullOrWhiteSpace(entry.SpeakerId) && !string.IsNullOrWhiteSpace(entry.DisplayName))
+                .Select(static entry =>
+                {
+                    var jobId = string.IsNullOrWhiteSpace(entry.JobId) ? "選択中ジョブ" : entry.JobId.Trim();
+                    return $"{jobId}: {entry.SpeakerId!.Trim()} -> {entry.DisplayName!.Trim()}";
+                }));
+
+        AppendPreviewSection(
+            builder,
+            "レビュー指針",
+            preset.ReviewGuidelines
+                .Select(static guideline => guideline.Trim())
+                .Where(static guideline => guideline.Length > 0));
+
+        return builder.ToString().Trim();
+    }
+
+    private static void AppendPreviewSection(StringBuilder builder, string title, IEnumerable<string> values)
+    {
+        var items = values.ToArray();
+        if (items.Length == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.AppendLine($"{title}:");
+        foreach (var item in items.Take(20))
+        {
+            builder.AppendLine($"- {item}");
+        }
+
+        if (items.Length > 20)
+        {
+            builder.AppendLine($"- ...ほか {items.Length - 20} 件");
         }
     }
 
@@ -431,7 +564,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         return hotword.Trim();
     }
 
-    private DatabaseImportResult ImportDatabaseEntries(DomainPreset preset, string? defaultJobId)
+    private DatabaseImportResult ImportDatabaseEntries(DomainPreset preset, string importId, string? defaultJobId)
     {
         if (preset.CorrectionMemory.Count == 0 &&
             preset.SpeakerAliases.Count == 0 &&
@@ -498,7 +631,10 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
                 continue;
             }
 
-            var result = UpsertSpeakerAlias(connection, transaction, jobId.Trim(), speakerId, displayName, now);
+            var normalizedJobId = jobId.Trim();
+            var previousDisplayName = LoadSpeakerAliasDisplayName(connection, transaction, normalizedJobId, speakerId);
+            var result = UpsertSpeakerAlias(connection, transaction, normalizedJobId, speakerId, displayName, now);
+            TrackSpeakerAliasImport(connection, transaction, importId, normalizedJobId, speakerId, previousDisplayName, displayName);
             if (result == UpsertResult.Inserted)
             {
                 addedAlias++;
@@ -556,6 +692,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
     }
 
     private void RecordImportHistory(
+        string importId,
         string presetPath,
         DomainPreset preset,
         bool contextUpdated,
@@ -602,7 +739,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
                 $imported_at
             );
             """;
-        command.Parameters.AddWithValue("$import_id", Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("$import_id", importId);
         command.Parameters.AddWithValue("$preset_id", (object?)preset.NormalizedPresetId ?? DBNull.Value);
         command.Parameters.AddWithValue("$display_name", preset.DisplayName);
         command.Parameters.AddWithValue("$schema_version", preset.SchemaVersion);
@@ -679,6 +816,109 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         return command.ExecuteNonQuery();
     }
 
+    private static int RestoreSpeakerAlias(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string speakerId,
+        string displayName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE speaker_aliases
+            SET display_name = $display_name,
+                updated_at = $updated_at
+            WHERE job_id = $job_id
+                AND speaker_id = $speaker_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$speaker_id", speakerId);
+        command.Parameters.AddWithValue("$display_name", displayName);
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        return command.ExecuteNonQuery();
+    }
+
+    private static void TrackSpeakerAliasImport(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string importId,
+        string jobId,
+        string speakerId,
+        string? previousDisplayName,
+        string appliedDisplayName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT OR IGNORE INTO domain_preset_speaker_alias_imports (
+                import_id,
+                job_id,
+                speaker_id,
+                previous_display_name,
+                applied_display_name
+            )
+            VALUES (
+                $import_id,
+                $job_id,
+                $speaker_id,
+                $previous_display_name,
+                $applied_display_name
+            );
+            """;
+        command.Parameters.AddWithValue("$import_id", importId);
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$speaker_id", speakerId);
+        command.Parameters.AddWithValue("$previous_display_name", (object?)previousDisplayName ?? DBNull.Value);
+        command.Parameters.AddWithValue("$applied_display_name", appliedDisplayName);
+        command.ExecuteNonQuery();
+    }
+
+    private static int RevertTrackedSpeakerAliases(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string importId)
+    {
+        using var selectCommand = connection.CreateCommand();
+        selectCommand.Transaction = transaction;
+        selectCommand.CommandText = """
+            SELECT job_id, speaker_id, previous_display_name
+            FROM domain_preset_speaker_alias_imports
+            WHERE import_id = $import_id;
+            """;
+        selectCommand.Parameters.AddWithValue("$import_id", importId);
+
+        var aliases = new List<(string JobId, string SpeakerId, string? PreviousDisplayName)>();
+        using (var reader = selectCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                aliases.Add((
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+        }
+
+        var changed = 0;
+        foreach (var alias in aliases)
+        {
+            changed += alias.PreviousDisplayName is null
+                ? DeleteSpeakerAlias(connection, transaction, alias.JobId, alias.SpeakerId)
+                : RestoreSpeakerAlias(connection, transaction, alias.JobId, alias.SpeakerId, alias.PreviousDisplayName);
+        }
+
+        using var deleteCommand = connection.CreateCommand();
+        deleteCommand.Transaction = transaction;
+        deleteCommand.CommandText = """
+            DELETE FROM domain_preset_speaker_alias_imports
+            WHERE import_id = $import_id;
+            """;
+        deleteCommand.Parameters.AddWithValue("$import_id", importId);
+        deleteCommand.ExecuteNonQuery();
+        return changed;
+    }
+
     private static int DisableReviewGuidelines(SqliteConnection connection, SqliteTransaction transaction, string presetId)
     {
         using var command = connection.CreateCommand();
@@ -695,10 +935,10 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         return command.ExecuteNonQuery();
     }
 
-    private static void MarkPresetImportsCleared(
+    private static void MarkPresetImportCleared(
         SqliteConnection connection,
         SqliteTransaction transaction,
-        string presetId,
+        string importId,
         string deactivatedAt)
     {
         using var command = connection.CreateCommand();
@@ -706,10 +946,10 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         command.CommandText = """
             UPDATE domain_preset_imports
             SET deactivated_at = $deactivated_at
-            WHERE COALESCE(preset_id, display_name) = $preset_id
+            WHERE import_id = $import_id
                 AND deactivated_at IS NULL;
             """;
-        command.Parameters.AddWithValue("$preset_id", presetId);
+        command.Parameters.AddWithValue("$import_id", importId);
         command.Parameters.AddWithValue("$deactivated_at", deactivatedAt);
         command.ExecuteNonQuery();
     }
@@ -808,6 +1048,24 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         command.Parameters.AddWithValue("$updated_at", now);
         command.ExecuteNonQuery();
         return exists ? UpsertResult.Updated : UpsertResult.Inserted;
+    }
+
+    private static string? LoadSpeakerAliasDisplayName(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string speakerId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT display_name
+            FROM speaker_aliases
+            WHERE job_id = $job_id AND speaker_id = $speaker_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$speaker_id", speakerId);
+        return command.ExecuteScalar() as string;
     }
 
     private static bool SpeakerAliasExists(SqliteConnection connection, SqliteTransaction transaction, string jobId, string speakerId)

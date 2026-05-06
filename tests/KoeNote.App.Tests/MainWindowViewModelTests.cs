@@ -74,6 +74,33 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void DeleteSelectedModelFilesCommand_IsDisabledWhileJobOrModelDownloadIsRunning()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.SelectedModelCatalogEntry = viewModel.ModelCatalogEntries.Single(entry => entry.ModelId == asrItem.ModelId);
+
+        Assert.True(viewModel.DeleteSelectedModelFilesCommand.CanExecute(null));
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+        Assert.False(viewModel.DeleteSelectedModelFilesCommand.CanExecute(null));
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), false);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsModelDownloadInProgress), true);
+        Assert.False(viewModel.DeleteSelectedModelFilesCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void JobSearchText_FiltersJobsByTitleFileNameAndStatus()
     {
         var viewModel = CreateViewModel();
@@ -111,6 +138,7 @@ public sealed class MainWindowViewModelTests
         Touch(audioPath);
         var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
         var job = viewModel.RegisterAudioFile(audioPath);
+        new JobRepository(viewModel.Paths).MarkPreprocessSucceeded(job, Path.Combine(root, "normalized.wav"));
         var confirmations = 0;
         viewModel.ConfirmAction = (_, _) =>
         {
@@ -166,6 +194,7 @@ public sealed class MainWindowViewModelTests
         Touch(audioPath);
         var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
         var job = viewModel.RegisterAudioFile(audioPath);
+        new JobRepository(viewModel.Paths).MarkPreprocessSucceeded(job, Path.Combine(root, "normalized.wav"));
         var jobDirectory = Path.Combine(viewModel.Paths.Jobs, job.JobId);
         Directory.CreateDirectory(jobDirectory);
         File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");
@@ -180,6 +209,29 @@ public sealed class MainWindowViewModelTests
         var deleted = Assert.Single(viewModel.DeletedJobs);
         Assert.True(deleted.StorageBytes >= "artifact".Length);
         Assert.False(viewModel.DeletedJobCountSummary.EndsWith("/ 0 B", StringComparison.Ordinal), viewModel.DeletedJobCountSummary);
+    }
+
+    [Fact]
+    public async Task DeleteJobCommand_UnstartedRegisteredJobDoesNotMoveToHistory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var viewModel = new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+        var job = viewModel.RegisterAudioFile(audioPath);
+        viewModel.ConfirmAction = (_, message) =>
+        {
+            Assert.Contains("履歴に残さず", message, StringComparison.Ordinal);
+            return true;
+        };
+
+        viewModel.DeleteJobCommand.Execute(job);
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+        Assert.Empty(viewModel.Jobs);
+        Assert.Empty(viewModel.DeletedJobs);
+        Assert.Empty(new JobRepository(viewModel.Paths).LoadRecent());
+        Assert.Empty(new JobRepository(viewModel.Paths).LoadDeleted());
     }
 
     [Fact]
@@ -259,6 +311,15 @@ public sealed class MainWindowViewModelTests
 
         viewModel.ImportDomainPresetFromFile(presetPath);
 
+        Assert.True(viewModel.HasLoadedDomainPreset);
+        Assert.Contains("産科・産後ケア研究プリセット", viewModel.LoadedDomainPresetSummary, StringComparison.Ordinal);
+        Assert.Contains("産後ケア研究のインタビューです。", viewModel.LoadedDomainPresetDetails, StringComparison.Ordinal);
+        Assert.Contains("助産師", viewModel.LoadedDomainPresetDetails, StringComparison.Ordinal);
+        Assert.Equal("既存設定", viewModel.AsrContextText);
+        Assert.Equal("産後ケア", viewModel.AsrHotwordsText);
+
+        viewModel.ApplyLoadedDomainPresetCommand.Execute(null);
+
         Assert.Contains("既存設定", viewModel.AsrContextText, StringComparison.Ordinal);
         Assert.Contains("産後ケア研究のインタビューです。", viewModel.AsrContextText, StringComparison.Ordinal);
         Assert.Equal(
@@ -293,6 +354,11 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(paths);
 
         viewModel.ImportDomainPresetFromFile(presetPath);
+
+        Assert.True(viewModel.HasLoadedDomainPreset);
+        Assert.Equal("Speaker_0", Assert.Single(viewModel.Segments).Speaker);
+
+        viewModel.ApplyLoadedDomainPresetCommand.Execute(null);
 
         Assert.Equal("聞き手", Assert.Single(viewModel.Segments).Speaker);
         Assert.Contains("話者別名: 1件追加", viewModel.LatestLog, StringComparison.Ordinal);
@@ -479,9 +545,32 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("llama-completion", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.Contains(paths.LlamaCompletionPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
-        Assert.Contains("セットアップを開く / モデル導入へ", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.Contains("セットアップ、またはモデル導入", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.False(viewModel.RequiredRuntimeAssetsReady);
         Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void FirstRunSummary_DoesNotRequireReviewRuntimeWhenReviewStageIsDisabled()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "kotoba-whisper-v2.2-faster",
+            false));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.False(viewModel.EnableReviewStage);
+        Assert.Equal("初回チェック OK", viewModel.FirstRunSummary);
+        Assert.DoesNotContain("llama-completion", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Phase 11", viewModel.FirstRunDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Phase 12", viewModel.FirstRunDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -492,8 +581,9 @@ public sealed class MainWindowViewModelTests
 
         viewModel.OpenSetupCommand.Execute(null);
 
-        Assert.Contains("Model Catalog", viewModel.LatestLog, StringComparison.Ordinal);
-        Assert.Contains("Setup Wizard", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains("セットアップウィザード", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("Phase 11", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.DoesNotContain("Phase 12", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.True(viewModel.IsSetupWizardModalOpen);
         Assert.False(viewModel.IsDetailPanelOpen);
         Assert.Contains("KoeNote", viewModel.SetupWizardModalTitle, StringComparison.Ordinal);
@@ -666,6 +756,142 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SkipToNextSegmentCommand_SelectsNextSegmentStart()
+    {
+        var viewModel = CreateViewModel();
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+        viewModel.PlaybackPositionSeconds = 1;
+
+        Assert.True(viewModel.SkipToNextSegmentCommand.CanExecute(null));
+
+        viewModel.SkipToNextSegmentCommand.Execute(null);
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(5, viewModel.PlaybackPositionSeconds, 2);
+        Assert.Equal(1, viewModel.TranscriptAutoScrollRequestId);
+    }
+
+    [Fact]
+    public void SkipToPreviousSegmentCommand_RestartsCurrentSegmentBeforeMovingPrevious()
+    {
+        var viewModel = CreateViewModel();
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+        viewModel.PlaybackPositionSeconds = 7;
+
+        viewModel.SkipToPreviousSegmentCommand.Execute(null);
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(5, viewModel.PlaybackPositionSeconds, 2);
+
+        viewModel.SkipToPreviousSegmentCommand.Execute(null);
+
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(0, viewModel.PlaybackPositionSeconds, 2);
+    }
+
+    [Fact]
+    public void ToggleReviewStageCommand_SwitchesReviewStageSettingAndStageStatus()
+    {
+        var viewModel = CreateViewModel();
+        var reviewStage = viewModel.StageStatuses.Single(stage => stage.IsToggleable);
+
+        Assert.True(viewModel.EnableReviewStage);
+        Assert.Equal("未開始", reviewStage.Status);
+
+        viewModel.ToggleReviewStageCommand.Execute(reviewStage);
+
+        Assert.False(viewModel.EnableReviewStage);
+        Assert.Equal("スキップ", reviewStage.Status);
+        Assert.Contains("スキップ", reviewStage.ToggleToolTip, StringComparison.Ordinal);
+        Assert.Contains("スキップ", viewModel.LatestLog, StringComparison.Ordinal);
+
+        viewModel.ToggleReviewStageCommand.Execute(reviewStage);
+
+        Assert.True(viewModel.EnableReviewStage);
+        Assert.Equal("未開始", reviewStage.Status);
+        Assert.Contains("実行", reviewStage.ToggleToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Constructor_ShowsReviewStageSkippedWhenSavedSettingIsOff()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            "context",
+            "term",
+            "kotoba-whisper-v2.2-faster",
+            false));
+
+        var viewModel = new MainWindowViewModel(paths);
+        var reviewStage = viewModel.StageStatuses.Single(stage => stage.IsToggleable);
+
+        Assert.False(viewModel.EnableReviewStage);
+        Assert.Equal("スキップ", reviewStage.Status);
+        Assert.Contains("スキップ", reviewStage.ToggleToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReviewStageSkippedRunUpdate_UsesLocalizedSkippedStatus()
+    {
+        var viewModel = CreateViewModel();
+        var reviewStage = viewModel.StageStatuses.Single(stage => stage.IsToggleable);
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Review,
+                JobRunStageState.Skipped,
+                100)
+        ]);
+
+        Assert.Equal("スキップ", reviewStage.Status);
+        Assert.True(reviewStage.IsSkipped);
+    }
+
+    [Fact]
     public void SelectingSegment_SeeksPlaybackPositionToSegmentStart()
     {
         var viewModel = CreateViewModel();
@@ -682,6 +908,130 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedSegment = segment;
 
         Assert.Equal(72.34, viewModel.PlaybackPositionSeconds, 2);
+    }
+
+    [Fact]
+    public void PlaybackPosition_SelectsVisibleSegmentWhenAutoScrollIsEnabled()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5));
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10));
+
+        viewModel.PlaybackPositionSeconds = 6;
+        Assert.Null(viewModel.SelectedSegment);
+
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(1, viewModel.TranscriptAutoScrollRequestId);
+        Assert.Equal(6, viewModel.PlaybackPositionSeconds, 2);
+    }
+
+    [Fact]
+    public void PlaybackPosition_DoesNotAutoSelectFilteredOutSegment()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "visible first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5));
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "hidden second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10));
+
+        viewModel.SegmentSearchText = "visible";
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+        viewModel.PlaybackPositionSeconds = 6;
+
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+    }
+
+    [Fact]
+    public void PlaybackAutoScroll_DoesNotChangeSelectedReviewDraft()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first"),
+            new TranscriptSegment("segment-002", job.JobId, 5, 10, "Speaker_1", "second")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "first", "1st", "suggestion", 0.8),
+            new CorrectionDraft("draft-002", job.JobId, "segment-002", "wording", "second", "2nd", "suggestion", 0.8)
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("draft-001", viewModel.SelectedCorrectionDraftId);
+
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+        viewModel.PlaybackPositionSeconds = 6;
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("draft-001", viewModel.SelectedCorrectionDraftId);
+    }
+
+    [Fact]
+    public void PlaybackAutoScroll_DoesNotReplacePendingSegmentEdit()
+    {
+        var viewModel = CreateViewModel();
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+        viewModel.SelectedSegment = first;
+        viewModel.SelectedSegmentEditText = "unsaved edit";
+
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+        viewModel.PlaybackPositionSeconds = 6;
+
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("unsaved edit", viewModel.SelectedSegmentEditText);
     }
 
     [Fact]
@@ -784,6 +1134,13 @@ public sealed class MainWindowViewModelTests
     private static List<T> ViewItems<T>(IEnumerable view)
     {
         return view.Cast<T>().ToList();
+    }
+
+    private static void SetPrivateProperty<T>(object target, string propertyName, T value)
+    {
+        var property = target.GetType().GetProperty(propertyName)
+            ?? throw new InvalidOperationException($"Property not found: {propertyName}");
+        property.SetValue(target, value);
     }
 
     private static void Touch(string path)

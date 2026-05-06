@@ -15,7 +15,9 @@ internal static class KoeNoteDatabaseMigrations
         new(9, "maintenance indexes", ApplyMaintenanceIndexes),
         new(10, "job recycle bin", ApplyJobRecycleBinSchema),
         new(11, "domain preset metadata", ApplyDomainPresetMetadataSchema),
-        new(12, "domain preset deactivation", ApplyDomainPresetDeactivationSchema)
+        new(12, "domain preset deactivation", ApplyDomainPresetDeactivationSchema),
+        new(13, "domain preset speaker alias tracking", ApplyDomainPresetSpeakerAliasTrackingSchema),
+        new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -427,5 +429,30 @@ internal static class KoeNoteDatabaseMigrations
     private static void ApplyDomainPresetDeactivationSchema(DatabaseMigrationContext migration)
     {
         migration.AddColumnIfTableExistsAndMissing("domain_preset_imports", "deactivated_at", "TEXT");
+    }
+
+    private static void ApplyDomainPresetSpeakerAliasTrackingSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS domain_preset_speaker_alias_imports (
+                import_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+                speaker_id TEXT NOT NULL,
+                previous_display_name TEXT,
+                applied_display_name TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (import_id, job_id, speaker_id)
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_domain_preset_speaker_alias_imports_import
+            ON domain_preset_speaker_alias_imports(import_id);
+            """);
+    }
+
+    private static void ApplyDomainPresetSpeakerAliasRestoreSchema(DatabaseMigrationContext migration)
+    {
+        migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "previous_display_name", "TEXT");
+        migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "applied_display_name", "TEXT NOT NULL DEFAULT ''");
     }
 }

@@ -48,4 +48,42 @@ public sealed class ModelDownloadJobRepositoryTests
         Assert.Equal("cancelled", repository.Find(downloadId)?.Status);
     }
 
+    [Fact]
+    public void MarkRunningJobsInterrupted_MakesStaleDownloadsResumable()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new ModelDownloadJobRepository(paths);
+        var runningId = repository.Start("model-running", "https://example.com/running.bin", "running.bin", "running.bin.partial", null);
+        repository.UpdateProgress(runningId, 62, 100);
+        var pausedId = repository.Start("model-paused", "https://example.com/paused.bin", "paused.bin", "paused.bin.partial", null);
+        repository.MarkPaused(pausedId);
+
+        var changed = repository.MarkRunningJobsInterrupted();
+
+        var running = repository.Find(runningId);
+        var paused = repository.Find(pausedId);
+        Assert.Equal(1, changed);
+        Assert.Equal("paused", running?.Status);
+        Assert.Equal(62, running?.BytesDownloaded);
+        Assert.Equal(100, running?.BytesTotal);
+        Assert.Contains("中断", running?.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal("paused", paused?.Status);
+        Assert.Null(paused?.ErrorMessage);
+    }
+
+    [Fact]
+    public void DeleteForModel_RemovesDownloadHistoryForModelOnly()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new ModelDownloadJobRepository(paths);
+        var firstId = repository.Start("model-delete", "https://example.com/1.bin", "1.bin", "1.bin.partial", null);
+        var secondId = repository.Start("model-keep", "https://example.com/2.bin", "2.bin", "2.bin.partial", null);
+
+        var deleted = repository.DeleteForModel("model-delete");
+
+        Assert.Equal(1, deleted);
+        Assert.Null(repository.Find(firstId));
+        Assert.NotNull(repository.Find(secondId));
+    }
+
 }

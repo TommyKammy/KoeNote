@@ -12,11 +12,12 @@ public sealed class ReviewPromptBuilder(ReviewGuidelineRepository? guidelineRepo
         var guidelineBlock = BuildGuidelineBlock(guidelineRepository?.LoadEnabled() ?? []);
 
         return $$"""
-            あなたは日本語ASR結果の校正補助です。原文を書き換えず、意味不明語や明らかな誤認識だけを最小修正してください。
+            あなたは日本語ASR結果の校正レビュー担当です。原文を書き換えすぎず、意味の通る範囲で明らかな誤認識だけを最小限修正してください。
+
             制約:
             - 原文にない情報を追加しない
             - 意味が通る文は変更しない
-            - 低確信の場合も候補として出し、confidence を低くする
+            - 不確実な場合も候補として出し、confidence を低くする
             - 出力はJSONのみ。説明文、Markdown、コードフェンスは禁止
             - 候補がない場合は [] を返す
             {{guidelineBlock}}
@@ -28,7 +29,7 @@ public sealed class ReviewPromptBuilder(ReviewGuidelineRepository? guidelineRepo
                 "issue_type": "意味不明語の疑い",
                 "original_text": "この仕様はサーバーのミギワで処理します",
                 "suggested_text": "この仕様はサーバーの右側で処理します",
-                "reason": "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になる",
+                "reason": "文脈上「ミギワ」が不自然で、音の近い語として「右側」が候補になります",
                 "confidence": 0.62
               }
             ]
@@ -64,7 +65,7 @@ public sealed class ReviewPromptBuilder(ReviewGuidelineRepository? guidelineRepo
 
         return Environment.NewLine +
             Environment.NewLine +
-            "専門領域レビュー指針:" +
+            "専門領域レビュー指示:" +
             Environment.NewLine +
             string.Join(Environment.NewLine, normalized.Select(static guideline => $"- {guideline}"));
     }

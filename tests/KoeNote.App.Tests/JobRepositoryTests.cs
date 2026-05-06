@@ -246,11 +246,52 @@ public sealed class JobRepositoryTests
     }
 
     [Fact]
+    public void DeleteJob_PermanentlyDeletesUnstartedRegisteredJobWithoutHistory()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        var movedToHistory = repository.DeleteJob(job.JobId);
+
+        Assert.False(movedToHistory);
+        Assert.Empty(repository.LoadRecent());
+        Assert.Empty(repository.LoadDeleted());
+
+        using var connection = fixture.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM jobs WHERE job_id = $job_id;";
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+        Assert.Equal(0, Convert.ToInt32(command.ExecuteScalar()));
+    }
+
+    [Fact]
+    public void DeleteAllJobs_OnlyMovesStartedJobsToDeletedHistory()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+        var repository = new JobRepository(paths);
+        var unstarted = repository.CreateFromAudio(@"C:\audio\unstarted.wav");
+        var started = repository.CreateFromAudio(@"C:\audio\started.wav");
+        repository.MarkPreprocessSucceeded(started, @"C:\normalized\audio.wav");
+
+        var movedToHistory = repository.DeleteAllJobs();
+
+        Assert.Equal([started.JobId], movedToHistory);
+        Assert.Empty(repository.LoadRecent());
+        var deleted = Assert.Single(repository.LoadDeleted());
+        Assert.Equal(started.JobId, deleted.JobId);
+        Assert.Equal("clear_all", deleted.DeleteReason);
+        Assert.DoesNotContain(repository.LoadDeleted(), job => job.JobId == unstarted.JobId);
+    }
+
+    [Fact]
     public void RestoreJob_ReturnsDeletedJobToRecentList()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkPreprocessSucceeded(job, @"C:\normalized\audio.wav");
 
         repository.DeleteJob(job.JobId);
         repository.RestoreJob(job.JobId);
@@ -269,6 +310,7 @@ public sealed class JobRepositoryTests
         var paths = fixture.Paths;
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkPreprocessSucceeded(job, @"C:\normalized\audio.wav");
         var jobDirectory = Path.Combine(paths.Jobs, job.JobId);
         Directory.CreateDirectory(jobDirectory);
         File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");
@@ -342,6 +384,7 @@ public sealed class JobRepositoryTests
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
         var repository = new JobRepository(paths);
         var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkPreprocessSucceeded(job, @"C:\normalized\meeting.wav");
         var jobDirectory = Path.Combine(paths.Jobs, job.JobId);
         Directory.CreateDirectory(jobDirectory);
         File.WriteAllText(Path.Combine(jobDirectory, "artifact.txt"), "artifact");

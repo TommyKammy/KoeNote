@@ -20,7 +20,7 @@ public sealed class CleanupWindow : Window
         _service = service;
         _dryRun = dryRun;
 
-        Title = "KoeNote Cleanup";
+        Title = "KoeNote クリーンアップ";
         Width = 560;
         Height = 480;
         MinWidth = 480;
@@ -38,7 +38,7 @@ public sealed class CleanupWindow : Window
 
         var title = new TextBlock
         {
-            Text = "KoeNote optional data cleanup",
+            Text = "KoeNote データのクリーンアップ",
             FontSize = 22,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 8)
@@ -50,11 +50,11 @@ public sealed class CleanupWindow : Window
             Margin = new Thickness(0, 8, 0, 12)
         };
         Grid.SetRow(options, 1);
-        _logs = NewCheckBox("Temporary files and logs", initialPlan.RemoveLogs);
-        _downloads = NewCheckBox("Temporary model downloads and optional Python packages", initialPlan.RemoveDownloads);
-        _models = NewCheckBox("Downloaded user models", initialPlan.RemoveUserModels);
-        _machineModels = NewCheckBox("Shared machine models", initialPlan.RemoveMachineModels);
-        _userData = NewCheckBox("Jobs, transcripts, setup state, and settings", initialPlan.RemoveUserData);
+        _logs = NewCheckBox("一時ファイルとログ", initialPlan.RemoveLogs);
+        _downloads = NewCheckBox("一時モデルダウンロードと任意の Python パッケージ", initialPlan.RemoveDownloads);
+        _models = NewCheckBox("ダウンロード済みユーザーモデル", initialPlan.RemoveUserModels);
+        _machineModels = NewCheckBox("共有マシンモデル", initialPlan.RemoveMachineModels);
+        _userData = NewCheckBox("ジョブ、文字起こし、セットアップ状態、設定", initialPlan.RemoveUserData);
         options.Children.Add(_logs);
         options.Children.Add(_downloads);
         options.Children.Add(_models);
@@ -62,7 +62,7 @@ public sealed class CleanupWindow : Window
         options.Children.Add(_userData);
         options.Children.Add(new TextBlock
         {
-            Text = "Models and job data are kept unless you select them here, so reinstall can reuse them.",
+            Text = "モデルとジョブデータは、ここで選択しない限り保持されます。再インストール後も再利用できます。",
             Foreground = Brushes.DimGray,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 8, 0, 0)
@@ -87,11 +87,11 @@ public sealed class CleanupWindow : Window
             Margin = new Thickness(0, 12, 0, 0)
         };
         Grid.SetRow(buttons, 3);
-        var preview = new Button { Content = "Preview", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
+        var preview = new Button { Content = "プレビュー", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
         preview.Click += (_, _) => Run(dryRun: true);
-        var cleanup = new Button { Content = "Clean up", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
+        var cleanup = new Button { Content = "削除する", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
         cleanup.Click += (_, _) => Run(_dryRun);
-        var close = new Button { Content = "Close", MinWidth = 96 };
+        var close = new Button { Content = "閉じる", MinWidth = 96 };
         close.Click += (_, _) => Close();
         buttons.Children.Add(preview);
         buttons.Children.Add(cleanup);
@@ -124,7 +124,50 @@ public sealed class CleanupWindow : Window
 
     private void Run(bool dryRun)
     {
-        var result = _service.Execute(BuildPlan(), dryRun);
+        var plan = BuildPlan();
+        if (!dryRun && RequiresDestructiveConfirmation(plan) && !ConfirmDestructiveCleanup(plan))
+        {
+            _output.Text = "削除をキャンセルしました。";
+            return;
+        }
+
+        var result = _service.Execute(plan, dryRun);
         _output.Text = result.ToConsoleText();
+    }
+
+    private static bool RequiresDestructiveConfirmation(CleanupPlan plan)
+    {
+        return plan.RemoveUserModels || plan.RemoveMachineModels || plan.RemoveUserData;
+    }
+
+    private bool ConfirmDestructiveCleanup(CleanupPlan plan)
+    {
+        var targets = new List<string>();
+        if (plan.RemoveUserModels)
+        {
+            targets.Add("ダウンロード済みユーザーモデル");
+        }
+
+        if (plan.RemoveMachineModels)
+        {
+            targets.Add("共有マシンモデル");
+        }
+
+        if (plan.RemoveUserData)
+        {
+            targets.Add("ジョブ、文字起こし、セットアップ状態、設定");
+        }
+
+        var message = string.Join(Environment.NewLine, targets.Select(static target => $"・{target}")) +
+            Environment.NewLine +
+            Environment.NewLine +
+            "選択したデータを削除します。この操作は元に戻せません。KoeNote 本体を開いている場合は、先に終了してください。";
+        return MessageBox.Show(
+            this,
+            message,
+            "クリーンアップの確認",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No) == MessageBoxResult.Yes;
     }
 }

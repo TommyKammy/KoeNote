@@ -31,6 +31,8 @@ public sealed class ScriptedDiarizationService(
         var outputDirectory = Path.Combine(paths.Jobs, jobId, "diarization");
         var rawOutputPath = Path.Combine(outputDirectory, "diarize.raw.json");
         Directory.CreateDirectory(outputDirectory);
+        var timeout = DiarizationTimeoutPolicy.Estimate(normalizedAudioPath);
+        WriteStatus(rawOutputPath, $"running: speaker diarization started; timeout {timeout:g}");
 
         if (!File.Exists(paths.DiarizeWorkerScriptPath))
         {
@@ -50,7 +52,7 @@ public sealed class ScriptedDiarizationService(
                     "--output-json",
                     rawOutputPath
                 ],
-                TimeSpan.FromHours(2),
+                timeout,
                 cancellationToken,
                 PythonRuntimeEnvironment.Build(paths));
         }

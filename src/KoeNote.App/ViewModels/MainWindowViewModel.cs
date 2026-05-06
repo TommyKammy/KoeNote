@@ -37,6 +37,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptExportService _transcriptExportService;
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
+    private readonly ModelDownloadJobRepository _modelDownloadJobRepository;
     private readonly ModelInstallService _modelInstallService;
     private readonly ModelDownloadService _modelDownloadService;
     private readonly ModelLicenseViewer _modelLicenseViewer;
@@ -52,10 +53,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private StatusBarInfo _statusBarInfo;
     private bool _isStatusRefreshInProgress;
     private bool _isRefreshingPlaybackPosition;
+    private bool _isSelectingSegmentForPlayback;
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
     private DomainPresetImportHistoryItem? _selectedDomainPresetImport;
+    private string? _loadedDomainPresetPath;
+    private string _loadedDomainPresetSummary = "プリセットJSONは未読み込みです。";
+    private string _loadedDomainPresetDetails = string.Empty;
     private ModelCatalogEntry? _selectedModelCatalogEntry;
     private ModelCatalogEntry? _selectedSetupAsrModel;
     private ModelCatalogEntry? _selectedSetupReviewModel;
@@ -68,6 +73,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isReviewOperationInProgress;
     private bool _isSelectingSegmentForDraft;
     private bool _isAudioPlaying;
+    private bool _isTranscriptAutoScrollEnabled;
     private bool _rememberCorrection = true;
     private double _playbackPositionSeconds;
     private double _playbackDurationSeconds;
@@ -86,6 +92,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private double _modelDownloadProgressPercent;
     private bool _isModelDownloadInProgress;
     private bool _isModelDownloadProgressIndeterminate;
+    private DateTimeOffset _lastModelCatalogProgressRefreshAt = DateTimeOffset.MinValue;
+    private string? _lastModelCatalogProgressRefreshModelId;
+    private int _lastModelCatalogProgressRefreshPercent = -1;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private int _selectedLogPanelTabIndex;
@@ -107,6 +116,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _reviewReason = "推敲候補はありません。";
     private double _confidence;
     private int _reviewSegmentFocusRequestId;
+    private int _transcriptAutoScrollRequestId;
 
     public MainWindowViewModel()
         : this(new AppPaths())
@@ -131,6 +141,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptExportService = services.TranscriptExportService;
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
+        _modelDownloadJobRepository = services.ModelDownloadJobRepository;
         _modelInstallService = services.ModelInstallService;
         _modelDownloadService = services.ModelDownloadService;
         _modelLicenseViewer = services.ModelLicenseViewer;
@@ -191,6 +202,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
+        RefreshReviewStageToggleStatus();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
@@ -210,8 +222,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
+        SkipToPreviousSegmentCommand = new RelayCommand(SkipToPreviousSegmentAsync, CanSkipPlaybackSegment);
+        SkipToNextSegmentCommand = new RelayCommand(SkipToNextSegmentAsync, CanSkipPlaybackSegment);
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
+        OpenCleanupToolCommand = new RelayCommand(OpenCleanupToolAsync, CanOpenCleanupTool);
         ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
+        ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
+        ToggleReviewStageCommand = new RelayCommand<StageStatus>(ToggleReviewStageAsync, stage => stage?.IsToggleable == true && !IsRunInProgress);
         ClearDomainPresetCommand = new RelayCommand(ClearSelectedDomainPresetAsync, () => SelectedDomainPresetImport?.DeactivatedAt is null && !IsRunInProgress);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
         CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync);
@@ -239,7 +256,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RetrySelectedModelDownloadCommand = new RelayCommand(RetrySelectedModelDownloadAsync, CanRetrySelectedModelDownload);
         UseSelectedModelCommand = new RelayCommand(UseSelectedModelAsync, () => SelectedModelCatalogEntry is not null);
         ShowSelectedModelLicenseCommand = new RelayCommand(ShowSelectedModelLicenseAsync, () => SelectedModelCatalogEntry is not null);
-        ForgetSelectedModelCommand = new RelayCommand(ForgetSelectedModelAsync, () => SelectedModelCatalogEntry?.IsInstalled == true);
+        DeleteSelectedModelFilesCommand = new RelayCommand(DeleteSelectedModelFilesAsync, CanDeleteSelectedModelFiles);
         AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
         RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
         ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
@@ -257,6 +274,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
         RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
 
+        MarkInterruptedModelDownloads();
         RefreshModelCatalog();
         RefreshSetupWizard();
         IsSetupWizardModalOpen = !IsSetupComplete;
@@ -291,7 +309,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get
         {
-            var missingCount = EnvironmentStatus.Count(static item => !item.IsOk);
+            var missingCount = GetBlockingEnvironmentIssues().Count();
             return missingCount == 0
                 ? "初回チェック OK"
                 : $"初回チェック: {missingCount} 件の確認が必要";
@@ -302,17 +320,38 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get
         {
-            var missingItems = EnvironmentStatus.Where(static item => !item.IsOk).ToArray();
+            var missingItems = GetBlockingEnvironmentIssues().ToArray();
             return missingItems.Length == 0
                 ? "必要なランタイム、ツール、モデルを確認済みです。"
                 : string.Join(Environment.NewLine, missingItems.Select(static item => $"{item.Name}: {item.Detail}"))
                     + Environment.NewLine
-                    + "セットアップを開く / モデル導入へ から Phase 11 Model Catalog / Phase 12 Setup Wizard に進む予定です。";
+                    + "セットアップ、またはモデル導入から不足項目を確認してください。";
         }
     }
 
     public string SetupPlaceholderText =>
-        "Phase 11 の Model Catalog と Phase 12 の Setup Wizard で、ASR / 推敲モデルの導入を案内します。現時点では必要ファイルの配置先を表示します。";
+        "セットアップウィザードで ASR / 推敲モデルの導入を案内します。必要なモデルやランタイムの状態を確認できます。";
+
+    private IEnumerable<StatusItem> GetBlockingEnvironmentIssues()
+    {
+        return EnvironmentStatus.Where(IsBlockingEnvironmentIssue);
+    }
+
+    private bool IsBlockingEnvironmentIssue(StatusItem item)
+    {
+        if (item.IsOk)
+        {
+            return false;
+        }
+
+        return item.Name switch
+        {
+            "ffmpeg" => true,
+            "llama-completion" => EnableReviewStage,
+            "AppData" or "SQLite" => true,
+            _ => false
+        };
+    }
 
     public string SetupDiarizationRuntimeSummary
     {
@@ -400,6 +439,20 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<DomainPresetImportHistoryItem> DomainPresetImports { get; } = [];
 
+    public string LoadedDomainPresetSummary
+    {
+        get => _loadedDomainPresetSummary;
+        private set => SetField(ref _loadedDomainPresetSummary, value);
+    }
+
+    public string LoadedDomainPresetDetails
+    {
+        get => _loadedDomainPresetDetails;
+        private set => SetField(ref _loadedDomainPresetDetails, value);
+    }
+
+    public bool HasLoadedDomainPreset => !string.IsNullOrWhiteSpace(_loadedDomainPresetPath);
+
     public ObservableCollection<double> PlaybackRates { get; } = [1.0, 1.25, 1.5, 2.0];
 
     public ObservableCollection<double> PlaybackWaveformSamples { get; } = [];
@@ -430,9 +483,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand PlayPauseAudioCommand { get; }
 
+    public ICommand SkipToPreviousSegmentCommand { get; }
+
+    public ICommand SkipToNextSegmentCommand { get; }
+
     public ICommand OpenSettingsCommand { get; }
 
+    public ICommand OpenCleanupToolCommand { get; }
+
     public ICommand ImportDomainPresetCommand { get; }
+
+    public ICommand ApplyLoadedDomainPresetCommand { get; }
+
+    public ICommand ToggleReviewStageCommand { get; }
 
     public ICommand ClearDomainPresetCommand { get; }
 
@@ -488,7 +551,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ShowSelectedModelLicenseCommand { get; }
 
-    public ICommand ForgetSelectedModelCommand { get; }
+    public ICommand DeleteSelectedModelFilesCommand { get; }
 
     public ICommand AcceptDraftCommand { get; }
 
@@ -570,13 +633,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 SelectedSegmentEditText = value.Text;
                 SelectedSpeakerAlias = value.Speaker;
-                if (!_isSelectingSegmentForDraft)
+                if (!_isSelectingSegmentForDraft && !_isSelectingSegmentForPlayback)
                 {
                     SelectFirstDraftForSegment(value.SegmentId);
                 }
 
                 UpdateSegmentEditCommandStates();
-                SeekPlaybackToSelectedSegment(value);
+                if (!_isSelectingSegmentForPlayback)
+                {
+                    SeekPlaybackToSelectedSegment(value);
+                }
             }
         }
     }
@@ -691,7 +757,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool IsModelDownloadInProgress
     {
         get => _isModelDownloadInProgress;
-        private set => SetField(ref _isModelDownloadInProgress, value);
+        private set
+        {
+            if (SetField(ref _isModelDownloadInProgress, value))
+            {
+                UpdateModelCatalogCommandStates();
+            }
+        }
     }
 
     public bool IsModelDownloadProgressIndeterminate
@@ -750,6 +822,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _reviewSegmentFocusRequestId;
         private set => SetField(ref _reviewSegmentFocusRequestId, value);
+    }
+
+    public int TranscriptAutoScrollRequestId
+    {
+        get => _transcriptAutoScrollRequestId;
+        private set => SetField(ref _transcriptAutoScrollRequestId, value);
     }
 
     public string SelectedSegmentEditText
@@ -888,6 +966,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isRunInProgress, value))
             {
+                RefreshReviewStageToggleStatus();
                 if (CancelCommand is RelayCommand cancelCommand)
                 {
                     cancelCommand.RaiseCanExecuteChanged();
@@ -928,9 +1007,26 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                     maintenanceCommand.RaiseCanExecuteChanged();
                 }
 
+                UpdateModelCatalogCommandStates();
+
+                if (OpenCleanupToolCommand is RelayCommand cleanupCommand)
+                {
+                    cleanupCommand.RaiseCanExecuteChanged();
+                }
+
                 if (ImportDomainPresetCommand is RelayCommand presetCommand)
                 {
                     presetCommand.RaiseCanExecuteChanged();
+                }
+
+                if (ApplyLoadedDomainPresetCommand is RelayCommand applyPresetCommand)
+                {
+                    applyPresetCommand.RaiseCanExecuteChanged();
+                }
+
+                if (ToggleReviewStageCommand is RelayCommand<StageStatus> toggleReviewCommand)
+                {
+                    toggleReviewCommand.RaiseCanExecuteChanged();
                 }
 
                 if (ClearDomainPresetCommand is RelayCommand clearPresetCommand)
@@ -958,6 +1054,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string PlayPauseAudioIcon => IsAudioPlaying ? "\uE769" : "\uE768";
 
+    public bool IsTranscriptAutoScrollEnabled
+    {
+        get => _isTranscriptAutoScrollEnabled;
+        set
+        {
+            if (SetField(ref _isTranscriptAutoScrollEnabled, value) && value)
+            {
+                SelectSegmentForPlaybackPosition(PlaybackPositionSeconds);
+            }
+        }
+    }
+
     public double PlaybackPositionSeconds
     {
         get => _playbackPositionSeconds;
@@ -972,6 +1080,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             _playbackPositionSeconds = nextValue;
             OnPropertyChanged();
             OnPropertyChanged(nameof(PlaybackTimeDisplay));
+            SelectSegmentForPlaybackPosition(nextValue);
 
             if (!_isRefreshingPlaybackPosition)
             {
@@ -1131,6 +1240,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
+                OnPropertyChanged(nameof(FirstRunSummary));
+                OnPropertyChanged(nameof(FirstRunDetail));
+                RefreshReviewStageToggleStatus();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
                     runCommand.RaiseCanExecuteChanged();

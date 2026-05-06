@@ -13,10 +13,13 @@ public sealed record CleanupActionResult(string Path, bool Removed, string Messa
 
 public sealed record CleanupResult(IReadOnlyList<CleanupActionResult> Actions)
 {
-    public bool Succeeded => Actions.All(static action => action.Removed || !action.Message.StartsWith("Failed:", StringComparison.Ordinal));
+    public bool Succeeded => Actions.All(static action =>
+        action.Removed ||
+        (!action.Message.StartsWith("Failed:", StringComparison.Ordinal) &&
+            !action.Message.Contains("失敗:", StringComparison.Ordinal)));
 
     public string ToConsoleText()
     {
-        return string.Join(Environment.NewLine, Actions.Select(static action => $"{(action.Removed ? "removed" : "kept")}: {action.Path} ({action.Message})"));
+        return string.Join(Environment.NewLine, Actions.Select(static action => $"{(action.Removed ? "削除" : "保持")}: {action.Path} ({action.Message})"));
     }
 }

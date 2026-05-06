@@ -46,8 +46,8 @@ public sealed partial class MainWindowViewModel
         BeginModelDownloadProgress(displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            RefreshModelCatalogKeepingSelection(downloadProgress.ModelId);
             UpdateModelDownloadProgress(displayName, downloadProgress);
+            RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("asr", progress);
         RefreshSetupWizard();
@@ -60,8 +60,8 @@ public sealed partial class MainWindowViewModel
         BeginModelDownloadProgress(displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            RefreshModelCatalogKeepingSelection(downloadProgress.ModelId);
             UpdateModelDownloadProgress(displayName, downloadProgress);
+            RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("review", progress);
         RefreshSetupWizard();

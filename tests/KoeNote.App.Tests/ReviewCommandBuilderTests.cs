@@ -6,6 +6,31 @@ namespace KoeNote.App.Tests;
 public sealed class ReviewCommandBuilderTests
 {
     [Fact]
+    public void BuildPrompt_UsesReadableJapaneseInstructions()
+    {
+        var prompt = new ReviewPromptBuilder().Build([
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "今日はテストです")
+        ]);
+
+        Assert.Contains("日本語ASR結果の校正レビュー担当", prompt, StringComparison.Ordinal);
+        Assert.Contains("出力はJSONのみ", prompt, StringComparison.Ordinal);
+        Assert.Contains("ASRセグメント:", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("縺", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("繝", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildRepairPrompt_UsesReadableJapaneseInstructions()
+    {
+        var prompt = new ReviewPromptBuilder().BuildRepairPrompt("not json");
+
+        Assert.Contains("JSON配列だけに修復", prompt, StringComparison.Ordinal);
+        Assert.Contains("修復対象:", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("縺", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("繝", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildArgumentList_IncludesModelPromptFileGpuAndNonInteractiveSettings()
     {
         var options = new ReviewRunOptions(

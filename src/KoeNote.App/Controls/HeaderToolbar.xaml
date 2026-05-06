@@ -7,6 +7,9 @@
         <SolidColorBrush x:Key="HeaderInfoValueBrush" Color="#777777" />
         <SolidColorBrush x:Key="HeaderHoverBrush" Color="#F5F6F7" />
         <SolidColorBrush x:Key="HeaderSeparatorBrush" Color="#EEF0F2" />
+        <SolidColorBrush x:Key="HeaderPrimaryGreenBrush" Color="#DDF7E8" />
+        <SolidColorBrush x:Key="HeaderPrimaryGreenHoverBrush" Color="#C8F0DA" />
+        <SolidColorBrush x:Key="HeaderPrimaryGreenPressedBrush" Color="#B5E7CA" />
 
         <Style x:Key="HeaderGhostButton" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
@@ -49,6 +52,61 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Margin" Value="0,0,5,0" />
             <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
+        <Style x:Key="HeaderPrimaryActionButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#17643C" />
+            <Setter Property="Background" Value="{StaticResource HeaderPrimaryGreenBrush}" />
+            <Setter Property="BorderBrush" Value="#8DD6AD" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#2F8F5B" BlurRadius="10" ShadowDepth="0" Opacity="0.12" />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource HeaderPrimaryGreenHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource HeaderPrimaryGreenPressedBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.42" />
+                                <Setter Property="Effect" Value="{x:Null}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HeaderPrimaryToolIcon" TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+            <Setter Property="Foreground" Value="#17643C" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <Style x:Key="HeaderPrimaryToolText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#17643C" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="HeaderToolText" TargetType="TextBlock">
@@ -119,10 +177,12 @@
                     Margin="0,0,12,0" />
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding AddAudioCommand}">
+                <Button Style="{StaticResource HeaderPrimaryActionButton}"
+                        Command="{Binding AddAudioCommand}"
+                        ToolTip="最初に音声ファイルを追加します">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8E5;" Style="{StaticResource HeaderToolIcon}" />
-                        <TextBlock Text="音声追加" Style="{StaticResource HeaderToolText}" />
+                        <TextBlock Text="&#xE8E5;" Style="{StaticResource HeaderPrimaryToolIcon}" />
+                        <TextBlock Text="音声追加" Style="{StaticResource HeaderPrimaryToolText}" />
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource HeaderGhostButton}" Command="{Binding RunSelectedJobCommand}" Margin="2,0,0,0">

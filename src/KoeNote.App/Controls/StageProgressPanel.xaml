@@ -7,6 +7,40 @@
                     <ItemsControl ItemsSource="{Binding StageStatuses}">
                         <ItemsControl.Resources>
                             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+                            <Style x:Key="StageToggleButtonStyle" TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="HoverGlow"
+                                                    Width="40"
+                                                    Height="40"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    CornerRadius="20"
+                                                    Background="#1033A06F"
+                                                    BorderBrush="#4EBB8A"
+                                                    BorderThickness="1.5"
+                                                    Opacity="0" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="HoverGlow" Property="Opacity" Value="1" />
+                                                    <Setter TargetName="HoverGlow" Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect Color="#33A06F"
+                                                                              BlurRadius="18"
+                                                                              ShadowDepth="0"
+                                                                              Opacity="0.55" />
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter TargetName="HoverGlow" Property="Opacity" Value="0" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
                         </ItemsControl.Resources>
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -59,6 +93,10 @@
                                                             <Setter Property="BorderBrush" Value="{Binding IconStroke}" />
                                                             <Setter Property="BorderThickness" Value="2.5" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsSkipped}" Value="True">
+                                                            <Setter Property="Background" Value="#F8FAFC" />
+                                                            <Setter Property="BorderBrush" Value="#CBD5E1" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
@@ -96,6 +134,10 @@
                                                                             <Setter Property="Stroke" Value="{Binding IconStroke}" />
                                                                             <Setter Property="Opacity" Value="1" />
                                                                         </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsSkipped}" Value="True">
+                                                                            <Setter Property="Stroke" Value="#94A3B8" />
+                                                                            <Setter Property="Opacity" Value="0.55" />
+                                                                        </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Path.Style>
@@ -104,6 +146,19 @@
                                                 </Viewbox>
                                             </Grid>
                                         </Border>
+                                        <Button Grid.Column="1"
+                                                Width="40"
+                                                Height="40"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Padding="0"
+                                                Cursor="Hand"
+                                                Focusable="False"
+                                                Style="{StaticResource StageToggleButtonStyle}"
+                                                IsHitTestVisible="{Binding IsToggleable}"
+                                                Command="{Binding DataContext.ToggleReviewStageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{Binding ToggleToolTip}" />
                                     </Grid>
                                     <TextBlock Grid.Row="1"
                                                Text="{Binding Name}"

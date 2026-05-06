@@ -17,7 +17,9 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                <Button Style="{StaticResource PlayerIconButton}" ToolTip="前へ">
+                <Button Style="{StaticResource PlayerIconButton}"
+                        Command="{Binding SkipToPreviousSegmentCommand}"
+                        ToolTip="前のセグメントへ">
                     <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
                 </Button>
                 <Button Width="36"
@@ -33,7 +35,9 @@
                                FontSize="18"
                                Foreground="{StaticResource AccentBrush}" />
                 </Button>
-                <Button Style="{StaticResource PlayerIconButton}" ToolTip="次へ">
+                <Button Style="{StaticResource PlayerIconButton}"
+                        Command="{Binding SkipToNextSegmentCommand}"
+                        ToolTip="次のセグメントへ">
                     <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
                 </Button>
                 <ComboBox Style="{StaticResource ToolbarComboBox}"

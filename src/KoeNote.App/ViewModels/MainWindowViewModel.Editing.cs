@@ -75,6 +75,7 @@ public sealed partial class MainWindowViewModel
             RefreshSpeakerFilters();
             FilteredSegments.Refresh();
             UpdateExportCommandStates();
+            UpdatePlaybackCommandStates();
             return;
         }
 
@@ -88,6 +89,7 @@ public sealed partial class MainWindowViewModel
         SelectedSegment = Segments.FirstOrDefault(segment => segment.SegmentId == preferredSegmentId)
             ?? Segments.FirstOrDefault();
         UpdateExportCommandStates();
+        UpdatePlaybackCommandStates();
     }
 
     private bool CanEditSelectedSegment()

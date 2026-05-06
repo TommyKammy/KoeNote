@@ -21,6 +21,10 @@
              Link="licenses\license-manifest.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
+    <Content Include="..\..\LICENSE"
+             Link="licenses\LICENSE"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always" />
     <Content Include="..\..\distribution\README.distribution.md"
              Link="README.distribution.md"
              CopyToOutputDirectory="PreserveNewest"

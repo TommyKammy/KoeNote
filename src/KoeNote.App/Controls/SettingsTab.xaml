@@ -38,17 +38,44 @@
                         MinHeight="34"
                         HorizontalAlignment="Left"
                         Padding="14,6"
-                        ToolTip="専門領域プリセットJSONからASRコンテキストとホットワードを追加します">
+                        ToolTip="専門領域プリセット JSON を読み込み、内容を確認できる状態にします">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE8E5;"
                                    Style="{StaticResource IconText}"
                                    Foreground="{StaticResource AccentBrush}" />
-                        <TextBlock Text="プリセットをインポート"
+                        <TextBlock Text="JSONを読み込み"
                                    Foreground="{StaticResource AccentBrush}"
                                    FontWeight="SemiBold" />
                     </StackPanel>
                 </Button>
-                <TextBlock Text="標準ビルドは空のまま、個別配布のJSONだけを読み込めます。実患者データは含めないでください。"
+                <TextBlock Text="{Binding LoadedDomainPresetSummary}"
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,6" />
+                <TextBox Text="{Binding LoadedDomainPresetDetails, Mode=OneWay}"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         MinHeight="120"
+                         MaxHeight="220"
+                         Margin="0,0,0,8" />
+                <Button Command="{Binding ApplyLoadedDomainPresetCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        Padding="14,6"
+                        ToolTip="読み込み済みのプリセット内容を DB と ASR 設定へ反映します">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE73E;"
+                                   Style="{StaticResource IconText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="読み込み済みをインポート"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="標準ビルドは空のまま、個別配布の JSON だけを読み込めます。実データは含めないでください。"
                            Style="{StaticResource MutedText}"
                            TextWrapping="Wrap"
                            Margin="0,6,0,0" />
@@ -65,7 +92,7 @@
                         MinHeight="34"
                         HorizontalAlignment="Left"
                         Padding="14,6"
-                        ToolTip="選択したプリセット由来のレビュー指針や補正メモリを無効化し、ASR欄から該当候補を削除します。">
+                        ToolTip="選択したプリセット由来のレビュー指針や補正メモリを無効化し、ASR 欄から該当候補を削除します">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE74D;"
                                    Style="{StaticResource IconText}"
@@ -104,6 +131,28 @@
                     </StackPanel>
                 </Button>
 
+                <TextBlock Text="クリーンアップ" Style="{StaticResource MutedText}" />
+                <TextBlock Text="一時ファイル、ログ、モデル、ジョブデータを選択して削除できます。ジョブと設定は選択しない限り保持されます。"
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,8" />
+                <Button Command="{Binding OpenCleanupToolCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        Padding="14,6"
+                        Margin="0,0,0,12"
+                        ToolTip="KoeNote クリーンアップツールを開きます">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74D;"
+                                   Style="{StaticResource IconText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="クリーンアップツールを開く"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+
                 <TextBlock Text="セットアップ" Style="{StaticResource MutedText}" />
                 <TextBlock Text="{Binding SetupStatusSummary}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,14" />
 
@@ -111,7 +160,7 @@
                 <CheckBox Content="推敲ステージを有効にする"
                           IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           Margin="0,0,0,6" />
-                <TextBlock Text="ASRの品質が十分で、LLMによる推敲を省略したい場合はオフにします。"
+                <TextBlock Text="ASR の品質が十分で、LLM による推敲を省略したい場合はオフにします。"
                            Style="{StaticResource MutedText}"
                            TextWrapping="Wrap" />
             </StackPanel>

@@ -102,6 +102,30 @@ public sealed class ModelDownloadJobRepository(AppPaths paths)
         Finish(downloadId, "paused", null, null);
     }
 
+    public int MarkRunningJobsInterrupted()
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE model_download_jobs
+            SET status = 'paused',
+                error_message = '前回のダウンロードが中断されました。再開できます。',
+                updated_at = $updated_at
+            WHERE status = 'running';
+            """;
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        return command.ExecuteNonQuery();
+    }
+
+    public int DeleteForModel(string modelId)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM model_download_jobs WHERE model_id = $model_id;";
+        command.Parameters.AddWithValue("$model_id", modelId);
+        return command.ExecuteNonQuery();
+    }
+
     private void Finish(string downloadId, string status, string? sha256Actual, string? errorMessage)
     {
         using var connection = SqliteConnectionFactory.Open(paths);

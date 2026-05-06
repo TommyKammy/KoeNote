@@ -8,16 +8,16 @@ public sealed class CleanupService(CleanupPaths paths)
     {
         return
         [
-            new("logs", paths.Logs, true, plan.RemoveLogs),
-            new("temporary model downloads", paths.ModelDownloads, true, plan.RemoveDownloads),
-            new("optional Python packages", paths.PythonPackages, true, plan.RemoveDownloads),
-            new("downloaded user models", paths.UserModels, true, plan.RemoveUserModels),
-            new("shared machine models", paths.MachineModels, true, plan.RemoveMachineModels),
-            new("jobs folder", paths.Jobs, true, plan.RemoveUserData),
-            new("jobs database", paths.DatabasePath, false, plan.RemoveUserData),
-            new("settings", paths.SettingsPath, false, plan.RemoveUserData),
-            new("setup state", paths.SetupStatePath, false, plan.RemoveUserData),
-            new("setup report", paths.SetupReportPath, false, plan.RemoveUserData)
+            new("一時ファイルとログ", paths.Logs, true, plan.RemoveLogs),
+            new("一時モデルダウンロード", paths.ModelDownloads, true, plan.RemoveDownloads),
+            new("任意の Python パッケージ", paths.PythonPackages, true, plan.RemoveDownloads),
+            new("ダウンロード済みユーザーモデル", paths.UserModels, true, plan.RemoveUserModels),
+            new("共有マシンモデル", paths.MachineModels, true, plan.RemoveMachineModels),
+            new("ジョブフォルダー", paths.Jobs, true, plan.RemoveUserData),
+            new("ジョブデータベース", paths.DatabasePath, false, plan.RemoveUserData),
+            new("設定", paths.SettingsPath, false, plan.RemoveUserData),
+            new("セットアップ状態", paths.SetupStatePath, false, plan.RemoveUserData),
+            new("セットアップレポート", paths.SetupReportPath, false, plan.RemoveUserData)
         ];
     }
 
@@ -29,25 +29,25 @@ public sealed class CleanupService(CleanupPaths paths)
         {
             if (!target.Remove)
             {
-                actions.Add(new CleanupActionResult(target.Path, false, "not selected"));
+                actions.Add(new CleanupActionResult(target.Path, false, $"{target.Label}: 未選択"));
                 continue;
             }
 
             if (!IsSafeKnownPath(target.Path))
             {
-                actions.Add(new CleanupActionResult(target.Path, false, "Failed: path is outside KoeNote data roots"));
+                actions.Add(new CleanupActionResult(target.Path, false, $"{target.Label}: 失敗: KoeNote のデータ領域外のパスです"));
                 continue;
             }
 
             if (!Exists(target))
             {
-                actions.Add(new CleanupActionResult(target.Path, false, "already absent"));
+                actions.Add(new CleanupActionResult(target.Path, false, $"{target.Label}: 既に存在しません"));
                 continue;
             }
 
             if (dryRun)
             {
-                actions.Add(new CleanupActionResult(target.Path, false, "dry run"));
+                actions.Add(new CleanupActionResult(target.Path, false, $"{target.Label}: プレビューのみ"));
                 continue;
             }
 
@@ -62,11 +62,11 @@ public sealed class CleanupService(CleanupPaths paths)
                     File.Delete(target.Path);
                 }
 
-                actions.Add(new CleanupActionResult(target.Path, true, "deleted"));
+                actions.Add(new CleanupActionResult(target.Path, true, $"{target.Label}: 削除しました"));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                actions.Add(new CleanupActionResult(target.Path, false, $"Failed: {ex.Message}"));
+                actions.Add(new CleanupActionResult(target.Path, false, $"{target.Label}: 失敗: {ex.Message}"));
             }
         }
 
@@ -116,11 +116,11 @@ public sealed class CleanupService(CleanupPaths paths)
                 }
 
                 Directory.Delete(directory);
-                actions.Add(new CleanupActionResult(directory, true, "empty data directory deleted"));
+                actions.Add(new CleanupActionResult(directory, true, "空のデータフォルダーを削除しました"));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                actions.Add(new CleanupActionResult(directory, false, $"Failed: {ex.Message}"));
+                actions.Add(new CleanupActionResult(directory, false, $"失敗: {ex.Message}"));
             }
         }
     }

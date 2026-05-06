@@ -9,11 +9,13 @@ public sealed class StageStatus(
     string iconStroke,
     string iconSoftBackground,
     bool showConnectorBefore = true,
-    bool showConnectorAfter = true) : INotifyPropertyChanged
+    bool showConnectorAfter = true,
+    bool isToggleable = false) : INotifyPropertyChanged
 {
     private string _status = "未開始";
     private string _durationText = "00:00:00";
     private int _progressPercent;
+    private string _toggleToolTip = string.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -29,10 +31,24 @@ public sealed class StageStatus(
 
     public bool ShowConnectorAfter { get; } = showConnectorAfter;
 
+    public bool IsToggleable { get; } = isToggleable;
+
+    public string ToggleToolTip
+    {
+        get => _toggleToolTip;
+        set => SetField(ref _toggleToolTip, value);
+    }
+
     public string Status
     {
         get => _status;
-        set => SetField(ref _status, value);
+        set
+        {
+            if (SetField(ref _status, value))
+            {
+                OnPropertyChanged(nameof(IsSkipped));
+            }
+        }
     }
 
     public string DurationText
@@ -62,6 +78,8 @@ public sealed class StageStatus(
     public bool IsDoing => ProgressPercent > 0 && ProgressPercent < 100;
 
     public bool IsPending => ProgressPercent <= 0;
+
+    public bool IsSkipped => string.Equals(Status, "スキップ", StringComparison.Ordinal);
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

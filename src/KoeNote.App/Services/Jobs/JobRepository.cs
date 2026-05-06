@@ -324,14 +324,35 @@ public sealed class JobRepository(AppPaths paths)
         UpdatePreprocessResult(job, "キャンセル済み", $"{currentStage}_cancelled", job.ProgressPercent, job.NormalizedAudioPath, "cancelled");
     }
 
-    public void DeleteJob(string jobId)
+    public bool DeleteJob(string jobId)
     {
-        SoftDeleteJob(jobId, "manual");
+        return DeleteJob(jobId, "manual");
     }
 
-    public void DeleteAllJobs()
+    private bool DeleteJob(string jobId, string reason)
     {
-        SoftDeleteAllJobs("clear_all");
+        if (IsUnstartedRegisteredJob(jobId))
+        {
+            PermanentlyDeleteJobs([jobId]);
+            return false;
+        }
+
+        SoftDeleteJob(jobId, reason);
+        return true;
+    }
+
+    public IReadOnlySet<string> DeleteAllJobs()
+    {
+        var movedToHistory = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var job in LoadRecent(int.MaxValue))
+        {
+            if (DeleteJob(job.JobId, "clear_all"))
+            {
+                movedToHistory.Add(job.JobId);
+            }
+        }
+
+        return movedToHistory;
     }
 
     public void RestoreJob(string jobId)
@@ -400,23 +421,25 @@ public sealed class JobRepository(AppPaths paths)
         return command.ExecuteScalar() is not null;
     }
 
-    private void SoftDeleteAllJobs(string reason)
+    private bool IsUnstartedRegisteredJob(string jobId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            UPDATE jobs
-            SET is_deleted = 1,
-                deleted_at = $deleted_at,
-                delete_reason = $delete_reason,
-                updated_at = $updated_at
-            WHERE is_deleted = 0;
+            SELECT 1
+            FROM jobs
+            WHERE job_id = $job_id
+                AND is_deleted = 0
+                AND current_stage = 'created'
+                AND progress_percent = 0
+                AND normalized_audio_path IS NULL
+                AND NOT EXISTS (SELECT 1 FROM transcript_segments WHERE transcript_segments.job_id = jobs.job_id)
+                AND NOT EXISTS (SELECT 1 FROM correction_drafts WHERE correction_drafts.job_id = jobs.job_id)
+                AND NOT EXISTS (SELECT 1 FROM stage_progress WHERE stage_progress.job_id = jobs.job_id)
+                AND NOT EXISTS (SELECT 1 FROM asr_runs WHERE asr_runs.job_id = jobs.job_id);
             """;
-        var now = DateTimeOffset.Now.ToString("o");
-        command.Parameters.AddWithValue("$deleted_at", now);
-        command.Parameters.AddWithValue("$delete_reason", reason);
-        command.Parameters.AddWithValue("$updated_at", now);
-        command.ExecuteNonQuery();
+        command.Parameters.AddWithValue("$job_id", jobId);
+        return command.ExecuteScalar() is not null;
     }
 
     private void PermanentlyDeleteJobs(IReadOnlyCollection<string> jobIds)

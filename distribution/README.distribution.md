@@ -23,4 +23,5 @@ The app can start without ASR/review runtimes and models. First-run checks repor
 
 ## Preview Warning
 
-KoeNote is still in preview. Confirm final app, tool, and model redistribution terms before sharing an external beta package.
+KoeNote application source code is licensed under the Apache License 2.0.
+Third-party libraries, runtime tools, and models are governed by their respective licenses. See `licenses/LICENSE` and `licenses/license-manifest.json` in the distribution package for details.

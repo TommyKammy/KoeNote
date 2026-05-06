@@ -40,6 +40,10 @@ public partial class TranscriptSegmentList : UserControl
         {
             Dispatcher.BeginInvoke(ScrollSelectedSegmentIntoView);
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.TranscriptAutoScrollRequestId))
+        {
+            Dispatcher.BeginInvoke(ScrollSelectedSegmentIntoView);
+        }
     }
 
     private void ScrollSelectedSegmentIntoView()

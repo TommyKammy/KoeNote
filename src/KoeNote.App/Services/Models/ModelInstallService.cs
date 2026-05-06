@@ -42,15 +42,34 @@ public sealed class ModelInstallService(
         return RegisterLocalModel(catalogItem, modelPath, sourceType: "download");
     }
 
-    public bool DeleteRegistration(string modelId)
+    public ModelFileDeleteResult DeleteModelFiles(string modelId)
     {
-        if (installedModelRepository.FindInstalledModel(modelId) is null)
+        var installed = installedModelRepository.FindInstalledModel(modelId);
+        if (installed is null)
         {
-            return false;
+            return new ModelFileDeleteResult(modelId, string.Empty, 0, false);
+        }
+
+        var modelPath = Path.GetFullPath(installed.FilePath);
+        if (!IsUnderModelStorage(modelPath))
+        {
+            throw new InvalidOperationException($"Model path is outside KoeNote model storage and was not deleted: {modelPath}");
+        }
+
+        var deletedBytes = CalculateSizeBytes(modelPath) ?? 0;
+        if (File.Exists(modelPath))
+        {
+            File.Delete(modelPath);
+            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath));
+        }
+        else if (Directory.Exists(modelPath))
+        {
+            Directory.Delete(modelPath, recursive: true);
+            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath));
         }
 
         installedModelRepository.DeleteInstalledModel(modelId);
-        return true;
+        return new ModelFileDeleteResult(modelId, modelPath, deletedBytes, true);
     }
 
     public string GetDefaultInstallPath(ModelCatalogItem catalogItem)
@@ -98,6 +117,40 @@ public sealed class ModelInstallService(
             .Sum(static file => new FileInfo(file).Length);
     }
 
+    private bool IsUnderModelStorage(string path)
+    {
+        var modelStorageRoot = Path.GetFullPath(paths.DefaultModelStorageRoot);
+        var rootWithSeparator = modelStorageRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        return path.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void DeleteEmptyParentDirectories(string? startDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(startDirectory))
+        {
+            return;
+        }
+
+        var modelStorageRoot = Path.GetFullPath(paths.DefaultModelStorageRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var current = Path.GetFullPath(startDirectory);
+        while (!current.Equals(modelStorageRoot, StringComparison.OrdinalIgnoreCase) &&
+            IsUnderModelStorage(current) &&
+            Directory.Exists(current) &&
+            !Directory.EnumerateFileSystemEntries(current).Any())
+        {
+            Directory.Delete(current);
+            var parent = Path.GetDirectoryName(current);
+            if (string.IsNullOrWhiteSpace(parent))
+            {
+                break;
+            }
+
+            current = parent;
+        }
+    }
+
     private static string? ResolveManifestPath(string modelPath, string? explicitManifestPath)
     {
         if (!string.IsNullOrWhiteSpace(explicitManifestPath) && File.Exists(explicitManifestPath))
@@ -121,3 +174,5 @@ public sealed class ModelInstallService(
         return File.Exists(sidecar) ? sidecar : null;
     }
 }
+
+public sealed record ModelFileDeleteResult(string ModelId, string FilePath, long DeletedBytes, bool DeletedRegistration);

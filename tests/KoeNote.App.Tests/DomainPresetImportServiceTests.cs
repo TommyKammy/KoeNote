@@ -42,6 +42,57 @@ public sealed class DomainPresetImportServiceTests
     }
 
     [Fact]
+    public void LoadPreview_ValidatesPresetWithoutChangingSettingsOrHistory()
+    {
+        var root = CreateRoot();
+        var paths = CreatePaths(root);
+        var repository = new AsrSettingsRepository(paths);
+        repository.Save(new AsrSettings("existing context", "existing term", "kotoba-whisper-v2.2-faster", true));
+        var presetPath = Path.Combine(root, "preset.json");
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "preset_id": "preview-domain",
+              "display_name": "Preview preset",
+              "description": "Preview description",
+              "asr_context": "preview context",
+              "hotwords": ["previewword"],
+              "correction_memory": [
+                {
+                  "wrong_text": "prevew",
+                  "correct_text": "preview"
+                }
+              ],
+              "speaker_aliases": [
+                {
+                  "speaker_id": "Speaker_0",
+                  "display_name": "Interviewer"
+                }
+              ],
+              "review_guidelines": ["Keep meaning."]
+            }
+            """);
+        var service = new DomainPresetImportService(paths, repository);
+
+        var preview = service.LoadPreview(presetPath);
+
+        Assert.Equal("Preview preset", preview.DisplayName);
+        Assert.Equal(1, preview.HotwordCount);
+        Assert.Equal(1, preview.CorrectionMemoryCount);
+        Assert.Equal(1, preview.SpeakerAliasCount);
+        Assert.Equal(1, preview.ReviewGuidelineCount);
+        Assert.Contains("Preview description", preview.Details, StringComparison.Ordinal);
+        Assert.Contains("preview context", preview.Details, StringComparison.Ordinal);
+        Assert.Contains("previewword", preview.Details, StringComparison.Ordinal);
+        Assert.Contains("prevew -> preview", preview.Details, StringComparison.Ordinal);
+        Assert.Contains("Speaker_0 -> Interviewer", preview.Details, StringComparison.Ordinal);
+        Assert.Contains("Keep meaning.", preview.Details, StringComparison.Ordinal);
+        Assert.Equal("existing context", repository.Load().ContextText);
+        Assert.Equal(["existing term"], repository.Load().Hotwords);
+        Assert.Empty(service.LoadHistory());
+    }
+
+    [Fact]
     public void Import_RejectsUnsupportedSchemaVersion()
     {
         var root = CreateRoot();
@@ -221,7 +272,7 @@ public sealed class DomainPresetImportServiceTests
             new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "sample")
         ]);
 
-        Assert.Contains("専門領域レビュー指針", prompt, StringComparison.Ordinal);
+        Assert.Contains("専門領域レビュー指示:", prompt, StringComparison.Ordinal);
         Assert.Contains("Keep participant wording unless an ASR error is obvious.", prompt, StringComparison.Ordinal);
     }
 
@@ -343,6 +394,126 @@ public sealed class DomainPresetImportServiceTests
         Assert.Equal("shared context", repository.Load().ContextText);
         Assert.Equal(["sharedword"], repository.Load().Hotwords);
         Assert.NotNull(service.LoadHistory().Single().DeactivatedAt);
+    }
+
+    [Fact]
+    public void ClearImport_RemovesSpeakerAliasesAppliedToDefaultJob()
+    {
+        var root = CreateRoot();
+        var paths = CreatePaths(root);
+        var repository = new AsrSettingsRepository(paths);
+        var presetPath = Path.Combine(root, "preset.json");
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "preset_id": "speaker-domain",
+              "display_name": "Speaker preset",
+              "speaker_aliases": [
+                {
+                  "speaker_id": "Speaker_0",
+                  "display_name": "Interviewer"
+                }
+              ]
+            }
+            """);
+        var service = new DomainPresetImportService(paths, repository);
+        service.Import(presetPath, "job-001");
+        var history = service.LoadHistory().Single();
+
+        var result = service.ClearImport(history.ImportId);
+
+        Assert.Equal(1, result.DeletedSpeakerAliasCount);
+        using var connection = OpenConnection(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                (SELECT COUNT(*) FROM speaker_aliases WHERE job_id = 'job-001' AND speaker_id = 'Speaker_0'),
+                (SELECT COUNT(*) FROM domain_preset_speaker_alias_imports WHERE import_id = $import_id);
+            """;
+        command.Parameters.AddWithValue("$import_id", history.ImportId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(0, reader.GetInt32(0));
+        Assert.Equal(0, reader.GetInt32(1));
+    }
+
+    [Fact]
+    public void ClearImport_RestoresSpeakerAliasThatExistedBeforeImport()
+    {
+        var root = CreateRoot();
+        var paths = CreatePaths(root);
+        var repository = new AsrSettingsRepository(paths);
+        using (var connection = OpenConnection(paths))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                INSERT INTO speaker_aliases (job_id, speaker_id, display_name, updated_at)
+                VALUES ('job-001', 'Speaker_0', 'Original name', '2026-01-01T00:00:00Z');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var presetPath = Path.Combine(root, "preset.json");
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "preset_id": "speaker-restore-domain",
+              "display_name": "Speaker restore preset",
+              "speaker_aliases": [
+                {
+                  "speaker_id": "Speaker_0",
+                  "display_name": "Preset name"
+                }
+              ]
+            }
+            """);
+        var service = new DomainPresetImportService(paths, repository);
+        service.Import(presetPath, "job-001");
+        var history = service.LoadHistory().Single();
+
+        var result = service.ClearImport(history.ImportId);
+
+        Assert.Equal(1, result.DeletedSpeakerAliasCount);
+        using var verifyConnection = OpenConnection(paths);
+        using var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = """
+            SELECT display_name
+            FROM speaker_aliases
+            WHERE job_id = 'job-001' AND speaker_id = 'Speaker_0';
+            """;
+        Assert.Equal("Original name", verifyCommand.ExecuteScalar());
+    }
+
+    [Fact]
+    public void ClearImport_DoesNotMarkOtherImportsWithSamePresetAsCleared()
+    {
+        var root = CreateRoot();
+        var paths = CreatePaths(root);
+        var repository = new AsrSettingsRepository(paths);
+        var presetPath = Path.Combine(root, "preset.json");
+        File.WriteAllText(presetPath, """
+            {
+              "schema_version": 1,
+              "preset_id": "same-speaker-domain",
+              "display_name": "Same speaker preset",
+              "speaker_aliases": [
+                {
+                  "speaker_id": "Speaker_0",
+                  "display_name": "Preset name"
+                }
+              ]
+            }
+            """);
+        var service = new DomainPresetImportService(paths, repository);
+        service.Import(presetPath, "job-001");
+        service.Import(presetPath, "job-002");
+        var histories = service.LoadHistory().OrderBy(static item => item.ImportedAt).ToArray();
+
+        service.ClearImport(histories[0].ImportId);
+
+        var refreshed = service.LoadHistory(10).ToDictionary(static item => item.ImportId);
+        Assert.NotNull(refreshed[histories[0].ImportId].DeactivatedAt);
+        Assert.Null(refreshed[histories[1].ImportId].DeactivatedAt);
     }
 
     [Fact]

@@ -12,15 +12,15 @@ public sealed record CleanupOptions(
     bool RemoveUserData)
 {
     public static string HelpText => """
-        KoeNoteCleanup removes optional KoeNote data after MSI uninstall.
+        KoeNoteCleanup は KoeNote の任意データを削除する補助ツールです。
 
         Usage:
           KoeNoteCleanup.exe [--quiet] [--dry-run] [--logs] [--downloads] [--models] [--machine-models] [--user-data]
 
-        Defaults:
-          Interactive mode opens a confirmation window.
-          Quiet mode removes logs and temporary model downloads only unless more switches are provided.
-          Models, jobs, transcripts, setup state, and settings are kept unless explicitly selected.
+        既定値:
+          通常起動では確認ウィンドウを表示します。
+          quiet mode は、追加指定がない限りログと一時モデルダウンロードのみ削除します。
+          モデル、ジョブ、文字起こし、セットアップ状態、設定は明示的に選択しない限り保持します。
         """;
 
     public static CleanupOptions Parse(string[] args)

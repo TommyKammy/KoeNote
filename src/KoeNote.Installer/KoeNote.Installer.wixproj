@@ -15,7 +15,9 @@
     <CleanupUiCommand Condition="'$(CleanupUiCommand)' == ''"></CleanupUiCommand>
     <CleanupQuietCommand Condition="'$(CleanupQuietCommand)' == ''">--quiet</CleanupQuietCommand>
     <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\publish\KoeNote-win-x64\</PayloadDir>
-    <DefineConstants>ProductName=$(ProductName);ProductVersion=$(ProductVersion);Publisher=$(Publisher);UpgradeCode=$(UpgradeCode);InstallFolderName=$(InstallFolderName);StartMenuFolderName=$(StartMenuFolderName);ShortcutComponentGuid=$(ShortcutComponentGuid);ArpMetadataComponentGuid=$(ArpMetadataComponentGuid);ProductRegistryKey=$(ProductRegistryKey);CleanupUiCommand=$(CleanupUiCommand);CleanupQuietCommand=$(CleanupQuietCommand);PayloadDir=$(PayloadDir)</DefineConstants>
+    <InstallerLicenseRtf Condition="'$(InstallerLicenseRtf)' == ''">$(MSBuildThisFileDirectory)License.rtf</InstallerLicenseRtf>
+    <WixVariables>WixUILicenseRtf=$(InstallerLicenseRtf)</WixVariables>
+    <DefineConstants>ProductName=$(ProductName);ProductVersion=$(ProductVersion);Publisher=$(Publisher);UpgradeCode=$(UpgradeCode);InstallFolderName=$(InstallFolderName);StartMenuFolderName=$(StartMenuFolderName);ShortcutComponentGuid=$(ShortcutComponentGuid);ArpMetadataComponentGuid=$(ArpMetadataComponentGuid);ProductRegistryKey=$(ProductRegistryKey);CleanupUiCommand=$(CleanupUiCommand);CleanupQuietCommand=$(CleanupQuietCommand);PayloadDir=$(PayloadDir);InstallerLicenseRtf=$(InstallerLicenseRtf)</DefineConstants>
     <SuppressIces>ICE91</SuppressIces>
   </PropertyGroup>
 

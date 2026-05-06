@@ -4,6 +4,8 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly TimeSpan ModelCatalogProgressRefreshInterval = TimeSpan.FromSeconds(1);
+
     private void BeginModelDownloadProgress(string displayName)
     {
         _modelDownloadNotificationTimer.Stop();
@@ -13,6 +15,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
         IsModelDownloadNotificationError = false;
         ModelDownloadNotification = string.Empty;
+        ResetModelCatalogProgressRefresh();
     }
 
     private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
@@ -30,6 +33,35 @@ public sealed partial class MainWindowViewModel
 
         ModelDownloadProgressSummary = $"Downloading {displayName}: {FormatDownloadProgress(progress)}";
         LatestLog = ModelDownloadProgressSummary;
+    }
+
+    private void RefreshModelCatalogForDownloadProgress(ModelDownloadProgress progress)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var percent = GetDownloadPercent(progress);
+        var isDifferentModel = !string.Equals(
+            _lastModelCatalogProgressRefreshModelId,
+            progress.ModelId,
+            StringComparison.OrdinalIgnoreCase);
+        var hasVisiblePercentChange = percent >= 0 && percent != _lastModelCatalogProgressRefreshPercent;
+        var hasElapsed = now - _lastModelCatalogProgressRefreshAt >= ModelCatalogProgressRefreshInterval;
+
+        if (!isDifferentModel && !hasVisiblePercentChange && !hasElapsed)
+        {
+            return;
+        }
+
+        _lastModelCatalogProgressRefreshModelId = progress.ModelId;
+        _lastModelCatalogProgressRefreshAt = now;
+        _lastModelCatalogProgressRefreshPercent = percent;
+        RefreshModelCatalogKeepingSelection(progress.ModelId);
+    }
+
+    private void ResetModelCatalogProgressRefresh()
+    {
+        _lastModelCatalogProgressRefreshAt = DateTimeOffset.MinValue;
+        _lastModelCatalogProgressRefreshModelId = null;
+        _lastModelCatalogProgressRefreshPercent = -1;
     }
 
     private void CompleteModelDownloadProgress(string displayName, bool succeeded, string? message = null)
@@ -82,6 +114,13 @@ public sealed partial class MainWindowViewModel
         return progress.BytesTotal is > 0 && progress.BytesDownloaded <= progress.BytesTotal.Value
             ? progress.BytesTotal
             : null;
+    }
+
+    private static int GetDownloadPercent(ModelDownloadProgress progress)
+    {
+        return GetUsableDownloadTotal(progress) is { } totalBytes
+            ? (int)Math.Floor(progress.BytesDownloaded * 100d / totalBytes)
+            : -1;
     }
 
     private static string FormatBytes(long sizeBytes)

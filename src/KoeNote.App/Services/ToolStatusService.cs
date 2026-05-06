@@ -26,7 +26,7 @@ public sealed class ToolStatusService(AppPaths paths)
     {
         var exists = File.Exists(path);
         var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
-        var detail = exists ? path : $"Place the file here: {path}";
+        var detail = exists ? path : $"配置先: {path}";
         return new StatusItem(name, value, exists || !required, detail);
     }
 
@@ -34,7 +34,7 @@ public sealed class ToolStatusService(AppPaths paths)
     {
         var exists = DiarizationRuntimeLayout.HasPackage(paths);
         var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
-        var detail = exists ? paths.PythonPackages : $"Install from Setup Wizard: {paths.PythonPackages}";
+        var detail = exists ? paths.PythonPackages : $"セットアップから導入: {paths.PythonPackages}";
         return new StatusItem("diarize runtime", value, exists || !required, detail);
     }
 

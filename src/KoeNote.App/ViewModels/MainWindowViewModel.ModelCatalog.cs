@@ -10,10 +10,25 @@ public sealed partial class MainWindowViewModel
     private Task ShowModelCatalogAsync()
     {
         OpenDetailPanel(3);
+        MarkInterruptedModelDownloads();
         RefreshModelCatalog();
         var installedCount = ModelCatalogEntries.Count(static entry => entry.IsInstalled);
         LatestLog = $"Model catalog loaded: {ModelCatalogEntries.Count} entries, {installedCount} installed. Select a model in the Models tab for use/license/forget actions.";
         return Task.CompletedTask;
+    }
+
+    private void MarkInterruptedModelDownloads()
+    {
+        if (IsModelDownloadInProgress)
+        {
+            return;
+        }
+
+        var interruptedCount = _modelDownloadJobRepository.MarkRunningJobsInterrupted();
+        if (interruptedCount > 0)
+        {
+            LatestLog = $"{interruptedCount} 件の中断されたモデルダウンロードを再開可能な状態に戻しました。";
+        }
     }
 
     private Task RegisterPreinstalledModelsAsync()
@@ -97,8 +112,8 @@ public sealed partial class MainWindowViewModel
         BeginModelDownloadProgress(entry.DisplayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            RefreshModelCatalogKeepingSelection(entry.ModelId);
             UpdateModelDownloadProgress(entry.DisplayName, downloadProgress);
+            RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
 
         try
@@ -164,7 +179,7 @@ public sealed partial class MainWindowViewModel
         }
         else
         {
-            LatestLog = $"Review model selected for Phase 12 setup: {SelectedModelCatalogEntry.DisplayName}";
+            LatestLog = $"推敲モデルを選択しました: {SelectedModelCatalogEntry.DisplayName}";
         }
 
         return Task.CompletedTask;
@@ -186,13 +201,41 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private Task ForgetSelectedModelAsync()
+    private Task DeleteSelectedModelFilesAsync()
     {
-        if (SelectedModelCatalogEntry is not null &&
-            _modelInstallService.DeleteRegistration(SelectedModelCatalogEntry.ModelId))
+        var entry = SelectedModelCatalogEntry;
+        if (entry is null || !entry.IsInstalled)
         {
-            LatestLog = $"Model registration removed: {SelectedModelCatalogEntry.DisplayName}";
+            return Task.CompletedTask;
+        }
+
+        var installedPath = entry.InstalledModel?.FilePath ?? string.Empty;
+        var sizeSummary = entry.SizeSummary;
+        if (!ConfirmAction(
+            "モデルファイルの削除",
+            $"「{entry.DisplayName}」のモデルファイルを削除します。\n\n対象: {installedPath}\n容量: {sizeSummary}\n\nDBの導入済み登録とダウンロード履歴も削除されます。この操作は元に戻せません。"))
+        {
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            var result = _modelInstallService.DeleteModelFiles(entry.ModelId);
+            var deletedDownloadJobs = _modelDownloadJobRepository.DeleteForModel(entry.ModelId);
+            LatestLog = $"Deleted model files: {entry.DisplayName} ({FormatByteSize(result.DeletedBytes)}, download records {deletedDownloadJobs})";
             RefreshModelCatalog();
+        }
+        catch (InvalidOperationException exception)
+        {
+            LatestLog = $"Model file delete skipped: {exception.Message}";
+        }
+        catch (IOException exception)
+        {
+            LatestLog = $"Model file delete failed: {entry.DisplayName}: {exception.Message}";
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            LatestLog = $"Model file delete failed: {entry.DisplayName}: {exception.Message}";
         }
 
         return Task.CompletedTask;
@@ -342,9 +385,9 @@ public sealed partial class MainWindowViewModel
             licenseCommand.RaiseCanExecuteChanged();
         }
 
-        if (ForgetSelectedModelCommand is RelayCommand forgetCommand)
+        if (DeleteSelectedModelFilesCommand is RelayCommand deleteFilesCommand)
         {
-            forgetCommand.RaiseCanExecuteChanged();
+            deleteFilesCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -374,6 +417,14 @@ public sealed partial class MainWindowViewModel
     {
         return SelectedModelCatalogEntry is { IsInstalled: false, LatestDownloadJob.Status: "failed" or "cancelled" } entry &&
             entry.IsDirectDownloadSupported;
+    }
+
+    private bool CanDeleteSelectedModelFiles()
+    {
+        return SelectedModelCatalogEntry is { IsInstalled: true } entry &&
+            !IsRunInProgress &&
+            !IsModelDownloadInProgress &&
+            !IsDownloadRunning(entry.LatestDownloadJob);
     }
 
     private static bool IsDownloadRunning(ModelDownloadJob? job)

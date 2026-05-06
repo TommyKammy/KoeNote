@@ -6,9 +6,9 @@
     {
       "name": "KoeNote",
       "type": "application",
-      "license": "TBD",
+      "license": "Apache-2.0",
       "source": "this repository",
-      "notes": "Set the final application license before external beta distribution."
+      "notes": "KoeNote application source code is licensed under the Apache License 2.0. Third-party libraries, runtime tools, and models are governed by their respective licenses."
     },
     {
       "name": "Microsoft.Data.Sqlite",
