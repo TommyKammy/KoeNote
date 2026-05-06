@@ -225,6 +225,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SkipToPreviousSegmentCommand = new RelayCommand(SkipToPreviousSegmentAsync, CanSkipPlaybackSegment);
         SkipToNextSegmentCommand = new RelayCommand(SkipToNextSegmentAsync, CanSkipPlaybackSegment);
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
+        OpenLogsCommand = new RelayCommand(OpenLogsAsync);
         OpenCleanupToolCommand = new RelayCommand(OpenCleanupToolAsync, CanOpenCleanupTool);
         ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
         ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
@@ -488,6 +489,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SkipToNextSegmentCommand { get; }
 
     public ICommand OpenSettingsCommand { get; }
+
+    public ICommand OpenLogsCommand { get; }
 
     public ICommand OpenCleanupToolCommand { get; }
 
@@ -925,10 +928,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedDetailPanelTabIndex;
         set
         {
-            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 2)))
+            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 3)))
             {
                 OnPropertyChanged(nameof(DetailPanelTitle));
-                SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex + 1;
+                SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex;
             }
         }
     }
@@ -944,6 +947,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         0 => "設定",
         1 => "セットアップ / モデル導入",
         2 => "モデル",
+        3 => "ログ",
         _ => "詳細"
     };
 

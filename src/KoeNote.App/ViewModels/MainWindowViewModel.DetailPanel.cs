@@ -8,8 +8,16 @@ public sealed partial class MainWindowViewModel
 {
     private Task OpenSettingsAsync()
     {
-        OpenDetailPanel(1);
+        OpenDetailPanel(0);
         LatestLog = "Settings opened. ASR engine, context, hotwords, storage path, and runtime readiness are available in the wide panel.";
+        return Task.CompletedTask;
+    }
+
+    private Task OpenLogsAsync()
+    {
+        RefreshLogs();
+        OpenDetailPanel(3);
+        LatestLog = "Logs opened.";
         return Task.CompletedTask;
     }
 
@@ -71,13 +79,13 @@ public sealed partial class MainWindowViewModel
 
     private Task OpenSelectedDetailPanelAsync()
     {
-        OpenDetailPanel(SelectedLogPanelTabIndex == 0 ? 2 : SelectedLogPanelTabIndex);
+        OpenDetailPanel(SelectedLogPanelTabIndex);
         return Task.CompletedTask;
     }
 
     private bool CanOpenSelectedDetailPanel()
     {
-        return SelectedLogPanelTabIndex > 0;
+        return true;
     }
 
     private Task CloseDetailPanelAsync()
@@ -88,8 +96,8 @@ public sealed partial class MainWindowViewModel
 
     private void OpenDetailPanel(int logPanelTabIndex)
     {
-        SelectedLogPanelTabIndex = Math.Clamp(logPanelTabIndex, 1, 3);
-        SelectedDetailPanelTabIndex = SelectedLogPanelTabIndex - 1;
+        SelectedLogPanelTabIndex = Math.Clamp(logPanelTabIndex, 0, 3);
+        SelectedDetailPanelTabIndex = SelectedLogPanelTabIndex;
         OnPropertyChanged(nameof(DetailPanelTitle));
         IsDetailPanelOpen = true;
     }

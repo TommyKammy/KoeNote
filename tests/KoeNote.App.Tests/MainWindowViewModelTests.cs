@@ -595,13 +595,20 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel();
 
         viewModel.OpenSettingsCommand.Execute(null);
-        Assert.Equal(1, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(0, viewModel.SelectedLogPanelTabIndex);
         Assert.Equal(0, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("設定", viewModel.DetailPanelTitle);
         Assert.True(viewModel.IsDetailPanelOpen);
 
         viewModel.ShowModelCatalogCommand.Execute(null);
-        Assert.Equal(3, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(2, viewModel.SelectedLogPanelTabIndex);
         Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("モデル", viewModel.DetailPanelTitle);
+
+        viewModel.OpenLogsCommand.Execute(null);
+        Assert.Equal(3, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(3, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("ログ", viewModel.DetailPanelTitle);
 
         viewModel.OpenSetupCommand.Execute(null);
         Assert.True(viewModel.IsSetupWizardModalOpen);
@@ -703,9 +710,14 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.False(viewModel.OpenSelectedDetailPanelCommand.CanExecute(null));
+        Assert.True(viewModel.OpenSelectedDetailPanelCommand.CanExecute(null));
+        viewModel.OpenSelectedDetailPanelCommand.Execute(null);
 
-        viewModel.SelectedLogPanelTabIndex = 3;
+        Assert.True(viewModel.IsDetailPanelOpen);
+        Assert.Equal(0, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("設定", viewModel.DetailPanelTitle);
+
+        viewModel.SelectedLogPanelTabIndex = 2;
         Assert.True(viewModel.OpenSelectedDetailPanelCommand.CanExecute(null));
         viewModel.OpenSelectedDetailPanelCommand.Execute(null);
 

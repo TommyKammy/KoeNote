@@ -9,7 +9,7 @@ public sealed partial class MainWindowViewModel
 {
     private Task ShowModelCatalogAsync()
     {
-        OpenDetailPanel(3);
+        OpenDetailPanel(2);
         MarkInterruptedModelDownloads();
         RefreshModelCatalog();
         var installedCount = ModelCatalogEntries.Count(static entry => entry.IsInstalled);
