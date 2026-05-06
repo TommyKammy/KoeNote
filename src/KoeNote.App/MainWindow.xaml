@@ -114,6 +114,104 @@
             </Grid>
         </Border>
 
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Panel.ZIndex="21"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Width="420"
+                Margin="0,68,18,0"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12"
+                Visibility="{Binding HasUpdateNotification, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="#EFF6FF" />
+                    <Setter Property="BorderBrush" Value="#60A5FA" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsUpdateMandatory}" Value="True">
+                            <Setter Property="Background" Value="#FEF2F2" />
+                            <Setter Property="BorderBrush" Value="#EF4444" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock FontFamily="Segoe MDL2 Assets"
+                           Text="&#xE895;"
+                           FontSize="16"
+                           Foreground="#2563EB"
+                           VerticalAlignment="Top"
+                           Margin="0,1,9,0" />
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding UpdateNotificationTitle}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding UpdateNotificationMessage}"
+                               FontSize="11"
+                               Foreground="{StaticResource MutedBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,3,0,6" />
+                    <TextBlock Text="{Binding UpdateDownloadProgressText}"
+                               FontSize="11"
+                               Foreground="#2563EB"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding DownloadUpdateCommand}"
+                                Padding="9,5"
+                                MinWidth="0"
+                                ToolTip="Download and verify update"
+                                Visibility="{Binding CanShowUpdateDownloadAction, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" Margin="0,0,5,0" />
+                                <TextBlock Text="Download" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding OpenUpdateReleaseNotesCommand}"
+                                Padding="9,5"
+                                MinWidth="0"
+                                Margin="8,0,0,0"
+                                ToolTip="Open release notes">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" Margin="0,0,5,0" />
+                                <TextBlock Text="Release notes" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding InstallVerifiedUpdateCommand}"
+                                Padding="9,5"
+                                MinWidth="0"
+                                Margin="8,0,0,0"
+                                ToolTip="Start verified update installer"
+                                Visibility="{Binding CanShowInstallUpdateAction, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7C3;" FontFamily="Segoe MDL2 Assets" Margin="0,0,5,0" />
+                                <TextBlock Text="Install" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DismissUpdateNotificationCommand}"
+                                Padding="9,5"
+                                MinWidth="0"
+                                Margin="8,0,0,0"
+                                ToolTip="Dismiss update notice">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" Margin="0,0,5,0" />
+                                <TextBlock Text="Later" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <Grid Grid.Row="1"
               Grid.RowSpan="2"
               Panel.ZIndex="10"

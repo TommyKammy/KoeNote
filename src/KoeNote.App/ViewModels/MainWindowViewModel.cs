@@ -15,6 +15,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
 
@@ -47,6 +48,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly StatusBarInfoService _statusBarInfoService;
     private readonly DatabaseMaintenanceService _databaseMaintenanceService;
     private readonly DomainPresetImportService _domainPresetImportService;
+    private readonly IUpdateCheckService _updateCheckService;
+    private readonly IUpdateDownloadService _updateDownloadService;
+    private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
@@ -88,7 +92,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isModelDownloadNotificationError;
     private string _setupDiarizationRuntimeSummary = "話者識別ランタイムは未導入です。必要になったらここから追加できます。";
     private string _databaseMaintenanceSummary = string.Empty;
+    private string _updateNotificationTitle = string.Empty;
+    private string _updateNotificationMessage = string.Empty;
+    private string _updateDownloadProgressText = string.Empty;
+    private string _verifiedUpdateInstallerPath = string.Empty;
+    private LatestReleaseInfo? _availableUpdate;
     private bool _isDatabaseMaintenanceInProgress;
+    private bool _isUpdateCheckInProgress;
+    private bool _isUpdateDownloadInProgress;
     private double _modelDownloadProgressPercent;
     private bool _isModelDownloadInProgress;
     private bool _isModelDownloadProgressIndeterminate;
@@ -159,6 +170,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _statusBarInfoService = services.StatusBarInfoService;
         _databaseMaintenanceService = services.DatabaseMaintenanceService;
         _domainPresetImportService = services.DomainPresetImportService;
+        _updateCheckService = services.UpdateCheckService;
+        _updateDownloadService = services.UpdateDownloadService;
+        _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -274,6 +288,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
         RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
+        CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
+        DownloadUpdateCommand = new RelayCommand(DownloadUpdateAsync, CanDownloadUpdate);
+        InstallVerifiedUpdateCommand = new RelayCommand(InstallVerifiedUpdateAsync, CanInstallVerifiedUpdate);
+        DismissUpdateNotificationCommand = new RelayCommand(DismissUpdateNotificationAsync);
+        OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
 
         MarkInterruptedModelDownloads();
         RefreshModelCatalog();
@@ -282,11 +301,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RefreshSpeakerFilters();
         RefreshDatabaseMaintenanceSummary();
         RefreshDomainPresetHistory();
+        _ = CheckForUpdatesOnStartupAsync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public AppPaths Paths { get; }
+
+    public Action<Uri> OpenUriAction { get; set; } = OpenUriInShell;
 
     public string GpuSummary => EnvironmentStatus.FirstOrDefault(item => item.Name == "nvidia-smi")?.Detail ?? "Unknown";
 
@@ -587,6 +609,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand OpenExportFolderCommand { get; }
 
     public ICommand RunDatabaseMaintenanceCommand { get; }
+
+    public ICommand CheckForUpdatesCommand { get; }
+
+    public ICommand DownloadUpdateCommand { get; }
+
+    public ICommand InstallVerifiedUpdateCommand { get; }
+
+    public ICommand DismissUpdateNotificationCommand { get; }
+
+    public ICommand OpenUpdateReleaseNotesCommand { get; }
 
     public JobSummary? SelectedJob
     {
@@ -1009,6 +1041,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 if (RunDatabaseMaintenanceCommand is RelayCommand maintenanceCommand)
                 {
                     maintenanceCommand.RaiseCanExecuteChanged();
+                }
+
+                if (InstallVerifiedUpdateCommand is RelayCommand installUpdateCommand)
+                {
+                    installUpdateCommand.RaiseCanExecuteChanged();
                 }
 
                 UpdateModelCatalogCommandStates();

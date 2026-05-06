@@ -10,6 +10,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
 
@@ -41,20 +42,27 @@ internal sealed record MainWindowRuntimeServices(
     DiarizationRuntimeService DiarizationRuntimeService,
     IAudioPlaybackService AudioPlaybackService,
     StatusBarInfoService StatusBarInfoService,
-    DatabaseMaintenanceService DatabaseMaintenanceService);
+    DatabaseMaintenanceService DatabaseMaintenanceService,
+    IUpdateCheckService UpdateCheckService,
+    IUpdateDownloadService UpdateDownloadService,
+    IUpdateInstallerLauncher UpdateInstallerLauncher);
 
 internal static class MainWindowRuntimeComposition
 {
     public static MainWindowRuntimeServices Create(AppPaths paths)
     {
         var processRunner = new ExternalProcessRunner();
+        var updateHttpClient = new HttpClient();
         return new MainWindowRuntimeServices(
             processRunner,
             new ToolStatusService(paths),
             new DiarizationRuntimeService(paths, processRunner),
             new AudioPlaybackService(),
             new StatusBarInfoService(paths),
-            new DatabaseMaintenanceService(paths));
+            new DatabaseMaintenanceService(paths),
+            new UpdateCheckService(updateHttpClient, UpdateCheckOptions.FromEnvironment()),
+            new UpdateDownloadService(updateHttpClient, paths),
+            new UpdateInstallerLauncher());
     }
 }
 

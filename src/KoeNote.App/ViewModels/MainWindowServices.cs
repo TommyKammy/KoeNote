@@ -9,6 +9,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
 
@@ -36,6 +37,9 @@ public sealed record MainWindowServices(
     ToolStatusService ToolStatusService,
     StatusBarInfoService StatusBarInfoService,
     DatabaseMaintenanceService DatabaseMaintenanceService,
+    IUpdateCheckService UpdateCheckService,
+    IUpdateDownloadService UpdateDownloadService,
+    IUpdateInstallerLauncher UpdateInstallerLauncher,
     DomainPresetImportService DomainPresetImportService)
 {
     public static MainWindowServices Create(AppPaths paths)
@@ -92,6 +96,9 @@ public sealed record MainWindowServices(
             runtime.ToolStatusService,
             runtime.StatusBarInfoService,
             runtime.DatabaseMaintenanceService,
+            runtime.UpdateCheckService,
+            runtime.UpdateDownloadService,
+            runtime.UpdateInstallerLauncher,
             new DomainPresetImportService(paths, repositories.AsrSettingsRepository));
     }
 }

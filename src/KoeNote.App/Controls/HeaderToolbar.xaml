@@ -286,6 +286,15 @@
                         <TextBlock Text="ログ" Style="{StaticResource HeaderAdminToolText}" />
                     </StackPanel>
                 </Button>
+                <Button Style="{StaticResource HeaderGhostButton}"
+                        Command="{Binding CheckForUpdatesCommand}"
+                        ToolTip="Check for KoeNote updates"
+                        Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE895;" Style="{StaticResource HeaderAdminToolIcon}" />
+                        <TextBlock Text="Update" Style="{StaticResource HeaderAdminToolText}" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <Border Grid.Column="7"

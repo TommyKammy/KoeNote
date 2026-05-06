@@ -6,6 +6,7 @@ using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Updates;
 using KoeNote.App.ViewModels;
 using Microsoft.Data.Sqlite;
 
@@ -1137,6 +1138,66 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void InstallVerifiedUpdateCommand_IsEnabledOnlyWhenInstallerIsReadyAndNoJobIsRunning()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.VerifiedUpdateInstallerPath), @"C:\updates\KoeNote.msi");
+
+        Assert.True(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+
+        Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void UpToDateUpdateCheck_ClearsPreviouslyVerifiedInstaller()
+    {
+        var viewModel = CreateViewModel();
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.VerifiedUpdateInstallerPath), @"C:\updates\KoeNote.msi");
+        Assert.True(viewModel.CanShowInstallUpdateAction);
+
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                false,
+                false,
+                "0.14.0",
+                null,
+                "KoeNote is up to date (0.14.0)."),
+            true);
+
+        Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
+        Assert.Empty(viewModel.UpdateDownloadProgressText);
+        Assert.False(viewModel.CanShowInstallUpdateAction);
+        Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task InstallVerifiedUpdateCommand_DisablesInstallAfterStartingInstaller()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var launcher = new RecordingUpdateInstallerLauncher();
+        SetPrivateField(viewModel, "_updateInstallerLauncher", launcher);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.VerifiedUpdateInstallerPath), installerPath);
+
+        viewModel.InstallVerifiedUpdateCommand.Execute(null);
+        await Task.Delay(50);
+
+        Assert.Equal(installerPath, launcher.StartedInstallerPath);
+        Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
+        Assert.False(viewModel.CanShowInstallUpdateAction);
+        Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
+        Assert.Contains("Installer started", viewModel.UpdateDownloadProgressText, StringComparison.Ordinal);
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -1155,9 +1216,38 @@ public sealed class MainWindowViewModelTests
         property.SetValue(target, value);
     }
 
+    private static void SetPrivateField<T>(object target, string fieldName, T value)
+    {
+        var field = target.GetType().GetField(
+            fieldName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Field not found: {fieldName}");
+        field.SetValue(target, value);
+    }
+
+    private static void InvokePrivate(object target, string methodName, params object[] arguments)
+    {
+        var method = target.GetType().GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Method not found: {methodName}");
+        method.Invoke(target, arguments);
+    }
+
     private static void Touch(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, string.Empty);
+    }
+
+    private sealed class RecordingUpdateInstallerLauncher : IUpdateInstallerLauncher
+    {
+        public string? StartedInstallerPath { get; private set; }
+
+        public UpdateInstallerLaunchResult Launch(string installerPath)
+        {
+            StartedInstallerPath = installerPath;
+            return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now);
+        }
     }
 }

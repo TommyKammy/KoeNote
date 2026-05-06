@@ -76,6 +76,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNote
 The CI verification command runs the versioning/release tests, verifies the SHA256 sidecar,
 and checks that the release manifest matches the MSI.
 
+Create the distribution `latest.json` used by the app's update check:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\New-KoeNoteLatestJson.ps1 `
+  -ReleaseManifestPath artifacts\msi\KoeNote-v0.13.0-win-x64.release-manifest.json `
+  -BaseDownloadUrl https://example.com/koenote/releases/0.13.0/ `
+  -ReleaseNotesUrl https://example.com/koenote/releases/0.13.0
+```
+
+The generated `latest.json` contains the version, runtime identifier, MSI URL, SHA256,
+SHA256 sidecar URL, optional release notes URL, and whether the update is mandatory.
+Set `KOENOTE_UPDATE_LATEST_URL` to the published `latest.json` URL to enable in-app
+update checks. If the variable is not set, KoeNote skips network update checks.
+When an update is available, the app can download the MSI into
+`%LOCALAPPDATA%\KoeNote\updates`, verify it against the `latest.json` SHA256, and then
+show that the installer is ready. Partially downloaded files use a `.download` suffix
+and are not promoted to `.msi` unless verification succeeds.
+After verification, the app exposes an install action that launches the MSI through
+`msiexec /i`. The install action is disabled while a KoeNote job is running, so users
+can finish active transcription/review work before handing off to the installer.
+
 ## Uninstall policy
 
 Removed by MSI:

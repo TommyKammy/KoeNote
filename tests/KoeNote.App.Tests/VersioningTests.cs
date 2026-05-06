@@ -102,6 +102,22 @@ public sealed class VersioningTests
     }
 
     [Fact]
+    public void LatestJsonScript_CreatesDistributionManifest()
+    {
+        var repoRoot = FindRepoRoot();
+        var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "New-KoeNoteLatestJson.ps1"));
+
+        Assert.Contains("ReleaseManifestPath", script);
+        Assert.Contains("BaseDownloadUrl", script);
+        Assert.Contains("latest.json", script);
+        Assert.Contains("msi_url", script);
+        Assert.Contains("sha256_url", script);
+        Assert.Contains("mandatory", script);
+        Assert.Contains("BaseDownloadUrl must be an absolute HTTPS URL", script);
+        Assert.Contains("ReleaseNotesUrl must be an absolute HTTPS URL", script);
+    }
+
+    [Fact]
     public void Installer_ClosesRunningKoeNoteBeforeUpdate()
     {
         var repoRoot = FindRepoRoot();
