@@ -11,11 +11,17 @@ public sealed record UpdateCheckOptions(
     string RuntimeIdentifier,
     bool IncludePrerelease = false)
 {
+    public static readonly Uri DefaultLatestJsonUri = new("https://tommykammy.github.io/KoeNote/latest.json");
+
     public static UpdateCheckOptions FromEnvironment()
     {
         var latestJsonUrl = Environment.GetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL");
+        var latestJsonUri = Uri.TryCreate(latestJsonUrl, UriKind.Absolute, out var uri)
+            ? uri
+            : DefaultLatestJsonUri;
+
         return new UpdateCheckOptions(
-            Uri.TryCreate(latestJsonUrl, UriKind.Absolute, out var uri) ? uri : null,
+            latestJsonUri,
             RuntimeInformation.RuntimeIdentifier);
     }
 }

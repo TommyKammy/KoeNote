@@ -255,6 +255,7 @@ public sealed partial class MainWindowViewModel
             : ModelCatalogEntries.FirstOrDefault(entry =>
                 entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+        OnPropertyChanged(nameof(ReviewStageAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
         UpdateModelCatalogCommandStates();
     }

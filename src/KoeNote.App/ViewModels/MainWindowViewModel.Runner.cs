@@ -21,7 +21,8 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, EnableReviewStage);
+            var enableReviewForRun = EnableReviewStage && ReviewStageAssetsReady;
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
         }
         finally

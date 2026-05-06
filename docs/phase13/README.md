@@ -87,8 +87,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\New-KoeNoteL
 
 The generated `latest.json` contains the version, runtime identifier, MSI URL, SHA256,
 SHA256 sidecar URL, optional release notes URL, and whether the update is mandatory.
-Set `KOENOTE_UPDATE_LATEST_URL` to the published `latest.json` URL to enable in-app
-update checks. If the variable is not set, KoeNote skips network update checks.
+KoeNote checks `https://tommykammy.github.io/KoeNote/latest.json` by default.
+Set `KOENOTE_UPDATE_LATEST_URL` only when overriding the update metadata URL for
+test or alternate distribution channels.
 When an update is available, the app can download the MSI into
 `%LOCALAPPDATA%\KoeNote\updates`, verify it against the `latest.json` SHA256, and then
 show that the installer is ready. Partially downloaded files use a `.download` suffix

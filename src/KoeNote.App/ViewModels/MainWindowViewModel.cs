@@ -372,7 +372,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         return item.Name switch
         {
             "ffmpeg" => true,
-            "llama-completion" => EnableReviewStage,
             "AppData" or "SQLite" => true,
             _ => false
         };
@@ -385,10 +384,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public bool RequiredRuntimeAssetsReady => EnvironmentStatus
-        .Where(item => item.Name == "ffmpeg" || (EnableReviewStage && item.Name == "llama-completion"))
+        .Where(item => item.Name == "ffmpeg")
         .All(static item => item.IsOk) &&
-        IsSelectedAsrEngineReady() &&
-        (!EnableReviewStage || IsReviewModelReady());
+        IsSelectedAsrEngineReady();
+
+    public bool ReviewStageAssetsReady => EnvironmentStatus
+        .Where(static item => item.Name == "llama-completion")
+        .All(static item => item.IsOk) &&
+        IsReviewModelReady();
 
     public bool IsSetupComplete => _setupState.IsCompleted;
 
@@ -1263,6 +1266,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(AsrModel));
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+                OnPropertyChanged(nameof(ReviewStageAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
@@ -1282,6 +1286,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _enableReviewStage, value))
             {
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+                OnPropertyChanged(nameof(ReviewStageAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
                 OnPropertyChanged(nameof(FirstRunSummary));
                 OnPropertyChanged(nameof(FirstRunDetail));

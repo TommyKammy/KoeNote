@@ -161,6 +161,42 @@ public sealed class UpdateCheckServiceTests
         Assert.False(result.IsUpdateAvailable);
     }
 
+    [Fact]
+    public void FromEnvironment_UsesGitHubPagesLatestJsonByDefault()
+    {
+        var original = Environment.GetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL");
+        try
+        {
+            Environment.SetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL", null);
+
+            var options = UpdateCheckOptions.FromEnvironment();
+
+            Assert.Equal(UpdateCheckOptions.DefaultLatestJsonUri, options.LatestJsonUri);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL", original);
+        }
+    }
+
+    [Fact]
+    public void FromEnvironment_UsesConfiguredLatestJsonUrlWhenPresent()
+    {
+        var original = Environment.GetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL");
+        try
+        {
+            Environment.SetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL", "https://updates.example.test/latest.json");
+
+            var options = UpdateCheckOptions.FromEnvironment();
+
+            Assert.Equal("https://updates.example.test/latest.json", options.LatestJsonUri?.AbsoluteUri);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KOENOTE_UPDATE_LATEST_URL", original);
+        }
+    }
+
     private static UpdateCheckService CreateService(string json)
     {
         return new UpdateCheckService(

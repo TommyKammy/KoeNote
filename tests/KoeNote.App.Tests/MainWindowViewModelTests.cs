@@ -543,8 +543,7 @@ public sealed class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel(paths);
 
         Assert.Contains("初回チェック:", viewModel.FirstRunSummary, StringComparison.Ordinal);
-        Assert.Contains("llama-completion", viewModel.FirstRunDetail, StringComparison.Ordinal);
-        Assert.Contains(paths.LlamaCompletionPath, viewModel.FirstRunDetail, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("llama-completion", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.DoesNotContain("ASR model", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.Contains("セットアップ、またはモデル導入", viewModel.FirstRunDetail, StringComparison.Ordinal);
         Assert.False(viewModel.RequiredRuntimeAssetsReady);
@@ -1069,6 +1068,34 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSelectedJobCommand_DoesNotRequireReviewAssetsWhenReviewStageIsEnabled()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.True(viewModel.EnableReviewStage);
+        Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.False(viewModel.ReviewStageAssetsReady);
         Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
     }
 

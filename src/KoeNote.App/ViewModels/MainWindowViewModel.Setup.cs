@@ -270,6 +270,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
         OnPropertyChanged(nameof(IsSetupComplete));
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+        OnPropertyChanged(nameof(ReviewStageAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
         SetupModelAudits.Clear();
         foreach (var audit in _setupWizardService.GetSelectedModelAudit())
