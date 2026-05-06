@@ -105,6 +105,29 @@ Update check, download, verification, and install handoff events are appended to
 update download, KoeNote also removes stale verified MSI downloads older than 30 days
 and stale `.download` files older than 1 day from `%LOCALAPPDATA%\KoeNote\updates`.
 
+For GitHub-hosted OSS releases, publish MSI artifacts to GitHub Releases and keep
+`latest.json` on GitHub Pages. The repository workflow
+`.github/workflows/publish-update-metadata.yml` listens for a published GitHub
+Release, downloads the `*.release-manifest.json` release asset, generates
+`public/latest.json`, and deploys it to Pages. Configure GitHub Pages to deploy
+from GitHub Actions, then set:
+
+```powershell
+$env:KOENOTE_UPDATE_LATEST_URL = "https://<owner>.github.io/<repo>/latest.json"
+```
+
+Each GitHub Release must include:
+
+- `KoeNote-v<version>-<rid>.msi`
+- `KoeNote-v<version>-<rid>.msi.sha256`
+- `KoeNote-v<version>-<rid>.release-manifest.json`
+
+The generated `latest.json` points MSI and SHA256 URLs at the versioned GitHub
+Release download path while keeping the app-facing metadata URL stable.
+Create the release as a draft, upload all three assets, and then publish it so the
+`release.published` workflow sees the complete asset set. If assets are corrected
+after publishing, run the workflow manually with the release tag.
+
 ## Uninstall policy
 
 Removed by MSI:

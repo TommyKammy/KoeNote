@@ -1,0 +1,154 @@
+name: Publish update metadata
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Release tag to publish as latest update metadata
+        required: true
+        type: string
+      mandatory:
+        description: Mark this update as mandatory
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  publish-latest-json:
+    name: Publish latest.json to GitHub Pages
+    runs-on: windows-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_JSON: ${{ toJson(github.event.release) }}
+          DISPATCH_TAG: ${{ inputs.tag_name }}
+          DISPATCH_MANDATORY: ${{ inputs.mandatory }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if ($env:EVENT_NAME -eq "release") {
+              $release = $env:RELEASE_JSON | ConvertFrom-Json
+              $tagName = $release.tag_name
+              $releaseNotesUrl = $release.html_url
+              $manifestAssetCount = @($release.assets | Where-Object { $_.name -like "*.release-manifest.json" }).Count
+              if ($manifestAssetCount -ne 1) {
+                  throw "Release '$tagName' must include exactly one *.release-manifest.json asset, but found $manifestAssetCount."
+              }
+
+              $mandatory = "false"
+          }
+          else {
+              if ([string]::IsNullOrWhiteSpace($env:DISPATCH_TAG)) {
+                  throw "tag_name is required for workflow_dispatch."
+              }
+
+              $tagName = $env:DISPATCH_TAG
+              $release = gh release view $tagName --repo $env:REPOSITORY --json assets,url | ConvertFrom-Json
+              $releaseNotesUrl = $release.url
+              $manifestAssetCount = @($release.assets | Where-Object { $_.name -like "*.release-manifest.json" }).Count
+              if ($manifestAssetCount -ne 1) {
+                  throw "Release '$tagName' must include exactly one *.release-manifest.json asset, but found $manifestAssetCount."
+              }
+
+              $mandatory = if ($env:DISPATCH_MANDATORY -eq "true") { "true" } else { "false" }
+          }
+
+          $baseDownloadUrl = "https://github.com/$env:REPOSITORY/releases/download/$tagName/"
+
+          "tag_name=$tagName" >> $env:GITHUB_OUTPUT
+          "release_notes_url=$releaseNotesUrl" >> $env:GITHUB_OUTPUT
+          "base_download_url=$baseDownloadUrl" >> $env:GITHUB_OUTPUT
+          "mandatory=$mandatory" >> $env:GITHUB_OUTPUT
+
+      - name: Download release manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path artifacts\release | Out-Null
+
+          gh release download $env:TAG_NAME `
+              --repo $env:REPOSITORY `
+              --pattern "*.release-manifest.json" `
+              --dir artifacts\release `
+              --clobber
+
+          $manifests = @(Get-ChildItem -LiteralPath artifacts\release -Filter "*.release-manifest.json")
+          if ($manifests.Count -ne 1) {
+              throw "Expected exactly one *.release-manifest.json asset, but found $($manifests.Count)."
+          }
+
+          $normalizedManifestPath = Join-Path (Resolve-Path artifacts\release) "release-manifest.json"
+          if ($manifests[0].FullName -ne $normalizedManifestPath) {
+              Copy-Item -LiteralPath $manifests[0].FullName -Destination $normalizedManifestPath -Force
+          }
+
+      - name: Generate latest.json
+        shell: pwsh
+        env:
+          BASE_DOWNLOAD_URL: ${{ steps.release.outputs.base_download_url }}
+          RELEASE_NOTES_URL: ${{ steps.release.outputs.release_notes_url }}
+          MANDATORY: ${{ steps.release.outputs.mandatory }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path public | Out-Null
+          $args = @(
+              "-NoProfile",
+              "-ExecutionPolicy", "Bypass",
+              "-File", "scripts\phase13\New-KoeNoteLatestJson.ps1",
+              "-ReleaseManifestPath", "artifacts\release\release-manifest.json",
+              "-BaseDownloadUrl", $env:BASE_DOWNLOAD_URL,
+              "-ReleaseNotesUrl", $env:RELEASE_NOTES_URL,
+              "-OutputPath", "public\latest.json"
+          )
+
+          if ($env:MANDATORY -eq "true") {
+              $args += "-Mandatory"
+          }
+
+          powershell @args
+          if ($LASTEXITCODE -ne 0) {
+              throw "New-KoeNoteLatestJson.ps1 failed with exit code $LASTEXITCODE."
+          }
+
+          "" | Set-Content -LiteralPath public\.nojekyll -Encoding ASCII
+          Get-Content -LiteralPath public\latest.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
