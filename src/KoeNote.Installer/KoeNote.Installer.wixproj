@@ -4,7 +4,7 @@
     <OutputName>KoeNote</OutputName>
     <OutputType>Package</OutputType>
     <ProductName Condition="'$(ProductName)' == ''">KoeNote</ProductName>
-    <ProductVersion Condition="'$(ProductVersion)' == ''">0.13.0</ProductVersion>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">$(VersionPrefix)</ProductVersion>
     <Publisher Condition="'$(Publisher)' == ''">KoeNote Project</Publisher>
     <UpgradeCode Condition="'$(UpgradeCode)' == ''">{C73B4C12-0F3B-4B7A-8F4C-43D1C8C5EB1D}</UpgradeCode>
     <InstallFolderName Condition="'$(InstallFolderName)' == ''">KoeNote</InstallFolderName>
@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
   </ItemGroup>
 
 </Project>

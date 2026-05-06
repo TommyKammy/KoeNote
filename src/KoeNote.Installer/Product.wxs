@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
       Name="$(var.ProductName)"
       Manufacturer="$(var.Publisher)"
@@ -11,6 +12,12 @@
 
     <SummaryInformation Description="$(var.ProductName) lightweight MSI installer" Manufacturer="$(var.Publisher)" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." Schedule="afterInstallInitialize" />
+    <util:CloseApplication Id="CloseKoeNoteApp"
+                           Target="KoeNote.App.exe"
+                           Description="$(var.ProductName)"
+                           CloseMessage="yes"
+                           PromptToContinue="yes"
+                           RebootPrompt="no" />
     <MediaTemplate EmbedCab="yes" />
 
     <Property Id="ARPPRODUCTICON" Value="KoeNoteIcon" />

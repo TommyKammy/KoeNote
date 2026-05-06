@@ -47,6 +47,7 @@ public sealed class AppPaths
         DefaultModelStorageRoot = InstallScope == InstallScope.AllUsers ? MachineModels : UserModels;
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
+        UpdateBackups = Path.Combine(localAppData, "KoeNote", "backups", "updates");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         Models = Path.Combine(baseDirectory, "models");
         ModelCatalogPath = Path.Combine(baseDirectory, "catalog", "model-catalog.json");
@@ -90,6 +91,8 @@ public sealed class AppPaths
 
     public string PythonPackages { get; }
 
+    public string UpdateBackups { get; }
+
     public string RuntimeTools { get; }
 
     public string Models { get; }
@@ -128,6 +131,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(UserModels);
         Directory.CreateDirectory(ModelDownloads);
         Directory.CreateDirectory(PythonPackages);
+        Directory.CreateDirectory(UpdateBackups);
 
         if (!File.Exists(SettingsPath))
         {

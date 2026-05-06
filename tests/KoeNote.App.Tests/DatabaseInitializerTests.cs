@@ -111,6 +111,77 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
+    public void EnsureCreated_CreatesUpdateBackupBeforeMigratingExistingDatabase()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateVersionOneDatabase(paths);
+        File.WriteAllText(paths.SettingsPath, "{ \"asrEngine\": \"legacy\" }");
+        File.WriteAllText(Path.Combine(paths.Jobs, "legacy-job.txt"), "legacy job");
+
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var backupDirectory = Assert.Single(Directory.EnumerateDirectories(paths.UpdateBackups));
+        Assert.True(File.Exists(Path.Combine(backupDirectory, "jobs.sqlite")));
+        Assert.True(File.Exists(Path.Combine(backupDirectory, "settings.json")));
+        Assert.True(File.Exists(Path.Combine(backupDirectory, "jobs", "legacy-job.txt")));
+        Assert.True(File.Exists(Path.Combine(backupDirectory, "backup-manifest.json")));
+    }
+
+    [Fact]
+    public void EnsureCreated_DoesNotMutateExistingDatabaseBeforeBackup()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateSchemaLessDatabase(paths);
+
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        var backupDirectory = Assert.Single(Directory.EnumerateDirectories(paths.UpdateBackups));
+        using var backupConnection = OpenDatabase(Path.Combine(backupDirectory, "jobs.sqlite"));
+        var backupTables = ReadTableNames(backupConnection);
+
+        Assert.Contains("legacy_table", backupTables);
+        Assert.DoesNotContain("schema_version", backupTables);
+    }
+
+    [Fact]
+    public void UpdateBackupService_CreatesUniqueBackupDirectoriesForRepeatedRuns()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateVersionOneDatabase(paths);
+        var service = new UpdateBackupService(paths);
+
+        var first = service.CreateBeforeMigrationBackup(1, 14);
+        var second = service.CreateBeforeMigrationBackup(1, 14);
+
+        Assert.NotEqual(first.BackupDirectory, second.BackupDirectory);
+        Assert.Equal(2, Directory.EnumerateDirectories(paths.UpdateBackups).Count());
+    }
+
+    [Fact]
+    public void EnsureCreated_RejectsDatabaseCreatedByNewerAppVersion()
+    {
+        var root = CreateTempDirectory();
+        var localRoot = CreateTempDirectory();
+        var paths = new AppPaths(root, localRoot);
+        paths.EnsureCreated();
+        CreateFutureVersionDatabase(paths);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new DatabaseInitializer(paths).EnsureCreated());
+
+        Assert.Contains("supports database schema up to", ex.Message);
+        Assert.Empty(Directory.EnumerateDirectories(paths.UpdateBackups));
+    }
+
+    [Fact]
     public void EnsureCreated_IsIdempotent()
     {
         var root = CreateTempDirectory();
@@ -173,6 +244,16 @@ public sealed class DatabaseInitializerTests
         }
 
         return tables;
+    }
+
+    private static SqliteConnection OpenDatabase(string databasePath)
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath
+        }.ToString());
+        connection.Open();
+        return connection;
     }
 
     private static List<int> ReadSchemaVersions(SqliteConnection connection)
@@ -355,6 +436,45 @@ public sealed class DatabaseInitializerTests
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL
             );
+            """);
+    }
+
+    private static void CreateFutureVersionDatabase(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Execute(connection, """
+            CREATE TABLE schema_version (
+                version INTEGER NOT NULL PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
+            """);
+        Execute(connection, """
+            INSERT INTO schema_version (version, applied_at)
+            VALUES (999, datetime('now'));
+            """);
+    }
+
+    private static void CreateSchemaLessDatabase(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+
+        Execute(connection, """
+            CREATE TABLE legacy_table (
+                value TEXT NOT NULL
+            );
+            """);
+        Execute(connection, """
+            INSERT INTO legacy_table (value)
+            VALUES ('before backup');
             """);
     }
 

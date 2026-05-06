@@ -47,6 +47,23 @@ public sealed class CleanupServiceTests
     }
 
     [Fact]
+    public void CleanupOptions_ParseRestoreUpdateBackup()
+    {
+        var options = CleanupOptions.Parse(["--restore-update-backup", "latest", "--dry-run"]);
+
+        Assert.True(options.DryRun);
+        Assert.Equal("latest", options.RestoreUpdateBackup);
+    }
+
+    [Fact]
+    public void CleanupOptions_ParseListUpdateBackups()
+    {
+        var options = CleanupOptions.Parse(["--list-update-backups"]);
+
+        Assert.True(options.ListUpdateBackups);
+    }
+
+    [Fact]
     public void Execute_DefaultQuietPolicy_RemovesLogsAndDownloadsButKeepsModelsAndUserData()
     {
         var root = CreateTempRoot();
@@ -106,6 +123,131 @@ public sealed class CleanupServiceTests
         Assert.False(File.Exists(paths.SetupReportPath));
     }
 
+    [Fact]
+    public void UpdateBackupRestoreService_ListBackups_ReturnsNewestFirst()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var older = Directory.CreateDirectory(Path.Combine(paths.UpdateBackups, "older"));
+        var newer = Directory.CreateDirectory(Path.Combine(paths.UpdateBackups, "newer"));
+        var preRestore = Directory.CreateDirectory(Path.Combine(paths.UpdateBackups, "pre-restore-latest"));
+        older.LastWriteTimeUtc = DateTime.UtcNow.AddMinutes(-10);
+        newer.LastWriteTimeUtc = DateTime.UtcNow;
+        preRestore.LastWriteTimeUtc = DateTime.UtcNow.AddMinutes(10);
+
+        var backups = new UpdateBackupRestoreService(paths).ListBackups();
+
+        Assert.Equal(["newer", "older"], backups.Select(static backup => backup.Name).ToArray());
+    }
+
+    [Fact]
+    public void UpdateBackupRestoreService_RestoreLatest_RestoresDataAndSavesCurrentData()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var backup = Path.Combine(paths.UpdateBackups, "schema-1-to-14-test");
+        CreateFile(Path.Combine(backup, "jobs.sqlite"), "backup database");
+        CreateFile(Path.Combine(backup, "settings.json"), "backup settings");
+        CreateFile(Path.Combine(backup, "jobs", "job-1", "result.json"), "backup job");
+        CreateFile(paths.DatabasePath, "current database");
+        CreateFile(paths.SettingsPath, "current settings");
+        CreateFile(Path.Combine(paths.Jobs, "job-1", "result.json"), "current job");
+
+        var result = new UpdateBackupRestoreService(paths).Restore("latest", dryRun: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("backup database", File.ReadAllText(paths.DatabasePath));
+        Assert.Equal("backup settings", File.ReadAllText(paths.SettingsPath));
+        Assert.Equal("backup job", File.ReadAllText(Path.Combine(paths.Jobs, "job-1", "result.json")));
+        var preRestore = Assert.Single(Directory.EnumerateDirectories(paths.UpdateBackups, "pre-restore-*"));
+        Assert.Equal("current database", File.ReadAllText(Path.Combine(preRestore, "jobs.sqlite")));
+        Assert.Equal("current settings", File.ReadAllText(Path.Combine(preRestore, "settings.json")));
+        Assert.Equal("current job", File.ReadAllText(Path.Combine(preRestore, "jobs", "job-1", "result.json")));
+    }
+
+    [Fact]
+    public void UpdateBackupRestoreService_RestoreLatest_DoesNotSelectPreRestoreDirectory()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var backup = Directory.CreateDirectory(Path.Combine(paths.UpdateBackups, "schema-1-to-14-test"));
+        var preRestore = Directory.CreateDirectory(Path.Combine(paths.UpdateBackups, "pre-restore-newer"));
+        backup.LastWriteTimeUtc = DateTime.UtcNow;
+        preRestore.LastWriteTimeUtc = DateTime.UtcNow.AddMinutes(10);
+        CreateFile(Path.Combine(backup.FullName, "settings.json"), "real backup settings");
+        CreateFile(Path.Combine(preRestore.FullName, "settings.json"), "pre restore settings");
+
+        var result = new UpdateBackupRestoreService(paths).Restore("latest", dryRun: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("real backup settings", File.ReadAllText(paths.SettingsPath));
+    }
+
+    [Fact]
+    public void UpdateBackupRestoreService_Restore_RemovesCurrentFilesMissingFromBackup()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var backup = Path.Combine(paths.UpdateBackups, "schema-1-to-14-test");
+        CreateFile(Path.Combine(backup, "settings.json"), "backup settings");
+        CreateFile(paths.SetupReportPath, "current report");
+        CreateFile(Path.Combine(paths.Jobs, "stale-job", "result.json"), "stale job");
+
+        var result = new UpdateBackupRestoreService(paths).Restore("schema-1-to-14-test", dryRun: false);
+
+        Assert.True(result.Succeeded);
+        Assert.False(File.Exists(paths.SetupReportPath));
+        Assert.False(Directory.Exists(paths.Jobs));
+        var preRestore = Assert.Single(Directory.EnumerateDirectories(paths.UpdateBackups, "pre-restore-*"));
+        Assert.Equal("current report", File.ReadAllText(Path.Combine(preRestore, "setup_report.json")));
+        Assert.Equal("stale job", File.ReadAllText(Path.Combine(preRestore, "jobs", "stale-job", "result.json")));
+    }
+
+    [Fact]
+    public void UpdateBackupRestoreService_Restore_ReplacesCurrentJobDirectoryWithBackupContents()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var backup = Path.Combine(paths.UpdateBackups, "schema-1-to-14-test");
+        CreateFile(Path.Combine(backup, "jobs", "job-1", "result.json"), "backup job");
+        CreateFile(Path.Combine(paths.Jobs, "stale-job", "result.json"), "stale job");
+
+        var result = new UpdateBackupRestoreService(paths).Restore("schema-1-to-14-test", dryRun: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("backup job", File.ReadAllText(Path.Combine(paths.Jobs, "job-1", "result.json")));
+        Assert.False(File.Exists(Path.Combine(paths.Jobs, "stale-job", "result.json")));
+    }
+
+    [Fact]
+    public void UpdateBackupRestoreService_Restore_RejectsPathOutsideUpdateBackups()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        var outsidePath = Path.Combine(root, "outside-backup");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new UpdateBackupRestoreService(paths).Restore(outsidePath, dryRun: true));
+    }
+
     private static string CreateTempRoot()
     {
         return Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -113,7 +255,12 @@ public sealed class CleanupServiceTests
 
     private static void CreateFile(string path)
     {
+        CreateFile(path, "test");
+    }
+
+    private static void CreateFile(string path, string content)
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, "test");
+        File.WriteAllText(path, content);
     }
 }

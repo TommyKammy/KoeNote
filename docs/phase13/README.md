@@ -20,7 +20,6 @@ The MSI removes the application payload on uninstall. KoeNote user data is inten
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Build-KoeNoteMsi.ps1 `
   -Configuration Release `
   -RuntimeIdentifier win-x64 `
-  -ProductVersion 0.13.0 `
   -Publisher "KoeNote Project"
 ```
 
@@ -29,7 +28,53 @@ The script:
 1. Publishes `KoeNote.App`.
 2. Publishes `KoeNoteCleanup.exe` into the same payload directory.
 3. Generates `src\KoeNote.Installer\PayloadFiles.wxs` from the publish payload.
-4. Builds `artifacts\msi\KoeNote.msi`.
+4. Builds `artifacts\msi\KoeNote-v<version>-<rid>.msi`.
+5. Writes a SHA256 sidecar file next to the MSI.
+6. Writes a JSON Lines update/release log under `artifacts\logs\updates`.
+7. Writes `artifacts\msi\KoeNote-v<version>-<rid>.release-manifest.json`.
+
+The default product version comes from the repository-level `Directory.Build.props` `VersionPrefix`.
+Pass `-ProductVersion` only when intentionally overriding that single source for a one-off build.
+When `-OutputName` is omitted, the MSI name is fixed as `KoeNote-v<version>-<rid>.msi`,
+for example `KoeNote-v0.13.0-win-x64.msi`.
+
+Optional code signing is enabled by environment variables:
+
+```powershell
+$env:KOENOTE_SIGNTOOL_PATH = "C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\signtool.exe"
+$env:KOENOTE_SIGN_CERT_SHA1 = "<certificate thumbprint>"
+$env:KOENOTE_SIGN_TIMESTAMP_URL = "http://timestamp.digicert.com"
+```
+
+Alternatively use `KOENOTE_SIGN_CERT_PATH` and `KOENOTE_SIGN_CERT_PASSWORD` for a PFX file.
+If signing variables are not set, signing is skipped and the release log records the reason.
+Pass `-RequireCodeSigning` for release/CI builds that must fail instead of producing unsigned artifacts.
+
+Release manifest:
+
+- MSI path
+- SHA256 sidecar path
+- update/release log path
+- product version
+- runtime identifier
+- signing requirement and status
+
+Verify the MSI sidecar before publishing:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNoteArtifactIntegrity.ps1 `
+  -MsiPath artifacts\msi\KoeNote-v0.13.0-win-x64.msi
+```
+
+CI-oriented release verification:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNoteReleaseVerification.ps1 `
+  -MsiPath artifacts\msi\KoeNote-v0.13.0-win-x64.msi
+```
+
+The CI verification command runs the versioning/release tests, verifies the SHA256 sidecar,
+and checks that the release manifest matches the MSI.
 
 ## Uninstall policy
 
@@ -64,14 +109,35 @@ KoeNoteCleanup.exe --quiet --logs --downloads --models --user-data
 KoeNoteCleanup.exe --dry-run --quiet --logs --downloads --models --user-data
 ```
 
+Update recovery options:
+
+```powershell
+KoeNoteCleanup.exe --list-update-backups
+KoeNoteCleanup.exe --restore-update-backup latest --dry-run
+KoeNoteCleanup.exe --restore-update-backup latest
+KoeNoteCleanup.exe --restore-update-backup schema-1-to-14-20260506-160000
+```
+
+Restore saves the current job database, settings, setup state, setup report, and job files under a `pre-restore-*` update backup directory before overwriting them.
+
 ## Smoke test
 
 Run on a clean Windows 11 VM when possible:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNoteMsiSmoke.ps1 `
-  -MsiPath artifacts\msi\KoeNote.msi
+  -MsiPath artifacts\msi\KoeNote-v0.13.0-win-x64.msi
 ```
+
+To test an MSI-to-MSI upgrade on a clean VM:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNoteMsiSmoke.ps1 `
+  -UpgradeFromMsiPath artifacts\msi\KoeNote-v0.13.0-win-x64.msi `
+  -MsiPath artifacts\msi\KoeNote-v0.14.0-win-x64.msi
+```
+
+The upgrade smoke refuses to run when existing KoeNote user data is present unless `-AllowExistingUserData` is passed.
 
 Expected result:
 
@@ -79,6 +145,7 @@ Expected result:
 - `UninstallString` and `QuietUninstallString` use `msiexec`.
 - Install, setup, run, uninstall, and reinstall complete.
 - Reinstall detects existing setup state, job database, job folders, and model storage in the Setup Wizard details panel.
+- Upgrade prompts to close `KoeNote.App.exe` when the app is running during install.
 
 ## Notes
 

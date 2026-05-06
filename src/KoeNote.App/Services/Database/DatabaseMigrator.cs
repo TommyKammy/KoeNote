@@ -24,10 +24,38 @@ internal sealed class DatabaseMigrator
         _migrations = orderedMigrations;
     }
 
+    public int LatestVersion => _migrations.Count == 0 ? 0 : _migrations[^1].Version;
+
+    public IReadOnlySet<int> ReadAppliedVersions(SqliteConnection connection)
+    {
+        EnsureSchemaVersionTable(connection);
+        return ReadAppliedSchemaVersions(connection);
+    }
+
+    public IReadOnlySet<int> ReadExistingAppliedVersions(SqliteConnection connection)
+    {
+        return SchemaVersionTableExists(connection) ? ReadAppliedSchemaVersions(connection) : new HashSet<int>();
+    }
+
+    public void ThrowIfUnsupportedNewerSchema(IReadOnlySet<int> appliedVersions)
+    {
+        var newestAppliedVersion = appliedVersions.Count == 0 ? 0 : appliedVersions.Max();
+        if (newestAppliedVersion > LatestVersion)
+        {
+            throw new InvalidOperationException(
+                $"This KoeNote version supports database schema up to {LatestVersion}, but the existing database is schema {newestAppliedVersion}. Please update KoeNote before opening this data.");
+        }
+    }
+
+    public bool HasPendingMigrations(IReadOnlySet<int> appliedVersions)
+    {
+        return _migrations.Any(migration => !appliedVersions.Contains(migration.Version));
+    }
+
     public void ApplyPendingMigrations(SqliteConnection connection)
     {
         EnsureSchemaVersionTable(connection);
-        var appliedVersions = ReadAppliedVersions(connection);
+        var appliedVersions = ReadAppliedSchemaVersions(connection);
         foreach (var migration in _migrations)
         {
             if (appliedVersions.Contains(migration.Version))
@@ -43,7 +71,7 @@ internal sealed class DatabaseMigrator
         }
     }
 
-    private static HashSet<int> ReadAppliedVersions(SqliteConnection connection)
+    private static HashSet<int> ReadAppliedSchemaVersions(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT version FROM schema_version;";
@@ -68,6 +96,17 @@ internal sealed class DatabaseMigrator
             );
             """;
         command.ExecuteNonQuery();
+    }
+
+    private static bool SchemaVersionTableExists(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'schema_version';
+            """;
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
     private static void RecordAppliedVersion(

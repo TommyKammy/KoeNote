@@ -4,6 +4,8 @@ public sealed record CleanupOptions(
     bool Quiet,
     bool DryRun,
     bool Help,
+    bool ListUpdateBackups,
+    string? RestoreUpdateBackup,
     bool HasExplicitTargets,
     bool RemoveLogs,
     bool RemoveDownloads,
@@ -16,6 +18,8 @@ public sealed record CleanupOptions(
 
         Usage:
           KoeNoteCleanup.exe [--quiet] [--dry-run] [--logs] [--downloads] [--models] [--machine-models] [--user-data]
+          KoeNoteCleanup.exe --list-update-backups
+          KoeNoteCleanup.exe --restore-update-backup <backup-name-or-path> [--dry-run]
 
         既定値:
           通常起動では確認ウィンドウを表示します。
@@ -31,6 +35,7 @@ public sealed record CleanupOptions(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var quiet = set.Contains("--quiet") || set.Contains("/quiet") || set.Contains("/qn");
+        var restoreUpdateBackup = ReadOptionValue(args, "--restore-update-backup");
         var explicitTarget = set.Contains("--logs") ||
             set.Contains("--downloads") ||
             set.Contains("--models") ||
@@ -41,12 +46,35 @@ public sealed record CleanupOptions(
             Quiet: quiet,
             DryRun: set.Contains("--dry-run"),
             Help: set.Contains("--help") || set.Contains("-h") || set.Contains("/?"),
+            ListUpdateBackups: set.Contains("--list-update-backups"),
+            RestoreUpdateBackup: restoreUpdateBackup,
             HasExplicitTargets: explicitTarget,
             RemoveLogs: set.Contains("--logs") || (quiet && !explicitTarget),
             RemoveDownloads: set.Contains("--downloads") || (quiet && !explicitTarget),
             RemoveUserModels: set.Contains("--models"),
             RemoveMachineModels: set.Contains("--machine-models"),
             RemoveUserData: set.Contains("--user-data"));
+    }
+
+    private static string? ReadOptionValue(string[] args, string optionName)
+    {
+        for (var index = 0; index < args.Length; index++)
+        {
+            if (!string.Equals(args[index], optionName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var valueIndex = index + 1;
+            if (valueIndex >= args.Length || args[valueIndex].StartsWith("-", StringComparison.Ordinal))
+            {
+                throw new ArgumentException($"{optionName} requires a value.");
+            }
+
+            return args[valueIndex];
+        }
+
+        return null;
     }
 
     public CleanupPlan ToPlan()

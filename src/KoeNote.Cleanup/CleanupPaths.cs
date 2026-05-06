@@ -25,6 +25,8 @@ public sealed record CleanupPaths(
 
     public string PythonPackages => Path.Combine(LocalAppDataRoot, "KoeNote", "python-packages");
 
+    public string UpdateBackups => Path.Combine(LocalAppDataRoot, "KoeNote", "backups", "updates");
+
     public string UserModels => Path.Combine(LocalAppDataRoot, "KoeNote", "models");
 
     public string MachineModels => Path.Combine(ProgramDataRoot, "KoeNote", "models");

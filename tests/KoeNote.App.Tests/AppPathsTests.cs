@@ -31,6 +31,7 @@ public sealed class AppPathsTests
 
         Assert.Equal(paths.UserModels, paths.DefaultModelStorageRoot);
         Assert.True(Directory.Exists(paths.UserModels));
+        Assert.True(Directory.Exists(paths.UpdateBackups));
         Assert.False(Directory.Exists(paths.MachineModels));
     }
 
@@ -51,6 +52,7 @@ public sealed class AppPathsTests
 
         Assert.Equal(paths.MachineModels, paths.DefaultModelStorageRoot);
         Assert.True(Directory.Exists(paths.UserModels));
+        Assert.True(Directory.Exists(paths.UpdateBackups));
         Assert.False(Directory.Exists(paths.MachineModels));
     }
 
