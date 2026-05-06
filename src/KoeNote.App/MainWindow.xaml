@@ -8,7 +8,7 @@
         Title="KoeNote" Height="820" Width="1360" MinHeight="720" MinWidth="1080"
         Icon="pack://application:,,,/Resources/AppIcon.ico"
         Background="#F8F9FA"
-        FontFamily="Yu Gothic UI"
+        FontFamily="Meiryo UI"
         AllowDrop="True"
         DragOver="OnDragOverAudioFiles"
         Drop="OnDropAudioFiles"
@@ -26,25 +26,35 @@
 
         <controls:HeaderToolbar Grid.Row="0" />
 
-        <Grid Grid.Row="1"
-              Grid.RowSpan="2"
-              Margin="10,10,10,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="4*" MinWidth="176" />
-                <ColumnDefinition Width="16*" MinWidth="564" />
-                <ColumnDefinition Width="5*" MinWidth="240" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" MinHeight="420" />
-                <RowDefinition Height="144" MinHeight="132" />
-            </Grid.RowDefinitions>
+        <ScrollViewer x:Name="MainContentScrollViewer"
+                      Grid.Row="1"
+                      Grid.RowSpan="2"
+                      Margin="10,10,10,10"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <Grid Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
+                  Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}">
+                <Grid.LayoutTransform>
+                    <ScaleTransform ScaleX="{Binding MainContentZoomScale}"
+                                    ScaleY="{Binding MainContentZoomScale}" />
+                </Grid.LayoutTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="4*" MinWidth="176" />
+                    <ColumnDefinition Width="16*" MinWidth="564" />
+                    <ColumnDefinition Width="5*" MinWidth="240" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" MinHeight="420" />
+                    <RowDefinition Height="144" MinHeight="132" />
+                </Grid.RowDefinitions>
 
-            <controls:JobListPanel Grid.RowSpan="2" Grid.Column="0" Margin="0,0,8,0" />
-            <controls:TranscriptPanel Grid.Column="1" Grid.Row="0" Margin="0,0,8,8" />
-            <controls:ReviewPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,8" />
-            <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="1" Margin="0,0,8,0" />
-            <controls:StageProgressPanel Grid.Column="2" Grid.Row="1" />
-        </Grid>
+                <controls:JobListPanel Grid.RowSpan="2" Grid.Column="0" Margin="0,0,8,0" />
+                <controls:TranscriptPanel Grid.Column="1" Grid.Row="0" Margin="0,0,8,8" />
+                <controls:ReviewPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,8" />
+                <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="1" Margin="0,0,8,0" />
+                <controls:StageProgressPanel Grid.Column="2" Grid.Row="1" />
+            </Grid>
+        </ScrollViewer>
 
         <controls:StatusBarPanel Grid.Row="3" />
 

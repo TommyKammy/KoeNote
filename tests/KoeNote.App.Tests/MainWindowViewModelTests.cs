@@ -24,6 +24,29 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ZoomCommands_AdjustAndPersistMainContentZoom()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        var first = new MainWindowViewModel(paths);
+
+        Assert.Equal(1.0, first.MainContentZoomScale);
+        Assert.Equal("100%", first.MainContentZoomPercentText);
+
+        first.ZoomInCommand.Execute(null);
+        Assert.Equal(1.1, first.MainContentZoomScale, 3);
+        Assert.Equal("110%", first.MainContentZoomPercentText);
+        Assert.True(first.ZoomOutCommand.CanExecute(null));
+
+        var second = new MainWindowViewModel(paths);
+        Assert.Equal(1.1, second.MainContentZoomScale, 3);
+
+        second.ResetZoomCommand.Execute(null);
+        Assert.Equal(1.0, second.MainContentZoomScale);
+        Assert.False(second.ResetZoomCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task SelectedAsrEngine_RestoresAfterRecreatingViewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

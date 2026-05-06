@@ -29,12 +29,16 @@
         </Style>
         <Style x:Key="ReviewApplyButton" TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
             <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Height" Value="56" />
             <Setter Property="Padding" Value="14,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style x:Key="ReviewSecondaryButton" TargetType="Button" BasedOn="{StaticResource OutlineNeutralButton}">
-            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="Height" Value="56" />
             <Setter Property="Padding" Value="12,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
     </UserControl.Resources>
 
@@ -139,7 +143,7 @@
 
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.35*" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />

@@ -25,6 +25,9 @@ public sealed record AsrEngineOption(string EngineId, string DisplayName);
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private const string DefaultSelectableAsrEngineId = "kotoba-whisper-v2.2-faster";
+    private const double MinMainContentZoomScale = 0.9;
+    private const double MaxMainContentZoomScale = 1.5;
+    private static readonly double[] MainContentZoomSteps = [0.9, 1.0, 1.1, 1.25, 1.5];
 
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
@@ -53,6 +56,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateDownloadService _updateDownloadService;
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
     private readonly IUpdateHistoryService _updateHistoryService;
+    private readonly UiPreferencesService _uiPreferencesService;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
@@ -122,6 +126,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _enableReviewStage = true;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
+    private double _mainContentZoomScale = 1.0;
     private bool _isSegmentInlineEditActive;
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
@@ -179,6 +184,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateDownloadService = services.UpdateDownloadService;
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _updateHistoryService = services.UpdateHistoryService;
+        _uiPreferencesService = new UiPreferencesService(paths);
+        _mainContentZoomScale = NormalizeZoomScale(_uiPreferencesService.Load().MainContentZoomScale);
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -299,6 +306,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt), CanExportSelectedJob);
         ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
+        ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
+        ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);
+        ResetZoomCommand = new RelayCommand(ResetZoomAsync, () => Math.Abs(MainContentZoomScale - 1.0) > 0.001);
         RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
         CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
         DownloadUpdateCommand = new RelayCommand(DownloadUpdateAsync, CanDownloadUpdate);
@@ -638,6 +648,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ExportDocxCommand { get; }
 
     public ICommand OpenExportFolderCommand { get; }
+
+    public ICommand ZoomOutCommand { get; }
+
+    public ICommand ZoomInCommand { get; }
+
+    public ICommand ResetZoomCommand { get; }
 
     public ICommand RunDatabaseMaintenanceCommand { get; }
 
@@ -1308,6 +1324,30 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         set => SetField(ref _includeExportTimestamps, value);
     }
 
+    public double MainContentZoomScale
+    {
+        get => _mainContentZoomScale;
+        private set
+        {
+            var normalized = NormalizeZoomScale(value);
+            if (Math.Abs(_mainContentZoomScale - normalized) < 0.001)
+            {
+                return;
+            }
+
+            _mainContentZoomScale = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MainContentZoomPercentText));
+            OnPropertyChanged(nameof(MainContentZoomToolTip));
+            UpdateZoomCommandStates();
+            _uiPreferencesService.Save(new UiPreferences(_mainContentZoomScale));
+        }
+    }
+
+    public string MainContentZoomPercentText => $"{MainContentZoomScale * 100:0}%";
+
+    public string MainContentZoomToolTip => $"表示倍率 {MainContentZoomPercentText}";
+
     public string AsrContextText
     {
         get => _asrContextText;
@@ -1489,5 +1529,73 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? assembly.GetName().Version?.ToString()
             ?? "0.0.0";
+    }
+
+    private Task ZoomOutAsync()
+    {
+        MainContentZoomScale = GetPreviousZoomStep(MainContentZoomScale);
+        return Task.CompletedTask;
+    }
+
+    private Task ZoomInAsync()
+    {
+        MainContentZoomScale = GetNextZoomStep(MainContentZoomScale);
+        return Task.CompletedTask;
+    }
+
+    private Task ResetZoomAsync()
+    {
+        MainContentZoomScale = 1.0;
+        return Task.CompletedTask;
+    }
+
+    private bool CanZoomOut()
+    {
+        return MainContentZoomScale > MinMainContentZoomScale + 0.001;
+    }
+
+    private bool CanZoomIn()
+    {
+        return MainContentZoomScale < MaxMainContentZoomScale - 0.001;
+    }
+
+    private void UpdateZoomCommandStates()
+    {
+        if (ZoomOutCommand is RelayCommand zoomOutCommand)
+        {
+            zoomOutCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ZoomInCommand is RelayCommand zoomInCommand)
+        {
+            zoomInCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ResetZoomCommand is RelayCommand resetCommand)
+        {
+            resetCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static double GetPreviousZoomStep(double current)
+    {
+        var normalized = NormalizeZoomScale(current);
+        return MainContentZoomSteps.LastOrDefault(step => step < normalized - 0.001, MinMainContentZoomScale);
+    }
+
+    private static double GetNextZoomStep(double current)
+    {
+        var normalized = NormalizeZoomScale(current);
+        return MainContentZoomSteps.FirstOrDefault(step => step > normalized + 0.001, MaxMainContentZoomScale);
+    }
+
+    private static double NormalizeZoomScale(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 1.0;
+        }
+
+        return Math.Clamp(value, MinMainContentZoomScale, MaxMainContentZoomScale);
     }
 }
