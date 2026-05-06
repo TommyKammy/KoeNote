@@ -138,6 +138,33 @@ public sealed class TranscriptEditService(AppPaths paths)
         return true;
     }
 
+    public bool UndoLastSegmentEdit(string jobId, string segmentId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("Job id is required.", nameof(jobId));
+        }
+
+        if (string.IsNullOrWhiteSpace(segmentId))
+        {
+            throw new ArgumentException("Segment id is required.", nameof(segmentId));
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        var operation = LoadLastSegmentEditOperation(connection, transaction, jobId, segmentId);
+        if (operation is null)
+        {
+            return false;
+        }
+
+        UndoSegmentEdit(connection, transaction, operation);
+        DeleteHistory(connection, transaction, operation.OperationId);
+        transaction.Commit();
+        return true;
+    }
+
     internal static void InsertHistory<TBefore, TAfter>(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -254,6 +281,42 @@ public sealed class TranscriptEditService(AppPaths paths)
         {
             command.Parameters.AddWithValue("$job_id", jobId);
         }
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        return new OperationSnapshot(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6));
+    }
+
+    private static OperationSnapshot? LoadLastSegmentEditOperation(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+            FROM review_operation_history
+            WHERE job_id = $job_id
+              AND segment_id = $segment_id
+              AND operation_type = 'segment_edit'
+            ORDER BY created_at DESC, operation_id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
 
         using var reader = command.ExecuteReader();
         if (!reader.Read())

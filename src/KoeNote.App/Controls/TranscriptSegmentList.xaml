@@ -13,6 +13,7 @@
                     <ColumnDefinition Width="92" />
                     <ColumnDefinition Width="96" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="72" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="時間" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="1" Text="話者" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
@@ -27,18 +28,115 @@
                  ItemContainerStyle="{StaticResource SegmentListBoxItem}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border Padding="12,17" Background="Transparent" BorderBrush="#EEF1F3" BorderThickness="0,0,0,1">
+                    <DataTemplate.Resources>
+                        <Style x:Key="InlineDisplayTextStyle" TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                        <Style x:Key="InlineEditorStyle" TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                        <Style x:Key="InlineEditorButtonStyle" TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
+                                        <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataTemplate.Resources>
+
+                    <Border Padding="12,14"
+                            Background="Transparent"
+                            BorderBrush="#EEF1F3"
+                            BorderThickness="0,0,0,1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="92" />
                                 <ColumnDefinition Width="96" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="72" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Start}" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Top" />
-                            <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="12" Padding="9,4" HorizontalAlignment="Left" VerticalAlignment="Top">
+
+                            <TextBlock Text="{Binding Start}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       VerticalAlignment="Top" />
+                            <Border Grid.Column="1"
+                                    Background="#F1F5F9"
+                                    CornerRadius="12"
+                                    Padding="9,4"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top">
                                 <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
                             </Border>
-                            <TextBlock Grid.Column="2" Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None" FontSize="14" LineHeight="22" />
+
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Text}"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="None"
+                                       FontSize="14"
+                                       LineHeight="22"
+                                       Style="{StaticResource InlineDisplayTextStyle}"
+                                       MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
+                            <Grid Grid.Column="2" Style="{StaticResource InlineEditorStyle}">
+                                <TextBox Tag="InlineSegmentEditor"
+                                         Text="{Binding DataContext.SelectedSegmentEditText, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MinHeight="54"
+                                         Padding="10,8"
+                                         VerticalContentAlignment="Top"
+                                         LostKeyboardFocus="OnInlineSegmentEditorLostKeyboardFocus"
+                                         ToolTip="選択中のセグメントを編集します。別の場所をクリックすると自動保存されます。" />
+                            </Grid>
+
+                            <StackPanel Grid.Column="3"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top">
+                                <Button Width="32"
+                                        Height="32"
+                                        Padding="0"
+                                        Margin="6,0,0,0"
+                                        ToolTip="セグメントを編集"
+                                        Command="{Binding DataContext.BeginSegmentInlineEditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
+                                </Button>
+                                <Button Width="32"
+                                        Height="32"
+                                        Padding="0"
+                                        Margin="6,0,0,0"
+                                        Tag="InlineSegmentRevertButton"
+                                        ToolTip="編集前に戻す"
+                                        PreviewMouseDown="OnInlineSegmentRevertPreviewMouseDown"
+                                        Command="{Binding DataContext.RevertSegmentEditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>

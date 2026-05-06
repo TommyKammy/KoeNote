@@ -1,22 +1,123 @@
+using KoeNote.App.Models;
+
 namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private Task SaveSegmentEditAsync()
+    private Task BeginSegmentInlineEditAsync(TranscriptSegmentPreview? segment)
     {
-        if (SelectedJob is null || SelectedSegment is null)
+        if (!CanBeginSegmentInlineEdit(segment))
         {
             return Task.CompletedTask;
         }
 
+        SelectedSegment = segment;
+        if (!string.Equals(SelectedSegment?.SegmentId, segment!.SegmentId, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        SelectedSegmentEditText = segment!.Text;
+        IsSegmentInlineEditActive = true;
+        return Task.CompletedTask;
+    }
+
+    private Task SaveSegmentEditAsync()
+    {
+        if (SelectedSegment is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        CommitSegmentInlineEdit(SelectedSegment, reloadSegments: true);
+        return Task.CompletedTask;
+    }
+
+    private Task SaveSegmentInlineEditAsync()
+    {
+        return SaveSegmentEditAsync();
+    }
+
+    private Task CancelSegmentInlineEditAsync()
+    {
+        if (SelectedSegment is not null)
+        {
+            SelectedSegmentEditText = SelectedSegment.Text;
+        }
+
+        IsSegmentInlineEditActive = false;
+        return Task.CompletedTask;
+    }
+
+    private Task RevertSegmentEditAsync(TranscriptSegmentPreview? segment)
+    {
+        if (SelectedJob is null || segment is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (IsSegmentInlineEditActive &&
+            SelectedSegment is not null &&
+            string.Equals(SelectedSegment.SegmentId, segment.SegmentId, StringComparison.Ordinal))
+        {
+            SelectedSegmentEditText = segment.Text;
+            IsSegmentInlineEditActive = false;
+            return Task.CompletedTask;
+        }
+
+        if (_transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId))
+        {
+            LatestLog = "選択セグメントの直近編集を戻しました。";
+            ReloadSegmentsForSelectedJob(segment.SegmentId);
+        }
+        else
+        {
+            LatestLog = "このセグメントに戻せる編集履歴はありません。";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private bool CommitSegmentInlineEdit(TranscriptSegmentPreview segment, bool reloadSegments)
+    {
+        if (SelectedJob is null || string.IsNullOrWhiteSpace(SelectedSegmentEditText))
+        {
+            return false;
+        }
+
+        if (string.Equals(SelectedSegmentEditText, segment.Text, StringComparison.Ordinal))
+        {
+            IsSegmentInlineEditActive = false;
+            return true;
+        }
+
         _transcriptEditService.ApplySegmentEdit(
             SelectedJob.JobId,
-            SelectedSegment.SegmentId,
+            segment.SegmentId,
             SelectedSegmentEditText);
 
+        IsSegmentInlineEditActive = false;
         LatestLog = "セグメント本文を手修正しました。元の文字起こしは保持されています。";
-        ReloadSegmentsForSelectedJob(SelectedSegment.SegmentId);
-        return Task.CompletedTask;
+        if (reloadSegments)
+        {
+            ReloadSegmentsForSelectedJob(segment.SegmentId);
+        }
+        else
+        {
+            ReplaceEditedSegmentPreview(segment, SelectedSegmentEditText);
+            FilteredSegments.Refresh();
+        }
+
+        return true;
+    }
+
+    private void ReplaceEditedSegmentPreview(TranscriptSegmentPreview segment, string text)
+    {
+        var index = Segments.IndexOf(segment);
+        if (index >= 0)
+        {
+            Segments[index] = segment with { Text = text, FinalText = text };
+        }
     }
 
     private Task SaveSpeakerAliasAsync()
@@ -68,28 +169,37 @@ public sealed partial class MainWindowViewModel
         }
 
         var previews = _transcriptSegmentRepository.ReadPreviews(SelectedJob.JobId);
-        Segments.Clear();
-        if (previews.Count == 0)
+        _isReloadingSegments = true;
+        try
         {
-            SelectedSegment = null;
+            Segments.Clear();
+            if (previews.Count == 0)
+            {
+                IsSegmentInlineEditActive = false;
+                SelectedSegment = null;
+                RefreshSpeakerFilters();
+                FilteredSegments.Refresh();
+                UpdateExportCommandStates();
+                UpdatePlaybackCommandStates();
+                return;
+            }
+
+            foreach (var preview in previews)
+            {
+                Segments.Add(preview);
+            }
+
             RefreshSpeakerFilters();
             FilteredSegments.Refresh();
+            SelectedSegment = Segments.FirstOrDefault(segment => segment.SegmentId == preferredSegmentId)
+                ?? Segments.FirstOrDefault();
             UpdateExportCommandStates();
             UpdatePlaybackCommandStates();
-            return;
         }
-
-        foreach (var preview in previews)
+        finally
         {
-            Segments.Add(preview);
+            _isReloadingSegments = false;
         }
-
-        RefreshSpeakerFilters();
-        FilteredSegments.Refresh();
-        SelectedSegment = Segments.FirstOrDefault(segment => segment.SegmentId == preferredSegmentId)
-            ?? Segments.FirstOrDefault();
-        UpdateExportCommandStates();
-        UpdatePlaybackCommandStates();
     }
 
     private bool CanEditSelectedSegment()
@@ -98,6 +208,20 @@ public sealed partial class MainWindowViewModel
             && SelectedSegment is not null
             && !IsRunInProgress
             && !string.IsNullOrWhiteSpace(SelectedSegmentEditText);
+    }
+
+    private bool CanBeginSegmentInlineEdit(TranscriptSegmentPreview? segment)
+    {
+        return SelectedJob is not null
+            && segment is not null
+            && !IsRunInProgress;
+    }
+
+    private bool CanRevertSegmentEdit(TranscriptSegmentPreview? segment)
+    {
+        return SelectedJob is not null
+            && segment is not null
+            && !IsRunInProgress;
     }
 
     private bool CanEditSelectedSpeaker()
@@ -114,6 +238,26 @@ public sealed partial class MainWindowViewModel
         if (SaveSegmentEditCommand is RelayCommand saveSegmentCommand)
         {
             saveSegmentCommand.RaiseCanExecuteChanged();
+        }
+
+        if (BeginSegmentInlineEditCommand is RelayCommand<TranscriptSegmentPreview> beginInlineCommand)
+        {
+            beginInlineCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SaveSegmentInlineEditCommand is RelayCommand saveInlineCommand)
+        {
+            saveInlineCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CancelSegmentInlineEditCommand is RelayCommand cancelInlineCommand)
+        {
+            cancelInlineCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RevertSegmentEditCommand is RelayCommand<TranscriptSegmentPreview> revertSegmentCommand)
+        {
+            revertSegmentCommand.RaiseCanExecuteChanged();
         }
 
         if (SaveSpeakerAliasCommand is RelayCommand saveSpeakerCommand)

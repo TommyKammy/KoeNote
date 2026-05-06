@@ -448,8 +448,9 @@ public sealed partial class MainWindowViewModel
     private bool HasPendingSelectedSegmentEdit()
     {
         return SelectedSegment is not null &&
+            (IsSegmentInlineEditActive ||
             (!string.Equals(SelectedSegmentEditText, SelectedSegment.Text, StringComparison.Ordinal) ||
-                !string.Equals(SelectedSpeakerAlias, SelectedSegment.Speaker, StringComparison.Ordinal));
+                !string.Equals(SelectedSpeakerAlias, SelectedSegment.Speaker, StringComparison.Ordinal)));
     }
 
     private void StopAudioPlayback()

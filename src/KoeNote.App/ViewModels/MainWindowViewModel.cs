@@ -121,6 +121,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _enableReviewStage = true;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
+    private bool _isSegmentInlineEditActive;
+    private bool _isReloadingSegments;
     private bool _isRunInProgress;
     private string _reviewIssueType = "候補なし";
     private string _originalText = string.Empty;
@@ -281,6 +283,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SelectNextDraftCommand = new RelayCommand(SelectNextDraftAsync, CanSelectNextDraft);
         FocusSelectedDraftSegmentCommand = new RelayCommand(FocusSelectedDraftSegmentAsync, () => SelectedCorrectionDraft is not null);
         SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
+        BeginSegmentInlineEditCommand = new RelayCommand<TranscriptSegmentPreview>(BeginSegmentInlineEditAsync, CanBeginSegmentInlineEdit);
+        SaveSegmentInlineEditCommand = new RelayCommand(SaveSegmentInlineEditAsync, CanEditSelectedSegment);
+        CancelSegmentInlineEditCommand = new RelayCommand(CancelSegmentInlineEditAsync, () => IsSegmentInlineEditActive);
+        RevertSegmentEditCommand = new RelayCommand<TranscriptSegmentPreview>(RevertSegmentEditAsync, CanRevertSegmentEdit);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
         ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
@@ -597,6 +603,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand SaveSegmentEditCommand { get; }
 
+    public ICommand BeginSegmentInlineEditCommand { get; }
+
+    public ICommand SaveSegmentInlineEditCommand { get; }
+
+    public ICommand CancelSegmentInlineEditCommand { get; }
+
+    public ICommand RevertSegmentEditCommand { get; }
+
     public ICommand SaveSpeakerAliasCommand { get; }
 
     public ICommand UndoLastOperationCommand { get; }
@@ -658,6 +672,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedSegment;
         set
         {
+            if (!_isReloadingSegments &&
+                _isSegmentInlineEditActive &&
+                _selectedSegment is { } previousSegment &&
+                value is not null &&
+                !string.Equals(previousSegment.SegmentId, value.SegmentId, StringComparison.Ordinal))
+            {
+                if (!CommitSegmentInlineEdit(previousSegment, reloadSegments: false))
+                {
+                    return;
+                }
+            }
+
             if (!SetField(ref _selectedSegment, value))
             {
                 return;
@@ -665,6 +691,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
             if (value is null)
             {
+                IsSegmentInlineEditActive = false;
                 SelectedSegmentEditText = string.Empty;
                 SelectedSpeakerAlias = string.Empty;
                 UpdateSegmentEditCommandStates();
@@ -969,6 +996,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(DetailPanelTitle));
                 SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex;
+            }
+        }
+    }
+
+    public bool IsSegmentInlineEditActive
+    {
+        get => _isSegmentInlineEditActive;
+        private set
+        {
+            if (SetField(ref _isSegmentInlineEditActive, value))
+            {
+                UpdateSegmentEditCommandStates();
             }
         }
     }

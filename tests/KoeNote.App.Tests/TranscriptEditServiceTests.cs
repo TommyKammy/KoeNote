@@ -89,6 +89,39 @@ public sealed class TranscriptEditServiceTests
         AssertSegment(paths, "job-002", "segment-002", expectedFinalText: null, expectedReviewState: "none");
     }
 
+    [Fact]
+    public void UndoLastSegmentEdit_RestoresOnlyTargetSegmentEdit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "first"),
+            new TranscriptSegment("segment-002", "job-001", 1, 2, "Speaker_1", "second")
+        ]);
+        var service = new TranscriptEditService(paths);
+        service.ApplySegmentEdit("job-001", "segment-001", "first edited");
+        service.ApplySegmentEdit("job-001", "segment-002", "second edited");
+
+        Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
+
+        AssertSegment(paths, "job-001", "segment-001", expectedFinalText: null, expectedReviewState: "none");
+        AssertSegment(paths, "job-001", "segment-002", expectedFinalText: "second edited", expectedReviewState: "manually_edited");
+
+        Assert.True(service.UndoLast("job-001"));
+        AssertSegment(paths, "job-001", "segment-002", expectedFinalText: null, expectedReviewState: "none");
+    }
+
+    [Fact]
+    public void UndoLastSegmentEdit_ReturnsFalseWhenSegmentHasNoEditHistory()
+    {
+        var paths = ArrangeSegment();
+
+        Assert.False(new TranscriptEditService(paths).UndoLastSegmentEdit("job-001", "segment-001"));
+    }
+
     private static AppPaths ArrangeSegment()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

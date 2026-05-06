@@ -1047,6 +1047,196 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void InlineSegmentEditCommand_ActivatesAndCancelRestoresSegmentText()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", @"C:\audio\meeting.wav", "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        var segment = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        viewModel.Segments.Add(segment);
+
+        Assert.True(viewModel.BeginSegmentInlineEditCommand.CanExecute(segment));
+        viewModel.BeginSegmentInlineEditCommand.Execute(segment);
+
+        Assert.True(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal(segment, viewModel.SelectedSegment);
+        Assert.Equal("first", viewModel.SelectedSegmentEditText);
+
+        viewModel.SelectedSegmentEditText = "edited";
+        viewModel.CancelSegmentInlineEditCommand.Execute(null);
+
+        Assert.False(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal("first", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
+    public void PlaybackAutoScroll_DoesNotReplaceActiveInlineSegmentEdit()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", @"C:\audio\meeting.wav", "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+        viewModel.PlaybackPositionSeconds = 6;
+
+        Assert.True(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("first", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
+    public void InlineSegmentEdit_AutoSavesWhenSelectingAnotherSegment()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        var repository = new TranscriptSegmentRepository(paths);
+        repository.SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first"),
+            new TranscriptSegment("segment-002", job.JobId, 5, 10, "Speaker_1", "second")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var first = viewModel.Segments.Single(segment => segment.SegmentId == "segment-001");
+        var second = viewModel.Segments.Single(segment => segment.SegmentId == "segment-002");
+
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedSegmentEditText = "edited first";
+        viewModel.SelectedSegment = second;
+
+        Assert.False(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("edited first", repository.ReadPreviews(job.JobId).Single(segment => segment.SegmentId == "segment-001").Text);
+    }
+
+    [Fact]
+    public void InlineSegmentEdit_DoesNotChangeSelectionWhenAutoSaveCannotCommit()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", @"C:\audio\meeting.wav", "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedSegmentEditText = "   ";
+        viewModel.SelectedSegment = second;
+
+        Assert.True(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("   ", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
+    public void InlineSegmentEdit_DoesNotOverwriteTextWhenBeginEditCannotChangeSelection()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", @"C:\audio\meeting.wav", "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        var first = new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5);
+        var second = new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10);
+        viewModel.Segments.Add(first);
+        viewModel.Segments.Add(second);
+
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedSegmentEditText = "   ";
+        viewModel.BeginSegmentInlineEditCommand.Execute(second);
+
+        Assert.True(viewModel.IsSegmentInlineEditActive);
+        Assert.Equal("segment-001", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal("   ", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
+    public void RevertSegmentEditCommand_RestoresCommittedSegmentEdit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        var repository = new TranscriptSegmentRepository(paths);
+        repository.SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first")
+        ]);
+        new TranscriptEditService(paths).ApplySegmentEdit(job.JobId, "segment-001", "edited first");
+        var viewModel = new MainWindowViewModel(paths);
+        var segment = Assert.Single(viewModel.Segments);
+
+        Assert.Equal("edited first", segment.Text);
+        Assert.True(viewModel.RevertSegmentEditCommand.CanExecute(segment));
+        viewModel.RevertSegmentEditCommand.Execute(segment);
+
+        Assert.Equal("first", repository.ReadPreviews(job.JobId).Single().Text);
+        Assert.Equal("first", viewModel.SelectedSegment?.Text);
+        Assert.Contains("戻しました", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunSelectedJobCommand_IsEnabledWhenJobAndRuntimeAssetsAreReady()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
