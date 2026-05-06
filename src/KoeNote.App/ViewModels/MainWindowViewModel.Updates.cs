@@ -111,10 +111,12 @@ public sealed partial class MainWindowViewModel
         try
         {
             var result = await _updateCheckService.CheckAsync();
+            RecordUpdateHistory("check_startup_completed", result.CurrentVersion, result.Message);
             ApplyUpdateCheckResult(result, showUpToDate: false);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
+            RecordUpdateHistory("check_startup_failed", null, exception.Message);
             LatestLog = $"Update check skipped: {exception.Message}";
         }
     }
@@ -128,13 +130,16 @@ public sealed partial class MainWindowViewModel
 
         IsUpdateCheckInProgress = true;
         LatestLog = "Checking for KoeNote updates...";
+        RecordUpdateHistory("check_started", null, "Manual update check started.");
         try
         {
             var result = await _updateCheckService.CheckAsync();
+            RecordUpdateHistory("check_completed", result.CurrentVersion, result.Message, result.LatestRelease);
             ApplyUpdateCheckResult(result, showUpToDate: true);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
+            RecordUpdateHistory("check_failed", null, exception.Message);
             _availableUpdate = null;
             ClearVerifiedUpdateInstallerState();
             UpdateNotificationTitle = "Update check failed";
@@ -178,6 +183,7 @@ public sealed partial class MainWindowViewModel
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = "Downloading update...";
         LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update...";
+        RecordUpdateHistory("download_started", _availableUpdate.Version, "Update download started.");
         try
         {
             var progress = new Progress<UpdateDownloadProgress>(downloadProgress =>
@@ -190,9 +196,11 @@ public sealed partial class MainWindowViewModel
             UpdateNotificationTitle = $"Update ready: KoeNote {AvailableUpdateVersion}";
             UpdateNotificationMessage = "The installer has been downloaded and verified. Finish current work before installing it.";
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
+            RecordUpdateHistory("download_verified", _availableUpdate.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or UnauthorizedAccessException or InvalidOperationException or TaskCanceledException)
         {
+            RecordUpdateHistory("download_failed", _availableUpdate.Version, exception.Message);
             UpdateDownloadProgressText = string.Empty;
             UpdateNotificationTitle = "Update download failed";
             UpdateNotificationMessage = exception.Message;
@@ -223,11 +231,13 @@ public sealed partial class MainWindowViewModel
             ClearVerifiedUpdateInstallerState();
             UpdateDownloadProgressText = $"Installer started: {result.InstallerPath}";
             UpdateNotificationTitle = "Update installer started";
-            UpdateNotificationMessage = "Follow the installer prompts to complete the update.";
+            UpdateNotificationMessage = $"Follow the installer prompts to complete the update. Signature: {result.SignerSubject}";
             LatestLog = $"Update installer started: {result.InstallerPath}";
+            RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Signature: {result.SignerSubject}", result.InstallerPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
+            RecordUpdateHistory("install_failed", AvailableUpdateVersion, exception.Message, VerifiedUpdateInstallerPath);
             UpdateNotificationTitle = "Update installer could not start";
             UpdateNotificationMessage = exception.Message;
             LatestLog = $"Update installer launch failed: {exception.Message}";
@@ -329,6 +339,37 @@ public sealed partial class MainWindowViewModel
         if (InstallVerifiedUpdateCommand is RelayCommand installCommand)
         {
             installCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RecordUpdateHistory(
+        string eventName,
+        string? version,
+        string message,
+        LatestReleaseInfo? release = null)
+    {
+        RecordUpdateHistory(eventName, release?.Version ?? version, message, null, release?.Sha256);
+    }
+
+    private void RecordUpdateHistory(
+        string eventName,
+        string? version,
+        string message,
+        string? installerPath,
+        string? sha256 = null)
+    {
+        try
+        {
+            _updateHistoryService.Record(new UpdateHistoryEntry(
+                DateTimeOffset.Now,
+                eventName,
+                message,
+                version,
+                installerPath,
+                sha256));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
         }
     }
 

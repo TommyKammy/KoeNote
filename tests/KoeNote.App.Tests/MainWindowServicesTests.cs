@@ -26,6 +26,7 @@ public sealed class MainWindowServicesTests
         Assert.NotNull(services.UpdateCheckService);
         Assert.NotNull(services.UpdateDownloadService);
         Assert.NotNull(services.UpdateInstallerLauncher);
+        Assert.NotNull(services.UpdateHistoryService);
         Assert.NotEmpty(services.ToolStatusService.GetStatusItems());
     }
 }

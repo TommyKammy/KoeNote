@@ -51,6 +51,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateCheckService _updateCheckService;
     private readonly IUpdateDownloadService _updateDownloadService;
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
+    private readonly IUpdateHistoryService _updateHistoryService;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
@@ -173,6 +174,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateCheckService = services.UpdateCheckService;
         _updateDownloadService = services.UpdateDownloadService;
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
+        _updateHistoryService = services.UpdateHistoryService;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {

@@ -1247,7 +1247,7 @@ public sealed class MainWindowViewModelTests
         public UpdateInstallerLaunchResult Launch(string installerPath)
         {
             StartedInstallerPath = installerPath;
-            return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now);
+            return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now, "CN=KoeNote Test");
         }
     }
 }

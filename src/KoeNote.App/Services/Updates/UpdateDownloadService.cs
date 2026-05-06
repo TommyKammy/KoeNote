@@ -20,8 +20,13 @@ public interface IUpdateDownloadService
         CancellationToken cancellationToken = default);
 }
 
-public sealed class UpdateDownloadService(HttpClient httpClient, AppPaths paths) : IUpdateDownloadService
+public sealed class UpdateDownloadService(
+    HttpClient httpClient,
+    AppPaths paths,
+    IUpdateDownloadCleanupService? cleanupService = null) : IUpdateDownloadService
 {
+    private readonly IUpdateDownloadCleanupService _cleanupService = cleanupService ?? new UpdateDownloadCleanupService(paths);
+
     public async Task<UpdateDownloadResult> DownloadAndVerifyAsync(
         LatestReleaseInfo release,
         IProgress<UpdateDownloadProgress>? progress = null,
@@ -34,6 +39,7 @@ public sealed class UpdateDownloadService(HttpClient httpClient, AppPaths paths)
         }
 
         Directory.CreateDirectory(paths.UpdateDownloads);
+        _cleanupService.CleanupOldDownloads();
 
         var fileName = GetSafeMsiFileName(release);
         var finalPath = Path.Combine(paths.UpdateDownloads, fileName);

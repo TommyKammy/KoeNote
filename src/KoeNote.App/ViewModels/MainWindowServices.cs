@@ -40,6 +40,7 @@ public sealed record MainWindowServices(
     IUpdateCheckService UpdateCheckService,
     IUpdateDownloadService UpdateDownloadService,
     IUpdateInstallerLauncher UpdateInstallerLauncher,
+    IUpdateHistoryService UpdateHistoryService,
     DomainPresetImportService DomainPresetImportService)
 {
     public static MainWindowServices Create(AppPaths paths)
@@ -99,6 +100,7 @@ public sealed record MainWindowServices(
             runtime.UpdateCheckService,
             runtime.UpdateDownloadService,
             runtime.UpdateInstallerLauncher,
+            runtime.UpdateHistoryService,
             new DomainPresetImportService(paths, repositories.AsrSettingsRepository));
     }
 }

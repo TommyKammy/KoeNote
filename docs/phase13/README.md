@@ -96,6 +96,14 @@ and are not promoted to `.msi` unless verification succeeds.
 After verification, the app exposes an install action that launches the MSI through
 `msiexec /i`. The install action is disabled while a KoeNote job is running, so users
 can finish active transcription/review work before handing off to the installer.
+Before launching `msiexec`, KoeNote verifies the downloaded MSI's Authenticode
+signature with Windows trust. Unsigned or untrusted MSI files are not launched.
+Set `KOENOTE_UPDATE_SIGNER_SUBJECT_CONTAINS` to require the trusted signing
+certificate subject to contain an expected publisher string.
+Update check, download, verification, and install handoff events are appended to
+`%LOCALAPPDATA%\KoeNote\updates\history.jsonl` for local troubleshooting. On each
+update download, KoeNote also removes stale verified MSI downloads older than 30 days
+and stale `.download` files older than 1 day from `%LOCALAPPDATA%\KoeNote\updates`.
 
 ## Uninstall policy
 
