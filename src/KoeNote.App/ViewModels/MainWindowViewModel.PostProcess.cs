@@ -40,15 +40,9 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if ((mode == PostProcessMode.ReviewOnly || mode == PostProcessMode.ReviewAndSummary) && HasExistingReviewOutput(SelectedJob.JobId))
+        if (!ConfirmOverwriteExistingPostProcessOutputs(mode, SelectedJob.JobId))
         {
-            LatestLog = "既存の整文候補または適用済み整文があるため、後から整文を実行しませんでした。上書き確認は後続段階で追加します。";
-            return;
-        }
-
-        if ((mode == PostProcessMode.SummaryOnly || mode == PostProcessMode.ReviewAndSummary) && HasExistingSummaryOutput(SelectedJob.JobId))
-        {
-            LatestLog = "既存の要約があるため、後から要約を実行しませんでした。上書き確認は後続段階で追加します。";
+            LatestLog = $"{GetPostProcessModeDisplayName(mode)}の後処理実行をキャンセルしました。";
             return;
         }
 
@@ -59,6 +53,13 @@ public sealed partial class MainWindowViewModel
 
         try
         {
+            _jobLogRepository.AddEvent(
+                SelectedJob.JobId,
+                "postprocess",
+                "info",
+                $"Started deferred {GetPostProcessModeLogName(mode)} post-processing.");
+            RefreshLogs();
+
             switch (mode)
             {
                 case PostProcessMode.ReviewOnly:
@@ -99,6 +100,30 @@ public sealed partial class MainWindowViewModel
         return _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Summary) is not null;
     }
 
+    private bool ConfirmOverwriteExistingPostProcessOutputs(PostProcessMode mode, string jobId)
+    {
+        var hasReviewOutput = (mode == PostProcessMode.ReviewOnly || mode == PostProcessMode.ReviewAndSummary) &&
+            HasExistingReviewOutput(jobId);
+        var hasSummaryOutput = (mode == PostProcessMode.SummaryOnly || mode == PostProcessMode.ReviewAndSummary) &&
+            HasExistingSummaryOutput(jobId);
+        if (!hasReviewOutput && !hasSummaryOutput)
+        {
+            return true;
+        }
+
+        var existingOutputText = (hasReviewOutput, hasSummaryOutput) switch
+        {
+            (true, true) => "既存の整文候補または適用済み整文と、既存の要約",
+            (true, false) => "既存の整文候補または適用済み整文",
+            (false, true) => "既存の要約",
+            _ => string.Empty
+        };
+
+        return ConfirmAction(
+            "後処理の上書き確認",
+            $"{existingOutputText}があります。{GetPostProcessModeDisplayName(mode)}を後から実行すると、新しい結果で上書き・追加生成されます。続行しますか？");
+    }
+
     private void RefreshPostProcessCommandStates()
     {
         OnPropertyChanged(nameof(CanRunPostReview));
@@ -133,6 +158,17 @@ public sealed partial class MainWindowViewModel
             PostProcessMode.ReviewOnly => "整文",
             PostProcessMode.SummaryOnly => "要約",
             PostProcessMode.ReviewAndSummary => "整文・要約",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+    }
+
+    private static string GetPostProcessModeLogName(PostProcessMode mode)
+    {
+        return mode switch
+        {
+            PostProcessMode.ReviewOnly => "review",
+            PostProcessMode.SummaryOnly => "summary",
+            PostProcessMode.ReviewAndSummary => "review_and_summary",
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
     }

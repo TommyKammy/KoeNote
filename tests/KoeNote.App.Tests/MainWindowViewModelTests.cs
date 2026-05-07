@@ -7,6 +7,7 @@ using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 using KoeNote.App.ViewModels;
 using Microsoft.Data.Sqlite;
@@ -791,6 +792,79 @@ public sealed class MainWindowViewModelTests
         command.Execute(null);
 
         Assert.Equal(expectedMode, viewModel.LastRequestedPostProcessMode);
+    }
+
+    [Fact]
+    public void PostProcessOverwriteConfirmation_CancelsWhenReviewOutputExistsAndUserDeclines()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw", "fixed", "reason", 0.8)
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var promptSeen = false;
+        viewModel.ConfirmAction = (_, message) =>
+        {
+            promptSeen = message.Contains("整文", StringComparison.Ordinal);
+            return false;
+        };
+
+        var result = InvokePrivate<bool>(
+            viewModel,
+            "ConfirmOverwriteExistingPostProcessOutputs",
+            PostProcessMode.ReviewOnly,
+            job.JobId);
+
+        Assert.False(result);
+        Assert.True(promptSeen);
+    }
+
+    [Fact]
+    public void PostProcessOverwriteConfirmation_CoversSummaryOutputForCombinedRun()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Summary,
+            TranscriptDerivativeFormats.Markdown,
+            "# summary",
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+        var promptSeen = false;
+        viewModel.ConfirmAction = (_, message) =>
+        {
+            promptSeen = message.Contains("要約", StringComparison.Ordinal);
+            return true;
+        };
+
+        var result = InvokePrivate<bool>(
+            viewModel,
+            "ConfirmOverwriteExistingPostProcessOutputs",
+            PostProcessMode.ReviewAndSummary,
+            job.JobId);
+
+        Assert.True(result);
+        Assert.True(promptSeen);
     }
 
     [Fact]
@@ -1934,6 +2008,15 @@ public sealed class MainWindowViewModelTests
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
             ?? throw new InvalidOperationException($"Method not found: {methodName}");
         method.Invoke(target, arguments);
+    }
+
+    private static T InvokePrivate<T>(object target, string methodName, params object[] arguments)
+    {
+        var method = target.GetType().GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Method not found: {methodName}");
+        return (T)method.Invoke(target, arguments)!;
     }
 
     private static void Touch(string path)
