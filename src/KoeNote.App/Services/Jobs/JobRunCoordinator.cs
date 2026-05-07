@@ -80,4 +80,30 @@ public sealed class JobRunCoordinator(
     {
         return summaryStageRunner.RunAsync(job, report, cancellationToken);
     }
+
+    public async Task RunReviewAndSummaryAsync(
+        JobSummary job,
+        IReadOnlyList<TranscriptSegment> segments,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken)
+    {
+        var reviewSucceeded = await reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
+        if (!reviewSucceeded)
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                summaryStageRunner.Skip(job, report, "review_not_succeeded");
+            }
+
+            return;
+        }
+
+        if (job.UnreviewedDrafts > 0)
+        {
+            summaryStageRunner.Skip(job, report, "manual_review_pending");
+            return;
+        }
+
+        await summaryStageRunner.RunAsync(job, report, cancellationToken);
+    }
 }

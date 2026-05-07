@@ -203,6 +203,77 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
+    public async Task RunReviewAndSummaryAsync_RunsSummaryAfterSuccessfulReview()
+    {
+        var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
+        var asrStageRunner = new AsrStageRunnerStub(null);
+        var reviewStageRunner = new ReviewStageRunnerStub();
+        var summaryStageRunner = new SummaryStageRunnerStub();
+        var coordinator = new JobRunCoordinator(
+            new PreprocessStageRunnerStub("normalized.wav"),
+            asrStageRunner,
+            reviewStageRunner,
+            summaryStageRunner);
+
+        await coordinator.RunReviewAndSummaryAsync(
+            CreateJob(),
+            segments,
+            _ => { },
+            CancellationToken.None);
+
+        Assert.False(asrStageRunner.WasCalled);
+        Assert.True(reviewStageRunner.RunWasCalled);
+        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
+        Assert.Equal(segments, reviewStageRunner.ReceivedSegments);
+    }
+
+    [Fact]
+    public async Task RunReviewAndSummaryAsync_SkipsSummaryWhenReviewFails()
+    {
+        var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
+        var summaryStageRunner = new SummaryStageRunnerStub();
+        var coordinator = new JobRunCoordinator(
+            new PreprocessStageRunnerStub("normalized.wav"),
+            new AsrStageRunnerStub(null),
+            new ReviewStageRunnerStub(runResult: false),
+            summaryStageRunner);
+
+        await coordinator.RunReviewAndSummaryAsync(
+            CreateJob(),
+            segments,
+            _ => { },
+            CancellationToken.None);
+
+        Assert.False(summaryStageRunner.RunWasCalled);
+        Assert.True(summaryStageRunner.SkipWasCalled);
+        Assert.Equal("review_not_succeeded", summaryStageRunner.SkipReason);
+    }
+
+    [Fact]
+    public async Task RunReviewAndSummaryAsync_SkipsSummaryWhenManualReviewIsPending()
+    {
+        var job = CreateJob();
+        var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
+        var summaryStageRunner = new SummaryStageRunnerStub();
+        var coordinator = new JobRunCoordinator(
+            new PreprocessStageRunnerStub("normalized.wav"),
+            new AsrStageRunnerStub(null),
+            new ReviewStageRunnerStub(onRun: () => job.UnreviewedDrafts = 1),
+            summaryStageRunner);
+
+        await coordinator.RunReviewAndSummaryAsync(
+            job,
+            segments,
+            _ => { },
+            CancellationToken.None);
+
+        Assert.False(summaryStageRunner.RunWasCalled);
+        Assert.True(summaryStageRunner.SkipWasCalled);
+        Assert.Equal("manual_review_pending", summaryStageRunner.SkipReason);
+    }
+
+    [Fact]
     public async Task RunAsync_SkipsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();

@@ -18,23 +18,17 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (mode == PostProcessMode.ReviewOnly && !ReviewStageAssetsReady)
+        if ((mode == PostProcessMode.ReviewOnly || mode == PostProcessMode.ReviewAndSummary) && !ReviewStageAssetsReady)
         {
             LatestLog = "整文ランタイムまたは整文モデルが不足しているため、後から整文を実行できません。";
             IsSetupWizardModalOpen = true;
             return;
         }
 
-        if (mode == PostProcessMode.SummaryOnly && !SummaryStageAssetsReady)
+        if ((mode == PostProcessMode.SummaryOnly || mode == PostProcessMode.ReviewAndSummary) && !SummaryStageAssetsReady)
         {
             LatestLog = "要約ランタイムまたは要約モデルが不足しているため、後から要約を実行できません。";
             IsSetupWizardModalOpen = true;
-            return;
-        }
-
-        if (mode == PostProcessMode.ReviewAndSummary)
-        {
-            LatestLog = $"{GetPostProcessModeDisplayName(mode)}の後処理実行ルートは次の段階で追加します。";
             return;
         }
 
@@ -46,13 +40,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (mode == PostProcessMode.ReviewOnly && HasExistingReviewOutput(SelectedJob.JobId))
+        if ((mode == PostProcessMode.ReviewOnly || mode == PostProcessMode.ReviewAndSummary) && HasExistingReviewOutput(SelectedJob.JobId))
         {
             LatestLog = "既存の整文候補または適用済み整文があるため、後から整文を実行しませんでした。上書き確認は後続段階で追加します。";
             return;
         }
 
-        if (mode == PostProcessMode.SummaryOnly && HasExistingSummaryOutput(SelectedJob.JobId))
+        if ((mode == PostProcessMode.SummaryOnly || mode == PostProcessMode.ReviewAndSummary) && HasExistingSummaryOutput(SelectedJob.JobId))
         {
             LatestLog = "既存の要約があるため、後から要約を実行しませんでした。上書き確認は後続段階で追加します。";
             return;
@@ -74,6 +68,12 @@ public sealed partial class MainWindowViewModel
                     break;
                 case PostProcessMode.SummaryOnly:
                     await _jobRunCoordinator.RunSummaryOnlyAsync(SelectedJob, ApplyRunUpdate, cancellation.Token);
+                    LoadSummaryForSelectedJob();
+                    break;
+                case PostProcessMode.ReviewAndSummary:
+                    await _jobRunCoordinator.RunReviewAndSummaryAsync(SelectedJob, segments, ApplyRunUpdate, cancellation.Token);
+                    ReloadSegmentsForSelectedJob(SelectedSegment?.SegmentId);
+                    LoadReviewQueue();
                     LoadSummaryForSelectedJob();
                     break;
                 default:
