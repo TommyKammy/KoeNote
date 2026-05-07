@@ -46,6 +46,11 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always"
              Condition="Exists('..\..\tools\python')" />
+    <Content Include="..\..\tools\review\**\*"
+             Link="tools\review\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always"
+             Condition="Exists('..\..\tools\review')" />
     <Content Include="catalog\model-catalog.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />

@@ -85,6 +85,11 @@ if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
     throw "Bundled Python runtime is required but missing from publish output: $pythonPath"
 }
 
+$reviewRuntimePath = Join-Path $publishDir "tools\review\llama-completion.exe"
+if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
+    throw "Review runtime is required but missing from publish output: $reviewRuntimePath"
+}
+
 if (-not ($manifest.PSObject.Properties.Name -contains "bundled_python_runtime")) {
     throw "Release manifest is missing bundled_python_runtime metadata."
 }
@@ -95,6 +100,18 @@ if (-not [bool]$manifest.bundled_python_runtime.required) {
 
 if ($manifest.bundled_python_runtime.path -ne $pythonPath) {
     throw "Release manifest bundled Python path does not match. Expected $pythonPath but got $($manifest.bundled_python_runtime.path)."
+}
+
+if (-not ($manifest.PSObject.Properties.Name -contains "review_runtime")) {
+    throw "Release manifest is missing review_runtime metadata."
+}
+
+if (-not [bool]$manifest.review_runtime.required) {
+    throw "Release manifest must mark review_runtime.required as true."
+}
+
+if ($manifest.review_runtime.path -ne $reviewRuntimePath) {
+    throw "Release manifest review runtime path does not match. Expected $reviewRuntimePath but got $($manifest.review_runtime.path)."
 }
 
 [pscustomobject]@{

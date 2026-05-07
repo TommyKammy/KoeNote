@@ -444,6 +444,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             issues.Add($"ASR モデルまたは実行スクリプトが不足しています: {SelectedAsrEngineId}");
         }
 
+        if (EnableReviewStage && !ReviewStageAssetsReady)
+        {
+            issues.Add($"推敲ランタイムまたは推敲モデルが不足しています: {Paths.LlamaCompletionPath}");
+        }
+
         return issues;
     }
 
@@ -522,11 +527,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             var details = issues.Length == 0
                 ? "選択ジョブ、セットアップ、ASR 実行環境を確認済みです。"
                 : string.Join(Environment.NewLine, issues);
-            if (EnableReviewStage && !ReviewStageAssetsReady)
-            {
-                details += Environment.NewLine + "推敲ステージの準備が未完了のため、この実行では推敲をスキップします。";
-            }
-
             return details.Trim();
         }
     }

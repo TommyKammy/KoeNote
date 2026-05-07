@@ -117,6 +117,24 @@ public sealed class VersioningTests
     }
 
     [Fact]
+    public void BuildMsiScript_RequiresReviewRuntimeForRelease()
+    {
+        var repoRoot = FindRepoRoot();
+        var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
+        var verificationScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleaseVerification.ps1"));
+        var publishScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase10", "Publish-KoeNote.ps1"));
+
+        Assert.Contains("-RequireReviewRuntime", buildScript);
+        Assert.Contains("review_runtime_verified", buildScript);
+        Assert.Contains("review_runtime = [ordered]@", buildScript);
+        Assert.Contains("Review runtime is required for release MSI builds", buildScript);
+        Assert.Contains("Review runtime is required but missing from publish output", verificationScript);
+        Assert.Contains("Release manifest is missing review_runtime metadata", verificationScript);
+        Assert.Contains("review_runtime.required", verificationScript);
+        Assert.Contains("[switch]$RequireReviewRuntime", publishScript);
+    }
+
+    [Fact]
     public void LatestJsonScript_CreatesDistributionManifest()
     {
         var repoRoot = FindRepoRoot();

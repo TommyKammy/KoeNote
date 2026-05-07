@@ -2,7 +2,8 @@ param(
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$IncludeLegacyRuntimeTools,
-    [switch]$RequireBundledPythonRuntime
+    [switch]$RequireBundledPythonRuntime,
+    [switch]$RequireReviewRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,25 +53,31 @@ elseif ($RequireBundledPythonRuntime) {
     throw "Missing bundled Python runtime: $pythonRuntimeSource. Place Python 3.12 x64 runtime there before publishing with -RequireBundledPythonRuntime."
 }
 
-$legacyRuntimeReadme = @"
-ASR and review runtime tools are intentionally not included in the Phase 10 core package.
+$reviewRuntimeSource = Join-Path $toolsSource "review"
+$reviewRuntimeDestination = Join-Path $publishDir "tools\review"
+if (Test-Path -LiteralPath $reviewRuntimeSource -PathType Container) {
+    New-Item -ItemType Directory -Force -Path $reviewRuntimeDestination | Out-Null
+    Get-ChildItem -LiteralPath $reviewRuntimeSource -Force |
+        Copy-Item -Destination $reviewRuntimeDestination -Recurse -Force
+}
+elseif ($RequireReviewRuntime) {
+    throw "Missing review runtime: $reviewRuntimeSource. Place llama.cpp CPU x64 runtime files there before publishing with -RequireReviewRuntime."
+}
 
-Phase 11 will introduce Model Catalog / Download Manager support for installing ASR and review runtimes after the app is installed.
-For local developer smoke tests, rerun Publish-KoeNote.ps1 with -IncludeLegacyRuntimeTools to copy the current tools/asr and tools/review folders.
+$legacyRuntimeReadme = @"
+ASR runtime tools are intentionally not included in the Phase 10 core package.
+
+ASR uses the bundled Python runtime and installs faster-whisper into a managed environment during first-run setup.
+For local developer smoke tests, rerun Publish-KoeNote.ps1 with -IncludeLegacyRuntimeTools to copy the current tools/asr folder.
 "@
 
 if ($IncludeLegacyRuntimeTools -and (Test-Path -LiteralPath $toolsSource)) {
     $asrTools = Join-Path $toolsSource "asr"
-    $reviewTools = Join-Path $toolsSource "review"
     if (Test-Path -LiteralPath $asrTools) {
         Copy-Item -LiteralPath $asrTools -Destination (Join-Path $publishDir "tools\asr") -Recurse -Force
     }
-
-    if (Test-Path -LiteralPath $reviewTools) {
-        Copy-Item -LiteralPath $reviewTools -Destination (Join-Path $publishDir "tools\review") -Recurse -Force
-    }
 }
-else {
+elseif (-not (Test-Path -LiteralPath $reviewRuntimeDestination -PathType Container)) {
     Set-Content -LiteralPath (Join-Path $publishDir "tools\README-runtime-tools-not-included.txt") -Value $legacyRuntimeReadme -Encoding UTF8
 }
 

@@ -1544,7 +1544,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RunSelectedJobCommand_DoesNotRequireReviewAssetsWhenReviewStageIsEnabled()
+    public void RunSelectedJobCommand_RequiresReviewAssetsWhenReviewStageIsEnabled()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
@@ -1571,7 +1571,8 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.EnableReviewStage);
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
         Assert.False(viewModel.ReviewStageAssetsReady);
-        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+        Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+        Assert.Contains("推敲ランタイムまたは推敲モデルが不足しています", viewModel.RunPreflightDetail, StringComparison.Ordinal);
     }
 
     [Fact]

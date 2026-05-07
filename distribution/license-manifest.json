@@ -33,6 +33,14 @@
       "expectedPath": "tools/python/python.exe",
       "licensePath": "tools/python/LICENSE.txt",
       "notes": "Bundled so ASR and speaker diarization setup do not depend on host Python. Python packages such as faster-whisper, diarize, torch, and torchaudio are downloaded during first-run setup and are governed by their respective package licenses."
+    },
+    {
+      "name": "llama.cpp CPU x64 runtime",
+      "type": "runtime tool",
+      "license": "MIT",
+      "source": "https://github.com/ggml-org/llama.cpp",
+      "expectedPath": "tools/review/llama-completion.exe",
+      "notes": "Bundled so the Review stage can run after a Review GGUF model is installed. KoeNote uses the CPU x64 binary to avoid adding a GPU driver dependency."
     }
   ]
 }

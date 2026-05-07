@@ -143,10 +143,11 @@ Write-UpdateLog "release_build_started" @{
     output_name = $OutputName
     require_code_signing = [bool]$RequireCodeSigning
     require_bundled_python_runtime = $true
+    require_review_runtime = $true
     log_path = $updateLogPath
 }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier -RequireBundledPythonRuntime
+& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier -RequireBundledPythonRuntime -RequireReviewRuntime
 if ($LASTEXITCODE -ne 0) {
     throw "Publish-KoeNote.ps1 failed with exit code $LASTEXITCODE."
 }
@@ -157,6 +158,12 @@ if (-not (Test-Path -LiteralPath $bundledPythonPath -PathType Leaf)) {
     throw "Bundled Python runtime is required for release MSI builds but was not published: $bundledPythonPath"
 }
 Write-UpdateLog "bundled_python_runtime_verified" @{ path = $bundledPythonPath }
+
+$reviewRuntimePath = Join-Path $publishDir "tools\review\llama-completion.exe"
+if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
+    throw "Review runtime is required for release MSI builds but was not published: $reviewRuntimePath"
+}
+Write-UpdateLog "review_runtime_verified" @{ path = $reviewRuntimePath }
 
 dotnet publish $cleanupProject `
     -c $Configuration `
@@ -242,6 +249,10 @@ $manifest = [ordered]@{
     bundled_python_runtime = [ordered]@{
         required = $true
         path = $bundledPythonPath
+    }
+    review_runtime = [ordered]@{
+        required = $true
+        path = $reviewRuntimePath
     }
     sha256 = $hash.Hash.ToLowerInvariant()
     signing = [ordered]@{

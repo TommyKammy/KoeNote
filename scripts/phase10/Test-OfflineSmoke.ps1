@@ -1,6 +1,7 @@
 param(
     [string]$PublishDir = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\..")) "artifacts\publish\KoeNote-win-x64"),
-    [switch]$RequireBundledPythonRuntime
+    [switch]$RequireBundledPythonRuntime,
+    [switch]$RequireReviewRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +41,13 @@ if ($RequireBundledPythonRuntime) {
     $pythonPath = Join-Path $PublishDir "tools\python\python.exe"
     if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
         throw "Missing bundled Python runtime: $pythonPath"
+    }
+}
+
+if ($RequireReviewRuntime) {
+    $reviewRuntimePath = Join-Path $PublishDir "tools\review\llama-completion.exe"
+    if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
+        throw "Missing review runtime: $reviewRuntimePath"
     }
 }
 
