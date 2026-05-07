@@ -5,7 +5,24 @@ namespace KoeNote.App.Services.Models;
 public sealed record ModelCatalog(
     [property: JsonPropertyName("schema_version")] int SchemaVersion,
     [property: JsonPropertyName("catalog_version")] string CatalogVersion,
-    [property: JsonPropertyName("models")] IReadOnlyList<ModelCatalogItem> Models);
+    [property: JsonPropertyName("models")] IReadOnlyList<ModelCatalogItem> Models,
+    [property: JsonPropertyName("presets")] IReadOnlyList<ModelQualityPreset>? Presets = null);
+
+public sealed record ModelQualityPreset(
+    [property: JsonPropertyName("preset_id")] string PresetId,
+    [property: JsonPropertyName("quality_label")] string QualityLabel,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("asr_model_id")] string AsrModelId,
+    [property: JsonPropertyName("review_model_id")] string ReviewModelId,
+    [property: JsonPropertyName("badges")] IReadOnlyList<string> Badges,
+    [property: JsonPropertyName("recommended_for")] IReadOnlyList<string> RecommendedFor)
+{
+    public override string ToString()
+    {
+        return DisplayName;
+    }
+}
 
 public sealed record ModelCatalogItem(
     [property: JsonPropertyName("model_id")] string ModelId,
@@ -20,7 +37,8 @@ public sealed record ModelCatalogItem(
     [property: JsonPropertyName("license")] ModelLicenseSpec License,
     [property: JsonPropertyName("requirements")] ModelRequirements Requirements,
     [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("size_bytes")] long? SizeBytes = null);
+    [property: JsonPropertyName("size_bytes")] long? SizeBytes = null,
+    [property: JsonPropertyName("quality_labels")] IReadOnlyList<string>? QualityLabels = null);
 
 public sealed record ModelRuntimeSpec(
     [property: JsonPropertyName("type")] string Type,
@@ -114,6 +132,10 @@ public sealed record ModelCatalogEntry(
         : "Size TBD";
 
     public string RuntimeRequirement => $"{CatalogItem.Runtime.Type}, VRAM {CatalogItem.Requirements.RecommendedVramGb}GB, Python {(CatalogItem.Requirements.PythonRequired ? "required" : "not required")}";
+
+    public string QualityLabelSummary => CatalogItem.QualityLabels is { Count: > 0 } labels
+        ? string.Join(", ", labels)
+        : string.Empty;
 
     public string DownloadState => LatestDownloadJob is null
         ? CatalogItem.Download.Type

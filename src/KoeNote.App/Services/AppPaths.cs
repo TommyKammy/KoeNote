@@ -54,13 +54,12 @@ public sealed class AppPaths
         Models = Path.Combine(baseDirectory, "models");
         ModelCatalogPath = Path.Combine(baseDirectory, "catalog", "model-catalog.json");
         FfmpegPath = Path.Combine(RuntimeTools, "ffmpeg.exe");
-        CrispAsrPath = Path.Combine(RuntimeTools, "asr", "crispasr.exe");
         FasterWhisperScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "faster_whisper_transcribe.py");
         ReazonSpeechK2ScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "reazonspeech_k2_transcribe.py");
         DiarizeWorkerScriptPath = Path.Combine(baseDirectory, "scripts", "diarization", "diarize_worker.py");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
-        VibeVoiceAsrModelPath = Path.Combine(Models, "asr", "vibevoice-asr-q4_k.gguf");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
+        WhisperBaseModelPath = Path.Combine(Models, "asr", "faster-whisper-base");
         FasterWhisperModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3-turbo");
         FasterWhisperLargeV3ModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3");
         ReazonSpeechK2ModelPath = Path.Combine(Models, "asr", "reazonspeech-k2-v3");
@@ -107,8 +106,6 @@ public sealed class AppPaths
 
     public string FfmpegPath { get; }
 
-    public string CrispAsrPath { get; }
-
     public string FasterWhisperScriptPath { get; }
 
     public string ReazonSpeechK2ScriptPath { get; }
@@ -117,9 +114,9 @@ public sealed class AppPaths
 
     public string LlamaCompletionPath { get; }
 
-    public string VibeVoiceAsrModelPath { get; }
-
     public string KotobaWhisperFasterModelPath { get; }
+
+    public string WhisperBaseModelPath { get; }
 
     public string FasterWhisperModelPath { get; }
 
@@ -144,7 +141,7 @@ public sealed class AppPaths
         {
             File.WriteAllText(SettingsPath, """
                 {
-                  "asrEngine": "vibevoice-asr-gguf",
+                  "asrEngine": "faster-whisper",
                   "reviewEngine": "llm-jp-gguf",
                   "networkAccess": false
                 }

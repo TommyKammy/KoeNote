@@ -61,7 +61,6 @@ public sealed record MainWindowServices(
         var asrEngineRegistry = MainWindowAsrEngineComposition.Create(
             paths,
             runtime.ProcessRunner,
-            workers.AsrWorker,
             workers.AsrResultStore,
             repositories.TranscriptSegmentRepository);
         var jobRunCoordinator = MainWindowJobRunComposition.Create(

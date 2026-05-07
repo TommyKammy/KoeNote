@@ -37,7 +37,7 @@ public sealed class AsrStageRunner(
             var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
             var engineId = asrEngineRegistry.Contains(effectiveAsrSettings.EngineId)
                 ? effectiveAsrSettings.EngineId
-                : VibeVoiceCrispAsrEngine.Id;
+                : "faster-whisper-large-v3-turbo";
             var engine = asrEngineRegistry.GetRequired(engineId);
             var result = await engine.TranscribeAsync(
                 new AsrInput(job.JobId, normalizedAudioPath),
@@ -169,6 +169,13 @@ public sealed class AsrStageRunner(
                 "kotoba-whisper-v2.2-faster",
                 paths.FasterWhisperScriptPath,
                 "kotoba-whisper-v2.2"),
+            "whisper-base" => new AsrEngineConfig(
+                "python",
+                ResolveModelPath("whisper-base", paths.WhisperBaseModelPath),
+                outputDirectory,
+                "whisper-base",
+                paths.FasterWhisperScriptPath,
+                "base"),
             "faster-whisper-large-v3-turbo" => new AsrEngineConfig(
                 "python",
                 ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),
@@ -191,10 +198,12 @@ public sealed class AsrStageRunner(
                 paths.ReazonSpeechK2ScriptPath,
                 "v3-k2"),
             _ => new AsrEngineConfig(
-                paths.CrispAsrPath,
-                ResolveModelPath("vibevoice-asr-q4-k", paths.VibeVoiceAsrModelPath),
+                "python",
+                ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),
                 outputDirectory,
-                "vibevoice-asr-q4_k")
+                "faster-whisper-large-v3-turbo",
+                paths.FasterWhisperScriptPath,
+                "large-v3-turbo")
         };
     }
 

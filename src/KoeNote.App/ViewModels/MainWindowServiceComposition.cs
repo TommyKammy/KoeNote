@@ -143,7 +143,6 @@ internal static class MainWindowSetupComposition
 
 internal sealed record MainWindowWorkerServices(
     AudioPreprocessWorker AudioPreprocessWorker,
-    AsrWorker AsrWorker,
     AsrResultStore AsrResultStore,
     ReviewWorker ReviewWorker);
 
@@ -158,12 +157,6 @@ internal static class MainWindowWorkerComposition
         var asrResultStore = new AsrResultStore();
         return new MainWindowWorkerServices(
             new AudioPreprocessWorker(processRunner, repositories.StageProgressRepository, repositories.JobLogRepository),
-            new AsrWorker(
-                processRunner,
-                new AsrCommandBuilder(),
-                new AsrJsonNormalizer(),
-                asrResultStore,
-                repositories.TranscriptSegmentRepository),
             asrResultStore,
             new ReviewWorker(
                 processRunner,
@@ -181,13 +174,11 @@ internal static class MainWindowAsrEngineComposition
     public static AsrEngineRegistry Create(
         AppPaths paths,
         ExternalProcessRunner processRunner,
-        AsrWorker asrWorker,
         AsrResultStore asrResultStore,
         TranscriptSegmentRepository transcriptSegmentRepository)
     {
         var asrJsonNormalizer = new AsrJsonNormalizer();
         return new AsrEngineRegistry([
-            new VibeVoiceCrispAsrEngine(asrWorker, new AsrRunRepository(paths)),
             CreateScriptedEngine(
                 paths,
                 processRunner,
@@ -196,6 +187,15 @@ internal static class MainWindowAsrEngineComposition
                 transcriptSegmentRepository,
                 "kotoba-whisper-v2.2-faster",
                 "kotoba-whisper v2.2 faster",
+                "faster-whisper"),
+            CreateScriptedEngine(
+                paths,
+                processRunner,
+                asrJsonNormalizer,
+                asrResultStore,
+                transcriptSegmentRepository,
+                "whisper-base",
+                "Whisper base",
                 "faster-whisper"),
             CreateScriptedEngine(
                 paths,
@@ -289,6 +289,7 @@ internal static class MainWindowJobRunComposition
                 repositories.StageProgressRepository,
                 repositories.JobLogRepository,
                 model.InstalledModelRepository,
+                new SetupStateService(paths),
                 workers.ReviewWorker));
     }
 }

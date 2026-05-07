@@ -327,7 +327,7 @@ public sealed class ModelDownloadServiceTests
             "download-model",
             "test",
             "asr",
-            "vibevoice-crispasr",
+            "local-asr",
             "Download Model",
             ["ja"],
             [],

@@ -22,6 +22,7 @@ public sealed record SetupState(
     [property: JsonPropertyName("is_completed")] bool IsCompleted,
     [property: JsonPropertyName("current_step")] SetupStep CurrentStep,
     [property: JsonPropertyName("setup_mode")] string SetupMode,
+    [property: JsonPropertyName("selected_model_preset_id")] string? SelectedModelPresetId,
     [property: JsonPropertyName("selected_asr_model_id")] string? SelectedAsrModelId,
     [property: JsonPropertyName("selected_review_model_id")] string? SelectedReviewModelId,
     [property: JsonPropertyName("storage_root")] string? StorageRoot,
@@ -34,9 +35,10 @@ public sealed record SetupState(
         return new SetupState(
             IsCompleted: false,
             CurrentStep: SetupStep.Welcome,
-            SetupMode: "guided",
-            SelectedAsrModelId: null,
-            SelectedReviewModelId: null,
+            SetupMode: "recommended",
+            SelectedModelPresetId: "recommended",
+            SelectedAsrModelId: "faster-whisper-large-v3-turbo",
+            SelectedReviewModelId: "llm-jp-4-8b-thinking-q4-k-m",
             StorageRoot: storageRoot,
             LicenseAccepted: false,
             LastSmokeSucceeded: false,
@@ -67,6 +69,18 @@ public sealed record SetupExistingDataItem(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("exists")] bool Exists,
     [property: JsonPropertyName("detail")] string Detail);
+
+public sealed record SetupHostResources(
+    long? TotalMemoryBytes,
+    int? MaxGpuMemoryGb,
+    bool NvidiaGpuDetected,
+    string Summary);
+
+public sealed record SetupPresetRecommendation(
+    string PresetId,
+    string DisplayName,
+    string Detail,
+    SetupHostResources Resources);
 
 public sealed record SetupReport(
     [property: JsonPropertyName("generated_at")] DateTimeOffset GeneratedAt,

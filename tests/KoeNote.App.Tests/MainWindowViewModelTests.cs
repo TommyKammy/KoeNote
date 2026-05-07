@@ -61,28 +61,135 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(first.SelectedAsrEngineId, second.SelectedAsrEngineId);
         Assert.Equal(
-            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster"],
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base"],
             second.AvailableAsrEngines.Select(engine => engine.EngineId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     [Fact]
-    public void AsrModel_ReflectsSelectedAsrEngine()
+    public void HeaderModels_ShowUnsetWhenSelectedModelsAreNotInstalled()
     {
         var viewModel = CreateViewModel();
 
         viewModel.SelectedAsrEngineId = "faster-whisper-large-v3-turbo";
 
-        Assert.Contains("faster-whisper", viewModel.AsrModel, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("未設定", viewModel.AsrModel);
+        Assert.Equal("未設定", viewModel.ReviewModel);
     }
 
     [Fact]
-    public void AsrModel_DistinguishesFasterWhisperLargeV3FromTurbo()
+    public void HeaderModels_ShowInstalledSelectedModels()
     {
-        var viewModel = CreateViewModel();
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, asrItem.EngineId));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
 
-        viewModel.SelectedAsrEngineId = "faster-whisper-large-v3";
+        var viewModel = new MainWindowViewModel(paths);
 
         Assert.Equal("faster-whisper large-v3", viewModel.AsrModel);
+        Assert.Equal("llm-jp 4 8B thinking Q4_K_M", viewModel.ReviewModel);
+    }
+
+    [Fact]
+    public void SetupInstallSelectedPresetCommand_RemainsEnabledWhenOnlyDiarizationRuntimeIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "whisper-base");
+        Directory.CreateDirectory(paths.WhisperBaseModelPath);
+        File.WriteAllText(Path.Combine(paths.WhisperBaseModelPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, paths.WhisperBaseModelPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "bonsai-8b-q1-0");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.AsrModel,
+            SetupMode = "lightweight",
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.SelectedSetupModelsReady);
+        Assert.False(viewModel.SetupDiarizationRuntimeReady);
+        Assert.False(viewModel.SelectedSetupConfigurationReady);
+        Assert.True(viewModel.SetupInstallSelectedPresetCommand.CanExecute(null));
+        Assert.Contains("話者識別ランタイム", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SettingsReviewModelSelection_UpdatesSetupReviewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.ReviewModel,
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSetupReviewModel = bonsai;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.Equal("custom", state.SetupMode);
+    }
+
+    [Fact]
+    public void HeaderModels_ShowUnsetWhenInstalledModelFileIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        Directory.Delete(asrPath, recursive: true);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, asrItem.EngineId));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedAsrModelId = asrItem.ModelId
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("未設定", viewModel.AsrModel);
     }
 
     [Fact]
@@ -99,7 +206,7 @@ public sealed class MainWindowViewModelTests
         Directory.CreateDirectory(asrPath);
         File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
         installService.RegisterLocalModel(asrItem, asrPath, "download");
-        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, VibeVoiceCrispAsrEngine.Id, true));
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "legacy-asr-engine", true));
 
         var viewModel = new MainWindowViewModel(paths);
 
@@ -1278,6 +1385,8 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FasterWhisperScriptPath);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
             IsCompleted = true,
@@ -1286,11 +1395,72 @@ public sealed class MainWindowViewModelTests
         });
 
         var viewModel = new MainWindowViewModel(paths);
-        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
         Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_StopsBeforeRunWhenSourceAudioIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        Touch(paths.FfmpegPath);
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster"
+        });
+        var missingAudioPath = Path.Combine(root, "missing.wav");
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", missingAudioPath, "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+        await viewModel.RunSelectedJobAsync();
+
+        Assert.False(viewModel.IsRunInProgress);
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+        Assert.Contains("音声ファイルが見つかりません", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains(missingAudioPath, viewModel.RunPreflightDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_RechecksFfmpegFileBeforeRun()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        Touch(paths.FfmpegPath);
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        File.Delete(paths.FfmpegPath);
+
+        await viewModel.RunSelectedJobAsync();
+
+        Assert.False(viewModel.IsRunInProgress);
+        Assert.True(viewModel.IsSetupWizardModalOpen);
+        Assert.Contains("ffmpeg が見つかりません", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains(paths.FfmpegPath, viewModel.RunPreflightDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1303,6 +1473,8 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", true));
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
@@ -1312,7 +1484,7 @@ public sealed class MainWindowViewModelTests
         });
 
         var viewModel = new MainWindowViewModel(paths);
-        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.EnableReviewStage);
@@ -1331,6 +1503,8 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
@@ -1340,7 +1514,7 @@ public sealed class MainWindowViewModelTests
         });
 
         var viewModel = new MainWindowViewModel(paths);
-        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.False(viewModel.EnableReviewStage);
@@ -1358,6 +1532,8 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Touch(paths.FasterWhisperScriptPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
         var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
@@ -1380,7 +1556,7 @@ public sealed class MainWindowViewModelTests
         });
 
         var viewModel = new MainWindowViewModel(paths);
-        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", Path.Combine(root, "meeting.wav"), "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.RequiredRuntimeAssetsReady);

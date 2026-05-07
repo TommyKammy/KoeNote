@@ -22,7 +22,7 @@ public sealed class ModelPackImportServiceTests
         var installed = importer.ImportModelPack(packPath);
 
         var model = Assert.Single(installed);
-        Assert.Equal("vibevoice-asr-q4-k", model.ModelId);
+        Assert.Equal("whisper-base", model.ModelId);
         Assert.Equal("model_pack", model.SourceType);
         Assert.True(model.Verified);
     }
@@ -40,7 +40,7 @@ public sealed class ModelPackImportServiceTests
         var install = new ModelInstallService(paths, new InstalledModelRepository(paths), verification);
         var importer = new ModelPackImportService(paths, catalog, install);
         importer.ImportModelPack(packPath);
-        var installedBefore = new InstalledModelRepository(paths).FindInstalledModel("vibevoice-asr-q4-k");
+        var installedBefore = new InstalledModelRepository(paths).FindInstalledModel("whisper-base");
         Assert.NotNull(installedBefore);
         var existingPath = installedBefore.FilePath;
         Assert.True(File.Exists(existingPath));
@@ -51,14 +51,14 @@ public sealed class ModelPackImportServiceTests
         Assert.Throws<InvalidOperationException>(() => importer.ImportModelPack(packPath));
 
         Assert.True(File.Exists(existingPath));
-        var installedAfter = new InstalledModelRepository(paths).FindInstalledModel("vibevoice-asr-q4-k");
+        var installedAfter = new InstalledModelRepository(paths).FindInstalledModel("whisper-base");
         Assert.Equal(existingPath, installedAfter?.FilePath);
     }
 
     private static void CreatePack(string packPath, bool badSha256 = false)
     {
         var sourceRoot = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var modelPath = Path.Combine(sourceRoot, "models", "vibevoice-asr-q4-k", "model.gguf");
+        var modelPath = Path.Combine(sourceRoot, "models", "whisper-base", "model.bin");
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
         File.WriteAllText(modelPath, "packed model");
         var sha256 = badSha256 ? new string('0', 64) : ModelVerificationService.ComputeSha256(modelPath);
@@ -69,9 +69,9 @@ public sealed class ModelPackImportServiceTests
               "display_name": "Test Pack",
               "models": [
                 {
-                  "model_id": "vibevoice-asr-q4-k",
-                  "engine_id": "vibevoice-crispasr",
-                  "relative_path": "models/vibevoice-asr-q4-k/model.gguf",
+                  "model_id": "whisper-base",
+                  "engine_id": "whisper-base",
+                  "relative_path": "models/whisper-base/model.bin",
                   "sha256": "{{sha256}}"
                 }
               ]

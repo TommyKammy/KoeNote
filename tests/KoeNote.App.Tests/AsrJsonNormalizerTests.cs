@@ -57,12 +57,12 @@ public sealed class AsrJsonNormalizerTests
     }
 
     [Fact]
-    public void Normalize_ReadsCrispAsrTranscriptionShape()
+    public void Normalize_ReadsLegacyTranscriptionShape()
     {
         const string rawJson = """
             {
-              "crispasr": {
-                "backend": "vibevoice",
+              "runtime": {
+                "backend": "faster-whisper",
                 "language": "ja"
               },
               "transcription": [
@@ -92,7 +92,7 @@ public sealed class AsrJsonNormalizerTests
     }
 
     [Fact]
-    public void Normalize_RemovesInlineCrispAsrTimingMarkers()
+    public void Normalize_RemovesInlineTimingMarkers()
     {
         const string rawJson = """
             {

@@ -51,7 +51,8 @@ public sealed class ModelInstallService(
         }
 
         var modelPath = Path.GetFullPath(installed.FilePath);
-        if (!IsUnderModelStorage(modelPath))
+        var storageRoot = ResolveManagedStorageRoot(installed, modelPath);
+        if (storageRoot is null)
         {
             throw new InvalidOperationException($"Model path is outside KoeNote model storage and was not deleted: {modelPath}");
         }
@@ -60,12 +61,12 @@ public sealed class ModelInstallService(
         if (File.Exists(modelPath))
         {
             File.Delete(modelPath);
-            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath));
+            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath), storageRoot);
         }
         else if (Directory.Exists(modelPath))
         {
             Directory.Delete(modelPath, recursive: true);
-            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath));
+            DeleteEmptyParentDirectories(Path.GetDirectoryName(modelPath), storageRoot);
         }
 
         installedModelRepository.DeleteInstalledModel(modelId);
@@ -74,16 +75,21 @@ public sealed class ModelInstallService(
 
     public string GetDefaultInstallPath(ModelCatalogItem catalogItem)
     {
+        return GetDefaultInstallPath(catalogItem, paths.DefaultModelStorageRoot);
+    }
+
+    public string GetDefaultInstallPath(ModelCatalogItem catalogItem, string storageRoot)
+    {
         if (catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase))
         {
             return Path.Combine(
-                paths.DefaultModelStorageRoot,
+                storageRoot,
                 catalogItem.Role,
                 catalogItem.ModelId,
                 ResolveDownloadFileName(catalogItem));
         }
 
-        return Path.Combine(paths.DefaultModelStorageRoot, catalogItem.Role, catalogItem.ModelId);
+        return Path.Combine(storageRoot, catalogItem.Role, catalogItem.ModelId);
     }
 
     private static string ResolveDownloadFileName(ModelCatalogItem catalogItem)
@@ -117,26 +123,51 @@ public sealed class ModelInstallService(
             .Sum(static file => new FileInfo(file).Length);
     }
 
-    private bool IsUnderModelStorage(string path)
+    private string? ResolveManagedStorageRoot(InstalledModel installed, string path)
     {
         var modelStorageRoot = Path.GetFullPath(paths.DefaultModelStorageRoot);
         var rootWithSeparator = modelStorageRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
             Path.DirectorySeparatorChar;
-        return path.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase);
+        if (path.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            return modelStorageRoot;
+        }
+
+        if (!installed.SourceType.Equals("download", StringComparison.OrdinalIgnoreCase) &&
+            !installed.SourceType.Equals("model_pack", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var modelDirectory = File.Exists(path) ? Path.GetDirectoryName(path) : path;
+        if (string.IsNullOrWhiteSpace(modelDirectory) ||
+            !Path.GetFileName(modelDirectory).Equals(installed.ModelId, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var roleDirectory = Path.GetDirectoryName(modelDirectory);
+        if (string.IsNullOrWhiteSpace(roleDirectory) ||
+            !Path.GetFileName(roleDirectory).Equals(installed.Role, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Path.GetDirectoryName(roleDirectory);
     }
 
-    private void DeleteEmptyParentDirectories(string? startDirectory)
+    private static void DeleteEmptyParentDirectories(string? startDirectory, string storageRoot)
     {
         if (string.IsNullOrWhiteSpace(startDirectory))
         {
             return;
         }
 
-        var modelStorageRoot = Path.GetFullPath(paths.DefaultModelStorageRoot)
+        var modelStorageRoot = Path.GetFullPath(storageRoot)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var current = Path.GetFullPath(startDirectory);
         while (!current.Equals(modelStorageRoot, StringComparison.OrdinalIgnoreCase) &&
-            IsUnderModelStorage(current) &&
+            IsUnderStorageRoot(current, modelStorageRoot) &&
             Directory.Exists(current) &&
             !Directory.EnumerateFileSystemEntries(current).Any())
         {
@@ -149,6 +180,13 @@ public sealed class ModelInstallService(
 
             current = parent;
         }
+    }
+
+    private static bool IsUnderStorageRoot(string path, string storageRoot)
+    {
+        var rootWithSeparator = storageRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        return path.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? ResolveManifestPath(string modelPath, string? explicitManifestPath)

@@ -19,6 +19,7 @@ TestResults/
 *.sln.docstates
 
 # .NET / NuGet
+.dotnet/
 project.lock.json
 project.assets.json
 *.nupkg

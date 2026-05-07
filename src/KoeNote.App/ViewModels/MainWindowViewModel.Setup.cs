@@ -27,9 +27,29 @@ public sealed partial class MainWindowViewModel
     private Task SetupUseRecommendedAsync()
     {
         _setupState = _setupWizardService.UseRecommendedSelections();
+        SelectedAsrEngineId = _setupState.SelectedAsrModelId ?? SelectedAsrEngineId;
         RefreshSetupWizard();
         LatestLog = "Recommended setup choices selected. Review ASR and LLM choices, then accept licenses.";
         return Task.CompletedTask;
+    }
+
+    private void ApplySetupModelPreset(string presetId)
+    {
+        try
+        {
+            _setupState = _setupWizardService.SelectModelPreset(presetId);
+            if (!string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
+            {
+                SelectedAsrEngineId = _setupState.SelectedAsrModelId;
+            }
+
+            RefreshSetupWizard();
+            LatestLog = $"Setup model preset selected: {presetId}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            LatestLog = $"Setup preset selection failed: {ex.Message}";
+        }
     }
 
     private Task SetupAcceptLicensesAsync()
@@ -38,6 +58,84 @@ public sealed partial class MainWindowViewModel
         RefreshSetupWizard();
         LatestLog = "Setup licenses accepted. Install or import the selected models, then run smoke check.";
         return Task.CompletedTask;
+    }
+
+    private bool CanInstallSelectedPreset()
+    {
+        return !IsModelDownloadInProgress &&
+            SelectedSetupAsrModel is not null &&
+            SelectedSetupReviewModel is not null &&
+            !SelectedSetupConfigurationReady;
+    }
+
+    private bool CanDownloadSetupAsr()
+    {
+        return !IsModelDownloadInProgress &&
+            SelectedSetupAsrModel is not null &&
+            !IsSetupModelReady(SelectedSetupAsrModel);
+    }
+
+    private bool CanDownloadSetupReview()
+    {
+        return !IsModelDownloadInProgress &&
+            SelectedSetupReviewModel is not null &&
+            !IsSetupModelReady(SelectedSetupReviewModel);
+    }
+
+    private async Task SetupInstallSelectedPresetAsync()
+    {
+        if (IsModelDownloadInProgress)
+        {
+            return;
+        }
+
+        var displayName = SelectedSetupModelPreset?.DisplayName ?? "selected model preset";
+        BeginModelDownloadProgress(displayName);
+        ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
+        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            var modelName = FindSetupModelDisplayName(
+                SetupAsrModelChoices.Concat(SetupReviewModelChoices),
+                downloadProgress.ModelId);
+            UpdateModelDownloadProgress(modelName, downloadProgress);
+            RefreshModelCatalogForDownloadProgress(downloadProgress);
+        });
+
+        try
+        {
+            var modelResult = await _setupWizardService.InstallSelectedPresetModelsAsync(progress);
+            RefreshSetupWizard();
+            if (!modelResult.IsSucceeded)
+            {
+                CompleteSetupModelDownload(displayName, modelResult);
+                return;
+            }
+
+            if (!SetupDiarizationRuntimeReady)
+            {
+                ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime...";
+                IsModelDownloadProgressIndeterminate = true;
+                var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync();
+                RefreshSetupWizard();
+                if (!runtimeResult.IsSucceeded)
+                {
+                    CompleteModelDownloadProgress(displayName, succeeded: false, runtimeResult.Message);
+                    LatestLog = runtimeResult.Message;
+                    return;
+                }
+
+                SetupDiarizationRuntimeSummary = $"話者識別ランタイム導入済み: {runtimeResult.InstallPath}";
+                LatestLog = runtimeResult.Message;
+            }
+
+            CompleteModelDownloadProgress(displayName, succeeded: true);
+        }
+        catch (OperationCanceledException)
+        {
+            RefreshSetupWizard();
+            CompleteModelDownloadProgress(displayName, succeeded: false, "Preset model installation was cancelled.");
+            LatestLog = "Preset model installation was cancelled.";
+        }
     }
 
     private async Task SetupDownloadAsrAsync()
@@ -220,6 +318,18 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
+        var stateBeforeRecommendation = _setupWizardService.LoadState();
+        _setupState = _setupWizardService.ApplyAutomaticModelPresetRecommendation();
+        if (!string.Equals(
+                stateBeforeRecommendation.SelectedModelPresetId,
+                _setupState.SelectedModelPresetId,
+                StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
+        {
+            SelectedAsrEngineId = _setupState.SelectedAsrModelId;
+        }
+
+        _setupPresetRecommendation = _setupWizardService.GetPresetRecommendation();
         _setupState = _setupWizardService.LoadState();
         RefreshDiarizationRuntimeSummary();
         SetupSteps.Clear();
@@ -240,12 +350,20 @@ public sealed partial class MainWindowViewModel
             SetupReviewModelChoices.Add(entry);
         }
 
+        SetupModelPresetChoices.Clear();
+        foreach (var preset in _setupWizardService.GetModelPresets())
+        {
+            SetupModelPresetChoices.Add(preset);
+        }
+
         _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
             entry.ModelId.Equals(_setupState.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase)) ??
             SetupAsrModelChoices.FirstOrDefault();
         _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
             entry.ModelId.Equals(_setupState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase)) ??
             SetupReviewModelChoices.FirstOrDefault();
+        _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
+            preset.PresetId.Equals(_setupState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
 
         if (refreshSmokeChecks)
         {
@@ -259,6 +377,18 @@ public sealed partial class MainWindowViewModel
 
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
+        OnPropertyChanged(nameof(SelectedSetupModelPreset));
+        OnPropertyChanged(nameof(AsrModel));
+        OnPropertyChanged(nameof(ReviewModel));
+        OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
+        OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
+        OnPropertyChanged(nameof(SelectedSetupModelsReady));
+        OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+        OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
+        OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
+        OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
+        OnPropertyChanged(nameof(SetupPresetRecommendationSummary));
+        OnPropertyChanged(nameof(SetupPresetRecommendationDetail));
         OnPropertyChanged(nameof(SetupCurrentStep));
         OnPropertyChanged(nameof(SetupStepDisplayName));
         OnPropertyChanged(nameof(SetupStatusSummary));
@@ -272,6 +402,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
+        OnPropertyChanged(nameof(RunPreflightSummary));
+        OnPropertyChanged(nameof(RunPreflightDetail));
         SetupModelAudits.Clear();
         foreach (var audit in _setupWizardService.GetSelectedModelAudit())
         {
@@ -288,6 +420,37 @@ public sealed partial class MainWindowViewModel
         {
             runCommand.RaiseCanExecuteChanged();
         }
+
+        UpdateSetupDownloadCommandStates();
+    }
+
+    private void UpdateSetupDownloadCommandStates()
+    {
+        if (SetupInstallSelectedPresetCommand is RelayCommand installPresetCommand)
+        {
+            installPresetCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupDownloadAsrCommand is RelayCommand asrCommand)
+        {
+            asrCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupDownloadReviewCommand is RelayCommand reviewCommand)
+        {
+            reviewCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupInstallDiarizationRuntimeCommand is RelayCommand diarizationCommand)
+        {
+            diarizationCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static string FindSetupModelDisplayName(IEnumerable<ModelCatalogEntry> models, string modelId)
+    {
+        return models.FirstOrDefault(model =>
+            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? modelId;
     }
 
     private void RefreshDiarizationRuntimeSummary()

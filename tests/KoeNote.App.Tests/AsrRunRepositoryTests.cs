@@ -11,7 +11,7 @@ public sealed class AsrRunRepositoryTests
         var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
-        var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
+        var asrRunId = repository.Start("job-001", "faster-whisper-large-v3-turbo", "faster-whisper-large-v3-turbo");
         repository.MarkSucceeded(asrRunId, TimeSpan.FromSeconds(1.25), "raw.json", "segments.json");
 
         using var connection = fixture.Open();
@@ -25,8 +25,8 @@ public sealed class AsrRunRepositoryTests
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal("vibevoice-crispasr", reader.GetString(0));
-        Assert.Equal("vibevoice-asr-q4_k", reader.GetString(1));
+        Assert.Equal("faster-whisper-large-v3-turbo", reader.GetString(0));
+        Assert.Equal("faster-whisper-large-v3-turbo", reader.GetString(1));
         Assert.Equal("succeeded", reader.GetString(2));
         Assert.Equal(1.25, reader.GetDouble(3));
         Assert.Equal("raw.json", reader.GetString(4));
@@ -40,7 +40,7 @@ public sealed class AsrRunRepositoryTests
         var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
-        var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
+        var asrRunId = repository.Start("job-001", "faster-whisper-large-v3-turbo", "faster-whisper-large-v3-turbo");
         repository.MarkFailed(asrRunId, "MissingModel");
 
         using var connection = fixture.Open();
@@ -65,7 +65,7 @@ public sealed class AsrRunRepositoryTests
         var paths = fixture.Paths;
         var repository = new AsrRunRepository(paths);
 
-        var asrRunId = repository.Start("job-001", "vibevoice-crispasr", "vibevoice-asr-q4_k");
+        var asrRunId = repository.Start("job-001", "faster-whisper-large-v3-turbo", "faster-whisper-large-v3-turbo");
         repository.MarkCancelled(asrRunId);
 
         using var connection = fixture.Open();

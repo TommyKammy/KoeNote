@@ -44,7 +44,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_ListsThreeSelectableAsrModelsAndReviewChoices()
+    public void SetupWizard_ListsSelectableAsrModelsAndReviewChoices()
     {
         var wizard = CreateWizard(CreatePaths());
 
@@ -52,7 +52,7 @@ public sealed class SetupWizardServiceTests
         var reviewModels = wizard.GetSelectableModels("review");
 
         Assert.Equal(
-            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster"],
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base"],
             asrModels.Select(entry => entry.ModelId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
         Assert.NotEmpty(reviewModels);
     }
@@ -66,6 +66,121 @@ public sealed class SetupWizardServiceTests
         var state = wizard.UseRecommendedSelections();
 
         Assert.Equal(paths.MachineModels, state.StorageRoot);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("recommended", state.SetupMode);
+    }
+
+    [Fact]
+    public void SetupWizard_SelectModelPreset_AppliesAsrAndReviewModels()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+
+        var presets = wizard.GetModelPresets();
+        var lightweight = Assert.Single(presets, preset => preset.PresetId == "lightweight");
+        var state = wizard.SelectModelPreset(lightweight.PresetId);
+
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("lightweight", state.SetupMode);
+        Assert.Equal("whisper-base", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_SelectModelPreset_PreservesChosenStorageRoot()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        var customRoot = Path.Combine(paths.Root, "custom-model-storage");
+
+        wizard.SetStorageRoot(customRoot);
+        var state = wizard.SelectModelPreset("lightweight");
+
+        Assert.Equal(customRoot, state.StorageRoot);
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+    }
+
+    [Fact]
+    public async Task SetupWizard_InstallSelectedPresetModels_SkipsAlreadyInstalledAsrAndReviewModels()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Directory.CreateDirectory(paths.WhisperBaseModelPath);
+        var reviewPath = Path.Combine(paths.UserModels, "review", "bonsai-8b-q1-0", "Bonsai-8B-Q1_0.gguf");
+        Touch(reviewPath);
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "whisper-base", "asr", "whisper-base", paths.WhisperBaseModelPath);
+        UpsertVerified(installedModels, "bonsai-8b-q1-0", "review", "llama-cpp", reviewPath);
+        var wizard = CreateWizard(paths);
+        wizard.SelectModelPreset("lightweight");
+
+        var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+
+        Assert.True(result.IsSucceeded);
+        Assert.Equal(2, result.InstalledModels.Count);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == "whisper-base");
+        Assert.Contains(result.InstalledModels, model => model.ModelId == "bonsai-8b-q1-0");
+        Assert.Equal(SetupStep.Install, wizard.LoadState().CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsLightweightForLowResourceHost()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 8L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false));
+
+        var recommendation = wizard.GetPresetRecommendation();
+        var state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Equal("lightweight", recommendation.PresetId);
+        Assert.Equal(SetupStep.Welcome, state.CurrentStep);
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("whisper-base", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_DoesNotOverrideManualModelChoice()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 8L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false));
+
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        var state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Null(state.SelectedModelPresetId);
+        Assert.Equal("custom", state.SetupMode);
+        Assert.Equal("kotoba-whisper-v2.2-faster", state.SelectedAsrModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_RunsOnlyOnce()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 8L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false));
+
+        wizard.ApplyAutomaticModelPresetRecommendation();
+        wizard.SelectModelPreset("recommended");
+        wizard.MoveBack();
+        wizard.MoveBack();
+        var state = wizard.MoveBack();
+        state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Equal(SetupStep.Welcome, state.CurrentStep);
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
     }
 
     [Fact]
@@ -238,6 +353,31 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void ModelInstallService_DefaultInstallPath_UsesProvidedStorageRoot()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var customRoot = Path.Combine(paths.Root, "custom-models");
+        var catalogItem = new ModelCatalogService(paths)
+            .LoadBuiltInCatalog()
+            .Models
+            .First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        var service = new ModelInstallService(
+            paths,
+            new InstalledModelRepository(paths),
+            new ModelVerificationService());
+
+        var installPath = service.GetDefaultInstallPath(catalogItem, customRoot);
+
+        Assert.StartsWith(customRoot, installPath, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(
+            Path.Combine("review", catalogItem.ModelId, "llm-jp-4-8B-thinking-Q4_K_M.gguf"),
+            installPath,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ModelInstallService_DefaultInstallPath_PutsReviewModelUnderModelDirectory()
     {
         var paths = CreatePaths();
@@ -273,7 +413,10 @@ public sealed class SetupWizardServiceTests
         Assert.Equal(SetupStep.Install, wizard.LoadState().CurrentStep);
     }
 
-    private static SetupWizardService CreateWizard(AppPaths paths, HttpClient? httpClient = null)
+    private static SetupWizardService CreateWizard(
+        AppPaths paths,
+        HttpClient? httpClient = null,
+        ISetupHostResourceProbe? hostResourceProbe = null)
     {
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
@@ -294,7 +437,8 @@ public sealed class SetupWizardServiceTests
                 new ModelDownloadJobRepository(paths),
                 verificationService,
                 installService),
-            new DiarizationRuntimeService(paths, new ExternalProcessRunner()));
+            new DiarizationRuntimeService(paths, new ExternalProcessRunner()),
+            hostResourceProbe);
     }
 
     private static AppPaths CreatePaths(InstallScope installScope = InstallScope.CurrentUser)
@@ -352,7 +496,7 @@ public sealed class SetupWizardServiceTests
               "models": [
                 {
                   "model_id": "{{modelId}}",
-                  "engine_id": "vibevoice-crispasr",
+                  "engine_id": "whisper-base",
                   "relative_path": "{{relativePath.Replace("\\", "\\\\")}}",
                   "sha256": "{{sha256}}"
                 }
@@ -375,6 +519,18 @@ public sealed class SetupWizardServiceTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }
+    }
+
+    private sealed class FixedHostResourceProbe(long? totalMemoryBytes, int? maxGpuMemoryGb, bool nvidiaGpuDetected) : ISetupHostResourceProbe
+    {
+        public SetupHostResources GetResources()
+        {
+            return new SetupHostResources(
+                totalMemoryBytes,
+                maxGpuMemoryGb,
+                nvidiaGpuDetected,
+                $"RAM {totalMemoryBytes} / VRAM {maxGpuMemoryGb}");
         }
     }
 }

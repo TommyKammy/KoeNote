@@ -25,6 +25,27 @@ public sealed class ModelInstallServiceTests
     }
 
     [Fact]
+    public void DeleteModelFiles_RemovesDownloadedModelFromCustomStorage()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        var repository = new InstalledModelRepository(paths);
+        var service = new ModelInstallService(paths, repository, new ModelVerificationService());
+        var catalogItem = CreateCatalogItem("custom-delete-model");
+        var customRoot = Path.Combine(paths.Root, "custom-models");
+        var modelPath = Path.Combine(customRoot, "asr", catalogItem.ModelId);
+        Directory.CreateDirectory(modelPath);
+        File.WriteAllText(Path.Combine(modelPath, "model.bin"), "model data");
+        service.RegisterLocalModel(catalogItem, modelPath, "download");
+
+        var result = service.DeleteModelFiles(catalogItem.ModelId);
+
+        Assert.True(result.DeletedRegistration);
+        Assert.False(Directory.Exists(modelPath));
+        Assert.True(Directory.Exists(customRoot));
+        Assert.Null(repository.FindInstalledModel(catalogItem.ModelId));
+    }
+
+    [Fact]
     public void DeleteModelFiles_RejectsRegisteredPathOutsideModelStorage()
     {
         var paths = TestDatabase.CreateReadyPaths();

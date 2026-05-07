@@ -2,6 +2,7 @@ using System.IO;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.Services.Jobs;
 
@@ -11,6 +12,7 @@ public sealed class ReviewStageRunner(
     StageProgressRepository stageProgressRepository,
     JobLogRepository jobLogRepository,
     InstalledModelRepository installedModelRepository,
+    SetupStateService setupStateService,
     ReviewWorker reviewWorker) : IReviewStageRunner
 {
     public async Task RunAsync(
@@ -32,7 +34,7 @@ public sealed class ReviewStageRunner(
             var result = await reviewWorker.RunAsync(new ReviewRunOptions(
                 job.JobId,
                 paths.LlamaCompletionPath,
-                ResolveModelPath("llm-jp-4-8b-thinking-q4-k-m", paths.ReviewModelPath),
+                ResolveReviewModelPath(),
                 outputDirectory,
                 segments,
                 MinConfidence: 0.5,
@@ -147,5 +149,22 @@ public sealed class ReviewStageRunner(
         }
 
         return fallbackPath;
+    }
+
+    private string ResolveReviewModelPath()
+    {
+        var selectedReviewModelId = setupStateService.Load().SelectedReviewModelId;
+        if (!string.IsNullOrWhiteSpace(selectedReviewModelId))
+        {
+            var installed = installedModelRepository.FindInstalledModel(selectedReviewModelId);
+            if (installed is not null &&
+                installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+                (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
+            {
+                return installed.FilePath;
+            }
+        }
+
+        return ResolveModelPath("llm-jp-4-8b-thinking-q4-k-m", paths.ReviewModelPath);
     }
 }

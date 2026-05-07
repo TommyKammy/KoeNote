@@ -9,7 +9,10 @@ public sealed class SetupWizardService
     private readonly SetupModelSelectionService _selectionService;
     private readonly SetupModelInstallService _installService;
     private readonly SetupReadinessService _readinessService;
+    private readonly SetupPresetRecommendationService _presetRecommendationService;
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
+    private SetupPresetRecommendation? _presetRecommendation;
+    private bool _automaticPresetRecommendationApplied;
 
     public SetupWizardService(
         AppPaths paths,
@@ -20,11 +23,15 @@ public sealed class SetupWizardService
         ModelInstallService modelInstallService,
         ModelPackImportService modelPackImportService,
         ModelDownloadService modelDownloadService,
-        DiarizationRuntimeService diarizationRuntimeService)
+        DiarizationRuntimeService diarizationRuntimeService,
+        ISetupHostResourceProbe? hostResourceProbe = null)
     {
         _diarizationRuntimeService = diarizationRuntimeService;
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
+        _presetRecommendationService = new SetupPresetRecommendationService(
+            modelCatalogService,
+            hostResourceProbe ?? new WindowsSetupHostResourceProbe());
         _installService = new SetupModelInstallService(
             stateService,
             _selectionService,
@@ -54,9 +61,50 @@ public sealed class SetupWizardService
         return _selectionService.GetSelectableModels(role);
     }
 
+    public IReadOnlyList<ModelQualityPreset> GetModelPresets()
+    {
+        return _selectionService.GetModelPresets();
+    }
+
+    public SetupPresetRecommendation GetPresetRecommendation()
+    {
+        _presetRecommendation ??= _presetRecommendationService.GetRecommendation();
+        return _presetRecommendation;
+    }
+
+    public SetupState ApplyAutomaticModelPresetRecommendation()
+    {
+        var state = _stateService.Load();
+        if (_automaticPresetRecommendationApplied)
+        {
+            return state;
+        }
+
+        _automaticPresetRecommendationApplied = true;
+        if (state.IsCompleted ||
+            state.CurrentStep != SetupStep.Welcome ||
+            !string.Equals(state.SelectedModelPresetId, "recommended", StringComparison.OrdinalIgnoreCase))
+        {
+            return state;
+        }
+
+        var recommendation = GetPresetRecommendation();
+        if (string.Equals(state.SelectedModelPresetId, recommendation.PresetId, StringComparison.OrdinalIgnoreCase))
+        {
+            return state;
+        }
+
+        return _selectionService.SelectPreset(recommendation.PresetId, advanceToModelStep: false);
+    }
+
     public SetupState UseRecommendedSelections()
     {
         return _selectionService.UseRecommendedSelections();
+    }
+
+    public SetupState SelectModelPreset(string presetId)
+    {
+        return _selectionService.SelectPreset(presetId);
     }
 
     public SetupState SelectSetupMode(string setupMode)
@@ -99,6 +147,13 @@ public sealed class SetupWizardService
         CancellationToken cancellationToken = default)
     {
         return _installService.DownloadSelectedModelAsync(role, progress, cancellationToken);
+    }
+
+    public Task<SetupInstallResult> InstallSelectedPresetModelsAsync(
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken = default)
+    {
+        return _installService.DownloadSelectedPresetModelsAsync(progress, cancellationToken);
     }
 
     public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)

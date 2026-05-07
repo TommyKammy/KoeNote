@@ -34,7 +34,6 @@ public sealed partial class MainWindowViewModel
     private Task RegisterPreinstalledModelsAsync()
     {
         var catalog = _modelCatalogService.LoadBuiltInCatalog();
-        RegisterIfPresent(catalog, "vibevoice-asr-q4-k", Paths.VibeVoiceAsrModelPath, "preinstalled");
         RegisterIfPresent(catalog, "llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath, "preinstalled");
         RefreshModelCatalog();
         LatestLog = "Preinstalled model scan completed.";
@@ -256,7 +255,11 @@ public sealed partial class MainWindowViewModel
                 entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
+        OnPropertyChanged(nameof(AsrModel));
+        OnPropertyChanged(nameof(ReviewModel));
         OnPropertyChanged(nameof(CanRunSelectedJob));
+        OnPropertyChanged(nameof(RunPreflightSummary));
+        OnPropertyChanged(nameof(RunPreflightDetail));
         UpdateModelCatalogCommandStates();
     }
 
@@ -276,13 +279,25 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private ModelCatalogEntry? FindInstalledCatalogEntry(string role, Func<ModelCatalogEntry, bool> predicate)
+    {
+        return ModelCatalogEntries.FirstOrDefault(entry =>
+            entry.IsInstalled &&
+            entry.IsVerified &&
+            entry.InstalledModel is { } installed &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)) &&
+            entry.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+            predicate(entry));
+    }
+
     private bool IsSelectedAsrEngineReady()
     {
         return SelectedAsrEngineId switch
         {
-            VibeVoiceCrispAsrEngine.Id => File.Exists(Paths.CrispAsrPath) && File.Exists(Paths.VibeVoiceAsrModelPath),
             "kotoba-whisper-v2.2-faster" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 ModelPathExists("kotoba-whisper-v2.2-faster", Paths.KotobaWhisperFasterModelPath),
+            "whisper-base" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                ModelPathExists("whisper-base", Paths.WhisperBaseModelPath),
             "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
             "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
@@ -296,6 +311,7 @@ public sealed partial class MainWindowViewModel
     private static bool IsUserSelectableAsrEngine(string? engineId)
     {
         return engineId is "kotoba-whisper-v2.2-faster"
+            or "whisper-base"
             or "faster-whisper-large-v3-turbo"
             or "faster-whisper-large-v3";
     }
@@ -314,8 +330,9 @@ public sealed partial class MainWindowViewModel
 
         foreach (var candidate in new[]
         {
-            "kotoba-whisper-v2.2-faster",
             "faster-whisper-large-v3-turbo",
+            "whisper-base",
+            "kotoba-whisper-v2.2-faster",
             "faster-whisper-large-v3"
         })
         {
@@ -333,7 +350,21 @@ public sealed partial class MainWindowViewModel
 
     private bool IsReviewModelReady()
     {
-        return ModelPathExists("llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath);
+        if (string.IsNullOrWhiteSpace(_setupState.SelectedReviewModelId))
+        {
+            return ModelPathExists("llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath);
+        }
+
+        if (_setupState.SelectedReviewModelId.Equals("llm-jp-4-8b-thinking-q4-k-m", StringComparison.OrdinalIgnoreCase))
+        {
+            return ModelPathExists(_setupState.SelectedReviewModelId, Paths.ReviewModelPath);
+        }
+
+        var installed = _installedModelRepository.FindInstalledModel(_setupState.SelectedReviewModelId);
+        return installed is not null &&
+            installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
     private bool ModelPathExists(string modelId, string fallbackPath)

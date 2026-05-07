@@ -31,33 +31,40 @@ public sealed class DiarizationRuntimeService(
 
     public async Task<DiarizationRuntimeInstallResult> InstallAsync(CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(paths.PythonPackages);
-        var result = await processRunner.RunAsync(
-            "python",
-            [
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "--target",
-                paths.PythonPackages,
-                PackageSpec
-            ],
-            TimeSpan.FromHours(1),
-            cancellationToken);
-
-        if (result.ExitCode != 0)
+        try
         {
-            var error = string.IsNullOrWhiteSpace(result.StandardError)
-                ? result.StandardOutput.Trim()
-                : result.StandardError.Trim();
-            return new DiarizationRuntimeInstallResult(false, $"diarize install failed: {error}", paths.PythonPackages);
-        }
+            Directory.CreateDirectory(paths.PythonPackages);
+            var result = await processRunner.RunAsync(
+                "python",
+                [
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--target",
+                    paths.PythonPackages,
+                    PackageSpec
+                ],
+                TimeSpan.FromHours(1),
+                cancellationToken);
 
-        var status = await CheckAsync(cancellationToken);
-        return status.IsAvailable
-            ? new DiarizationRuntimeInstallResult(true, $"diarize runtime installed: {status.Detail}", paths.PythonPackages)
-            : new DiarizationRuntimeInstallResult(false, $"diarize installed but import check failed: {status.Detail}", paths.PythonPackages);
+            if (result.ExitCode != 0)
+            {
+                var error = string.IsNullOrWhiteSpace(result.StandardError)
+                    ? result.StandardOutput.Trim()
+                    : result.StandardError.Trim();
+                return new DiarizationRuntimeInstallResult(false, $"diarize install failed: {error}", paths.PythonPackages);
+            }
+
+            var status = await CheckAsync(cancellationToken);
+            return status.IsAvailable
+                ? new DiarizationRuntimeInstallResult(true, $"diarize runtime installed: {status.Detail}", paths.PythonPackages)
+                : new DiarizationRuntimeInstallResult(false, $"diarize installed but import check failed: {status.Detail}", paths.PythonPackages);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new DiarizationRuntimeInstallResult(false, $"diarize install failed: {exception.Message}", paths.PythonPackages);
+        }
     }
 }
 

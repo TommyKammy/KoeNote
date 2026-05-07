@@ -29,7 +29,7 @@ public sealed class AsrSettingsRepositoryTests
 
         Assert.Equal("", restored.ContextText);
         Assert.Equal("", restored.HotwordsText);
-        Assert.Equal(VibeVoiceCrispAsrEngine.Id, restored.EngineId);
+        Assert.Equal("faster-whisper-large-v3-turbo", restored.EngineId);
         Assert.True(restored.EnableReviewStage);
         Assert.Empty(restored.Hotwords);
     }

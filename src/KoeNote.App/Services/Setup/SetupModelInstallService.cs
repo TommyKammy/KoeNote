@@ -38,7 +38,10 @@ internal sealed class SetupModelInstallService(
                 return new SetupInstallResult(true, $"Already installed: {existing.DisplayName}", [existing]);
             }
 
-            var targetPath = modelInstallService.GetDefaultInstallPath(catalogItem);
+            var storageRoot = stateService.Load().StorageRoot;
+            var targetPath = string.IsNullOrWhiteSpace(storageRoot)
+                ? modelInstallService.GetDefaultInstallPath(catalogItem)
+                : modelInstallService.GetDefaultInstallPath(catalogItem, storageRoot);
             var installed = await modelDownloadService.DownloadAndInstallAsync(catalogItem, targetPath, progress, cancellationToken);
             MarkInstallStep();
             return new SetupInstallResult(true, $"Downloaded and installed: {installed.DisplayName}", [installed]);
@@ -48,6 +51,30 @@ internal sealed class SetupModelInstallService(
             MarkInstallStep();
             return new SetupInstallResult(false, $"Online download failed: {exception.Message}", []);
         }
+    }
+
+    public async Task<SetupInstallResult> DownloadSelectedPresetModelsAsync(
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<SetupInstallResult>();
+        foreach (var role in new[] { "asr", "review" })
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            results.Add(await DownloadSelectedModelAsync(role, progress, cancellationToken));
+        }
+
+        var installedModels = results
+            .SelectMany(static result => result.InstalledModels)
+            .ToArray();
+        var failedResults = results
+            .Where(static result => !result.IsSucceeded)
+            .ToArray();
+        var message = failedResults.Length == 0
+            ? $"Preset models are ready: {installedModels.Length} model(s)."
+            : string.Join(" / ", failedResults.Select(static result => result.Message));
+        MarkInstallStep();
+        return new SetupInstallResult(failedResults.Length == 0, message, installedModels);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

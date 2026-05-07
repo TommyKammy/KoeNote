@@ -115,12 +115,12 @@ internal static class KoeNoteDatabaseMigrations
                 settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
-                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL
             );
             """);
-        migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'vibevoice-crispasr'");
+        migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo'");
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
     }
 
@@ -292,12 +292,12 @@ internal static class KoeNoteDatabaseMigrations
                 settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
-                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL
             );
             """);
-        migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'vibevoice-crispasr'");
+        migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo'");
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
     }
 
@@ -308,7 +308,7 @@ internal static class KoeNoteDatabaseMigrations
                 settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
                 context_text TEXT NOT NULL DEFAULT '',
                 hotwords_text TEXT NOT NULL DEFAULT '',
-                engine_id TEXT NOT NULL DEFAULT 'vibevoice-crispasr',
+                engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL
             );
@@ -455,4 +455,5 @@ internal static class KoeNoteDatabaseMigrations
         migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "previous_display_name", "TEXT");
         migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "applied_display_name", "TEXT NOT NULL DEFAULT ''");
     }
+
 }

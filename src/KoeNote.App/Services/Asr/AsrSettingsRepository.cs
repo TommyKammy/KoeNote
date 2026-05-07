@@ -3,7 +3,7 @@ namespace KoeNote.App.Services.Asr;
 public sealed record AsrSettings(
     string ContextText,
     string HotwordsText,
-    string EngineId = VibeVoiceCrispAsrEngine.Id,
+    string EngineId = "faster-whisper-large-v3-turbo",
     bool EnableReviewStage = true)
 {
     public IReadOnlyList<string> Hotwords => HotwordsText

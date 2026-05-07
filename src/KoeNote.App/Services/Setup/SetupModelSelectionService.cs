@@ -15,16 +15,57 @@ internal sealed class SetupModelSelectionService(
             .ToArray();
     }
 
+    public IReadOnlyList<ModelQualityPreset> GetModelPresets()
+    {
+        return modelCatalogService.LoadBuiltInCatalog().Presets ?? [];
+    }
+
     public SetupState UseRecommendedSelections()
     {
+        var recommendedPreset = GetModelPresets()
+            .FirstOrDefault(preset => preset.PresetId.Equals("recommended", StringComparison.OrdinalIgnoreCase));
+        if (recommendedPreset is not null)
+        {
+            return SelectPreset(recommendedPreset.PresetId);
+        }
+
         var asrModel = PickRecommended("asr");
         var reviewModel = PickRecommended("review");
         var state = stateService.Load() with
         {
             CurrentStep = SetupStep.AsrModel,
+            SelectedModelPresetId = null,
             SelectedAsrModelId = asrModel?.ModelId,
             SelectedReviewModelId = reviewModel?.ModelId,
             StorageRoot = paths.DefaultModelStorageRoot
+        };
+        return stateService.Save(state);
+    }
+
+    public SetupState SelectPreset(string presetId, bool advanceToModelStep = true)
+    {
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var preset = (catalog.Presets ?? [])
+            .FirstOrDefault(candidate => candidate.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase));
+        if (preset is null)
+        {
+            throw new InvalidOperationException($"Model preset is not in the catalog: {presetId}");
+        }
+
+        EnsurePresetModelExists(catalog, preset.AsrModelId, "asr");
+        EnsurePresetModelExists(catalog, preset.ReviewModelId, "review");
+
+        var current = stateService.Load();
+        var state = current with
+        {
+            CurrentStep = advanceToModelStep ? SetupStep.AsrModel : current.CurrentStep,
+            SetupMode = preset.PresetId,
+            SelectedModelPresetId = preset.PresetId,
+            SelectedAsrModelId = preset.AsrModelId,
+            SelectedReviewModelId = preset.ReviewModelId,
+            StorageRoot = string.IsNullOrWhiteSpace(current.StorageRoot)
+                ? paths.DefaultModelStorageRoot
+                : current.StorageRoot
         };
         return stateService.Save(state);
     }
@@ -41,8 +82,8 @@ internal sealed class SetupModelSelectionService(
 
         var state = stateService.Load();
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
-            ? state with { CurrentStep = SetupStep.AsrModel, SelectedAsrModelId = catalogItem.ModelId }
-            : state with { CurrentStep = SetupStep.ReviewModel, SelectedReviewModelId = catalogItem.ModelId };
+            ? state with { CurrentStep = SetupStep.AsrModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
+            : state with { CurrentStep = SetupStep.ReviewModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
         return stateService.Save(state);
     }
 
@@ -75,8 +116,24 @@ internal sealed class SetupModelSelectionService(
 
     private ModelCatalogEntry? PickRecommended(string role)
     {
-        return GetSelectableModels(role)
-            .FirstOrDefault(entry => entry.CatalogItem.RecommendedFor.Contains("v0.1", StringComparer.OrdinalIgnoreCase)) ??
-            GetSelectableModels(role).FirstOrDefault();
+        var recommendedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? "faster-whisper-large-v3-turbo"
+            : "llm-jp-4-8b-thinking-q4-k-m";
+        var selectableModels = GetSelectableModels(role);
+        return selectableModels.FirstOrDefault(entry =>
+            entry.ModelId.Equals(recommendedModelId, StringComparison.OrdinalIgnoreCase)) ??
+            selectableModels.FirstOrDefault(entry =>
+                entry.CatalogItem.RecommendedFor.Contains("fast_baseline", StringComparer.OrdinalIgnoreCase) ||
+                entry.CatalogItem.RecommendedFor.Contains("review_default", StringComparer.OrdinalIgnoreCase)) ??
+            selectableModels.FirstOrDefault();
+    }
+
+    private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)
+    {
+        if (!catalog.Models.Any(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Preset references missing {role} model: {modelId}");
+        }
     }
 }

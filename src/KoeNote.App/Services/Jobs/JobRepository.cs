@@ -159,8 +159,8 @@ public sealed class JobRepository(AppPaths paths)
         command.Parameters.AddWithValue("$progress_percent", job.ProgressPercent);
         command.Parameters.AddWithValue("$created_at", now.ToString("o"));
         command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$asr_engine", "vibevoice-asr-gguf");
-        command.Parameters.AddWithValue("$asr_model", "vibevoice-asr-q4_k.gguf");
+        command.Parameters.AddWithValue("$asr_engine", "faster-whisper");
+        command.Parameters.AddWithValue("$asr_model", "faster-whisper-large-v3-turbo");
         command.Parameters.AddWithValue("$review_model", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
         command.ExecuteNonQuery();
 

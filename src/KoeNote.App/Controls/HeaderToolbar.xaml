@@ -184,7 +184,7 @@
                         VerticalAlignment="Center">
                 <Button Style="{StaticResource HeaderOutlineButton}"
                         Command="{Binding RunSelectedJobCommand}"
-                        ToolTip="選択中のジョブを実行">
+                        ToolTip="{Binding RunPreflightDetail}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="&#xE768;" Style="{StaticResource HeaderRunIcon}" />
                         <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" />

@@ -3,110 +3,273 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="ModelSection" TargetType="Border" BasedOn="{StaticResource PanelBorder}">
+            <Setter Property="Padding" Value="14" />
+        </Style>
+        <Style x:Key="ModelFieldLabel" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="Margin" Value="0,0,0,3" />
+        </Style>
+        <Style x:Key="ModelActionButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="ModelCardItem" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Chrome"
+                                Background="#FFFFFF"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#F8FAFC" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#CBD5E1" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
-    <DockPanel Margin="0,8,0,0">
-        <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal">
-                <Button Command="{Binding RegisterPreinstalledModelsCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="再検出" FontSize="12" />
-                </Button>
-                <Button Command="{Binding DownloadSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="ダウンロード" FontSize="12" />
-                </Button>
-                <Button Command="{Binding PauseSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="一時停止" FontSize="12" />
-                </Button>
-                <Button Command="{Binding ResumeSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="再開" FontSize="12" />
-                </Button>
-                <Button Command="{Binding CancelSelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="中止" FontSize="12" />
-                </Button>
-                <Button Command="{Binding RetrySelectedModelDownloadCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="再試行" FontSize="12" />
-                </Button>
-                <Button Command="{Binding UseSelectedModelCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="使用" FontSize="12" />
-                </Button>
-                <Button Command="{Binding ShowSelectedModelLicenseCommand}" Padding="10,5" Margin="0,0,8,0">
-                    <TextBlock Text="ライセンス" FontSize="12" />
-                </Button>
-                <Button Command="{Binding DeleteSelectedModelFilesCommand}"
-                        Padding="10,5"
-                        ToolTip="選択したモデルファイルを削除し、導入済み登録とダウンロード履歴を削除します">
-                    <TextBlock Text="モデルファイルを削除" FontSize="12" />
-                </Button>
+
+    <Grid Margin="0,8,0,0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.08*" MinWidth="280" />
+            <ColumnDefinition Width="14" />
+            <ColumnDefinition Width="0.92*" MinWidth="240" />
+        </Grid.ColumnDefinitions>
+
+        <Border Style="{StaticResource ModelSection}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <TextBlock Text="モデル一覧"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="ASR と Review の利用モデルを確認し、必要なモデルを導入できます。"
+                               Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <ListBox ItemsSource="{Binding ModelCatalogEntries}"
+                         SelectedItem="{Binding SelectedModelCatalogEntry, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource ModelCardItem}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="{Binding DisplayName}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,10,2" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding InstallState}"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Top" />
+
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,3,0,0">
+                                    <TextBlock Text="{Binding Role}"
+                                               Foreground="#334155"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,12,0" />
+                                    <TextBlock Text="{Binding SizeSummary}"
+                                               Style="{StaticResource MutedText}"
+                                               Margin="0,0,12,0" />
+                                    <TextBlock Text="{Binding DownloadProgressSummary}"
+                                               Style="{StaticResource MutedText}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="{Binding QualityLabelSummary}"
+                                           Style="{StaticResource MutedText}"
+                                           Margin="0,4,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <ProgressBar Grid.Row="2"
+                                             Grid.Column="1"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding DownloadProgressPercent, Mode=OneWay}"
+                                             IsIndeterminate="{Binding IsDownloadProgressIndeterminate}"
+                                             Visibility="{Binding IsDownloadActive, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                             Width="88"
+                                             Height="6"
+                                             Margin="12,8,0,0" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Style="{StaticResource ModelSection}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="{Binding SelectedModelCatalogEntry.DisplayName}"
+                                   FontWeight="SemiBold"
+                                   FontSize="16"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SelectedModelCatalogEntry.Role}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,0,0,12" />
+
+                        <UniformGrid Columns="2" Margin="0,0,0,12">
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="状態" Style="{StaticResource ModelFieldLabel}" />
+                                <TextBlock Text="{Binding SelectedModelCatalogEntry.InstallState}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource AccentBrush}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,8">
+                                <TextBlock Text="サイズ" Style="{StaticResource ModelFieldLabel}" />
+                                <TextBlock Text="{Binding SelectedModelCatalogEntry.SizeSummary}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="ライセンス" Style="{StaticResource ModelFieldLabel}" />
+                                <TextBlock Text="{Binding SelectedModelCatalogEntry.LicenseName}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="ダウンロード" Style="{StaticResource ModelFieldLabel}" />
+                                <TextBlock Text="{Binding SelectedModelCatalogEntry.DownloadProgressSummary}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBlock Text="実行要件" Style="{StaticResource ModelFieldLabel}" />
+                        <TextBlock Text="{Binding SelectedModelCatalogEntry.RuntimeRequirement}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="品質ラベル" Style="{StaticResource ModelFieldLabel}" />
+                        <TextBlock Text="{Binding SelectedModelCatalogEntry.QualityLabelSummary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12" />
+
+                        <ProgressBar Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding SelectedModelCatalogEntry.DownloadProgressPercent, Mode=OneWay}"
+                                     IsIndeterminate="{Binding SelectedModelCatalogEntry.IsDownloadProgressIndeterminate}"
+                                     Visibility="{Binding SelectedModelCatalogEntry.IsDownloadActive, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                     Height="8"
+                                     Margin="0,0,0,8" />
+
+                        <TextBlock Text="{Binding SelectedModelCatalogEntry.DownloadError}"
+                                   Foreground="{StaticResource DangerBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ModelSection}">
+                    <StackPanel>
+                        <TextBlock Text="操作"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+
+                        <WrapPanel>
+                            <Button Command="{Binding DownloadSelectedModelCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE896;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="ダウンロード" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding UseSelectedModelCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="使用する" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ShowSelectedModelLicenseCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="ライセンス" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RegisterPreinstalledModelsCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="再検出" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding PauseSelectedModelDownloadCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE769;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="一時停止" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ResumeSelectedModelDownloadCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="再開" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RetrySelectedModelDownloadCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="再試行" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding CancelSelectedModelDownloadCommand}"
+                                    Style="{StaticResource ModelActionButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="中止" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DeleteSelectedModelFilesCommand}"
+                                    Style="{StaticResource ModelActionButton}"
+                                    ToolTip="選択したモデルファイルと導入済み登録を削除します。">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="モデルファイルを削除" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
-        <TextBlock DockPanel.Dock="Bottom"
-                   Text="{Binding SelectedModelCatalogEntry.DownloadError}"
-                   Foreground="{StaticResource DangerBrush}"
-                   FontSize="12"
-                   TextWrapping="Wrap"
-                   Margin="0,8,0,0" />
-        <Border DockPanel.Dock="Bottom" Background="#F8FAFC" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding SelectedModelCatalogEntry.DisplayName}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="1" Text="{Binding SelectedModelCatalogEntry.DownloadProgressSummary}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="12,0,0,0" />
-                <ProgressBar Grid.Row="1"
-                             Grid.ColumnSpan="2"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="{Binding SelectedModelCatalogEntry.DownloadProgressPercent, Mode=OneWay}"
-                             IsIndeterminate="{Binding SelectedModelCatalogEntry.IsDownloadProgressIndeterminate}"
-                             Visibility="{Binding SelectedModelCatalogEntry.IsDownloadActive, Converter={StaticResource BooleanToVisibilityConverter}}"
-                             Height="8"
-                             Margin="0,8,0,0" />
-            </Grid>
-        </Border>
-        <ListBox ItemsSource="{Binding ModelCatalogEntries}"
-                 SelectedItem="{Binding SelectedModelCatalogEntry, Mode=TwoWay}"
-                 BorderThickness="0"
-                 Background="Transparent">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Grid Margin="0,3,0,4">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="72" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="92" />
-                            <ColumnDefinition Width="130" />
-                            <ColumnDefinition Width="92" />
-                            <ColumnDefinition Width="110" />
-                            <ColumnDefinition Width="128" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding Role}" Foreground="#64748B" FontSize="12" />
-                        <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="#334155" FontSize="12" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="2" Text="{Binding SizeSummary}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="3" Text="{Binding RuntimeRequirement}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="4" Text="{Binding LicenseName}" Foreground="#64748B" FontSize="12" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="5" Text="{Binding InstallState}" Foreground="{StaticResource AccentBrush}" FontSize="12" TextAlignment="Right" />
-                        <TextBlock Grid.Column="6" Text="{Binding DownloadProgressSummary}" Foreground="#64748B" FontSize="12" TextAlignment="Right" TextTrimming="CharacterEllipsis" />
-                        <ProgressBar Grid.Row="1"
-                                     Grid.Column="1"
-                                     Grid.ColumnSpan="6"
-                                     Minimum="0"
-                                     Maximum="100"
-                                     Value="{Binding DownloadProgressPercent, Mode=OneWay}"
-                                     IsIndeterminate="{Binding IsDownloadProgressIndeterminate}"
-                                     Visibility="{Binding IsDownloadActive, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                     Height="4"
-                                     Margin="0,4,0,0" />
-                    </Grid>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-    </DockPanel>
+    </Grid>
 </UserControl>

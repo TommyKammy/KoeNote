@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -9,6 +10,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Audio;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
@@ -24,7 +26,7 @@ public sealed record AsrEngineOption(string EngineId, string DisplayName);
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
-    private const string DefaultSelectableAsrEngineId = "kotoba-whisper-v2.2-faster";
+    private const string DefaultSelectableAsrEngineId = "faster-whisper-large-v3-turbo";
     private const double MinMainContentZoomScale = 0.9;
     private const double MaxMainContentZoomScale = 1.5;
     private static readonly double[] MainContentZoomSteps = [0.9, 1.0, 1.1, 1.25, 1.5];
@@ -72,6 +74,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _loadedDomainPresetSummary = "プリセットJSONは未読み込みです。";
     private string _loadedDomainPresetDetails = string.Empty;
     private ModelCatalogEntry? _selectedModelCatalogEntry;
+    private SetupPresetRecommendation? _setupPresetRecommendation;
+    private ModelQualityPreset? _selectedSetupModelPreset;
     private ModelCatalogEntry? _selectedSetupAsrModel;
     private ModelCatalogEntry? _selectedSetupReviewModel;
     private SetupState _setupState;
@@ -122,7 +126,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSpeakerFilter = "全話者";
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
-    private string _selectedAsrEngineId = VibeVoiceCrispAsrEngine.Id;
+    private string _selectedAsrEngineId = "faster-whisper-large-v3-turbo";
     private bool _enableReviewStage = true;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
@@ -266,9 +270,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupNextCommand = new RelayCommand(SetupNextAsync);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
         SetupAcceptLicensesCommand = new RelayCommand(SetupAcceptLicensesAsync);
-        SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync);
-        SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync);
-        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync);
+        SetupInstallSelectedPresetCommand = new RelayCommand(SetupInstallSelectedPresetAsync, CanInstallSelectedPreset);
+        SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
+        SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
+        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, () => !IsModelDownloadInProgress);
         SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
         SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
         SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
@@ -338,11 +343,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string GpuSummary => EnvironmentStatus.FirstOrDefault(item => item.Name == "nvidia-smi")?.Detail ?? "Unknown";
 
-    public string AsrModel => AvailableAsrEngines
-        .FirstOrDefault(engine => string.Equals(engine.EngineId, SelectedAsrEngineId, StringComparison.OrdinalIgnoreCase))
-        ?.DisplayName ?? "VibeVoice ASR Q4";
+    public string AsrModel => FindInstalledCatalogEntry(
+        "asr",
+        entry => string.Equals(entry.EngineId, SelectedAsrEngineId, StringComparison.OrdinalIgnoreCase))
+        ?.DisplayName ?? "未設定";
 
-    public string ReviewModel => "llm-jp Q4_K_M";
+    public string ReviewModel => FindInstalledCatalogEntry(
+        "review",
+        entry => string.Equals(entry.ModelId, _setupState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase))
+        ?.DisplayName ?? "未設定";
 
     public string StoragePath => Paths.Root;
 
@@ -401,6 +410,36 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         };
     }
 
+    private IReadOnlyList<string> GetRunPreflightIssues()
+    {
+        var issues = new List<string>();
+        if (SelectedJob is null)
+        {
+            issues.Add("ジョブを選択してください。");
+        }
+        else if (!File.Exists(SelectedJob.SourceAudioPath))
+        {
+            issues.Add($"音声ファイルが見つかりません: {SelectedJob.SourceAudioPath}");
+        }
+
+        if (!IsSetupComplete)
+        {
+            issues.Add("セットアップを完了してください。");
+        }
+
+        if (!File.Exists(Paths.FfmpegPath))
+        {
+            issues.Add($"ffmpeg が見つかりません: {Paths.FfmpegPath}");
+        }
+
+        if (!IsSelectedAsrEngineReady())
+        {
+            issues.Add($"ASR モデルまたは実行スクリプトが不足しています: {SelectedAsrEngineId}");
+        }
+
+        return issues;
+    }
+
     public string SetupDiarizationRuntimeSummary
     {
         get => _setupDiarizationRuntimeSummary;
@@ -429,7 +468,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         SetupStep.Welcome => "KoeNote へようこそ",
         SetupStep.EnvironmentCheck => "まず動作環境を確認します",
-        SetupStep.SetupMode => "使い方に合わせて準備します",
+        SetupStep.SetupMode => "モデル構成を選びます",
         SetupStep.AsrModel => "文字起こしモデルを選びます",
         SetupStep.ReviewModel => "推敲モデルを選びます",
         SetupStep.Storage => "モデルの保存先を確認します",
@@ -444,7 +483,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         SetupStep.Welcome => "KoeNote は本体だけ先に起動し、ASR / 推敲モデルはあとから導入します。ここでは最初の文字起こしに必要な準備を順番に案内します。",
         SetupStep.EnvironmentCheck => "足りない runtime やモデルがあってもアプリ本体は壊れません。ここで次に必要な導入操作を確認できます。",
-        SetupStep.SetupMode => "迷ったら Recommended を選んでください。高精度 ASR だけで始めたい場合は、あとから推敲をオフにできます。",
+        SetupStep.SetupMode => "軽量、推奨、高精度、実験的からPC環境に合う構成を選びます。あとからASRと推敲モデルを個別に変更できます。",
         SetupStep.AsrModel => "日本語文字起こしには faster-whisper large-v3-turbo を推奨します。精度優先なら large-v3 も選べます。",
         SetupStep.ReviewModel => "推敲は文字起こし結果の確認を助ける追加ステージです。不要な場合は Settings でいつでもスキップできます。",
         SetupStep.Storage => "オンラインダウンロード、ローカルファイル、offline model pack のどれでも導入できます。",
@@ -455,7 +494,35 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _ => "KoeNote の初回利用に必要な準備を案内します。"
     };
 
-    public bool CanRunSelectedJob => SelectedJob is not null && !IsRunInProgress && RequiredRuntimeAssetsReady && IsSetupComplete;
+    public bool CanRunSelectedJob => !IsRunInProgress && GetRunPreflightIssues().Count == 0;
+
+    public string RunPreflightSummary
+    {
+        get
+        {
+            var issues = GetRunPreflightIssues().ToArray();
+            return issues.Length == 0
+                ? "実行できます"
+                : $"実行前チェック: {issues.Length} 件の確認が必要";
+        }
+    }
+
+    public string RunPreflightDetail
+    {
+        get
+        {
+            var issues = GetRunPreflightIssues().ToArray();
+            var details = issues.Length == 0
+                ? "選択ジョブ、セットアップ、ASR 実行環境を確認済みです。"
+                : string.Join(Environment.NewLine, issues);
+            if (EnableReviewStage && !ReviewStageAssetsReady)
+            {
+                details += Environment.NewLine + "推敲ステージの準備が未完了のため、この実行では推敲をスキップします。";
+            }
+
+            return details.Trim();
+        }
+    }
 
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
@@ -482,6 +549,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<ModelCatalogEntry> SetupAsrModelChoices { get; } = [];
 
     public ObservableCollection<ModelCatalogEntry> SetupReviewModelChoices { get; } = [];
+
+    public ObservableCollection<ModelQualityPreset> SetupModelPresetChoices { get; } = [];
 
     public ObservableCollection<SetupSmokeCheck> SetupSmokeChecks { get; } = [];
 
@@ -568,6 +637,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SetupUseRecommendedCommand { get; }
 
     public ICommand SetupAcceptLicensesCommand { get; }
+
+    public ICommand SetupInstallSelectedPresetCommand { get; }
 
     public ICommand SetupDownloadAsrCommand { get; }
 
@@ -684,6 +755,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobPlaybackPath));
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+                OnPropertyChanged(nameof(RunPreflightSummary));
+                OnPropertyChanged(nameof(RunPreflightDetail));
                 RefreshPlaybackWaveform();
                 StopAudioPlayback();
                 RefreshLogs();
@@ -805,6 +878,79 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public ModelQualityPreset? SelectedSetupModelPreset
+    {
+        get => _selectedSetupModelPreset;
+        set
+        {
+            if (SetField(ref _selectedSetupModelPreset, value) && value is not null)
+            {
+                ApplySetupModelPreset(value.PresetId);
+            }
+        }
+    }
+
+    public string SelectedSetupModelPresetDescription => SelectedSetupModelPreset?.Description ?? string.Empty;
+
+    public string SelectedSetupModelPresetModels => SelectedSetupModelPreset is null
+        ? string.Empty
+        : $"ASR: {FindSetupModelDisplayName(SetupAsrModelChoices, SelectedSetupModelPreset.AsrModelId)} / Review: {FindSetupModelDisplayName(SetupReviewModelChoices, SelectedSetupModelPreset.ReviewModelId)}";
+
+    public bool SelectedSetupModelsReady => IsSetupModelReady(SelectedSetupAsrModel) &&
+        IsSetupModelReady(SelectedSetupReviewModel);
+
+    public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
+
+    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady && SetupDiarizationRuntimeReady;
+
+    public string SetupPrimaryInstallActionText => IsModelDownloadInProgress
+        ? "導入中..."
+        : SelectedSetupConfigurationReady
+            ? "構成は導入済み"
+            : "構成をまとめて導入";
+
+    public string SetupPrimaryInstallSummary
+    {
+        get
+        {
+            if (IsModelDownloadInProgress)
+            {
+                return "選択した構成の導入を進めています。このまま完了を待ってください。";
+            }
+
+            if (SelectedSetupConfigurationReady)
+            {
+                return "ASR、推敲モデル、話者識別ランタイムは導入済みです。ライセンス同意と最終確認へ進めます。";
+            }
+
+            var missing = new List<string>();
+            if (!IsSetupModelReady(SelectedSetupAsrModel))
+            {
+                missing.Add("ASR");
+            }
+
+            if (!IsSetupModelReady(SelectedSetupReviewModel))
+            {
+                missing.Add("推敲モデル");
+            }
+
+            if (!SetupDiarizationRuntimeReady)
+            {
+                missing.Add("話者識別ランタイム");
+            }
+
+            return missing.Count == 0
+                ? "選択した構成を確認しています。"
+                : $"{string.Join(" / ", missing)} をまとめて導入できます。";
+        }
+    }
+
+    public string SetupPresetRecommendationSummary => _setupPresetRecommendation is null
+        ? string.Empty
+        : $"自動判定のおすすめ: {_setupPresetRecommendation.DisplayName}";
+
+    public string SetupPresetRecommendationDetail => _setupPresetRecommendation?.Detail ?? string.Empty;
+
     public ModelCatalogEntry? SelectedSetupReviewModel
     {
         get => _selectedSetupReviewModel;
@@ -827,7 +973,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         SetupStep.Welcome => "ようこそ",
         SetupStep.EnvironmentCheck => "環境確認",
-        SetupStep.SetupMode => "セットアップ方式",
+        SetupStep.SetupMode => "モデル構成",
         SetupStep.AsrModel => "ASRモデル",
         SetupStep.ReviewModel => "推敲LLM",
         SetupStep.Storage => "保存先",
@@ -843,6 +989,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string SetupStorageRoot => _setupState.StorageRoot ?? Paths.DefaultModelStorageRoot;
 
     public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
+
+    private static bool IsSetupModelReady(ModelCatalogEntry? model)
+    {
+        return model?.InstalledModel is { Verified: true } installed &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+    }
 
     public string ModelDownloadProgressSummary
     {
@@ -870,6 +1022,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _isModelDownloadInProgress, value))
             {
                 UpdateModelCatalogCommandStates();
+                UpdateSetupDownloadCommandStates();
+                OnPropertyChanged(nameof(SelectedSetupModelsReady));
+                OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+                OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
+                OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
+                OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
             }
         }
     }
@@ -1146,6 +1304,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 }
 
                 UpdateModelCatalogCommandStates();
+                OnPropertyChanged(nameof(RunPreflightSummary));
+                OnPropertyChanged(nameof(RunPreflightDetail));
 
                 if (OpenCleanupToolCommand is RelayCommand cleanupCommand)
                 {
@@ -1384,6 +1544,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(ReviewStageAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
+                OnPropertyChanged(nameof(RunPreflightSummary));
+                OnPropertyChanged(nameof(RunPreflightDetail));
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
                     runCommand.RaiseCanExecuteChanged();
@@ -1404,6 +1566,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(ReviewStageAssetsReady));
                 OnPropertyChanged(nameof(CanRunSelectedJob));
+                OnPropertyChanged(nameof(RunPreflightSummary));
+                OnPropertyChanged(nameof(RunPreflightDetail));
                 OnPropertyChanged(nameof(FirstRunSummary));
                 OnPropertyChanged(nameof(FirstRunDetail));
                 OnPropertyChanged(nameof(ReviewStageToggleText));

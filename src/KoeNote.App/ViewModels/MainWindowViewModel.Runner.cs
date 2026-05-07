@@ -13,6 +13,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        var preflightIssues = GetRunPreflightIssues();
+        if (preflightIssues.Count > 0)
+        {
+            LatestLog = "実行前チェックで不足があります: " + string.Join(" / ", preflightIssues);
+            IsSetupWizardModalOpen = true;
+            OnPropertyChanged(nameof(RunPreflightSummary));
+            OnPropertyChanged(nameof(RunPreflightDetail));
+            return;
+        }
+
         var job = SelectedJob;
         using var cancellation = new CancellationTokenSource();
         _runCancellation = cancellation;
@@ -22,6 +32,11 @@ public sealed partial class MainWindowViewModel
         try
         {
             var enableReviewForRun = EnableReviewStage && ReviewStageAssetsReady;
+            if (EnableReviewStage && !enableReviewForRun)
+            {
+                LatestLog = "推敲ステージの準備が未完了のため、この実行では推敲をスキップします。";
+            }
+
             var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
         }
