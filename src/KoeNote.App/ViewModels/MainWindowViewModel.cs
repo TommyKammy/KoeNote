@@ -247,7 +247,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
         _enableSummaryStage = asrSettings.EnableSummaryStage;
-        RefreshReviewStageToggleStatus();
+        RefreshOptionalStageToggleStatuses();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
@@ -274,7 +274,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OpenCleanupToolCommand = new RelayCommand(OpenCleanupToolAsync, CanOpenCleanupTool);
         ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
         ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
-        ToggleReviewStageCommand = new RelayCommand<StageStatus>(ToggleReviewStageAsync, stage => stage?.IsToggleable == true && !IsRunInProgress);
         ClearDomainPresetCommand = new RelayCommand(ClearSelectedDomainPresetAsync, () => SelectedDomainPresetImport?.DeactivatedAt is null && !IsRunInProgress);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
         CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync);
@@ -651,8 +650,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ImportDomainPresetCommand { get; }
 
     public ICommand ApplyLoadedDomainPresetCommand { get; }
-
-    public ICommand ToggleReviewStageCommand { get; }
 
     public ICommand ClearDomainPresetCommand { get; }
 
@@ -1322,7 +1319,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isRunInProgress, value))
             {
-                RefreshReviewStageToggleStatus();
+                RefreshOptionalStageToggleStatuses();
                 if (CancelCommand is RelayCommand cancelCommand)
                 {
                     cancelCommand.RaiseCanExecuteChanged();
@@ -1385,11 +1382,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 if (ApplyLoadedDomainPresetCommand is RelayCommand applyPresetCommand)
                 {
                     applyPresetCommand.RaiseCanExecuteChanged();
-                }
-
-                if (ToggleReviewStageCommand is RelayCommand<StageStatus> toggleReviewCommand)
-                {
-                    toggleReviewCommand.RaiseCanExecuteChanged();
                 }
 
                 if (ClearDomainPresetCommand is RelayCommand clearPresetCommand)
@@ -1663,7 +1655,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(FirstRunDetail));
                 OnPropertyChanged(nameof(ReviewStageToggleText));
                 OnPropertyChanged(nameof(ReviewStageToggleToolTip));
-                RefreshReviewStageToggleStatus();
+                RefreshOptionalStageToggleStatuses();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
                     runCommand.RaiseCanExecuteChanged();
@@ -1698,6 +1690,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanRunSelectedJob));
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
+                OnPropertyChanged(nameof(FirstRunSummary));
+                OnPropertyChanged(nameof(FirstRunDetail));
+                OnPropertyChanged(nameof(SummaryStageToggleText));
+                OnPropertyChanged(nameof(SummaryStageToggleToolTip));
+                RefreshOptionalStageToggleStatuses();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
                     runCommand.RaiseCanExecuteChanged();
@@ -1707,6 +1704,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public string SummaryStageToggleText => EnableSummaryStage ? "要約 ON" : "要約 OFF";
+
+    public string SummaryStageToggleToolTip => EnableSummaryStage
+        ? "要約ステージを実行します。クリックでスキップ"
+        : "要約ステージをスキップします。クリックで実行";
 
     public string ReviewIssueType
     {

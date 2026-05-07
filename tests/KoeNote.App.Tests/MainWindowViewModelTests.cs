@@ -448,7 +448,8 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.All(viewModel.StageStatuses, stage => Assert.Equal("未開始", stage.Status));
+        Assert.All(viewModel.StageStatuses.Take(3), stage => Assert.Equal("未開始", stage.Status));
+        Assert.Equal("スキップ", viewModel.StageStatuses.Last().Status);
     }
 
     [Fact]
@@ -1059,29 +1060,6 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ToggleReviewStageCommand_SwitchesReviewStageSettingAndStageStatus()
-    {
-        var viewModel = CreateViewModel();
-        var reviewStage = viewModel.StageStatuses.Single(stage => stage.IsToggleable);
-
-        Assert.True(viewModel.EnableReviewStage);
-        Assert.Equal("未開始", reviewStage.Status);
-
-        viewModel.ToggleReviewStageCommand.Execute(reviewStage);
-
-        Assert.False(viewModel.EnableReviewStage);
-        Assert.Equal("スキップ", reviewStage.Status);
-        Assert.Contains("スキップ", reviewStage.ToggleToolTip, StringComparison.Ordinal);
-        Assert.Contains("スキップ", viewModel.LatestLog, StringComparison.Ordinal);
-
-        viewModel.ToggleReviewStageCommand.Execute(reviewStage);
-
-        Assert.True(viewModel.EnableReviewStage);
-        Assert.Equal("未開始", reviewStage.Status);
-        Assert.Contains("実行", reviewStage.ToggleToolTip, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Constructor_ShowsReviewStageSkippedWhenSavedSettingIsOff()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -1100,6 +1078,43 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.EnableReviewStage);
         Assert.Equal("スキップ", reviewStage.Status);
         Assert.Contains("スキップ", reviewStage.ToggleToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SummaryStageToggleText_ReflectsSummaryStageSetting()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.EnableSummaryStage = true;
+
+        Assert.Equal("要約 ON", viewModel.SummaryStageToggleText);
+        Assert.Contains("スキップ", viewModel.SummaryStageToggleToolTip, StringComparison.Ordinal);
+
+        viewModel.EnableSummaryStage = false;
+
+        Assert.Equal("要約 OFF", viewModel.SummaryStageToggleText);
+        Assert.Contains("実行", viewModel.SummaryStageToggleToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SummaryStageToggle_UpdatesStageStatusForHeaderToggle()
+    {
+        var viewModel = CreateViewModel();
+        var summaryStage = viewModel.StageStatuses.Last();
+
+        Assert.False(viewModel.EnableSummaryStage);
+        Assert.Equal("スキップ", summaryStage.Status);
+        Assert.True(summaryStage.IsSkipped);
+
+        viewModel.EnableSummaryStage = true;
+
+        Assert.Equal("未開始", summaryStage.Status);
+        Assert.False(summaryStage.IsSkipped);
+
+        viewModel.EnableSummaryStage = false;
+
+        Assert.Equal("スキップ", summaryStage.Status);
+        Assert.True(summaryStage.IsSkipped);
     }
 
     [Fact]

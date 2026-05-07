@@ -45,24 +45,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="StageToggleButtonStyle" TargetType="Button">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Hit"
-                                Width="38"
-                                Height="38"
-                                CornerRadius="19"
-                                Background="Transparent" />
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Hit" Property="Background" Value="#1433A06F" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}" Padding="14,12">
@@ -148,16 +130,6 @@
                                         </Style>
                                     </Path.Style>
                                 </Path>
-                                <Button Width="38"
-                                        Height="38"
-                                        Padding="0"
-                                        Cursor="Hand"
-                                        Focusable="False"
-                                        Style="{StaticResource StageToggleButtonStyle}"
-                                        IsHitTestVisible="{Binding IsToggleable}"
-                                        Command="{Binding DataContext.ToggleReviewStageCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding}"
-                                        ToolTip="{Binding ToggleToolTip}" />
                             </Grid>
 
                             <TextBlock Grid.Row="1"

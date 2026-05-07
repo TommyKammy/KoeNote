@@ -26,23 +26,20 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private Task ToggleReviewStageAsync(StageStatus? stage)
+    private void RefreshOptionalStageToggleStatuses()
     {
-        if (stage?.IsToggleable != true || IsRunInProgress)
-        {
-            return Task.CompletedTask;
-        }
-
-        EnableReviewStage = !EnableReviewStage;
-        LatestLog = EnableReviewStage
-            ? "整文ステージを有効にしました。"
-            : "整文ステージをスキップします。";
-        return Task.CompletedTask;
+        RefreshOptionalStageToggleStatus(
+            StageStatuses.FirstOrDefault(static item => item.IsToggleable),
+            EnableReviewStage,
+            "整文");
+        RefreshOptionalStageToggleStatus(
+            StageStatuses.ElementAtOrDefault(3),
+            EnableSummaryStage,
+            "要約");
     }
 
-    private void RefreshReviewStageToggleStatus()
+    private void RefreshOptionalStageToggleStatus(StageStatus? stage, bool isEnabled, string stageName)
     {
-        var stage = StageStatuses.FirstOrDefault(static item => item.IsToggleable);
         if (stage is null)
         {
             return;
@@ -54,11 +51,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        stage.ToggleToolTip = EnableReviewStage
-            ? "整文を実行します。クリックでスキップ"
-            : "整文をスキップします。クリックで実行";
+        stage.ToggleToolTip = isEnabled
+            ? $"{stageName}を実行します。クリックでスキップ"
+            : $"{stageName}をスキップします。クリックで実行";
 
-        if (EnableReviewStage)
+        if (isEnabled)
         {
             if (stage.IsSkipped)
             {

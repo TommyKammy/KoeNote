@@ -48,30 +48,7 @@
                               Width="150"
                               Height="38"
                               HorizontalAlignment="Right"
-                              HorizontalContentAlignment="Left"
-                              Margin="0,0,8,0" />
-                    <Button Style="{StaticResource ToolbarButton}"
-                            Width="88"
-                            Height="38"
-                            Padding="0"
-                            HorizontalAlignment="Right"
-                            Command="{Binding ExportSelectedJobCommand}"
-                            ToolTip="整文を TXT / Markdown / JSON / SRT / VTT / DOCX で出力">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" Margin="0,0,7,0" />
-                            <TextBlock Text="出力" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource ToolbarButton}"
-                            Width="38"
-                            Height="38"
-                            Padding="0"
-                            MinWidth="0"
-                            Margin="6,0,0,0"
-                            Command="{Binding OpenExportFolderCommand}"
-                            ToolTip="出力フォルダーを開く">
-                        <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" />
-                    </Button>
+                              HorizontalContentAlignment="Left" />
                 </StackPanel>
             </Grid>
 
