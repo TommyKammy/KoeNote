@@ -62,6 +62,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
     private readonly IUpdateHistoryService _updateHistoryService;
     private readonly UiPreferencesService _uiPreferencesService;
+    private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
@@ -192,6 +193,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _updateHistoryService = services.UpdateHistoryService;
         _uiPreferencesService = new UiPreferencesService(paths);
+        var currentApplication = System.Windows.Application.Current;
+        _shutdownApplication = currentApplication is null ? (() => { }) : currentApplication.Shutdown;
         _mainContentZoomScale = NormalizeZoomScale(_uiPreferencesService.Load().MainContentZoomScale);
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer

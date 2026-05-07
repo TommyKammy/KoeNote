@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json.Serialization;
 
 namespace KoeNote.App.Services.Models;
@@ -119,11 +120,15 @@ public sealed record ModelCatalogEntry(
 
     public string EngineId => CatalogItem.EngineId;
 
-    public string InstallState => InstalledModel is null ? "Available" : InstalledModel.Status;
+    public string InstallState => InstalledModel is null
+        ? "Available"
+        : IsInstalled
+            ? InstalledModel.Status
+            : "missing";
 
-    public bool IsInstalled => InstalledModel is not null;
+    public bool IsInstalled => InstalledModel is not null && InstalledModelPathExists;
 
-    public bool IsVerified => InstalledModel?.Verified == true;
+    public bool IsVerified => InstalledModel?.Verified == true && InstalledModelPathExists;
 
     public string LicenseName => CatalogItem.License.Name;
 
@@ -212,6 +217,9 @@ public sealed record ModelCatalogEntry(
         job.BytesDownloaded <= job.BytesTotal.Value
             ? job.BytesTotal
             : null;
+
+    private bool InstalledModelPathExists => InstalledModel is not null &&
+        (File.Exists(InstalledModel.FilePath) || Directory.Exists(InstalledModel.FilePath));
 
     private static bool IsHuggingFaceRepositoryUrl(string url)
     {

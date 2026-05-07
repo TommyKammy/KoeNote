@@ -125,7 +125,7 @@ public sealed class VersioningTests
 
         Assert.Contains("util:CloseApplication", productWxs);
         Assert.Contains("Target=\"KoeNote.App.exe\"", productWxs);
-        Assert.Contains("PromptToContinue=\"yes\"", productWxs);
+        Assert.Contains("PromptToContinue=\"no\"", productWxs);
     }
 
     private static string FindRepoRoot()

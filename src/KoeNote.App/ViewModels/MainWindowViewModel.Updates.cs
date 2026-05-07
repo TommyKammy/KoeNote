@@ -234,6 +234,7 @@ public sealed partial class MainWindowViewModel
             UpdateNotificationMessage = $"Follow the installer prompts to complete the update. Verification: {result.TrustDescription}.";
             LatestLog = $"Update installer started: {result.InstallerPath}";
             RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Verification: {result.TrustDescription}", result.InstallerPath);
+            _shutdownApplication();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {

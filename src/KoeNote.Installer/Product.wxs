@@ -16,7 +16,7 @@
                            Target="KoeNote.App.exe"
                            Description="$(var.ProductName)"
                            CloseMessage="yes"
-                           PromptToContinue="yes"
+                           PromptToContinue="no"
                            RebootPrompt="no" />
     <MediaTemplate EmbedCab="yes" />
 

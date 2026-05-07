@@ -1674,7 +1674,10 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel();
         var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
         var launcher = new RecordingUpdateInstallerLauncher();
+        var shutdownRequested = false;
+        Action requestShutdown = () => shutdownRequested = true;
         SetPrivateField(viewModel, "_updateInstallerLauncher", launcher);
+        SetPrivateField(viewModel, "_shutdownApplication", requestShutdown);
         SetPrivateProperty(viewModel, nameof(MainWindowViewModel.VerifiedUpdateInstallerPath), installerPath);
 
         viewModel.InstallVerifiedUpdateCommand.Execute(null);
@@ -1685,6 +1688,7 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.CanShowInstallUpdateAction);
         Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
         Assert.Contains("Installer started", viewModel.UpdateDownloadProgressText, StringComparison.Ordinal);
+        Assert.True(shutdownRequested);
     }
 
     private static MainWindowViewModel CreateViewModel()

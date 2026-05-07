@@ -86,6 +86,29 @@ public sealed class ModelCatalogServiceTests
     }
 
     [Fact]
+    public void ListEntries_TreatsInstalledRecordWithMissingFilesAsMissing()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var modelPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(modelPath);
+        File.WriteAllText(Path.Combine(modelPath, "model.bin"), "dummy model");
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        installService.RegisterLocalModel(catalogItem, modelPath, "download");
+        Directory.Delete(modelPath, recursive: true);
+
+        var entry = catalogService.ListEntries().First(entry => entry.ModelId == "faster-whisper-large-v3");
+
+        Assert.False(entry.IsInstalled);
+        Assert.False(entry.IsVerified);
+        Assert.Equal("missing", entry.InstallState);
+        Assert.Equal("faster-whisper large-v3", entry.SetupDisplayName);
+    }
+
+    [Fact]
     public void ListEntries_IncludesLatestDownloadState()
     {
         var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
