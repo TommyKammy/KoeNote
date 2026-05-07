@@ -131,6 +131,12 @@ public sealed class VersioningTests
         Assert.Contains("Review runtime is required but missing from publish output", verificationScript);
         Assert.Contains("Release manifest is missing review_runtime metadata", verificationScript);
         Assert.Contains("review_runtime.required", verificationScript);
+        Assert.Contains("Ternary review runtime is required for release MSI builds", buildScript);
+        Assert.Contains("ternary_review_runtime_verified", buildScript);
+        Assert.Contains("ternary_review_runtime = [ordered]@", buildScript);
+        Assert.Contains("Ternary review runtime is required but missing from publish output", verificationScript);
+        Assert.Contains("Release manifest is missing ternary_review_runtime metadata", verificationScript);
+        Assert.Contains("ternary_review_runtime.required", verificationScript);
         Assert.Contains("[switch]$RequireReviewRuntime", publishScript);
     }
 

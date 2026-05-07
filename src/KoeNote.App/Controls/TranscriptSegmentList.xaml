@@ -2,6 +2,33 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DockPanel>
+        <DockPanel.Resources>
+            <Style x:Key="VisibleWhenRawTranscriptMode" TargetType="FrameworkElement">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenPolishedTranscriptMode" TargetType="FrameworkElement">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenDiffTranscriptMode" TargetType="FrameworkElement">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Diff">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </DockPanel.Resources>
+
         <Border DockPanel.Dock="Top"
                 Background="#FAFBFC"
                 BorderBrush="#E2E8F0"
@@ -17,7 +44,9 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="時間" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="1" Text="話者" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="2" Text="発話内容" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="素起こし" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenRawTranscriptMode}" />
+                <TextBlock Grid.Column="2" Text="整文" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenPolishedTranscriptMode}" />
+                <TextBlock Grid.Column="2" Text="差分" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenDiffTranscriptMode}" />
             </Grid>
         </Border>
 
@@ -30,10 +59,14 @@
                 <DataTemplate>
                     <DataTemplate.Resources>
                         <Style x:Key="InlineDisplayTextStyle" TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Visible" />
+                            <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
+                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -46,18 +79,7 @@
                             <Style.Triggers>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
-                                        <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                        <Style x:Key="InlineEditorButtonStyle" TargetType="Button">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -70,6 +92,7 @@
                             <Style.Triggers>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -82,6 +105,7 @@
                             <Style.Triggers>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -140,6 +164,65 @@
                                        LineHeight="22"
                                        Style="{StaticResource InlineDisplayTextStyle}"
                                        MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding RawTranscriptText}"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="None"
+                                       FontSize="14"
+                                       LineHeight="22"
+                                       Style="{StaticResource VisibleWhenRawTranscriptMode}" />
+                            <Grid Grid.Column="2"
+                                  Style="{StaticResource VisibleWhenDiffTranscriptMode}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Border Background="#F8FAFC"
+                                        BorderBrush="#E2E8F0"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="10,8">
+                                    <StackPanel>
+                                        <TextBlock Text="素起こし"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding RawTranscriptText}"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="21" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Row="1"
+                                        Background="{StaticResource AccentLightBrush}"
+                                        CornerRadius="10"
+                                        Padding="8,3"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,6">
+                                    <TextBlock Text="{Binding TranscriptDiffStatus}"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontSize="11"
+                                               FontWeight="SemiBold" />
+                                </Border>
+                                <Border Grid.Row="2"
+                                        Background="#F7FCF9"
+                                        BorderBrush="#B7D8C4"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="10,8">
+                                    <StackPanel>
+                                        <TextBlock Text="整文"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding PolishedTranscriptText}"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="21" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                             <Grid Grid.Column="2" Style="{StaticResource InlineEditorStyle}">
                                 <TextBox Tag="InlineSegmentEditor"
                                          Text="{Binding DataContext.SelectedSegmentEditText, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -155,7 +238,8 @@
                             <StackPanel Grid.Column="3"
                                         Orientation="Horizontal"
                                         HorizontalAlignment="Right"
-                                        VerticalAlignment="Top">
+                                        VerticalAlignment="Top"
+                                        Style="{StaticResource VisibleWhenPolishedTranscriptMode}">
                                 <Button Width="32"
                                         Height="32"
                                         Padding="0"

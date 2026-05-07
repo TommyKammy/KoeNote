@@ -61,7 +61,7 @@
                     <TextBlock Text="モデル一覧"
                                Style="{StaticResource SectionTitle}"
                                Margin="0,0,0,4" />
-                    <TextBlock Text="ASR と Review の利用モデルを確認し、必要なモデルを導入できます。"
+                    <TextBlock Text="ASR と整文の利用モデルを確認し、必要なモデルを導入できます。"
                                Style="{StaticResource MutedText}"
                                TextWrapping="Wrap" />
                 </StackPanel>

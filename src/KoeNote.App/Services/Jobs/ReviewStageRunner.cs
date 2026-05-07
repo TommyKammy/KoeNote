@@ -3,6 +3,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Services.Jobs;
 
@@ -15,7 +16,7 @@ public sealed class ReviewStageRunner(
     SetupStateService setupStateService,
     ReviewWorker reviewWorker) : IReviewStageRunner
 {
-    public async Task RunAsync(
+    public async Task<bool> RunAsync(
         JobSummary job,
         IReadOnlyList<TranscriptSegment> segments,
         Action<JobRunUpdate> report,
@@ -31,14 +32,29 @@ public sealed class ReviewStageRunner(
         try
         {
             var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "review");
+            var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+            var modelId = ResolveReviewModelId();
+            var sanitizerProfile = ResolveOutputSanitizerProfile(modelId);
+            var tuning = ReviewRuntimeTuningProfiles.ForReviewModel(modelId);
             var result = await reviewWorker.RunAsync(new ReviewRunOptions(
                 job.JobId,
-                paths.LlamaCompletionPath,
-                ResolveReviewModelPath(),
+                ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId),
+                ResolveReviewModelPath(modelId),
                 outputDirectory,
                 segments,
                 MinConfidence: 0.5,
-                Timeout: TimeSpan.FromHours(2)),
+                Timeout: tuning.Timeout,
+                ModelId: modelId,
+                OutputSanitizerProfile: sanitizerProfile,
+                ContextSize: tuning.ContextSize,
+                GpuLayers: tuning.GpuLayers,
+                MaxTokens: tuning.MaxTokens,
+                ChunkSegmentCount: tuning.ChunkSegmentCount,
+                Threads: tuning.Threads,
+                ThreadsBatch: tuning.ThreadsBatch,
+                UseJsonSchema: tuning.UseJsonSchema,
+                EnableRepair: tuning.EnableRepair,
+                PromptProfile: tuning.PromptProfile),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
@@ -60,6 +76,7 @@ public sealed class ReviewStageRunner(
             report(result.Drafts.Count > 0
                 ? new JobRunUpdate(Drafts: result.Drafts)
                 : new JobRunUpdate(ClearReviewPreview: true));
+            return true;
         }
         catch (OperationCanceledException)
         {
@@ -77,7 +94,8 @@ public sealed class ReviewStageRunner(
             jobRepository.MarkCancelled(job, "review");
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "review", "info", "Run was cancelled.");
-            report(new JobRunUpdate(RefreshLogs: true, LatestLog: "推敲をキャンセルしました。"));
+            report(new JobRunUpdate(RefreshLogs: true, LatestLog: "整文をキャンセルしました。"));
+            return false;
         }
         catch (ReviewWorkerException exception)
         {
@@ -96,6 +114,7 @@ public sealed class ReviewStageRunner(
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "review", "error", $"{exception.Category}: {exception.Message}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review failed ({exception.Category}): {exception.Message}"));
+            return false;
         }
         catch (Exception exception)
         {
@@ -114,6 +133,7 @@ public sealed class ReviewStageRunner(
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}"));
+            return false;
         }
     }
 
@@ -151,12 +171,30 @@ public sealed class ReviewStageRunner(
         return fallbackPath;
     }
 
-    private string ResolveReviewModelPath()
+    private string ResolveReviewModelId()
     {
-        var selectedReviewModelId = setupStateService.Load().SelectedReviewModelId;
-        if (!string.IsNullOrWhiteSpace(selectedReviewModelId))
+        var state = setupStateService.Load();
+        var selectedReviewModelId = state.SelectedReviewModelId;
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        if (IsSelectableReviewModel(catalog, selectedReviewModelId))
         {
-            var installed = installedModelRepository.FindInstalledModel(selectedReviewModelId);
+            return selectedReviewModelId!;
+        }
+
+        var presetReviewModelId = (catalog.Presets ?? [])
+            .FirstOrDefault(preset => !string.IsNullOrWhiteSpace(state.SelectedModelPresetId) &&
+                preset.PresetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase))
+            ?.ReviewModelId;
+        return IsSelectableReviewModel(catalog, presetReviewModelId)
+            ? presetReviewModelId!
+            : "llm-jp-4-8b-thinking-q4-k-m";
+    }
+
+    private string ResolveReviewModelPath(string modelId)
+    {
+        if (!string.IsNullOrWhiteSpace(modelId))
+        {
+            var installed = installedModelRepository.FindInstalledModel(modelId);
             if (installed is not null &&
                 installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
                 (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
@@ -166,5 +204,25 @@ public sealed class ReviewStageRunner(
         }
 
         return ResolveModelPath("llm-jp-4-8b-thinking-q4-k-m", paths.ReviewModelPath);
+    }
+
+    private string ResolveOutputSanitizerProfile(string modelId)
+    {
+        var catalogProfile = new ModelCatalogService(paths)
+            .LoadBuiltInCatalog()
+            .Models
+            .FirstOrDefault(model => model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase))
+            ?.OutputSanitizerProfile;
+
+        return LlmOutputSanitizerProfiles.ForReviewModel(modelId, catalogProfile);
+    }
+
+    private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
+    {
+        return !string.IsNullOrWhiteSpace(modelId) &&
+            catalog.Models.Any(model =>
+                model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
+                ModelCatalogCompatibility.IsSelectable(model));
     }
 }

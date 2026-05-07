@@ -90,6 +90,11 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
     throw "Review runtime is required but missing from publish output: $reviewRuntimePath"
 }
 
+$ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
+if (-not (Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf)) {
+    throw "Ternary review runtime is required but missing from publish output: $ternaryReviewRuntimePath"
+}
+
 if (-not ($manifest.PSObject.Properties.Name -contains "bundled_python_runtime")) {
     throw "Release manifest is missing bundled_python_runtime metadata."
 }
@@ -110,8 +115,20 @@ if (-not [bool]$manifest.review_runtime.required) {
     throw "Release manifest must mark review_runtime.required as true."
 }
 
+if (-not ($manifest.PSObject.Properties.Name -contains "ternary_review_runtime")) {
+    throw "Release manifest is missing ternary_review_runtime metadata."
+}
+
+if (-not [bool]$manifest.ternary_review_runtime.required) {
+    throw "Release manifest must mark ternary_review_runtime.required as true."
+}
+
 if ($manifest.review_runtime.path -ne $reviewRuntimePath) {
     throw "Release manifest review runtime path does not match. Expected $reviewRuntimePath but got $($manifest.review_runtime.path)."
+}
+
+if ($manifest.ternary_review_runtime.path -ne $ternaryReviewRuntimePath) {
+    throw "Release manifest ternary review runtime path does not match. Expected $ternaryReviewRuntimePath but got $($manifest.ternary_review_runtime.path)."
 }
 
 [pscustomobject]@{

@@ -10,6 +10,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
@@ -20,7 +21,9 @@ internal sealed record MainWindowRepositoryServices(
     JobLogRepository JobLogRepository,
     AsrSettingsRepository AsrSettingsRepository,
     CorrectionDraftRepository CorrectionDraftRepository,
-    TranscriptSegmentRepository TranscriptSegmentRepository);
+    TranscriptSegmentRepository TranscriptSegmentRepository,
+    TranscriptDerivativeRepository TranscriptDerivativeRepository,
+    TranscriptReadRepository TranscriptReadRepository);
 
 internal static class MainWindowRepositoryComposition
 {
@@ -32,7 +35,9 @@ internal static class MainWindowRepositoryComposition
             new JobLogRepository(paths),
             new AsrSettingsRepository(paths),
             new CorrectionDraftRepository(paths),
-            new TranscriptSegmentRepository(paths));
+            new TranscriptSegmentRepository(paths),
+            new TranscriptDerivativeRepository(paths),
+            new TranscriptReadRepository(paths));
     }
 }
 
@@ -109,17 +114,23 @@ internal sealed record MainWindowReviewServices(
     ReviewOperationService ReviewOperationService,
     TranscriptEditService TranscriptEditService,
     CorrectionMemoryService CorrectionMemoryService,
-    TranscriptExportService TranscriptExportService);
+    TranscriptExportService TranscriptExportService,
+    TranscriptSummaryService TranscriptSummaryService);
 
 internal static class MainWindowReviewComposition
 {
     public static MainWindowReviewServices Create(AppPaths paths)
     {
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
         return new MainWindowReviewServices(
             new ReviewOperationService(paths),
             new TranscriptEditService(paths),
             new CorrectionMemoryService(paths),
-            new TranscriptExportService(paths));
+            new TranscriptExportService(paths),
+            new TranscriptSummaryService(
+                new TranscriptReadRepository(paths),
+                derivativeRepository,
+                new LlamaTranscriptSummaryRuntime(new ExternalProcessRunner(), new TranscriptSummaryPromptBuilder())));
     }
 }
 
@@ -199,6 +210,15 @@ internal static class MainWindowAsrEngineComposition
                 transcriptSegmentRepository,
                 "whisper-base",
                 "Whisper base",
+                "faster-whisper"),
+            CreateScriptedEngine(
+                paths,
+                processRunner,
+                asrJsonNormalizer,
+                asrResultStore,
+                transcriptSegmentRepository,
+                "whisper-small",
+                "Whisper small",
                 "faster-whisper"),
             CreateScriptedEngine(
                 paths,
@@ -293,6 +313,14 @@ internal static class MainWindowJobRunComposition
                 repositories.JobLogRepository,
                 model.InstalledModelRepository,
                 new SetupStateService(paths),
-                workers.ReviewWorker));
+                workers.ReviewWorker),
+            new SummaryStageRunner(
+                paths,
+                repositories.JobRepository,
+                repositories.StageProgressRepository,
+                repositories.JobLogRepository,
+                model.InstalledModelRepository,
+                new SetupStateService(paths),
+                review.TranscriptSummaryService));
     }
 }

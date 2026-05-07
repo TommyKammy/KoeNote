@@ -65,7 +65,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource PanelBorder}" Padding="16,12">
+    <Border Style="{StaticResource PanelBorder}" Padding="14,12">
         <DockPanel>
             <TextBlock DockPanel.Dock="Top"
                        Text="処理ステージ"

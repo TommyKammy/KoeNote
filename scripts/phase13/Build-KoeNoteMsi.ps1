@@ -165,6 +165,12 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
 }
 Write-UpdateLog "review_runtime_verified" @{ path = $reviewRuntimePath }
 
+$ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
+if (-not (Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf)) {
+    throw "Ternary review runtime is required for release MSI builds but was not published: $ternaryReviewRuntimePath"
+}
+Write-UpdateLog "ternary_review_runtime_verified" @{ path = $ternaryReviewRuntimePath }
+
 dotnet publish $cleanupProject `
     -c $Configuration `
     -r $RuntimeIdentifier `
@@ -253,6 +259,10 @@ $manifest = [ordered]@{
     review_runtime = [ordered]@{
         required = $true
         path = $reviewRuntimePath
+    }
+    ternary_review_runtime = [ordered]@{
+        required = $true
+        path = $ternaryReviewRuntimePath
     }
     sha256 = $hash.Hash.ToLowerInvariant()
     signing = [ordered]@{

@@ -11,7 +11,8 @@ internal sealed class SetupModelSelectionService(
     public IReadOnlyList<ModelCatalogEntry> GetSelectableModels(string role)
     {
         return modelCatalogService.ListEntries()
-            .Where(entry => entry.Role.Equals(role, StringComparison.OrdinalIgnoreCase))
+            .Where(entry => entry.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+                ModelCatalogCompatibility.IsSelectable(entry.CatalogItem))
             .ToArray();
     }
 
@@ -98,6 +99,19 @@ internal sealed class SetupModelSelectionService(
         });
     }
 
+    public SetupState RepairUnsupportedSelections(SetupState state)
+    {
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var preset = string.IsNullOrWhiteSpace(state.SelectedModelPresetId)
+            ? null
+            : (catalog.Presets ?? []).FirstOrDefault(candidate =>
+                candidate.PresetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
+
+        var repaired = RepairSelection(state, catalog, preset, "asr");
+        repaired = RepairSelection(repaired, catalog, preset, "review");
+        return repaired.Equals(state) ? state : stateService.Save(repaired);
+    }
+
     public ModelCatalogItem? GetSelectedCatalogItem(string role)
     {
         var state = stateService.Load();
@@ -118,7 +132,7 @@ internal sealed class SetupModelSelectionService(
     {
         var recommendedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
             ? "faster-whisper-large-v3-turbo"
-            : "llm-jp-4-8b-thinking-q4-k-m";
+            : "gemma-4-e4b-it-q4-k-m";
         var selectableModels = GetSelectableModels(role);
         return selectableModels.FirstOrDefault(entry =>
             entry.ModelId.Equals(recommendedModelId, StringComparison.OrdinalIgnoreCase)) ??
@@ -128,10 +142,58 @@ internal sealed class SetupModelSelectionService(
             selectableModels.FirstOrDefault();
     }
 
+    private SetupState RepairSelection(
+        SetupState state,
+        ModelCatalog catalog,
+        ModelQualityPreset? preset,
+        string role)
+    {
+        var selectedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? state.SelectedAsrModelId
+            : state.SelectedReviewModelId;
+        var selectedModel = FindCatalogModel(catalog, selectedModelId, role);
+        if (selectedModel is not null && ModelCatalogCompatibility.IsSelectable(selectedModel))
+        {
+            return state;
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedModelId) && selectedModel is null)
+        {
+            return state;
+        }
+
+        var presetModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? preset?.AsrModelId
+            : preset?.ReviewModelId;
+        var replacementModelId = IsSelectableCatalogModel(catalog, presetModelId, role)
+            ? presetModelId
+            : PickRecommended(role)?.ModelId;
+
+        return role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? state with { SelectedAsrModelId = replacementModelId }
+            : state with { SelectedReviewModelId = replacementModelId };
+    }
+
+    private static bool IsSelectableCatalogModel(ModelCatalog catalog, string? modelId, string role)
+    {
+        var model = FindCatalogModel(catalog, modelId, role);
+        return model is not null && ModelCatalogCompatibility.IsSelectable(model);
+    }
+
+    private static ModelCatalogItem? FindCatalogModel(ModelCatalog catalog, string? modelId, string role)
+    {
+        return string.IsNullOrWhiteSpace(modelId)
+            ? null
+            : catalog.Models.FirstOrDefault(model =>
+                model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)
     {
         if (!catalog.Models.Any(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
-            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase)))
+            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
+            ModelCatalogCompatibility.IsSelectable(model)))
         {
             throw new InvalidOperationException($"Preset references missing {role} model: {modelId}");
         }

@@ -56,7 +56,7 @@
                             Padding="0"
                             HorizontalAlignment="Right"
                             Command="{Binding ExportSelectedJobCommand}"
-                            ToolTip="TXT / Markdown / JSON / SRT / VTT を出力">
+                            ToolTip="整文を TXT / Markdown / JSON / SRT / VTT / DOCX で出力">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" Margin="0,0,7,0" />
                             <TextBlock Text="出力" FontWeight="SemiBold" />
@@ -69,7 +69,7 @@
                             MinWidth="0"
                             Margin="6,0,0,0"
                             Command="{Binding OpenExportFolderCommand}"
-                            ToolTip="出力フォルダを開く">
+                            ToolTip="出力フォルダーを開く">
                         <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" />
                     </Button>
                 </StackPanel>
@@ -82,7 +82,18 @@
                        FontWeight="SemiBold"
                        TextWrapping="Wrap"
                        Margin="0,8,0,0" />
-            <controls:TranscriptSegmentList />
+
+            <TabControl>
+                <TabItem Header="素起こし">
+                    <controls:TranscriptSegmentList DisplayMode="Raw" />
+                </TabItem>
+                <TabItem Header="整文">
+                    <controls:TranscriptSegmentList DisplayMode="Polished" />
+                </TabItem>
+                <TabItem Header="差分">
+                    <controls:TranscriptSegmentList DisplayMode="Diff" />
+                </TabItem>
+            </TabControl>
         </DockPanel>
     </Border>
 </UserControl>

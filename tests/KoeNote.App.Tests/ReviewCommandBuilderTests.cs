@@ -60,4 +60,33 @@ public sealed class ReviewCommandBuilderTests
         Assert.Contains("--json-schema-file", arguments);
         Assert.Contains(@"C:\out\review.schema.json", arguments);
     }
+
+    [Fact]
+    public void BuildArgumentList_UsesRuntimeTuningOverrides()
+    {
+        var options = new ReviewRunOptions(
+            "job-001",
+            "llama-completion.exe",
+            @"C:\models\ternary.gguf",
+            @"C:\out",
+            [new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "text")],
+            ContextSize: 1024,
+            GpuLayers: 0,
+            MaxTokens: 192,
+            Threads: 8,
+            ThreadsBatch: 8,
+            UseJsonSchema: false);
+
+        var arguments = new ReviewCommandBuilder().BuildArgumentList(
+            options,
+            @"C:\out\review.prompt.txt",
+            options.UseJsonSchema ? @"C:\out\review.schema.json" : null);
+
+        Assert.Contains("1024", arguments);
+        Assert.Contains("192", arguments);
+        Assert.Contains("--threads", arguments);
+        Assert.Contains("8", arguments);
+        Assert.Contains("--threads-batch", arguments);
+        Assert.DoesNotContain("--json-schema-file", arguments);
+    }
 }

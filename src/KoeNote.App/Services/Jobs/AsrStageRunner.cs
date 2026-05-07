@@ -176,6 +176,13 @@ public sealed class AsrStageRunner(
                 "whisper-base",
                 paths.FasterWhisperScriptPath,
                 "base"),
+            "whisper-small" => new AsrEngineConfig(
+                paths.AsrPythonPath,
+                ResolveModelPath("whisper-small", paths.WhisperSmallModelPath),
+                outputDirectory,
+                "whisper-small",
+                paths.FasterWhisperScriptPath,
+                "small"),
             "faster-whisper-large-v3-turbo" => new AsrEngineConfig(
                 paths.AsrPythonPath,
                 ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),

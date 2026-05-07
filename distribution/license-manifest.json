@@ -41,6 +41,14 @@
       "source": "https://github.com/ggml-org/llama.cpp",
       "expectedPath": "tools/review/llama-completion.exe",
       "notes": "Bundled so the Review stage can run after a Review GGUF model is installed. KoeNote uses the CPU x64 binary to avoid adding a GPU driver dependency."
+    },
+    {
+      "name": "Prism llama.cpp CPU x64 runtime",
+      "type": "runtime tool",
+      "license": "MIT",
+      "source": "https://github.com/PrismML-Eng/llama.cpp",
+      "expectedPath": "tools/review-ternary/llama-completion.exe",
+      "notes": "Bundled separately for Ternary Bonsai Q2_0 models so the standard review runtime remains isolated from Prism-specific GGUF Q2_0 support."
     }
   ]
 }

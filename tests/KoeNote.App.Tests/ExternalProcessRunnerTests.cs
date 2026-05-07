@@ -25,11 +25,11 @@ public sealed class ExternalProcessRunnerTests
 
         var result = await runner.RunAsync(
             "powershell",
-            "-NoProfile -Command \"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Output '推敲候補'\"",
+            "-NoProfile -Command \"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Output '整文候補'\"",
             TimeSpan.FromSeconds(10));
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("推敲候補", result.StandardOutput);
+        Assert.Contains("整文候補", result.StandardOutput);
     }
 
     [Fact]

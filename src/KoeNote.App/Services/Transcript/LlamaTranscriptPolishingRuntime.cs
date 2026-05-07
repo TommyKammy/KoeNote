@@ -36,7 +36,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
                 $"Transcript polishing runtime exited with code {result.ExitCode}: {result.StandardError}");
         }
 
-        var content = NormalizeOutput(result.StandardOutput);
+        var content = LlmOutputSanitizer.SanitizeMarkdown(result.StandardOutput, options.OutputSanitizerProfile);
         if (string.IsNullOrWhiteSpace(content))
         {
             throw new ReviewWorkerException(ReviewFailureCategory.JsonParseFailed, "Transcript polishing returned empty output.");
@@ -49,44 +49,37 @@ public sealed class LlamaTranscriptPolishingRuntime(
 
     private static IReadOnlyList<string> BuildArguments(TranscriptPolishingOptions options, string promptPath)
     {
-        return
-        [
+        var arguments = new List<string>
+        {
             "--model",
             options.ModelPath,
             "--file",
             promptPath,
             "--ctx-size",
-            "8192",
+            options.ContextSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--n-gpu-layers",
-            "999",
+            options.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--n-predict",
-            "4096",
+            options.MaxTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--temp",
             "0.1",
             "--single-turn",
             "--no-display-prompt"
-        ];
-    }
+        };
 
-    private static string NormalizeOutput(string output)
-    {
-        var text = (output ?? string.Empty).Trim();
-        if (text.StartsWith("```", StringComparison.Ordinal))
+        if (options.Threads is { } threads)
         {
-            var firstLineEnd = text.IndexOf('\n');
-            if (firstLineEnd >= 0)
-            {
-                text = text[(firstLineEnd + 1)..];
-            }
-
-            var fenceIndex = text.LastIndexOf("```", StringComparison.Ordinal);
-            if (fenceIndex >= 0)
-            {
-                text = text[..fenceIndex];
-            }
+            arguments.Add("--threads");
+            arguments.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        return text.Trim();
+        if (options.ThreadsBatch is { } threadsBatch)
+        {
+            arguments.Add("--threads-batch");
+            arguments.Add(threadsBatch.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        return arguments;
     }
 
     private static void ValidateInputs(TranscriptPolishingOptions options, TranscriptPolishingChunk chunk)

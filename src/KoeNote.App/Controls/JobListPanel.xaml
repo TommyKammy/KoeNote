@@ -150,7 +150,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding UpdatedAtDisplay}" Style="{StaticResource MutedText}" />
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}"
+                                                           Text="{Binding UnreviewedDrafts, StringFormat=未確認 {0}}"
                                                            Style="{StaticResource MutedText}" />
                                             </Grid>
                                         </StackPanel>
@@ -213,7 +213,7 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding UnreviewedDrafts, StringFormat=未レビュー {0}}" Style="{StaticResource MutedText}" />
+                                                <TextBlock Text="{Binding UnreviewedDrafts, StringFormat=未確認 {0}}" Style="{StaticResource MutedText}" />
                                                 <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" Style="{StaticResource MutedText}" />
                                             </Grid>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

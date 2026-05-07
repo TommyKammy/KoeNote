@@ -61,7 +61,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(first.SelectedAsrEngineId, second.SelectedAsrEngineId);
         Assert.Equal(
-            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base"],
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base", "whisper-small"],
             second.AvailableAsrEngines.Select(engine => engine.EngineId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
@@ -632,10 +632,10 @@ public sealed class MainWindowViewModelTests
 
         Assert.Empty(viewModel.SelectedCorrectionDraftId);
         Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
-        Assert.Equal("レビュー完了", viewModel.SelectedJob?.Status);
+        Assert.Equal("整文完了", viewModel.SelectedJob?.Status);
         Assert.Equal(100, viewModel.SelectedJob?.ProgressPercent);
-        Assert.Equal("完了", viewModel.StageStatuses[3].Status);
-        Assert.Equal(100, viewModel.StageStatuses[3].ProgressPercent);
+        Assert.Equal("完了", viewModel.StageStatuses[4].Status);
+        Assert.Equal(100, viewModel.StageStatuses[4].ProgressPercent);
     }
 
     [Fact]
@@ -647,7 +647,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("候補なし", viewModel.ReviewIssueType);
         Assert.Empty(viewModel.OriginalText);
         Assert.Empty(viewModel.SuggestedText);
-        Assert.Equal("推敲候補はありません。", viewModel.ReviewReason);
+        Assert.Equal("整文候補はありません。", viewModel.ReviewReason);
         Assert.Equal(0, viewModel.Confidence);
         Assert.Equal("0 / 0", viewModel.DraftPositionText);
     }
@@ -707,8 +707,8 @@ public sealed class MainWindowViewModelTests
 
         viewModel.ExportSelectedJobToFolder(string.Empty);
 
-        Assert.StartsWith("Export failed:", viewModel.ExportWarning, StringComparison.Ordinal);
-        Assert.StartsWith("Export failed:", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.StartsWith("整文の出力に失敗しました:", viewModel.ExportWarning, StringComparison.Ordinal);
+        Assert.StartsWith("整文の出力に失敗しました:", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.Contains(viewModel.Logs, entry => entry.Stage == "export" && entry.Level == "error");
     }
 
@@ -1112,6 +1112,69 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void StageRunUpdate_MarksStageDoingEvenWhenProgressIsZero()
+    {
+        var viewModel = CreateViewModel();
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Summary,
+                JobRunStageState.Running,
+                0)
+        ]);
+
+        var summaryStage = viewModel.StageStatuses[3];
+        Assert.True(summaryStage.IsRunning);
+        Assert.True(summaryStage.IsDoing);
+        Assert.False(summaryStage.IsPending);
+    }
+
+    [Fact]
+    public void StageRunUpdate_DoesNotMarkRunningStageDoneAtOneHundredPercent()
+    {
+        var viewModel = CreateViewModel();
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Summary,
+                JobRunStageState.Running,
+                100)
+        ]);
+
+        var summaryStage = viewModel.StageStatuses[3];
+        Assert.True(summaryStage.IsRunning);
+        Assert.True(summaryStage.IsDoing);
+        Assert.False(summaryStage.IsDone);
+    }
+
+    [Fact]
+    public void StageRunUpdate_DoesNotMarkSkippedStageDone()
+    {
+        var viewModel = CreateViewModel();
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Summary,
+                JobRunStageState.Skipped,
+                100)
+        ]);
+
+        var summaryStage = viewModel.StageStatuses[3];
+        Assert.True(summaryStage.IsSkipped);
+        Assert.False(summaryStage.IsDone);
+        Assert.False(summaryStage.IsDoing);
+    }
+
+    [Fact]
     public void SelectingSegment_SeeksPlaybackPositionToSegmentStart()
     {
         var viewModel = CreateViewModel();
@@ -1465,7 +1528,8 @@ public sealed class MainWindowViewModelTests
             IsCompleted = true,
             LastSmokeSucceeded = true,
             LicenseAccepted = true,
-            SelectedAsrModelId = "kotoba-whisper-v2.2-faster"
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
         });
 
         var viewModel = new MainWindowViewModel(paths);
@@ -1572,7 +1636,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
         Assert.False(viewModel.ReviewStageAssetsReady);
         Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
-        Assert.Contains("推敲ランタイムまたは推敲モデルが不足しています", viewModel.RunPreflightDetail, StringComparison.Ordinal);
+        Assert.Contains("整文ランタイムまたは整文モデルが不足しています", viewModel.RunPreflightDetail, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1644,6 +1708,45 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSelectedJobCommand_UsesPresetReviewModelWhenSelectedReviewModelIsEmpty()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
+        Directory.CreateDirectory(paths.WhisperSmallModelPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var reviewItem = catalog.Models.First(model => model.ModelId == "bonsai-8b-q1-0");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "whisper-small", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = "whisper-small",
+            SelectedReviewModelId = string.Empty
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.True(viewModel.ReviewStageAssetsReady);
         Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
     }
 

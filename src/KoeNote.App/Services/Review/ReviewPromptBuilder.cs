@@ -5,7 +5,14 @@ namespace KoeNote.App.Services.Review;
 
 public sealed class ReviewPromptBuilder(ReviewGuidelineRepository? guidelineRepository = null)
 {
-    public string Build(IReadOnlyList<TranscriptSegment> segments)
+    public string Build(IReadOnlyList<TranscriptSegment> segments, string promptProfile = "default")
+    {
+        return string.Equals(promptProfile, "compact", StringComparison.OrdinalIgnoreCase)
+            ? BuildCompact(segments)
+            : BuildDefault(segments);
+    }
+
+    private string BuildDefault(IReadOnlyList<TranscriptSegment> segments)
     {
         var lines = segments.Select(segment =>
             $"- segment_id: {segment.SegmentId}\n  speaker: {segment.SpeakerId ?? ""}\n  text: {segment.NormalizedText ?? segment.RawText}");
@@ -35,6 +42,21 @@ public sealed class ReviewPromptBuilder(ReviewGuidelineRepository? guidelineRepo
             ]
 
             ASRセグメント:
+            {{string.Join("\n", lines)}}
+            """;
+    }
+
+    private static string BuildCompact(IReadOnlyList<TranscriptSegment> segments)
+    {
+        var lines = segments.Select(segment =>
+            $"{segment.SegmentId}: {segment.NormalizedText ?? segment.RawText}");
+
+        return $$"""
+            日本語ASRの明らかな誤りだけ、最大1件のJSON配列で返してください。候補なしは [] だけ返してください。
+            説明、Markdown、コードフェンスは禁止です。
+            形式: [{"segment_id":"0","issue_type":"誤り","original_text":"原文","suggested_text":"修正","reason":"理由","confidence":0.5}]
+
+            ASR:
             {{string.Join("\n", lines)}}
             """;
     }

@@ -16,6 +16,7 @@ public sealed class ToolStatusServiceTests
 
         AssertMissing(items, "ffmpeg", paths.FfmpegPath);
         AssertMissing(items, "llama-completion", paths.LlamaCompletionPath);
+        AssertNotInstalled(items, "llama-completion-ternary", paths.TernaryLlamaCompletionPath);
         Assert.DoesNotContain(items, item => item.Name == "ASR model");
         Assert.DoesNotContain(items, item => item.Name == "Review model");
     }
@@ -29,11 +30,13 @@ public sealed class ToolStatusServiceTests
         paths.EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
+        Touch(paths.TernaryLlamaCompletionPath);
 
         var items = new ToolStatusService(paths).GetStatusItems();
 
         AssertFound(items, "ffmpeg", paths.FfmpegPath);
         AssertFound(items, "llama-completion", paths.LlamaCompletionPath);
+        AssertFound(items, "llama-completion-ternary", paths.TernaryLlamaCompletionPath);
     }
 
     [Fact]
@@ -78,6 +81,14 @@ public sealed class ToolStatusServiceTests
         Assert.True(item.IsOk);
         Assert.Equal("Found", item.Value);
         Assert.Equal(expectedPath, item.Detail);
+    }
+
+    private static void AssertNotInstalled(IReadOnlyList<Models.StatusItem> items, string name, string expectedPath)
+    {
+        var item = Assert.Single(items, item => item.Name == name);
+        Assert.True(item.IsOk);
+        Assert.Equal("Not installed yet", item.Value);
+        Assert.Contains(expectedPath, item.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void Touch(string path)

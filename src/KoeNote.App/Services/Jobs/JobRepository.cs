@@ -55,7 +55,7 @@ public sealed class JobRepository(AppPaths paths)
                 reader.GetString(1),
                 Path.GetFileName(sourceAudioPath),
                 sourceAudioPath,
-                reader.GetString(4),
+                NormalizeDisplayStatus(reader.GetString(4)),
                 reader.GetInt32(5),
                 reader.GetInt32(6),
                 updatedAt,
@@ -86,7 +86,7 @@ public sealed class JobRepository(AppPaths paths)
                 GROUP BY job_id
             )
             UPDATE jobs
-            SET status = 'レビュー完了',
+            SET status = '整文完了',
                 current_stage = 'review_completed',
                 progress_percent = 100,
                 unreviewed_draft_count = 0,
@@ -96,11 +96,27 @@ public sealed class JobRepository(AppPaths paths)
                 AND unreviewed_draft_count = 0
                 AND (
                     current_stage = 'review_ready'
+                    OR status = '整文候補なし'
                     OR status = '推敲候補なし'
                 );
             """;
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
+    }
+
+    private static string NormalizeDisplayStatus(string status)
+    {
+        return status switch
+        {
+            "レビュー待ち" => "整文待ち",
+            "レビュー完了" => "整文完了",
+            "レビュー済み" => "整文済み",
+            "レビュー中" => "整文中",
+            "レビュー失敗" => "整文失敗",
+            "推敲候補なし" => "整文候補なし",
+            "推敲中" => "整文中",
+            _ => status
+        };
     }
 
     public JobSummary CreateFromAudio(string sourceAudioPath)
@@ -242,14 +258,14 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkReviewRunning(JobSummary job)
     {
-        UpdatePreprocessResult(job, "推敲中", "reviewing", 82, job.NormalizedAudioPath);
+        UpdatePreprocessResult(job, "整文中", "reviewing", 82, job.NormalizedAudioPath);
     }
 
     public void MarkReviewSucceeded(JobSummary job, int draftCount)
     {
         UpdatePreprocessResult(
             job,
-            draftCount > 0 ? "レビュー待ち" : "レビュー完了",
+            draftCount > 0 ? "整文待ち" : "整文完了",
             draftCount > 0 ? "review_ready" : "review_completed",
             draftCount > 0 ? 90 : 100,
             job.NormalizedAudioPath,
@@ -258,7 +274,7 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkReviewSkippedAndClearDrafts(JobSummary job)
     {
-        job.Status = "レビュー完了";
+        job.Status = "整文完了";
         job.ProgressPercent = 100;
         job.UnreviewedDrafts = 0;
         job.UpdatedAt = DateTimeOffset.Now;
@@ -316,7 +332,27 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkReviewFailed(JobSummary job, string errorCategory)
     {
-        UpdatePreprocessResult(job, $"推敲失敗: {errorCategory}", "review_failed", 90, job.NormalizedAudioPath, errorCategory);
+        UpdatePreprocessResult(job, $"整文失敗: {errorCategory}", "review_failed", 90, job.NormalizedAudioPath, errorCategory);
+    }
+
+    public void MarkSummaryRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "要約中", "summarizing", 94, job.NormalizedAudioPath);
+    }
+
+    public void MarkSummarySucceeded(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "要約完了", "summary_completed", 100, job.NormalizedAudioPath);
+    }
+
+    public void MarkSummarySkipped(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "要約スキップ", "summary_skipped", 100, job.NormalizedAudioPath);
+    }
+
+    public void MarkSummaryFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, $"要約失敗: {errorCategory}", "summary_failed", 96, job.NormalizedAudioPath, errorCategory);
     }
 
     public void MarkCancelled(JobSummary job, string currentStage)

@@ -304,6 +304,106 @@ Implemented behavior:
 The runtime abstraction allows tests and future engines to supply polished
 chunks without starting `llama-completion`.
 
+## Phase S3 readiness decisions
+
+Phase S3 will implement the summary engine before adding UI controls or minutes
+generation. The implementation should keep Summary separate from Minutes so
+that the first summary slice can be tested and tuned independently.
+
+Input selection:
+
+- Prefer the latest successful `polished` derivative when it exists and is not
+  stale.
+- Fall back to the current raw transcript when no usable polished derivative
+  exists.
+- Keep raw transcript segment ids, speaker labels, and timestamps available for
+  decisions and action items even when the readable input is polished text.
+
+Output format:
+
+- Store the final summary as `kind = summary`.
+- Use `content_format = markdown` for the first implementation.
+- Use these default sections in order:
+  - Overview
+  - Key points
+  - Decisions
+  - Action items
+  - Open questions
+  - Keywords
+
+Generation shape:
+
+- Use a two-step pipeline for long transcripts: chunk summaries first, then a
+  final merged summary.
+- Store each chunk summary in `transcript_derivative_chunks` with source segment
+  ids and source time range.
+- Store the final merged summary in `transcript_derivatives`.
+- Use `source_kind = polished` when the source is a polished derivative; use
+  `source_kind = raw` when falling back to raw transcript.
+- Store the source transcript hash for both chunk and final records.
+
+Safety rules:
+
+- The summary prompt must say not to add facts that are not present in the
+  transcript.
+- Owners, dates, participants, and deadlines must be `Unspecified` when the
+  transcript does not provide them.
+- Decisions and action items must not be invented. Include them only when the
+  source states or clearly implies them.
+- Prefer source references for decisions and action items when timestamps are
+  available.
+
+Validation and failure handling:
+
+- Reject empty output.
+- Reject malformed structured output when a structured contract is used.
+- Reject extremely short summaries for non-short transcripts unless the runtime
+  explicitly reports that there was little content to summarize.
+- Save failed generations as failed summary derivatives with error details so
+  the user can retry later.
+
+Phase S3 planned service slice:
+
+- `TranscriptSummaryPromptBuilder`
+- `TranscriptSummaryService`
+- `ITranscriptSummaryRuntime`
+- `LlamaTranscriptSummaryRuntime`
+- unit tests for input selection, chunking, final merge, stale source behavior,
+  and failed-output persistence
+
+Phase S3 will not add the main UI tabs, copy/export buttons, or minutes
+generation. Those remain later-phase work after the summary service contract is
+stable.
+
+## Phase S3 implemented slice
+
+Phase S3 adds the summary generation service. It still does not expose the
+feature in the UI and it does not generate minutes.
+
+Implemented service objects:
+
+- `TranscriptSummaryPromptBuilder`
+- `TranscriptSummaryService`
+- `LlamaTranscriptSummaryRuntime`
+
+Implemented behavior:
+
+- Read current transcript segments for a job.
+- Prefer the latest successful non-stale `polished` derivative as summary
+  input.
+- Fall back to raw transcript segments when no usable polished derivative
+  exists.
+- Split summary input into chunks while preserving source segment ids and time
+  ranges.
+- Generate Markdown chunk summaries through a runtime abstraction.
+- Merge chunk summaries into a final Markdown summary.
+- Save the final result as a `summary` derivative.
+- Save each chunk summary in `transcript_derivative_chunks`.
+- Store failed empty or invalid generations as failed summary derivatives.
+
+The runtime abstraction allows tests and future engines to supply summary
+chunks without starting `llama-completion`.
+
 ## UI contract for later phases
 
 Initial UI should avoid a crowded tool surface.

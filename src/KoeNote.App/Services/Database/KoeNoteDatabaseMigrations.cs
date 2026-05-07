@@ -18,7 +18,8 @@ internal static class KoeNoteDatabaseMigrations
         new(12, "domain preset deactivation", ApplyDomainPresetDeactivationSchema),
         new(13, "domain preset speaker alias tracking", ApplyDomainPresetSpeakerAliasTrackingSchema),
         new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema),
-        new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema)
+        new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema),
+        new(16, "summary stage toggle", ApplySummaryStageToggle)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -118,11 +119,13 @@ internal static class KoeNoteDatabaseMigrations
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                enable_summary_stage INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo'");
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
+        migration.AddColumnIfMissing("asr_settings", "enable_summary_stage", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void ApplyEditingAndUndoSchema(DatabaseMigrationContext migration)
@@ -295,11 +298,13 @@ internal static class KoeNoteDatabaseMigrations
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                enable_summary_stage INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "engine_id", "TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo'");
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
+        migration.AddColumnIfMissing("asr_settings", "enable_summary_stage", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void ApplyReviewStageToggle(DatabaseMigrationContext migration)
@@ -311,10 +316,12 @@ internal static class KoeNoteDatabaseMigrations
                 hotwords_text TEXT NOT NULL DEFAULT '',
                 engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
                 enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                enable_summary_stage INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "enable_review_stage", "INTEGER NOT NULL DEFAULT 1");
+        migration.AddColumnIfMissing("asr_settings", "enable_summary_stage", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void ApplyMaintenanceIndexes(DatabaseMigrationContext migration)
@@ -522,6 +529,22 @@ internal static class KoeNoteDatabaseMigrations
             CREATE INDEX IF NOT EXISTS idx_transcript_derivative_chunks_job_status
             ON transcript_derivative_chunks(job_id, status);
             """);
+    }
+
+    private static void ApplySummaryStageToggle(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
+                enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                enable_summary_stage INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            """);
+        migration.AddColumnIfMissing("asr_settings", "enable_summary_stage", "INTEGER NOT NULL DEFAULT 0");
     }
 
 }

@@ -18,6 +18,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
@@ -38,6 +39,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly JobLogRepository _jobLogRepository;
     private readonly AsrSettingsRepository _asrSettingsRepository;
     private readonly TranscriptSegmentRepository _transcriptSegmentRepository;
+    private readonly TranscriptDerivativeRepository _transcriptDerivativeRepository;
     private readonly AsrEngineRegistry _asrEngineRegistry;
     private readonly JobRunCoordinator _jobRunCoordinator;
     private readonly CorrectionDraftRepository _correctionDraftRepository;
@@ -100,6 +102,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _exportWarning = string.Empty;
     private string _lastExportFolder = string.Empty;
     private bool _includeExportTimestamps = true;
+    private string _summaryContent = string.Empty;
+    private string _summaryStatus = "要約はまだありません。";
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
     private string _modelDownloadNotification = string.Empty;
@@ -132,6 +136,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _asrHotwordsText = string.Empty;
     private string _selectedAsrEngineId = "faster-whisper-large-v3-turbo";
     private bool _enableReviewStage = true;
+    private bool _enableSummaryStage;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private double _mainContentZoomScale = 1.0;
@@ -139,10 +144,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
+    private bool _isSummaryStageRunning;
     private string _reviewIssueType = "候補なし";
     private string _originalText = string.Empty;
     private string _suggestedText = string.Empty;
-    private string _reviewReason = "推敲候補はありません。";
+    private string _reviewReason = "整文候補はありません。";
     private double _confidence;
     private int _reviewSegmentFocusRequestId;
     private int _transcriptAutoScrollRequestId;
@@ -192,6 +198,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateDownloadService = services.UpdateDownloadService;
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _updateHistoryService = services.UpdateHistoryService;
+        _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
         _uiPreferencesService = new UiPreferencesService(paths);
         var currentApplication = System.Windows.Application.Current;
         _shutdownApplication = currentApplication is null ? (() => { }) : currentApplication.Shutdown;
@@ -239,6 +246,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
+        _enableSummaryStage = asrSettings.EnableSummaryStage;
         RefreshReviewStageToggleStatus();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
@@ -316,6 +324,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json), CanExportSelectedJob);
         ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt), CanExportSelectedJob);
         ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
+        ExportRawTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawVttCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Vtt, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportPolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportPolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportPolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportSummaryMarkdownCommand = new RelayCommand(ExportSummaryMarkdownAsync, CanExportSummaryMarkdown);
+        ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
         ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
         ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);
@@ -395,7 +414,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public string SetupPlaceholderText =>
-        "セットアップウィザードで ASR / 推敲モデルの導入を案内します。必要なモデルやランタイムの状態を確認できます。";
+        "セットアップウィザードで ASR / 整文モデルの導入を案内します。必要なモデルやランタイムの状態を確認できます。";
 
     private IEnumerable<StatusItem> GetBlockingEnvironmentIssues()
     {
@@ -446,7 +465,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
         if (EnableReviewStage && !ReviewStageAssetsReady)
         {
-            issues.Add($"推敲ランタイムまたは推敲モデルが不足しています: {Paths.LlamaCompletionPath}");
+            issues.Add($"整文ランタイムまたは整文モデルが不足しています: {GetSelectedReviewRuntimePath()}");
+        }
+
+        if (EnableSummaryStage && !SummaryStageAssetsReady)
+        {
+            issues.Add($"要約ランタイムまたは要約モデルが不足しています: {GetSelectedReviewRuntimePath()}");
         }
 
         return issues;
@@ -466,7 +490,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool ReviewStageAssetsReady => EnvironmentStatus
         .Where(static item => item.Name == "llama-completion")
         .All(static item => item.IsOk) &&
+        IsSelectedReviewRuntimeReady() &&
         IsReviewModelReady();
+
+    public bool SummaryStageAssetsReady => ReviewStageAssetsReady;
 
     public bool IsSetupComplete => _setupState.IsCompleted;
 
@@ -482,7 +509,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupStep.EnvironmentCheck => "まず動作環境を確認します",
         SetupStep.SetupMode => "モデル構成を選びます",
         SetupStep.AsrModel => "文字起こしモデルを選びます",
-        SetupStep.ReviewModel => "推敲モデルを選びます",
+        SetupStep.ReviewModel => "整文モデルを選びます",
         SetupStep.Storage => "モデルの保存先を確認します",
         SetupStep.License => "ライセンスを確認します",
         SetupStep.Install => "モデルを導入します",
@@ -493,11 +520,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupWizardModalGuide => _setupState.CurrentStep switch
     {
-        SetupStep.Welcome => "KoeNote は本体だけ先に起動し、ASR / 推敲モデルはあとから導入します。ここでは最初の文字起こしに必要な準備を順番に案内します。",
+        SetupStep.Welcome => "KoeNote は本体だけ先に起動し、ASR / 整文モデルはあとから導入します。ここでは最初の文字起こしに必要な準備を順番に案内します。",
         SetupStep.EnvironmentCheck => "足りない runtime やモデルがあってもアプリ本体は壊れません。ここで次に必要な導入操作を確認できます。",
-        SetupStep.SetupMode => "軽量、推奨、高精度、実験的からPC環境に合う構成を選びます。あとからASRと推敲モデルを個別に変更できます。",
+        SetupStep.SetupMode => "軽量、推奨、高精度、実験的からPC環境に合う構成を選びます。あとからASRと整文モデルを個別に変更できます。",
         SetupStep.AsrModel => "日本語文字起こしには faster-whisper large-v3-turbo を推奨します。精度優先なら large-v3 も選べます。",
-        SetupStep.ReviewModel => "推敲は文字起こし結果の確認を助ける追加ステージです。不要な場合は Settings でいつでもスキップできます。",
+        SetupStep.ReviewModel => "整文は文字起こし結果を読みやすく整える追加ステージです。不要な場合は Settings でいつでもスキップできます。",
         SetupStep.Storage => "オンラインダウンロード、ローカルファイル、offline model pack のどれでも導入できます。",
         SetupStep.License => "モデルごとの license / size / runtime requirement を確認してから導入します。",
         SetupStep.Install => "ダウンロード中は進捗を表示します。失敗しても本体は起動したままで、別経路から再試行できます。",
@@ -725,6 +752,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportDocxCommand { get; }
 
+    public ICommand ExportRawTxtCommand { get; }
+
+    public ICommand ExportRawMarkdownCommand { get; }
+
+    public ICommand ExportRawJsonCommand { get; }
+
+    public ICommand ExportRawSrtCommand { get; }
+
+    public ICommand ExportRawVttCommand { get; }
+
+    public ICommand ExportRawDocxCommand { get; }
+
+    public ICommand ExportPolishedTxtCommand { get; }
+
+    public ICommand ExportPolishedMarkdownCommand { get; }
+
+    public ICommand ExportPolishedDocxCommand { get; }
+
+    public ICommand ExportSummaryMarkdownCommand { get; }
+
+    public ICommand ExportSummaryTextCommand { get; }
+
     public ICommand OpenExportFolderCommand { get; }
 
     public ICommand ZoomOutCommand { get; }
@@ -768,6 +817,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 StopAudioPlayback();
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
+                LoadSummaryForSelectedJob();
                 LoadReviewQueue();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
@@ -929,7 +979,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
             if (SelectedSetupConfigurationReady)
             {
-                return "ASR、推敲モデル、話者識別ランタイムは導入済みです。ライセンス同意と最終確認へ進めます。";
+                return "ASR、整文モデル、話者識別ランタイムは導入済みです。ライセンス同意と最終確認へ進めます。";
             }
 
             var missing = new List<string>();
@@ -940,7 +990,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
             if (!IsSetupModelReady(SelectedSetupReviewModel))
             {
-                missing.Add("推敲モデル");
+                missing.Add("整文モデル");
             }
 
             if (!SetupFasterWhisperRuntimeReady)
@@ -989,7 +1039,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupStep.EnvironmentCheck => "環境確認",
         SetupStep.SetupMode => "モデル構成",
         SetupStep.AsrModel => "ASRモデル",
-        SetupStep.ReviewModel => "推敲LLM",
+        SetupStep.ReviewModel => "整文LLM",
         SetupStep.Storage => "保存先",
         SetupStep.License => "ライセンス",
         SetupStep.Install => "モデル導入",
@@ -1499,6 +1549,32 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         set => SetField(ref _includeExportTimestamps, value);
     }
 
+    public string SummaryContent
+    {
+        get => _summaryContent;
+        private set
+        {
+            if (SetField(ref _summaryContent, value))
+            {
+                OnPropertyChanged(nameof(HasSummaryContent));
+                OnPropertyChanged(nameof(SummaryContentDisplay));
+                UpdateExportCommandStates();
+            }
+        }
+    }
+
+    public bool HasSummaryContent => !string.IsNullOrWhiteSpace(SummaryContent);
+
+    public string SummaryContentDisplay => HasSummaryContent
+        ? SummaryContent
+        : "要約はまだ生成されていません。";
+
+    public string SummaryStatus
+    {
+        get => _summaryStatus;
+        private set => SetField(ref _summaryStatus, value);
+    }
+
     public double MainContentZoomScale
     {
         get => _mainContentZoomScale;
@@ -1598,11 +1674,39 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ReviewStageToggleText => EnableReviewStage ? "推敲 ON" : "推敲 OFF";
+    public string ReviewStageToggleText => EnableReviewStage ? "整文 ON" : "整文 OFF";
 
     public string ReviewStageToggleToolTip => EnableReviewStage
-        ? "推敲ステージを実行します。クリックでスキップ"
-        : "推敲ステージをスキップします。クリックで実行";
+        ? "整文ステージを実行します。クリックでスキップ"
+        : "整文ステージをスキップします。クリックで実行";
+
+    public bool IsSummaryStageRunning
+    {
+        get => _isSummaryStageRunning;
+        private set => SetField(ref _isSummaryStageRunning, value);
+    }
+
+    public bool EnableSummaryStage
+    {
+        get => _enableSummaryStage;
+        set
+        {
+            if (SetField(ref _enableSummaryStage, value))
+            {
+                OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+                OnPropertyChanged(nameof(SummaryStageAssetsReady));
+                OnPropertyChanged(nameof(CanRunSelectedJob));
+                OnPropertyChanged(nameof(RunPreflightSummary));
+                OnPropertyChanged(nameof(RunPreflightDetail));
+                if (RunSelectedJobCommand is RelayCommand runCommand)
+                {
+                    runCommand.RaiseCanExecuteChanged();
+                }
+
+                ScheduleSaveAsrSettings();
+            }
+        }
+    }
 
     public string ReviewIssueType
     {

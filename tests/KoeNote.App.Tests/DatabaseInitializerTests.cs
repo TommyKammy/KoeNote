@@ -48,7 +48,7 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("transcript_derivatives", tables);
         Assert.Contains("transcript_derivative_chunks", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("is_deleted", ReadColumnNames(connection, "jobs"));
         Assert.Contains("deleted_at", ReadColumnNames(connection, "jobs"));
@@ -90,7 +90,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
@@ -205,7 +205,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ReadSchemaVersions(connection));
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ReadSchemaVersions(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
     }

@@ -40,8 +40,8 @@
                 </Grid.LayoutTransform>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4*" MinWidth="176" />
-                    <ColumnDefinition Width="16*" MinWidth="564" />
-                    <ColumnDefinition Width="5*" MinWidth="240" />
+                    <ColumnDefinition Width="15*" MinWidth="540" />
+                    <ColumnDefinition Width="6*" MinWidth="300" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="420" />

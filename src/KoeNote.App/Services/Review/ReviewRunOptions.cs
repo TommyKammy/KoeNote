@@ -9,4 +9,15 @@ public sealed record ReviewRunOptions(
     string OutputDirectory,
     IReadOnlyList<TranscriptSegment> Segments,
     double MinConfidence = 0.5,
-    TimeSpan? Timeout = null);
+    TimeSpan? Timeout = null,
+    string ModelId = "",
+    string OutputSanitizerProfile = "none",
+    int ContextSize = 8192,
+    int GpuLayers = 999,
+    int MaxTokens = 4096,
+    int ChunkSegmentCount = 80,
+    int? Threads = null,
+    int? ThreadsBatch = null,
+    bool UseJsonSchema = true,
+    bool EnableRepair = true,
+    string PromptProfile = "default");

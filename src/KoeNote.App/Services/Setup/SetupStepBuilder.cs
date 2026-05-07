@@ -17,7 +17,7 @@ internal static class SetupStepBuilder
             SetupStep.EnvironmentCheck => "環境確認",
             SetupStep.SetupMode => "セットアップ方式",
             SetupStep.AsrModel => "ASRモデル",
-            SetupStep.ReviewModel => "推敲LLM",
+            SetupStep.ReviewModel => "整文LLM",
             SetupStep.Storage => "保存先",
             SetupStep.License => "ライセンス",
             SetupStep.Install => "モデル導入",

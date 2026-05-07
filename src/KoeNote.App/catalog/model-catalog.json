@@ -3,13 +3,23 @@
   "catalog_version": "2026-05-07",
   "presets": [
     {
+      "preset_id": "ultra_lightweight",
+      "quality_label": "超軽量",
+      "display_name": "超軽量",
+      "description": "GPUなし、または低VRAMのPC向け。最小構成で文字起こしと整文・要約を試せます。",
+      "asr_model_id": "whisper-base",
+      "review_model_id": "bonsai-8b-q1-0",
+      "badges": ["超軽量", "CPU向け"],
+      "recommended_for": ["cpu_friendly", "low_vram", "first_run_ultra_lightweight"]
+    },
+    {
       "preset_id": "lightweight",
       "quality_label": "軽量",
       "display_name": "軽量",
-      "description": "GPUなし、または低VRAMのPC向け。処理は軽めですが、文字起こし精度と推敲品質は控えめです。",
-      "asr_model_id": "whisper-base",
+      "description": "GPUなし、または低VRAMのPC向け。処理は軽めですが、文字起こし精度と整文品質は控えめです。",
+      "asr_model_id": "whisper-small",
       "review_model_id": "bonsai-8b-q1-0",
-      "badges": ["軽量", "Reviewは実験的"],
+      "badges": ["軽量"],
       "recommended_for": ["cpu_friendly", "low_vram", "first_run_lightweight"]
     },
     {
@@ -18,7 +28,7 @@
       "display_name": "推奨",
       "description": "速度、精度、安定性のバランスを重視した標準構成です。",
       "asr_model_id": "faster-whisper-large-v3-turbo",
-      "review_model_id": "llm-jp-4-8b-thinking-q4-k-m",
+      "review_model_id": "gemma-4-e4b-it-q4-k-m",
       "badges": ["推奨"],
       "recommended_for": ["default", "balanced", "first_run_recommended"]
     },
@@ -28,7 +38,7 @@
       "display_name": "高精度",
       "description": "日本語精度と専門語を重視する構成です。処理時間とメモリ使用量は大きめです。",
       "asr_model_id": "kotoba-whisper-v2.2-faster",
-      "review_model_id": "llm-jp-4-8b-thinking-q4-k-m",
+      "review_model_id": "gemma-4-e4b-it-q4-k-m",
       "badges": ["高精度"],
       "recommended_for": ["high_accuracy_japanese", "domain_terms"]
     },
@@ -36,9 +46,9 @@
       "preset_id": "experimental",
       "quality_label": "実験的",
       "display_name": "実験的",
-      "description": "標準ASRに実験的な軽量Reviewを組み合わせ、Bonsai 8Bの推敲品質とJSON安定性を検証する構成です。",
+      "description": "標準ASRに実験的な軽量Reviewを組み合わせ、整文品質とJSON安定性を検証する構成です。",
       "asr_model_id": "faster-whisper-large-v3-turbo",
-      "review_model_id": "bonsai-8b-q1-0",
+      "review_model_id": "llm-jp-4-8b-thinking-q4-k-m",
       "badges": ["実験的", "Review検証用"],
       "recommended_for": ["experimental_review", "review_quality_eval"]
     }
@@ -66,6 +76,36 @@
       "license": {
         "name": "MIT / converted from openai/whisper-base",
         "url": "https://huggingface.co/Systran/faster-whisper-base"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 0,
+        "python_required": true
+      },
+      "status": "available"
+    },
+    {
+      "model_id": "whisper-small",
+      "family": "whisper",
+      "role": "asr",
+      "engine_id": "whisper-small",
+      "display_name": "Whisper small",
+      "language": ["ja", "multi"],
+      "recommended_for": ["lightweight", "cpu_friendly", "low_vram"],
+      "quality_labels": ["軽量"],
+      "runtime": {
+        "type": "python-ctranslate2",
+        "package_id": "runtime-faster-whisper"
+      },
+      "size_bytes": null,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/Systran/faster-whisper-small",
+        "sha256": null
+      },
+      "license": {
+        "name": "MIT / converted from openai/whisper-small",
+        "url": "https://huggingface.co/Systran/faster-whisper-small"
       },
       "requirements": {
         "gpu_required": false,
@@ -192,7 +232,70 @@
         "recommended_vram_gb": 6,
         "python_required": false
       },
-      "status": "preinstalled-compatible"
+      "status": "preinstalled-compatible",
+      "output_sanitizer_profile": "markdownSectionOnly"
+    },
+    {
+      "model_id": "gemma-4-e4b-it-q4-k-m",
+      "family": "gemma",
+      "role": "review",
+      "engine_id": "llama-cpp",
+      "display_name": "Gemma 4 E4B it Q4_K_M",
+      "language": ["ja", "multi"],
+      "recommended_for": ["review_default", "balanced_review", "summary_review"],
+      "quality_labels": ["推奨", "高精度"],
+      "runtime": {
+        "type": "llama-cpp",
+        "package_id": "runtime-llama-cpp"
+      },
+      "size_bytes": null,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+        "sha256": null
+      },
+      "license": {
+        "name": "Apache-2.0",
+        "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 6,
+        "python_required": false
+      },
+      "status": "available",
+      "output_sanitizer_profile": "markdownSectionOnly"
+    },
+    {
+      "model_id": "ternary-bonsai-8b-q2-0",
+      "family": "bonsai",
+      "role": "review",
+      "engine_id": "llama-cpp",
+      "display_name": "Ternary Bonsai 8B Q2_0",
+      "language": ["ja", "multi"],
+      "recommended_for": ["lightweight_review", "cpu_friendly"],
+      "quality_labels": ["軽量"],
+      "runtime": {
+        "type": "llama-cpp",
+        "package_id": "runtime-llama-cpp-ternary"
+      },
+      "size_bytes": 2180000000,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/prism-ml/Ternary-Bonsai-8B-gguf/resolve/main/Ternary-Bonsai-8B-Q2_0.gguf",
+        "sha256": null
+      },
+      "license": {
+        "name": "Apache-2.0",
+        "url": "https://huggingface.co/prism-ml/Ternary-Bonsai-8B-gguf"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 0,
+        "python_required": false
+      },
+      "status": "available",
+      "output_sanitizer_profile": "strict"
     },
     {
       "model_id": "bonsai-8b-q1-0",
@@ -201,8 +304,8 @@
       "engine_id": "llama-cpp",
       "display_name": "Bonsai 8B Q1_0",
       "language": ["ja", "multi"],
-      "recommended_for": ["lightweight_review", "experimental_review", "cpu_friendly"],
-      "quality_labels": ["軽量", "実験的"],
+      "recommended_for": ["ultra_lightweight_review", "lightweight_review", "cpu_friendly"],
+      "quality_labels": ["超軽量", "軽量"],
       "runtime": {
         "type": "llama-cpp",
         "package_id": "runtime-llama-cpp"
@@ -222,7 +325,8 @@
         "recommended_vram_gb": 0,
         "python_required": false
       },
-      "status": "experimental"
+      "status": "available",
+      "output_sanitizer_profile": "strict"
     }
   ]
 }

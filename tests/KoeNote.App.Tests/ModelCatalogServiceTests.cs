@@ -18,13 +18,15 @@ public sealed class ModelCatalogServiceTests
 
         var asrModels = entries.Where(entry => entry.Role == "asr").Select(entry => entry.ModelId).ToArray();
         Assert.Equal(
-            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base"],
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base", "whisper-small"],
             asrModels.Order(StringComparer.OrdinalIgnoreCase).ToArray());
         Assert.Contains(entries, entry => entry.ModelId == "whisper-base" && entry.Role == "asr" && entry.QualityLabelSummary.Contains("軽量", StringComparison.Ordinal));
         Assert.Contains(entries, entry => entry.ModelId == "kotoba-whisper-v2.2-faster" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "faster-whisper-large-v3-turbo" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
-        Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported);
+        Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported && entry.CatalogItem.Status == "available");
+        Assert.Contains(entries, entry => entry.ModelId == "gemma-4-e4b-it-q4-k-m" && entry.Role == "review" && entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
+        Assert.Contains(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0" && entry.Role == "review" && entry.CatalogItem.Runtime.PackageId == "runtime-llama-cpp-ternary");
     }
 
     [Fact]
@@ -37,28 +39,32 @@ public sealed class ModelCatalogServiceTests
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var presets = catalog.Presets ?? [];
 
-        Assert.Equal(["experimental", "high_accuracy", "lightweight", "recommended"], presets.Select(preset => preset.PresetId).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(["experimental", "high_accuracy", "lightweight", "recommended", "ultra_lightweight"], presets.Select(preset => preset.PresetId).Order(StringComparer.Ordinal).ToArray());
+
+        var ultraLightweight = presets.Single(preset => preset.PresetId == "ultra_lightweight");
+        Assert.Equal("whisper-base", ultraLightweight.AsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", ultraLightweight.ReviewModelId);
 
         var lightweight = presets.Single(preset => preset.PresetId == "lightweight");
         Assert.Equal("軽量", lightweight.QualityLabel);
-        Assert.Equal("whisper-base", lightweight.AsrModelId);
+        Assert.Equal("whisper-small", lightweight.AsrModelId);
         Assert.Equal("bonsai-8b-q1-0", lightweight.ReviewModelId);
-        Assert.Contains("Reviewは実験的", lightweight.Badges);
+        Assert.DoesNotContain("Reviewは実験的", lightweight.Badges);
 
         var recommended = presets.Single(preset => preset.PresetId == "recommended");
         Assert.Equal("推奨", recommended.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", recommended.AsrModelId);
-        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", recommended.ReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", recommended.ReviewModelId);
 
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
         Assert.Equal("高精度", highAccuracy.QualityLabel);
         Assert.Equal("kotoba-whisper-v2.2-faster", highAccuracy.AsrModelId);
-        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", highAccuracy.ReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
         Assert.Equal("実験的", experimental.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", experimental.AsrModelId);
-        Assert.Equal("bonsai-8b-q1-0", experimental.ReviewModelId);
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", experimental.ReviewModelId);
     }
 
     [Fact]

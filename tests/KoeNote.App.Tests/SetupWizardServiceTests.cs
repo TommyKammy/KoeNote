@@ -53,9 +53,10 @@ public sealed class SetupWizardServiceTests
         var reviewModels = wizard.GetSelectableModels("review");
 
         Assert.Equal(
-            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base"],
+            ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base", "whisper-small"],
             asrModels.Select(entry => entry.ModelId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
         Assert.NotEmpty(reviewModels);
+        Assert.Contains(reviewModels, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
     }
 
     [Fact]
@@ -68,7 +69,7 @@ public sealed class SetupWizardServiceTests
 
         Assert.Equal(paths.MachineModels, state.StorageRoot);
         Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
-        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
         Assert.Equal("recommended", state.SelectedModelPresetId);
         Assert.Equal("recommended", state.SetupMode);
     }
@@ -85,7 +86,28 @@ public sealed class SetupWizardServiceTests
 
         Assert.Equal("lightweight", state.SelectedModelPresetId);
         Assert.Equal("lightweight", state.SetupMode);
-        Assert.Equal("whisper-base", state.SelectedAsrModelId);
+        Assert.Equal("whisper-small", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_LoadState_PreservesSupportedBonsaiLightweightReviewModel()
+    {
+        var paths = CreatePaths();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SetupMode = "lightweight",
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = "whisper-small",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.LoadState();
+
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("whisper-small", state.SelectedAsrModelId);
         Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
     }
 
@@ -116,7 +138,7 @@ public sealed class SetupWizardServiceTests
         UpsertVerified(installedModels, "whisper-base", "asr", "whisper-base", paths.WhisperBaseModelPath);
         UpsertVerified(installedModels, "bonsai-8b-q1-0", "review", "llama-cpp", reviewPath);
         var wizard = CreateWizard(paths);
-        wizard.SelectModelPreset("lightweight");
+        wizard.SelectModelPreset("ultra_lightweight");
 
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
 
@@ -139,9 +161,9 @@ public sealed class SetupWizardServiceTests
         var recommendation = wizard.GetPresetRecommendation();
         var state = wizard.ApplyAutomaticModelPresetRecommendation();
 
-        Assert.Equal("lightweight", recommendation.PresetId);
+        Assert.Equal("ultra_lightweight", recommendation.PresetId);
         Assert.Equal(SetupStep.Welcome, state.CurrentStep);
-        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("ultra_lightweight", state.SelectedModelPresetId);
         Assert.Equal("whisper-base", state.SelectedAsrModelId);
         Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
     }

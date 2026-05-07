@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Services.Review;
 
@@ -14,15 +15,13 @@ public sealed class ReviewWorker(
     CorrectionDraftRepository repository,
     CorrectionMemoryService? correctionMemoryService = null)
 {
-    private const int ReviewChunkSegmentCount = 80;
-
     public async Task<ReviewRunResult> RunAsync(ReviewRunOptions options, CancellationToken cancellationToken = default)
     {
         ValidateInputs(options);
 
         var timeout = options.Timeout ?? TimeSpan.FromHours(2);
         var schemaPath = WriteJsonSchema(options.OutputDirectory);
-        var chunks = ChunkSegments(options.Segments, ReviewChunkSegmentCount).ToArray();
+        var chunks = ChunkSegments(options.Segments, options.ChunkSegmentCount).ToArray();
         var allDrafts = new List<CorrectionDraft>();
         var rawOutputs = new List<ReviewChunkRawOutput>();
         var totalDuration = TimeSpan.Zero;
@@ -72,10 +71,11 @@ public sealed class ReviewWorker(
         CancellationToken cancellationToken)
     {
         var suffix = chunkCount == 1 ? "" : $".chunk-{chunkIndex:D3}";
-        var prompt = promptBuilder.Build(segments);
+        var prompt = promptBuilder.Build(segments, options.PromptProfile);
         var promptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.prompt.txt", prompt);
         var processResult = await RunRuntimeAsync(options, promptPath, schemaPath, timeout, cancellationToken);
-        var rawOutput = AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
+        var sanitizedOutput = LlmOutputSanitizer.SanitizeJsonCandidate(processResult.StandardOutput, options.OutputSanitizerProfile);
+        var rawOutput = AsrOutputExtractor.ExtractJson(sanitizedOutput, processResult.StandardError);
         var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.raw.json");
         IReadOnlyList<CorrectionDraft> drafts;
         try
@@ -84,10 +84,17 @@ public sealed class ReviewWorker(
         }
         catch (ReviewWorkerException exception) when (exception.Category == ReviewFailureCategory.JsonParseFailed)
         {
+            if (!options.EnableRepair)
+            {
+                drafts = [];
+                return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration);
+            }
+
             var repairPrompt = promptBuilder.BuildRepairPrompt(rawOutput);
             var repairPromptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.repair.prompt.txt", repairPrompt);
             var repairResult = await RunRuntimeAsync(options, repairPromptPath, schemaPath, timeout, cancellationToken);
-            rawOutput = AsrOutputExtractor.ExtractJson(repairResult.StandardOutput, repairResult.StandardError);
+            sanitizedOutput = LlmOutputSanitizer.SanitizeJsonCandidate(repairResult.StandardOutput, options.OutputSanitizerProfile);
+            rawOutput = AsrOutputExtractor.ExtractJson(sanitizedOutput, repairResult.StandardError);
             rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.repair.raw.json");
             try
             {
@@ -111,7 +118,8 @@ public sealed class ReviewWorker(
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var arguments = commandBuilder.BuildArgumentList(options, promptFilePath, jsonSchemaFilePath);
+        var schemaPath = options.UseJsonSchema ? jsonSchemaFilePath : null;
+        var arguments = commandBuilder.BuildArgumentList(options, promptFilePath, schemaPath);
         var processResult = await processRunner.RunAsync(options.LlamaCompletionPath, arguments, timeout, cancellationToken);
 
         if (processResult.ExitCode != 0)
@@ -227,6 +235,11 @@ public sealed class ReviewWorker(
         if (options.Segments.Count == 0)
         {
             throw new ReviewWorkerException(ReviewFailureCategory.MissingSegments, "No transcript segments were available for review.");
+        }
+
+        if (options.ChunkSegmentCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), "Chunk segment count must be greater than zero.");
         }
     }
 

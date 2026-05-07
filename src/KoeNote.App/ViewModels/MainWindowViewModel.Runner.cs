@@ -26,23 +26,27 @@ public sealed partial class MainWindowViewModel
         var job = SelectedJob;
         using var cancellation = new CancellationTokenSource();
         _runCancellation = cancellation;
+        IsSummaryStageRunning = false;
         IsRunInProgress = true;
         SaveAsrSettings();
 
         try
         {
             var enableReviewForRun = EnableReviewStage && ReviewStageAssetsReady;
+            var enableSummaryForRun = EnableSummaryStage && SummaryStageAssetsReady;
             if (EnableReviewStage && !enableReviewForRun)
             {
-                LatestLog = "推敲ステージの準備が未完了のため、この実行では推敲をスキップします。";
+                LatestLog = "整文ステージの準備が未完了のため、この実行では整文をスキップします。";
             }
 
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun);
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, enableSummaryForRun);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
+            LoadSummaryForSelectedJob();
         }
         finally
         {
             _runCancellation = null;
+            IsSummaryStageRunning = false;
             IsRunInProgress = false;
         }
     }
@@ -59,8 +63,14 @@ public sealed partial class MainWindowViewModel
         if (update.Stage is { } stage && update.StageState is { } state && update.ProgressPercent is { } progressPercent)
         {
             var stageStatus = GetStageStatus(stage);
+            stageStatus.IsRunning = state == JobRunStageState.Running;
             stageStatus.Status = GetStageStatusText(state, update.ErrorCategory);
             stageStatus.ProgressPercent = progressPercent;
+            if (stage == JobRunStage.Summary)
+            {
+                IsSummaryStageRunning = state == JobRunStageState.Running;
+            }
+
             if (state == JobRunStageState.Running)
             {
                 stageStatus.DurationText = "00:00:00";
@@ -112,6 +122,7 @@ public sealed partial class MainWindowViewModel
             JobRunStage.Preprocess => StageStatuses[0],
             JobRunStage.Asr => StageStatuses.First(item => item.Name == "ASR"),
             JobRunStage.Review => StageStatuses[2],
+            JobRunStage.Summary => StageStatuses[3],
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, null)
         };
     }
@@ -191,7 +202,7 @@ public sealed partial class MainWindowViewModel
 
     private void MarkManualReviewStageWaiting(int pendingCount)
     {
-        var stage = StageStatuses[3];
+        var stage = StageStatuses[4];
         stage.Status = $"確認待ち {pendingCount}";
         stage.ProgressPercent = 0;
         stage.DurationText = "00:00:00";
@@ -199,7 +210,7 @@ public sealed partial class MainWindowViewModel
 
     private void MarkManualReviewStageCompleted()
     {
-        var stage = StageStatuses[3];
+        var stage = StageStatuses[4];
         stage.Status = "完了";
         stage.ProgressPercent = 100;
         stage.DurationText = "00:00:00";
@@ -207,7 +218,7 @@ public sealed partial class MainWindowViewModel
 
     private void ResetManualReviewStage()
     {
-        var stage = StageStatuses[3];
+        var stage = StageStatuses[4];
         stage.Status = "未開始";
         stage.ProgressPercent = 0;
         stage.DurationText = "00:00:00";

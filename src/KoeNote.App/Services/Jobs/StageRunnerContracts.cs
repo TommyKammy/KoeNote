@@ -23,11 +23,21 @@ public interface IAsrStageRunner
 
 public interface IReviewStageRunner
 {
-    Task RunAsync(
+    Task<bool> RunAsync(
         JobSummary job,
         IReadOnlyList<TranscriptSegment> segments,
         Action<JobRunUpdate> report,
         CancellationToken cancellationToken);
 
     void Skip(JobSummary job, Action<JobRunUpdate> report);
+}
+
+public interface ISummaryStageRunner
+{
+    Task RunAsync(
+        JobSummary job,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken);
+
+    void Skip(JobSummary job, Action<JobRunUpdate> report, string reason);
 }

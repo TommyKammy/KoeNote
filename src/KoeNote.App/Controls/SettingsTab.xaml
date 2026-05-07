@@ -36,11 +36,15 @@
                                   MinHeight="32"
                                   Margin="0,0,0,12" />
 
-                        <CheckBox Content="推敲ステージを有効にする"
+                        <CheckBox Content="整文ステージを有効にする"
                                   IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Margin="0,0,0,10" />
 
-                        <TextBlock Text="Reviewモデル" Style="{StaticResource SettingsFieldLabel}" />
+                        <CheckBox Content="要約ステージを有効にする"
+                                  IsChecked="{Binding EnableSummaryStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  Margin="0,0,0,10" />
+
+                        <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
                                   SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
                                   DisplayMemberPath="SetupDisplayName"

@@ -52,7 +52,7 @@ public sealed class SetupWizardService
 
     public SetupState LoadState()
     {
-        return _stateService.Load();
+        return _selectionService.RepairUnsupportedSelections(_stateService.Load());
     }
 
     public IReadOnlyList<SetupEnvironmentCheck> GetEnvironmentChecks()

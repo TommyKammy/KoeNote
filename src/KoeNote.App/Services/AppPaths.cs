@@ -64,8 +64,10 @@ public sealed class AppPaths
         ReazonSpeechK2ScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "reazonspeech_k2_transcribe.py");
         DiarizeWorkerScriptPath = Path.Combine(baseDirectory, "scripts", "diarization", "diarize_worker.py");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
+        TernaryLlamaCompletionPath = Path.Combine(RuntimeTools, "review-ternary", "llama-completion.exe");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
         WhisperBaseModelPath = Path.Combine(Models, "asr", "whisper-base");
+        WhisperSmallModelPath = Path.Combine(Models, "asr", "whisper-small");
         FasterWhisperModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3-turbo");
         FasterWhisperLargeV3ModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3");
         ReazonSpeechK2ModelPath = Path.Combine(Models, "asr", "reazonspeech-k2-v3");
@@ -132,9 +134,13 @@ public sealed class AppPaths
 
     public string LlamaCompletionPath { get; }
 
+    public string TernaryLlamaCompletionPath { get; }
+
     public string KotobaWhisperFasterModelPath { get; }
 
     public string WhisperBaseModelPath { get; }
+
+    public string WhisperSmallModelPath { get; }
 
     public string FasterWhisperModelPath { get; }
 

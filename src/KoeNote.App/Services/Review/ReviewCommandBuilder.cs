@@ -16,16 +16,28 @@ public sealed class ReviewCommandBuilder
             "--file",
             promptFilePath,
             "--ctx-size",
-            "8192",
+            options.ContextSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--n-gpu-layers",
-            "999",
+            options.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--n-predict",
-            "4096",
+            options.MaxTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--temp",
             "0.1",
             "--single-turn",
             "--no-display-prompt"
         };
+
+        if (options.Threads is { } threads)
+        {
+            arguments.Add("--threads");
+            arguments.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        if (options.ThreadsBatch is { } threadsBatch)
+        {
+            arguments.Add("--threads-batch");
+            arguments.Add(threadsBatch.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
 
         if (!string.IsNullOrWhiteSpace(jsonSchemaFilePath))
         {

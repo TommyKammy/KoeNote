@@ -9,7 +9,13 @@ public sealed record TranscriptPolishingOptions(
     string GenerationProfile = "recommended",
     string PromptVersion = TranscriptPolishingPromptBuilder.PromptVersion,
     int ChunkSegmentCount = 80,
-    TimeSpan? Timeout = null);
+    TimeSpan? Timeout = null,
+    string OutputSanitizerProfile = LlmOutputSanitizerProfiles.None,
+    int ContextSize = 8192,
+    int GpuLayers = 999,
+    int MaxTokens = 4096,
+    int? Threads = null,
+    int? ThreadsBatch = null);
 
 public sealed record TranscriptPolishingChunk(
     int ChunkIndex,

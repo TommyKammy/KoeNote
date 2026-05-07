@@ -4,5 +4,6 @@ public enum JobRunStage
 {
     Preprocess,
     Asr,
-    Review
+    Review,
+    Summary
 }

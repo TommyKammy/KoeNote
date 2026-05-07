@@ -2,4 +2,5 @@ namespace KoeNote.App.Services.Export;
 
 public sealed record TranscriptExportOptions(
     string? BaseFileName = null,
-    bool IncludeTimestamps = true);
+    bool IncludeTimestamps = true,
+    TranscriptExportSource Source = TranscriptExportSource.Polished);

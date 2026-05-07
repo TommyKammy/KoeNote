@@ -9,6 +9,7 @@ using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.SystemStatus;
+using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
@@ -18,6 +19,7 @@ public sealed record MainWindowServices(
     JobLogRepository JobLogRepository,
     AsrSettingsRepository AsrSettingsRepository,
     TranscriptSegmentRepository TranscriptSegmentRepository,
+    TranscriptDerivativeRepository TranscriptDerivativeRepository,
     AsrEngineRegistry AsrEngineRegistry,
     JobRunCoordinator JobRunCoordinator,
     CorrectionDraftRepository CorrectionDraftRepository,
@@ -25,6 +27,7 @@ public sealed record MainWindowServices(
     TranscriptEditService TranscriptEditService,
     CorrectionMemoryService CorrectionMemoryService,
     TranscriptExportService TranscriptExportService,
+    TranscriptSummaryService TranscriptSummaryService,
     ModelCatalogService ModelCatalogService,
     InstalledModelRepository InstalledModelRepository,
     ModelDownloadJobRepository ModelDownloadJobRepository,
@@ -78,6 +81,7 @@ public sealed record MainWindowServices(
             repositories.JobLogRepository,
             repositories.AsrSettingsRepository,
             repositories.TranscriptSegmentRepository,
+            repositories.TranscriptDerivativeRepository,
             asrEngineRegistry,
             jobRunCoordinator,
             repositories.CorrectionDraftRepository,
@@ -85,6 +89,7 @@ public sealed record MainWindowServices(
             review.TranscriptEditService,
             review.CorrectionMemoryService,
             review.TranscriptExportService,
+            review.TranscriptSummaryService,
             model.ModelCatalogService,
             model.InstalledModelRepository,
             model.ModelDownloadJobRepository,

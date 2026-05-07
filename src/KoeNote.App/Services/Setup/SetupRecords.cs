@@ -38,7 +38,7 @@ public sealed record SetupState(
             SetupMode: "recommended",
             SelectedModelPresetId: "recommended",
             SelectedAsrModelId: "faster-whisper-large-v3-turbo",
-            SelectedReviewModelId: "llm-jp-4-8b-thinking-q4-k-m",
+            SelectedReviewModelId: "gemma-4-e4b-it-q4-k-m",
             StorageRoot: storageRoot,
             LicenseAccepted: false,
             LastSmokeSucceeded: false,

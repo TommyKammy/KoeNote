@@ -78,7 +78,7 @@
                 <Button Style="{StaticResource OutlineNeutralButton}" MinHeight="42" Padding="12,0" Command="{Binding SaveSpeakerAliasCommand}" Margin="6,0,0,0" ToolTip="話者表示名を保存">
                     <TextBlock Text="話者保存" FontWeight="SemiBold" />
                 </Button>
-                <Button Width="42" MinHeight="42" Padding="0" Command="{Binding UndoLastOperationCommand}" Margin="6,0,0,0" ToolTip="直前のレビュー/編集/話者変更を取り消す">
+                <Button Width="42" MinHeight="42" Padding="0" Command="{Binding UndoLastOperationCommand}" Margin="6,0,0,0" ToolTip="直前の整文/編集/話者変更を取り消す">
                     <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" />
                 </Button>
             </StackPanel>

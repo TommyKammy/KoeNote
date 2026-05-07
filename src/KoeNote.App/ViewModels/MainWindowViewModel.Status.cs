@@ -35,8 +35,8 @@ public sealed partial class MainWindowViewModel
 
         EnableReviewStage = !EnableReviewStage;
         LatestLog = EnableReviewStage
-            ? "推敲ステージを有効にしました。"
-            : "推敲ステージをスキップします。";
+            ? "整文ステージを有効にしました。"
+            : "整文ステージをスキップします。";
         return Task.CompletedTask;
     }
 
@@ -55,8 +55,8 @@ public sealed partial class MainWindowViewModel
         }
 
         stage.ToggleToolTip = EnableReviewStage
-            ? "推敲を実行します。クリックでスキップ"
-            : "推敲をスキップします。クリックで実行";
+            ? "整文を実行します。クリックでスキップ"
+            : "整文をスキップします。クリックで実行";
 
         if (EnableReviewStage)
         {
@@ -91,11 +91,17 @@ public sealed partial class MainWindowViewModel
             "#EFF6FF");
 
         yield return new StageStatus(
-            "推敲",
+            "整文",
             "M5,16.5 L4,20 L7.5,19 L17.8,8.7 C18.6,7.9 18.6,6.7 17.8,5.9 L16.1,4.2 C15.3,3.4 14.1,3.4 13.3,4.2 Z M12.5,5 L17,9.5 M17.5,15 L20,15 M18.75,13.75 L18.75,16.25 M6.5,6.5 L8.5,6.5 M7.5,5.5 L7.5,7.5",
             "#7C3AED",
             "#F3E8FF",
             isToggleable: true);
+
+        yield return new StageStatus(
+            "要約",
+            "M6,4 L18,4 L18,20 L6,20 Z M8.5,8 L15.5,8 M8.5,11.5 L15.5,11.5 M8.5,15 L13,15",
+            "#0F766E",
+            "#CCFBF1");
 
         yield return new StageStatus(
             "レビュー",

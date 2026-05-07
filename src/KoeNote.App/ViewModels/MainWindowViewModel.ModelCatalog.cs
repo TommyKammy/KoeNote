@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.ViewModels;
 
@@ -223,7 +224,7 @@ public sealed partial class MainWindowViewModel
         }
         else
         {
-            LatestLog = $"推敲モデルを選択しました: {SelectedModelCatalogEntry.DisplayName}";
+            LatestLog = $"整文モデルを選択しました: {SelectedModelCatalogEntry.DisplayName}";
         }
 
         return Task.CompletedTask;
@@ -300,6 +301,7 @@ public sealed partial class MainWindowViewModel
                 entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
+        OnPropertyChanged(nameof(SummaryStageAssetsReady));
         OnPropertyChanged(nameof(AsrModel));
         OnPropertyChanged(nameof(ReviewModel));
         OnPropertyChanged(nameof(CanRunSelectedJob));
@@ -345,6 +347,9 @@ public sealed partial class MainWindowViewModel
             "whisper-base" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("whisper-base", Paths.WhisperBaseModelPath),
+            "whisper-small" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
+                ModelPathExists("whisper-small", Paths.WhisperSmallModelPath),
             "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
                 FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
@@ -361,6 +366,7 @@ public sealed partial class MainWindowViewModel
     {
         return engineId is "kotoba-whisper-v2.2-faster"
             or "whisper-base"
+            or "whisper-small"
             or "faster-whisper-large-v3-turbo"
             or "faster-whisper-large-v3";
     }
@@ -381,6 +387,7 @@ public sealed partial class MainWindowViewModel
         {
             "faster-whisper-large-v3-turbo",
             "whisper-base",
+            "whisper-small",
             "kotoba-whisper-v2.2-faster",
             "faster-whisper-large-v3"
         })
@@ -399,21 +406,59 @@ public sealed partial class MainWindowViewModel
 
     private bool IsReviewModelReady()
     {
-        if (string.IsNullOrWhiteSpace(_setupState.SelectedReviewModelId))
+        var modelId = ResolveEffectiveReviewModelId();
+
+        if (modelId.Equals("llm-jp-4-8b-thinking-q4-k-m", StringComparison.OrdinalIgnoreCase))
         {
-            return ModelPathExists("llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath);
+            return ModelPathExists(modelId, Paths.ReviewModelPath);
         }
 
-        if (_setupState.SelectedReviewModelId.Equals("llm-jp-4-8b-thinking-q4-k-m", StringComparison.OrdinalIgnoreCase))
-        {
-            return ModelPathExists(_setupState.SelectedReviewModelId, Paths.ReviewModelPath);
-        }
-
-        var installed = _installedModelRepository.FindInstalledModel(_setupState.SelectedReviewModelId);
+        var installed = _installedModelRepository.FindInstalledModel(modelId);
         return installed is not null &&
             installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+    }
+
+    private bool IsSelectedReviewRuntimeReady()
+    {
+        return File.Exists(GetSelectedReviewRuntimePath());
+    }
+
+    private string GetSelectedReviewRuntimePath()
+    {
+        var catalog = _modelCatalogService.LoadBuiltInCatalog();
+        var modelId = ResolveEffectiveReviewModelId(catalog);
+        return ReviewRuntimeResolver.ResolveLlamaCompletionPath(Paths, catalog, modelId);
+    }
+
+    private string ResolveEffectiveReviewModelId(ModelCatalog? catalog = null)
+    {
+        catalog ??= _modelCatalogService.LoadBuiltInCatalog();
+
+        if (IsSelectableReviewModel(catalog, _setupState.SelectedReviewModelId))
+        {
+            return _setupState.SelectedReviewModelId!;
+        }
+
+        var presetReviewModelId = (catalog.Presets ?? [])
+            .FirstOrDefault(preset =>
+                !string.IsNullOrWhiteSpace(_setupState.SelectedModelPresetId) &&
+                preset.PresetId.Equals(_setupState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase))
+            ?.ReviewModelId;
+
+        return IsSelectableReviewModel(catalog, presetReviewModelId)
+            ? presetReviewModelId!
+            : "llm-jp-4-8b-thinking-q4-k-m";
+    }
+
+    private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
+    {
+        return !string.IsNullOrWhiteSpace(modelId) &&
+            catalog.Models.Any(model =>
+                model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
+                ModelCatalogCompatibility.IsSelectable(model));
     }
 
     private bool ModelPathExists(string modelId, string fallbackPath)

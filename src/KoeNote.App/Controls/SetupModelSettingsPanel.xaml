@@ -138,7 +138,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="推敲 LLM"
+                <TextBlock Text="整文 LLM"
                            Foreground="#64748B"
                            FontSize="12"
                            VerticalAlignment="Center" />

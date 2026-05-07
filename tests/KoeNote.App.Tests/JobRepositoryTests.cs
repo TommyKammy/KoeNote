@@ -107,7 +107,7 @@ public sealed class JobRepositoryTests
         var restored = Assert.Single(repository.LoadRecent());
 
         Assert.Equal(created.JobId, restored.JobId);
-        Assert.Equal("レビュー待ち", restored.Status);
+        Assert.Equal("整文待ち", restored.Status);
         Assert.Equal(@"C:\audio\meeting.wav", restored.SourceAudioPath);
         Assert.Equal(90, restored.ProgressPercent);
         Assert.Equal(2, restored.UnreviewedDrafts);
@@ -124,7 +124,7 @@ public sealed class JobRepositoryTests
 
         var restored = Assert.Single(repository.LoadRecent());
 
-        Assert.Equal("レビュー完了", restored.Status);
+        Assert.Equal("整文完了", restored.Status);
         Assert.Equal(100, restored.ProgressPercent);
         Assert.Equal(0, restored.UnreviewedDrafts);
     }
@@ -138,7 +138,7 @@ public sealed class JobRepositoryTests
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
         repository.UpdatePreprocessResult(
             created,
-            "推敲候補なし",
+            "整文候補なし",
             "review_ready",
             90,
             created.NormalizedAudioPath,
@@ -146,9 +146,39 @@ public sealed class JobRepositoryTests
 
         var restored = Assert.Single(repository.LoadRecent());
 
-        Assert.Equal("レビュー完了", restored.Status);
+        Assert.Equal("整文完了", restored.Status);
         Assert.Equal(100, restored.ProgressPercent);
         Assert.Equal(0, restored.UnreviewedDrafts);
+    }
+
+    [Fact]
+    public void LoadRecent_MapsLegacyReviewDisplayStatusesToPolishedLabels()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        using (var connection = fixture.Open())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                UPDATE jobs
+                SET status = 'レビュー完了',
+                    current_stage = 'review_completed',
+                    progress_percent = 100,
+                    updated_at = $updated_at
+                WHERE job_id = $job_id;
+                """;
+            command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            command.Parameters.AddWithValue("$job_id", created.JobId);
+            command.ExecuteNonQuery();
+        }
+
+        var restored = Assert.Single(repository.LoadRecent());
+
+        Assert.Equal("整文完了", restored.Status);
+        Assert.Equal(100, restored.ProgressPercent);
     }
 
     [Fact]
@@ -208,7 +238,7 @@ public sealed class JobRepositoryTests
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal("レビュー完了", reader.GetString(0));
+        Assert.Equal("整文完了", reader.GetString(0));
         Assert.Equal("review_skipped", reader.GetString(1));
         Assert.Equal(100, reader.GetInt32(2));
         Assert.Equal(0, reader.GetInt32(3));

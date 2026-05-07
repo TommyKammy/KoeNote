@@ -36,14 +36,19 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (SelectedJob.ProgressPercent >= 100 &&
-            string.Equals(SelectedJob.Status, "レビュー完了", StringComparison.Ordinal))
+        if (SelectedJob.ProgressPercent >= 100 && IsReviewCompletedDisplayStatus(SelectedJob.Status))
         {
             MarkManualReviewStageCompleted();
             return;
         }
 
         ResetManualReviewStage();
+    }
+
+    private static bool IsReviewCompletedDisplayStatus(string status)
+    {
+        return string.Equals(status, "整文完了", StringComparison.Ordinal) ||
+            string.Equals(status, "レビュー完了", StringComparison.Ordinal);
     }
 
     private void SelectFirstDraftForSegment(string segmentId)
@@ -187,7 +192,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
-            LatestLog = $"レビュー操作に失敗しました: {exception.Message}";
+            LatestLog = $"整文操作に失敗しました: {exception.Message}";
             LoadReviewQueue();
         }
         catch (Exception exception)
@@ -217,7 +222,7 @@ public sealed partial class MainWindowViewModel
             SelectedJob.UnreviewedDrafts = result.PendingDraftCount;
             if (result.PendingDraftCount == 0)
             {
-                SelectedJob.Status = "レビュー完了";
+                SelectedJob.Status = "整文完了";
                 SelectedJob.ProgressPercent = 100;
                 MarkManualReviewStageCompleted();
             }
@@ -283,7 +288,7 @@ public sealed partial class MainWindowViewModel
             Segments[i] = Segments[i] with
             {
                 Text = nextText,
-                ReviewState = hasPendingDraft ? "推敲候補あり" : "レビュー済み"
+                ReviewState = hasPendingDraft ? "整文候補あり" : "整文済み"
             };
             break;
         }

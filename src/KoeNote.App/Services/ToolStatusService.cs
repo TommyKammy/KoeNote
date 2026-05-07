@@ -16,6 +16,7 @@ public sealed class ToolStatusService(AppPaths paths)
             CheckFile("ffmpeg", paths.FfmpegPath, required: true),
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: false),
             CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
+            CheckFile("llama-completion-ternary", paths.TernaryLlamaCompletionPath, required: false),
             CheckFasterWhisperRuntime(required: false),
             CheckDiarizationRuntime(required: false),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),

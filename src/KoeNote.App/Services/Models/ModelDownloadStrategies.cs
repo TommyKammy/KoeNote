@@ -247,6 +247,11 @@ internal sealed class ModelDownloadProgressReporter
 
     public void Report(long downloadedBytes, long? totalBytes, bool force = false)
     {
+        if (force && _lastReportedBytes == downloadedBytes && _lastReportedTotalBytes == totalBytes)
+        {
+            return;
+        }
+
         if (!force && !ShouldReport(downloadedBytes, totalBytes))
         {
             return;

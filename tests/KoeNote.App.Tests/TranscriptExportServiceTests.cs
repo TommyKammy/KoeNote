@@ -40,6 +40,9 @@ public sealed class TranscriptExportServiceTests
         Assert.Contains("\"PendingDraftCount\": 1", json, StringComparison.Ordinal);
         Assert.Contains("\"Text\": \"final one\"", json, StringComparison.Ordinal);
 
+        var markdown = File.ReadAllText(Path.Combine(output, "meeting.md"));
+        Assert.Contains("1件の未処理の整文候補が残っています。", markdown, StringComparison.Ordinal);
+
         var srt = File.ReadAllText(Path.Combine(output, "meeting.srt"));
         Assert.Contains("00:00:01,000 --> 00:00:02,500", srt, StringComparison.Ordinal);
 
@@ -49,6 +52,29 @@ public sealed class TranscriptExportServiceTests
 
         var logs = new JobLogRepository(paths).ReadLatest("job-001");
         Assert.Contains(logs, entry => entry.Stage == "export" && entry.Level == "warning");
+    }
+
+    [Fact]
+    public void ExportJob_CanUseRawTranscriptSource()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 1, 2.5, "spk-1", "raw one", "normalized one")
+        ]);
+        SetFinalText(paths, "job-001", "seg-001", "final one");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Text],
+            new TranscriptExportOptions(IncludeTimestamps: false, Source: TranscriptExportSource.Raw));
+
+        var text = File.ReadAllText(Path.Combine(output, "meeting.txt"));
+        Assert.Contains("raw one", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("final one", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("normalized one", text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -19,7 +19,7 @@ public sealed partial class MainWindowViewModel
             var preview = Segments[i];
             if (draftSegmentIds.Contains(preview.SegmentId))
             {
-                Segments[i] = preview with { ReviewState = "推敲候補あり" };
+                Segments[i] = preview with { ReviewState = "整文候補あり" };
             }
         }
     }
@@ -29,7 +29,7 @@ public sealed partial class MainWindowViewModel
         ReviewIssueType = "候補なし";
         OriginalText = string.Empty;
         SuggestedText = string.Empty;
-        ReviewReason = "推敲候補はありません。";
+        ReviewReason = "整文候補はありません。";
         Confidence = 0;
         DiffTokens.Clear();
         OnPropertyChanged(nameof(SelectedCorrectionDraftId));
@@ -48,6 +48,7 @@ public sealed partial class MainWindowViewModel
             || string.Equals(segment.Speaker, SelectedSpeakerFilter, StringComparison.Ordinal);
         var textMatches = string.IsNullOrWhiteSpace(SegmentSearchText)
             || segment.Text.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase)
+            || segment.RawTranscriptText.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase)
             || segment.Speaker.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase)
             || segment.ReviewState.Contains(SegmentSearchText, StringComparison.OrdinalIgnoreCase);
 

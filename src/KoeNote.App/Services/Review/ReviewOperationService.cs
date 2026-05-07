@@ -259,7 +259,7 @@ public sealed class ReviewOperationService(AppPaths paths)
             UPDATE jobs
             SET unreviewed_draft_count = (SELECT value FROM pending),
                 status = CASE
-                    WHEN (SELECT value FROM pending) = 0 THEN 'レビュー完了'
+                    WHEN (SELECT value FROM pending) = 0 THEN '整文完了'
                     ELSE status
                 END,
                 current_stage = CASE

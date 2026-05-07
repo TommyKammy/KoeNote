@@ -10,6 +10,12 @@ namespace KoeNote.App.Controls;
 
 public partial class TranscriptSegmentList : UserControl
 {
+    public static readonly DependencyProperty DisplayModeProperty = DependencyProperty.Register(
+        nameof(DisplayMode),
+        typeof(string),
+        typeof(TranscriptSegmentList),
+        new PropertyMetadata("Polished"));
+
     private bool _suppressNextInlineAutoSave;
 
     public TranscriptSegmentList()
@@ -17,6 +23,12 @@ public partial class TranscriptSegmentList : UserControl
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Unloaded += OnUnloaded;
+    }
+
+    public string DisplayMode
+    {
+        get => (string)GetValue(DisplayModeProperty);
+        set => SetValue(DisplayModeProperty, value);
     }
 
     private void OnDataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
@@ -88,7 +100,7 @@ public partial class TranscriptSegmentList : UserControl
 
     private void OnSegmentTextMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount < 2)
+        if (e.ClickCount < 2 || !string.Equals(DisplayMode, "Polished", StringComparison.Ordinal))
         {
             return;
         }
@@ -108,6 +120,11 @@ public partial class TranscriptSegmentList : UserControl
 
     private void OnSpeakerMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (!string.Equals(DisplayMode, "Polished", StringComparison.Ordinal))
+        {
+            return;
+        }
+
         if (DataContext is not MainWindowViewModel viewModel ||
             sender is not FrameworkElement { DataContext: TranscriptSegmentPreview segment })
         {

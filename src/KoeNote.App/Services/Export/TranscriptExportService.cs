@@ -42,7 +42,8 @@ public sealed class TranscriptExportService(AppPaths paths)
             throw new ArgumentException("Output directory is required.", nameof(outputDirectory));
         }
 
-        var snapshot = LoadSnapshot(jobId);
+        var exportOptions = options ?? new TranscriptExportOptions();
+        var snapshot = LoadSnapshot(jobId, exportOptions.Source);
         if (snapshot.Segments.Count == 0)
         {
             throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
@@ -53,7 +54,6 @@ public sealed class TranscriptExportService(AppPaths paths)
             ? formats
             : [TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Json, TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt];
         var filePaths = new List<string>();
-        var exportOptions = options ?? new TranscriptExportOptions();
         var baseName = SanitizeFileName(string.IsNullOrWhiteSpace(exportOptions.BaseFileName)
             ? snapshot.Title
             : exportOptions.BaseFileName);
@@ -75,7 +75,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         var level = result.HasUnresolvedDrafts ? "warning" : "info";
         var warning = result.HasUnresolvedDrafts ? $" ({result.PendingDraftCount} unresolved drafts)" : "";
-        new JobLogRepository(paths).AddEvent(jobId, "export", level, $"Exported transcript files to {outputDirectory}{warning}");
+        new JobLogRepository(paths).AddEvent(
+            jobId,
+            "export",
+            level,
+            $"Exported {GetSourceLogName(exportOptions.Source)} transcript files to {outputDirectory}{warning}");
         return result;
     }
 
@@ -101,14 +105,14 @@ public sealed class TranscriptExportService(AppPaths paths)
             throw new ArgumentException("Output path must include a directory.", nameof(outputPath));
         }
 
-        var snapshot = LoadSnapshot(jobId);
+        var exportOptions = options ?? new TranscriptExportOptions();
+        var snapshot = LoadSnapshot(jobId, exportOptions.Source);
         if (snapshot.Segments.Count == 0)
         {
             throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
         }
 
         Directory.CreateDirectory(outputDirectory);
-        var exportOptions = options ?? new TranscriptExportOptions();
         WriteFormat(outputPath, snapshot, format, exportOptions);
 
         var result = new TranscriptExportResult(
@@ -121,25 +125,49 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         var level = result.HasUnresolvedDrafts ? "warning" : "info";
         var warning = result.HasUnresolvedDrafts ? $" ({result.PendingDraftCount} unresolved drafts)" : "";
-        new JobLogRepository(paths).AddEvent(jobId, "export", level, $"Exported transcript file to {outputPath}{warning}");
+        new JobLogRepository(paths).AddEvent(
+            jobId,
+            "export",
+            level,
+            $"Exported {GetSourceLogName(exportOptions.Source)} transcript file to {outputPath}{warning}");
         return result;
     }
 
-    private ExportSnapshot LoadSnapshot(string jobId)
+    private ExportSnapshot LoadSnapshot(string jobId, TranscriptExportSource source)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
         var title = LoadJobTitle(connection, jobId);
         var pendingDraftCount = LoadPendingDraftCount(connection, jobId);
         var segments = new TranscriptReadRepository(paths)
             .ReadForJob(jobId)
-            .Select(static segment => new TranscriptExportSegment(
+            .Select(segment => new TranscriptExportSegment(
                 segment.SegmentId,
                 segment.StartSeconds,
                 segment.EndSeconds,
                 segment.Speaker,
-                segment.Text))
+                SelectExportText(segment, source)))
             .ToArray();
         return new ExportSnapshot(jobId, title, pendingDraftCount, segments);
+    }
+
+    private static string SelectExportText(TranscriptReadModel segment, TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.Raw => segment.RawText,
+            TranscriptExportSource.Polished => segment.Text,
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
+    }
+
+    private static string GetSourceLogName(TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.Raw => "raw",
+            TranscriptExportSource.Polished => "polished",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
     }
 
     private static string LoadJobTitle(SqliteConnection connection, string jobId)
@@ -214,7 +242,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         {
             builder.Append("> Warning: ")
                 .Append(snapshot.PendingDraftCount)
-                .AppendLine(" unresolved correction drafts remain.")
+                .AppendLine("件の未処理の整文候補が残っています。")
                 .AppendLine();
         }
 
@@ -365,7 +393,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         if (snapshot.PendingDraftCount > 0)
         {
             builder.Append("<w:p><w:r><w:t>")
-                .Append(SecurityElement.Escape($"{snapshot.PendingDraftCount} unresolved correction drafts remain."))
+                .Append(SecurityElement.Escape($"{snapshot.PendingDraftCount}件の未処理の整文候補が残っています。"))
                 .AppendLine("</w:t></w:r></w:p>");
         }
 

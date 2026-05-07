@@ -223,10 +223,23 @@
                         ToolTip="エクスポートメニュー">
                     <Button.ContextMenu>
                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                            <MenuItem Header="TXT" Command="{Binding ExportTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                            <MenuItem Header="JSON" Command="{Binding ExportJsonCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                            <MenuItem Header="SRT" Command="{Binding ExportSrtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                            <MenuItem Header="DOCX" Command="{Binding ExportDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="素起こし" Style="{StaticResource HeaderExportMenuItem}">
+                                <MenuItem Header="TXT" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Markdown" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="JSON" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="SRT" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            </MenuItem>
+                            <MenuItem Header="整文" Style="{StaticResource HeaderExportMenuItem}">
+                                <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="DOCX" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            </MenuItem>
+                            <MenuItem Header="要約" Style="{StaticResource HeaderExportMenuItem}">
+                                <MenuItem Header="Markdown" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="TXT" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            </MenuItem>
                             <Separator />
                             <MenuItem Header="タイムスタンプを含める"
                                       IsCheckable="True"
@@ -291,7 +304,7 @@
                            MaxWidth="118"
                            ToolTip="{Binding AsrModel}"
                            Margin="0,0,12,0" />
-                <TextBlock Text="REVIEW" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
+                <TextBlock Text="整文" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
                 <TextBlock Text="{Binding ReviewModel}"
                            Style="{StaticResource HeaderInfoValue}"
                            MaxWidth="96"

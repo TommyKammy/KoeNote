@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KoeNote Review UI Mockup</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --line: #d9e1ec;
+      --line-soft: #edf1f7;
+      --text: #172033;
+      --muted: #66758b;
+      --accent: #2563eb;
+      --accent-soft: #eaf1ff;
+      --success: #15803d;
+      --success-soft: #eaf7ee;
+      --warn: #b45309;
+      --warn-soft: #fff7ed;
+      --danger: #b91c1c;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Meiryo UI", "Segoe UI", sans-serif;
+      font-size: 13px;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 48px 1fr 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 22px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    button, .select {
+      height: 32px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 6px;
+      padding: 0 11px;
+      color: var(--text);
+      font: inherit;
+    }
+
+    button.primary {
+      border-color: #b7cdfa;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    button.success {
+      border-color: #b7e4c7;
+      background: var(--success-soft);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .main {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 260px minmax(520px, 1fr) 420px;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line-soft);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h1 { font-size: 17px; }
+    h2 { font-size: 15px; }
+    h3 { font-size: 13px; }
+
+    .muted { color: var(--muted); }
+
+    .jobs {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .job-list {
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      overflow: auto;
+    }
+
+    .job {
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .job.active {
+      border-color: #9dbcf8;
+      background: #f7fbff;
+    }
+
+    .job-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .tag {
+      border-radius: 999px;
+      padding: 2px 7px;
+      background: #eef2f7;
+      color: #475569;
+      font-size: 11px;
+      line-height: 18px;
+    }
+
+    .tag.ok { background: var(--success-soft); color: var(--success); }
+    .tag.warn { background: var(--warn-soft); color: var(--warn); }
+    .tag.blue { background: var(--accent-soft); color: var(--accent); }
+
+    .workspace {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-height: 0;
+    }
+
+    .stage-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px 10px;
+      background: #fff;
+    }
+
+    .stage.current {
+      border-color: #9dbcf8;
+      background: var(--accent-soft);
+    }
+
+    .stage .label {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stage .state {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 12px 16px 0;
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      background: #f8fafc;
+      border-radius: 7px 7px 0 0;
+      padding: 8px 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .tab.active {
+      background: #fff;
+      color: var(--accent);
+    }
+
+    .content {
+      padding: 14px 16px 16px;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .searchbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .input {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 10px;
+      background: #fff;
+      flex: 1;
+      color: var(--muted);
+    }
+
+    .segment {
+      border-bottom: 1px solid var(--line-soft);
+      display: grid;
+      grid-template-columns: 82px 78px 1fr;
+      gap: 10px;
+      padding: 12px 0;
+    }
+
+    .segment:last-child { border-bottom: 0; }
+
+    .time {
+      font-family: Consolas, monospace;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .speaker {
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .text-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .raw {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: #e2a5a5;
+    }
+
+    .polished {
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .inline-note {
+      border-left: 3px solid #f59e0b;
+      background: #fffbeb;
+      padding: 7px 9px;
+      color: #92400e;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .review {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+    }
+
+    .review-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .mode-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .mode-card.active {
+      border-color: #9dbcf8;
+      background: var(--accent-soft);
+    }
+
+    .review-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 14px 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .summary-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .summary-card header {
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .summary-card .body {
+      padding: 12px;
+      line-height: 1.7;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+
+    li { margin: 5px 0; }
+
+    .candidate {
+      border: 1px solid #f4d8a8;
+      background: #fffaf0;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .candidate-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .diff {
+      display: grid;
+      gap: 6px;
+      line-height: 1.7;
+    }
+
+    .delete { background: #fee2e2; color: #991b1b; padding: 1px 3px; border-radius: 3px; }
+    .insert { background: #dcfce7; color: #166534; padding: 1px 3px; border-radius: 3px; }
+
+    .review-actions {
+      border-top: 1px solid var(--line-soft);
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      background: #fbfcfe;
+    }
+
+    .statusbar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 16px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">KoeNote</div>
+      <div class="muted">VERSION v0.17.0 mock</div>
+      <div class="tag-row">
+        <span class="tag blue">ASR Whisper base</span>
+        <span class="tag ok">整文 ON</span>
+        <span class="tag ok">要約 ON</span>
+      </div>
+      <div class="toolbar">
+        <button>＋ 音声追加</button>
+        <button class="primary">▶ 実行</button>
+        <button>⚙</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <aside class="panel jobs">
+        <div class="panel-header">
+          <h2>ジョブ</h2>
+          <span class="muted">3 件</span>
+        </div>
+        <div class="job-list">
+          <section class="job active">
+            <div class="job-title">定例ミーティング.m4a</div>
+            <div class="tag-row">
+              <span class="tag ok">文字起こし済み</span>
+              <span class="tag warn">確認 2</span>
+              <span class="tag blue">要約あり</span>
+            </div>
+          </section>
+          <section class="job">
+            <div class="job-title">製品相談.wav</div>
+            <div class="tag-row">
+              <span class="tag ok">完了</span>
+              <span class="tag blue">要約あり</span>
+            </div>
+          </section>
+          <section class="job">
+            <div class="job-title">録音_2026-05-07.mp3</div>
+            <div class="tag-row">
+              <span class="tag">未実行</span>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <section class="panel workspace">
+        <div class="panel-header">
+          <h1>整文済み文字起こし</h1>
+          <span class="muted">未確定の候補は本文に反映せず、右側で確認します。</span>
+        </div>
+        <div class="stage-strip">
+          <div class="stage"><div class="label">音声変換</div><div class="state">完了 00:00:03</div></div>
+          <div class="stage"><div class="label">ASR</div><div class="state">完了 00:02:18</div></div>
+          <div class="stage current"><div class="label">整文</div><div class="state">確認待ち 2</div></div>
+          <div class="stage"><div class="label">要約</div><div class="state">整文確認後に更新</div></div>
+        </div>
+        <nav class="tabs">
+          <div class="tab">素起こし</div>
+          <div class="tab active">整文</div>
+          <div class="tab">要約</div>
+          <div class="tab">差分</div>
+        </nav>
+        <div class="content">
+          <div class="searchbar">
+            <div class="input">検索: 存在している情報</div>
+            <div class="select">全話者</div>
+            <button>Markdown保存</button>
+          </div>
+
+          <div class="segment">
+            <div class="time">00:01:14</div>
+            <div class="speaker">話者 1</div>
+            <div class="text-stack">
+              <div class="raw">だけどその実際にを存在している情報っていうことですね。</div>
+              <div class="polished">ただし、実際に存在している情報ということですね。</div>
+              <div class="inline-note">候補適用済み: 助詞の重複を修正</div>
+            </div>
+          </div>
+
+          <div class="segment">
+            <div class="time">00:02:08</div>
+            <div class="speaker">話者 2</div>
+            <div class="text-stack">
+              <div class="polished">次回までに、軽量プリセットの初回セットアップ導線を確認します。</div>
+            </div>
+          </div>
+
+          <div class="segment">
+            <div class="time">00:03:31</div>
+            <div class="speaker">話者 1</div>
+            <div class="text-stack">
+              <div class="polished">高精度モデルは品質評価後に既定候補へ含める方針です。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel review">
+        <div class="panel-header">
+          <h2>整文・要約</h2>
+          <span class="tag warn">確認待ち 2</span>
+        </div>
+
+        <div class="review-mode">
+          <div class="mode-card active">
+            <h3>整文レビュー</h3>
+            <div class="muted">候補を確認して本文へ反映</div>
+          </div>
+          <div class="mode-card">
+            <h3>要約</h3>
+            <div class="muted">確認後に最新化</div>
+          </div>
+        </div>
+
+        <div class="review-body">
+          <section class="candidate">
+            <div class="candidate-title">
+              <span>候補 1 / 2</span>
+              <span class="tag warn">文法</span>
+            </div>
+            <div class="diff">
+              <div>原文: だけどその実際<span class="delete">にを</span>存在している情報っていうことですね。</div>
+              <div>提案: ただし、実際<span class="insert">に</span>存在している情報ということですね。</div>
+              <div class="muted">理由: 助詞の連続と口語表現を整えています。</div>
+            </div>
+          </section>
+
+          <section class="summary-card">
+            <header>
+              <h3>要約プレビュー</h3>
+              <span class="tag blue">stale</span>
+            </header>
+            <div class="body">
+              <strong>概要</strong>
+              <ul>
+                <li>軽量プリセットの導入体験を改善する方針を確認。</li>
+                <li>Review モデルを使った整文と要約を同じ導線にまとめる。</li>
+              </ul>
+              <strong>決定事項</strong>
+              <ul>
+                <li>未確認の整文候補がある場合、要約は更新しない。</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="summary-card">
+            <header>
+              <h3>出力</h3>
+              <span class="tag ok">Markdown</span>
+            </header>
+            <div class="body">
+              整文済み本文、要約、未確認候補を分けて保存できます。
+            </div>
+          </section>
+        </div>
+
+        <div class="review-actions">
+          <button>スキップ</button>
+          <button>手動編集</button>
+          <button class="success">反映して次へ</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <span>保存先 C:\Users\Administrator\AppData\Roaming\KoeNote</span>
+      <span>DB 260 KB</span>
+      <span>Review: Bonsai 8B Q1_0</span>
+      <span>Summary: Review model shared</span>
+    </footer>
+  </div>
+</body>
+</html>

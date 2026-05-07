@@ -51,6 +51,11 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always"
              Condition="Exists('..\..\tools\review')" />
+    <Content Include="..\..\tools\review-ternary\**\*"
+             Link="tools\review-ternary\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always"
+             Condition="Exists('..\..\tools\review-ternary')" />
     <Content Include="catalog\model-catalog.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
@@ -66,12 +71,17 @@
                       Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\asr')" />
       <ReviewRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\review\**\*"
                          Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\review')" />
+      <TernaryReviewRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\review-ternary\**\*"
+                                Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\review-ternary')" />
     </ItemGroup>
     <Copy SourceFiles="@(AsrRuntimeTool)"
           DestinationFiles="@(AsrRuntimeTool->'$(TargetDir)tools\asr\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ReviewRuntimeTool)"
           DestinationFiles="@(ReviewRuntimeTool->'$(TargetDir)tools\review\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(TernaryReviewRuntimeTool)"
+          DestinationFiles="@(TernaryReviewRuntimeTool->'$(TargetDir)tools\review-ternary\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 

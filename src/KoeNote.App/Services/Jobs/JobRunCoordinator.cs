@@ -6,7 +6,8 @@ namespace KoeNote.App.Services.Jobs;
 public sealed class JobRunCoordinator(
     IPreprocessStageRunner preprocessStageRunner,
     IAsrStageRunner asrStageRunner,
-    IReviewStageRunner reviewStageRunner)
+    IReviewStageRunner reviewStageRunner,
+    ISummaryStageRunner summaryStageRunner)
 {
     public async Task RunAsync(
         JobSummary job,
@@ -28,10 +29,38 @@ public sealed class JobRunCoordinator(
 
         if (asrSettings.EnableReviewStage)
         {
-            await reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
+            var reviewSucceeded = await reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
+            if (!reviewSucceeded)
+            {
+                if (!cancellationToken.IsCancellationRequested && asrSettings.EnableSummaryStage)
+                {
+                    summaryStageRunner.Skip(job, report, "review_not_succeeded");
+                }
+
+                return;
+            }
+
+            if (job.UnreviewedDrafts > 0)
+            {
+                if (asrSettings.EnableSummaryStage)
+                {
+                    summaryStageRunner.Skip(job, report, "manual_review_pending");
+                }
+
+                return;
+            }
+        }
+        else
+        {
+            reviewStageRunner.Skip(job, report);
+        }
+
+        if (asrSettings.EnableSummaryStage)
+        {
+            await summaryStageRunner.RunAsync(job, report, cancellationToken);
             return;
         }
 
-        reviewStageRunner.Skip(job, report);
+        summaryStageRunner.Skip(job, report, "disabled_by_user");
     }
 }

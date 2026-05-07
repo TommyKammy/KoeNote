@@ -39,7 +39,8 @@ public sealed record ModelCatalogItem(
     [property: JsonPropertyName("requirements")] ModelRequirements Requirements,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("size_bytes")] long? SizeBytes = null,
-    [property: JsonPropertyName("quality_labels")] IReadOnlyList<string>? QualityLabels = null);
+    [property: JsonPropertyName("quality_labels")] IReadOnlyList<string>? QualityLabels = null,
+    [property: JsonPropertyName("output_sanitizer_profile")] string? OutputSanitizerProfile = null);
 
 public sealed record ModelRuntimeSpec(
     [property: JsonPropertyName("type")] string Type,

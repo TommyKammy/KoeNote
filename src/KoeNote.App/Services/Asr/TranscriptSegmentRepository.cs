@@ -181,8 +181,8 @@ public sealed class TranscriptSegmentRepository(AppPaths paths)
     {
         return state switch
         {
-            "has_draft" => "推敲候補あり",
-            "reviewed" => "レビュー済み",
+            "has_draft" => "整文候補あり",
+            "reviewed" => "整文済み",
             "manually_edited" => "手修正済み",
             _ => "候補なし"
         };

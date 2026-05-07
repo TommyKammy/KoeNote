@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Input;
 using KoeNote.App.Services.Export;
 using Microsoft.Win32;
 
@@ -14,10 +15,20 @@ public sealed partial class MainWindowViewModel
 
     private Task ExportSelectedJobFormatAsync(TranscriptExportFormat format)
     {
-        return ExportSelectedJobWithDialogAsync(format);
+        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.Polished);
+    }
+
+    private Task ExportSelectedJobFormatAsync(TranscriptExportFormat format, TranscriptExportSource source)
+    {
+        return ExportSelectedJobWithDialogAsync(format, source);
     }
 
     private Task ExportSelectedJobWithDialogAsync(TranscriptExportFormat? format)
+    {
+        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.Polished);
+    }
+
+    private Task ExportSelectedJobWithDialogAsync(TranscriptExportFormat? format, TranscriptExportSource source)
     {
         if (SelectedJob is null)
         {
@@ -26,10 +37,10 @@ public sealed partial class MainWindowViewModel
 
         var dialog = new SaveFileDialog
         {
-            Title = "Export transcript",
+            Title = $"{GetExportSourceDisplayName(source)}を出力",
             AddExtension = true,
             OverwritePrompt = true,
-            FileName = GetDefaultExportFileName(format ?? TranscriptExportFormat.Text),
+            FileName = GetDefaultExportFileName(format ?? TranscriptExportFormat.Text, source),
             Filter = CreateExportFilter(format),
             FilterIndex = 1,
             DefaultExt = GetExtension(format ?? TranscriptExportFormat.Text)
@@ -43,11 +54,16 @@ public sealed partial class MainWindowViewModel
         }
 
         var selectedFormat = format ?? GetFormatFromFilterIndex(dialog.FilterIndex);
-        ExportSelectedJobToFile(EnsureExtension(dialog.FileName, selectedFormat), selectedFormat);
+        ExportSelectedJobToFile(EnsureExtension(dialog.FileName, selectedFormat), selectedFormat, source);
         return Task.CompletedTask;
     }
 
     public void ExportSelectedJobToFile(string outputPath, TranscriptExportFormat format)
+    {
+        ExportSelectedJobToFile(outputPath, format, TranscriptExportSource.Polished);
+    }
+
+    public void ExportSelectedJobToFile(string outputPath, TranscriptExportFormat format, TranscriptExportSource source)
     {
         if (SelectedJob is null)
         {
@@ -60,18 +76,16 @@ public sealed partial class MainWindowViewModel
                 SelectedJob.JobId,
                 outputPath,
                 format,
-                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps));
+                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
-            ExportWarning = result.HasUnresolvedDrafts
-                ? $"{result.PendingDraftCount} unresolved correction draft(s) remain. Exported as confirmation output."
-                : string.Empty;
-            LatestLog = $"Exported transcript file: {string.Join(", ", result.FilePaths)}";
+            ExportWarning = CreateExportWarning(result);
+            LatestLog = $"{GetExportSourceDisplayName(source)}を出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"Export failed: {exception.Message}";
+            ExportWarning = $"{GetExportSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
             RefreshLogs();
@@ -79,6 +93,14 @@ public sealed partial class MainWindowViewModel
     }
 
     public void ExportSelectedJobToFolder(string outputDirectory, TranscriptExportFormat? format = null)
+    {
+        ExportSelectedJobToFolder(outputDirectory, format, TranscriptExportSource.Polished);
+    }
+
+    public void ExportSelectedJobToFolder(
+        string outputDirectory,
+        TranscriptExportFormat? format,
+        TranscriptExportSource source)
     {
         if (SelectedJob is null)
         {
@@ -92,18 +114,16 @@ public sealed partial class MainWindowViewModel
                 SelectedJob.JobId,
                 outputDirectory,
                 formats,
-                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps));
+                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
-            ExportWarning = result.HasUnresolvedDrafts
-                ? $"{result.PendingDraftCount} unresolved correction draft(s) remain. Exported as confirmation output."
-                : string.Empty;
-            LatestLog = $"Exported {result.FilePaths.Count} transcript file(s): {string.Join(", ", result.FilePaths)}";
+            ExportWarning = CreateExportWarning(result);
+            LatestLog = $"{GetExportSourceDisplayName(source)}を{result.FilePaths.Count}件出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"Export failed: {exception.Message}";
+            ExportWarning = $"{GetExportSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
             RefreshLogs();
@@ -147,6 +167,11 @@ public sealed partial class MainWindowViewModel
 
     private string GetDefaultExportFileName(TranscriptExportFormat format)
     {
+        return GetDefaultExportFileName(format, TranscriptExportSource.Polished);
+    }
+
+    private string GetDefaultExportFileName(TranscriptExportFormat format, TranscriptExportSource source)
+    {
         var baseName = SelectedJob is null
             ? "transcript"
             : Path.GetFileNameWithoutExtension(SelectedJob.FileName);
@@ -155,7 +180,13 @@ public sealed partial class MainWindowViewModel
             baseName = "transcript";
         }
 
-        return $"{baseName}.{GetExtension(format)}";
+        var suffix = source switch
+        {
+            TranscriptExportSource.Raw => ".raw",
+            TranscriptExportSource.Polished => ".polished",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
+        return $"{baseName}{suffix}.{GetExtension(format)}";
     }
 
     private static string CreateExportFilter(TranscriptExportFormat? format)
@@ -190,6 +221,23 @@ public sealed partial class MainWindowViewModel
             TranscriptExportFormat.Docx => "Word document",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
+    }
+
+    private static string GetExportSourceDisplayName(TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.Raw => "素起こし",
+            TranscriptExportSource.Polished => "整文",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
+    }
+
+    private static string CreateExportWarning(TranscriptExportResult result)
+    {
+        return result.HasUnresolvedDrafts
+            ? $"未処理の整文候補が{result.PendingDraftCount}件残っています。確認用として出力しました。"
+            : string.Empty;
     }
 
     private static string GetExtension(TranscriptExportFormat format)
@@ -241,9 +289,37 @@ public sealed partial class MainWindowViewModel
             docxCommand.RaiseCanExecuteChanged();
         }
 
+        RaiseExportCommandState(ExportRawTxtCommand);
+        RaiseExportCommandState(ExportRawMarkdownCommand);
+        RaiseExportCommandState(ExportRawJsonCommand);
+        RaiseExportCommandState(ExportRawSrtCommand);
+        RaiseExportCommandState(ExportRawVttCommand);
+        RaiseExportCommandState(ExportRawDocxCommand);
+        RaiseExportCommandState(ExportPolishedTxtCommand);
+        RaiseExportCommandState(ExportPolishedMarkdownCommand);
+        RaiseExportCommandState(ExportPolishedDocxCommand);
+
+        if (ExportSummaryMarkdownCommand is RelayCommand summaryCommand)
+        {
+            summaryCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ExportSummaryTextCommand is RelayCommand summaryTextCommand)
+        {
+            summaryTextCommand.RaiseCanExecuteChanged();
+        }
+
         if (OpenExportFolderCommand is RelayCommand openCommand)
         {
             openCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static void RaiseExportCommandState(ICommand command)
+    {
+        if (command is RelayCommand relayCommand)
+        {
+            relayCommand.RaiseCanExecuteChanged();
         }
     }
 }

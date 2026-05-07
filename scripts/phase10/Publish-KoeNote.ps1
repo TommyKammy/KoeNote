@@ -64,6 +64,17 @@ elseif ($RequireReviewRuntime) {
     throw "Missing review runtime: $reviewRuntimeSource. Place llama.cpp CPU x64 runtime files there before publishing with -RequireReviewRuntime."
 }
 
+$ternaryReviewRuntimeSource = Join-Path $toolsSource "review-ternary"
+$ternaryReviewRuntimeDestination = Join-Path $publishDir "tools\review-ternary"
+if (Test-Path -LiteralPath $ternaryReviewRuntimeSource -PathType Container) {
+    New-Item -ItemType Directory -Force -Path $ternaryReviewRuntimeDestination | Out-Null
+    Get-ChildItem -LiteralPath $ternaryReviewRuntimeSource -Force |
+        Copy-Item -Destination $ternaryReviewRuntimeDestination -Recurse -Force
+}
+elseif ($RequireReviewRuntime) {
+    throw "Missing ternary review runtime: $ternaryReviewRuntimeSource. Place Prism llama.cpp CPU x64 runtime files there before publishing with -RequireReviewRuntime."
+}
+
 $legacyRuntimeReadme = @"
 ASR runtime tools are intentionally not included in the Phase 10 core package.
 

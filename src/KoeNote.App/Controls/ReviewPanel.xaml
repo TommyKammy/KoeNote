@@ -19,6 +19,30 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="VisibleWhenSummaryStyle" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasSummaryContent}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="VisibleWhenNoSummaryStyle" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasSummaryContent}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="VisibleWhenSummaryRunningStyle" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSummaryStageRunning}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="VisibleWhenReviewOperationStyle" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
@@ -29,16 +53,21 @@
         </Style>
         <Style x:Key="ReviewApplyButton" TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
             <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-            <Setter Property="Height" Value="56" />
-            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style x:Key="ReviewSecondaryButton" TargetType="Button" BasedOn="{StaticResource OutlineNeutralButton}">
-            <Setter Property="Height" Value="56" />
-            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="10,8" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="ReviewSubheading" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </UserControl.Resources>
 
@@ -49,22 +78,26 @@
                     BorderBrush="{StaticResource BorderBrushSoft}"
                     BorderThickness="0,0,0,1">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="38" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="推敲レビュー"
-                               Style="{StaticResource SectionTitle}"
-                               Margin="0"
-                               VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="整文・要約"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SummaryStatus}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                Style="{StaticResource VisibleWhenDraftStyle}">
                         <Button Padding="7,4"
                                 MinWidth="0"
                                 Command="{Binding SelectPreviousDraftCommand}"
@@ -94,24 +127,6 @@
                             ToolTip="閉じる">
                         <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
                     </Button>
-
-                    <WrapPanel Grid.Row="1"
-                               Grid.ColumnSpan="3"
-                               Margin="0,12,0,0"
-                               Style="{StaticResource VisibleWhenDraftStyle}">
-                        <Border Background="#FFF7ED" CornerRadius="12" Padding="9,4" Margin="0,0,8,6">
-                            <TextBlock Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}"
-                                       Foreground="{StaticResource WarningBrush}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold" />
-                        </Border>
-                        <Border Background="#FEF3C7" CornerRadius="12" Padding="10,5" Margin="0,0,8,6">
-                            <TextBlock Text="{Binding ReviewIssueType}"
-                                       Foreground="{StaticResource WarningBrush}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold" />
-                        </Border>
-                    </WrapPanel>
                 </Grid>
             </Border>
 
@@ -128,9 +143,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="この候補への操作"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
+                                   Style="{StaticResource ReviewSubheading}"
                                    VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1"
                                    Text="保存中..."
@@ -152,27 +165,20 @@
 
                         <Button Style="{StaticResource ReviewApplyButton}"
                                 Command="{Binding AcceptDraftCommand}"
-                                ToolTip="推敲候補を文字起こしへ反映して、次の候補へ進みます">
+                                ToolTip="整文候補を整文へ反映して、次の候補へ進みます">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                <StackPanel>
-                                    <TextBlock Text="提案を適用"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="候補を反映"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontSize="11"
-                                               Opacity="0.75"
-                                               TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
+                                <TextBlock Text="適用"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Button>
 
                         <Button Grid.Column="2"
                                 Style="{StaticResource ReviewSecondaryButton}"
                                 Command="{Binding RejectDraftCommand}"
-                                ToolTip="この推敲候補を反映せず、次の候補へ進みます">
+                                ToolTip="この候補を反映せず、次の候補へ進みます">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
                                 <TextBlock Text="却下"
@@ -201,29 +207,123 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           Padding="18">
                 <StackPanel>
+                    <Border BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="0,0,0,1"
+                            Padding="0,0,0,16"
+                            Margin="0,0,0,16">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="要約"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="生成中"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
+                                <Button Grid.Column="2"
+                                        Command="{Binding ExportSummaryMarkdownCommand}"
+                                        Padding="8,5"
+                                        Margin="8,0,0,0"
+                                        ToolTip="要約をMarkdownで保存"
+                                        Style="{StaticResource VisibleWhenSummaryStyle}">
+                                    <TextBlock Text="MD" FontSize="11" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Grid.Column="3"
+                                        Command="{Binding ExportSummaryTextCommand}"
+                                        Padding="8,5"
+                                        Margin="6,0,0,0"
+                                        ToolTip="要約をTXTで保存"
+                                        Style="{StaticResource VisibleWhenSummaryStyle}">
+                                    <TextBlock Text="TXT" FontSize="11" FontWeight="SemiBold" />
+                                </Button>
+                            </Grid>
+
+                            <Border Background="#FAFBFC"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12"
+                                    Style="{StaticResource VisibleWhenNoSummaryStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="要約はまだありません"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,6" />
+                                    <TextBlock Text="要約ステージを有効にして実行すると、ここに要約が表示されます。"
+                                               Style="{StaticResource MutedText}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBox Text="{Binding SummaryContentDisplay, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     MinHeight="128"
+                                     MaxHeight="260"
+                                     BorderThickness="0"
+                                     Background="#FAFBFC"
+                                     Padding="12"
+                                     Style="{StaticResource VisibleWhenSummaryStyle}" />
+                        </StackPanel>
+                    </Border>
+
                     <Border Style="{StaticResource VisibleWhenNoDraftStyle}"
                             Background="#FAFBFC"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="16"
-                            Margin="0,0,0,16">
+                            Padding="16">
                         <StackPanel>
-                            <TextBlock Text="推敲候補はありません"
+                            <TextBlock Text="整文候補はありません"
                                        FontWeight="SemiBold"
                                        Margin="0,0,0,6" />
-                            <TextBlock Text="ASR結果が自然な場合、ここには候補が表示されません。"
+                            <TextBlock Text="整文が生成済みの場合は中央の整文タブで確認できます。必要な確認候補がある場合だけ、ここに候補が表示されます。"
                                        Style="{StaticResource MutedText}"
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 
                     <StackPanel Style="{StaticResource VisibleWhenDraftStyle}">
-                        <TextBlock Text="原文" Style="{StaticResource MutedText}" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="整文候補"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                            <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                                <Border Background="#FFF7ED" CornerRadius="12" Padding="9,4" Margin="0,0,8,0">
+                                    <TextBlock Text="{Binding Confidence, StringFormat=信頼度 {0:P0}}"
+                                               Foreground="{StaticResource WarningBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold" />
+                                </Border>
+                                <Border Background="#FEF3C7" CornerRadius="12" Padding="10,5">
+                                    <TextBlock Text="{Binding ReviewIssueType}"
+                                               Foreground="{StaticResource WarningBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold" />
+                                </Border>
+                            </WrapPanel>
+                        </Grid>
+
+                        <TextBlock Text="原文" Style="{StaticResource ReviewSubheading}" />
                         <TextBox Text="{Binding OriginalText, Mode=OneWay}"
                                  IsReadOnly="True"
                                  TextWrapping="Wrap"
-                                 MinHeight="82"
+                                 MinHeight="74"
                                  Margin="0,5,0,14"
                                  Background="#FAFBFC"
                                  PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick" />
@@ -233,21 +333,21 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="提案文" Style="{StaticResource MutedText}" />
+                            <TextBlock Text="整文案" Style="{StaticResource ReviewSubheading}" />
                             <TextBlock Grid.Column="1"
-                                       Text="ここを直してから手修正できます"
+                                       Text="ここで編集してから手修正できます"
                                        Foreground="{StaticResource MutedBrush}"
                                        FontSize="11"
                                        VerticalAlignment="Center" />
                         </Grid>
                         <TextBox Text="{Binding SuggestedText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  TextWrapping="Wrap"
-                                 MinHeight="88"
+                                 MinHeight="82"
                                  Margin="0,0,0,14"
                                  Background="#F7FCF9"
                                  BorderBrush="#B7D8C4" />
 
-                        <TextBlock Text="差分" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="差分" Style="{StaticResource ReviewSubheading}" />
                         <Border Background="#FAFBFC"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1"
@@ -307,7 +407,7 @@
                             </ItemsControl>
                         </Border>
 
-                        <TextBlock Text="理由" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="理由" Style="{StaticResource ReviewSubheading}" />
                         <TextBlock Text="{Binding ReviewReason}"
                                    TextWrapping="Wrap"
                                    TextTrimming="None"
