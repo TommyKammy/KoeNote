@@ -1669,10 +1669,10 @@ public sealed class MainWindowViewModelTests
     {
         public string? StartedInstallerPath { get; private set; }
 
-        public UpdateInstallerLaunchResult Launch(string installerPath)
+        public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null)
         {
             StartedInstallerPath = installerPath;
-            return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now, "CN=KoeNote Test");
+            return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now, "SHA256 verified download", false);
         }
     }
 }

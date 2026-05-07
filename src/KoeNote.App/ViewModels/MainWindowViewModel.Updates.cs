@@ -192,9 +192,9 @@ public sealed partial class MainWindowViewModel
             });
             var result = await _updateDownloadService.DownloadAndVerifyAsync(_availableUpdate, progress);
             VerifiedUpdateInstallerPath = result.FilePath;
-            UpdateDownloadProgressText = $"Verified installer: {result.FilePath}";
+            UpdateDownloadProgressText = $"SHA256 verified installer: {result.FilePath}";
             UpdateNotificationTitle = $"Update ready: KoeNote {AvailableUpdateVersion}";
-            UpdateNotificationMessage = "The installer has been downloaded and verified. Finish current work before installing it.";
+            UpdateNotificationMessage = "The installer has been downloaded and SHA256 verified. This project distributes unsigned MSI files, so Windows may show a publisher warning.";
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
             RecordUpdateHistory("download_verified", _availableUpdate.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
         }
@@ -227,13 +227,13 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var result = _updateInstallerLauncher.Launch(VerifiedUpdateInstallerPath);
+            var result = _updateInstallerLauncher.Launch(VerifiedUpdateInstallerPath, _availableUpdate?.Sha256);
             ClearVerifiedUpdateInstallerState();
             UpdateDownloadProgressText = $"Installer started: {result.InstallerPath}";
             UpdateNotificationTitle = "Update installer started";
-            UpdateNotificationMessage = $"Follow the installer prompts to complete the update. Signature: {result.SignerSubject}";
+            UpdateNotificationMessage = $"Follow the installer prompts to complete the update. Verification: {result.TrustDescription}.";
             LatestLog = $"Update installer started: {result.InstallerPath}";
-            RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Signature: {result.SignerSubject}", result.InstallerPath);
+            RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Verification: {result.TrustDescription}", result.InstallerPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
