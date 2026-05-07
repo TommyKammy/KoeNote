@@ -4,7 +4,7 @@ namespace KoeNote.App.Services.Diarization;
 
 internal static class PythonRuntimeEnvironment
 {
-    public static IReadOnlyDictionary<string, string> Build(AppPaths paths)
+    public static IReadOnlyDictionary<string, string> BuildLegacy(AppPaths paths)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var existingPythonPath = Environment.GetEnvironmentVariable("PYTHONPATH");

@@ -40,6 +40,51 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
+    private void RegisterDiscoveredManagedModels()
+    {
+        var catalog = _modelCatalogService.LoadBuiltInCatalog();
+        foreach (var item in catalog.Models)
+        {
+            var existing = _installedModelRepository.FindInstalledModel(item.ModelId);
+            if (existing is not null &&
+                existing.Verified &&
+                (File.Exists(existing.FilePath) || Directory.Exists(existing.FilePath)))
+            {
+                continue;
+            }
+
+            foreach (var candidatePath in GetManagedModelCandidatePaths(item))
+            {
+                if (!File.Exists(candidatePath) && !Directory.Exists(candidatePath))
+                {
+                    continue;
+                }
+
+                _modelInstallService.RegisterLocalModel(item, candidatePath, "discovered");
+                break;
+            }
+        }
+    }
+
+    private IEnumerable<string> GetManagedModelCandidatePaths(ModelCatalogItem item)
+    {
+        var roots = new[]
+        {
+            _setupState.StorageRoot,
+            Paths.DefaultModelStorageRoot,
+            Paths.UserModels,
+            Paths.MachineModels
+        }
+            .Where(static root => !string.IsNullOrWhiteSpace(root))
+            .Select(static root => root!)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in roots)
+        {
+            yield return _modelInstallService.GetDefaultInstallPath(item, root);
+        }
+    }
+
     private async Task DownloadSelectedModelAsync()
     {
         if (SelectedModelCatalogEntry is null)

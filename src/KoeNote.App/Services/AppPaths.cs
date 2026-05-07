@@ -48,9 +48,13 @@ public sealed class AppPaths
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         UpdateDownloads = Path.Combine(localAppData, "KoeNote", "updates");
         UpdateHistoryPath = Path.Combine(UpdateDownloads, "history.jsonl");
-        PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
-        UpdateBackups = Path.Combine(localAppData, "KoeNote", "backups", "updates");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
+        PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
+        PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
+        DiarizationPythonEnvironment = Path.Combine(PythonEnvironments, "diarization");
+        DiarizationPythonPath = Path.Combine(DiarizationPythonEnvironment, "Scripts", "python.exe");
+        BundledPythonPath = Path.Combine(RuntimeTools, "python", "python.exe");
+        UpdateBackups = Path.Combine(localAppData, "KoeNote", "backups", "updates");
         Models = Path.Combine(baseDirectory, "models");
         ModelCatalogPath = Path.Combine(baseDirectory, "catalog", "model-catalog.json");
         FfmpegPath = Path.Combine(RuntimeTools, "ffmpeg.exe");
@@ -96,6 +100,14 @@ public sealed class AppPaths
 
     public string PythonPackages { get; }
 
+    public string PythonEnvironments { get; }
+
+    public string DiarizationPythonEnvironment { get; }
+
+    public string DiarizationPythonPath { get; }
+
+    public string BundledPythonPath { get; }
+
     public string UpdateBackups { get; }
 
     public string RuntimeTools { get; }
@@ -135,6 +147,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(ModelDownloads);
         Directory.CreateDirectory(UpdateDownloads);
         Directory.CreateDirectory(PythonPackages);
+        Directory.CreateDirectory(PythonEnvironments);
         Directory.CreateDirectory(UpdateBackups);
 
         if (!File.Exists(SettingsPath))

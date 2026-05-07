@@ -13,8 +13,11 @@ public sealed class ScriptedDiarizationService(
     DiarizationJsonNormalizer normalizer,
     DiarizationSegmentAssigner assigner,
     TranscriptSegmentRepository transcriptSegmentRepository,
-    AsrResultStore asrResultStore)
+    AsrResultStore asrResultStore,
+    PythonRuntimeResolver? pythonRuntimeResolver = null)
 {
+    private readonly PythonRuntimeResolver _pythonRuntimeResolver = pythonRuntimeResolver ?? new PythonRuntimeResolver(paths, processRunner);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -43,18 +46,24 @@ public sealed class ScriptedDiarizationService(
         ProcessRunResult processResult;
         try
         {
+            var runtime = await _pythonRuntimeResolver.ResolveInstalledRuntimeAsync(cancellationToken);
+            if (!runtime.IsFound || runtime.Command is null)
+            {
+                WriteStatus(rawOutputPath, $"failed: {runtime.Message}");
+                return new DiarizationRunResult($"failed: {runtime.Message}", rawOutputPath, segments, 0, 0, DateTimeOffset.UtcNow - startedAt);
+            }
+
             processResult = await processRunner.RunAsync(
-                "python",
-                [
+                runtime.Command.FileName,
+                runtime.Command.BuildArguments(
                     paths.DiarizeWorkerScriptPath,
                     "--audio",
                     normalizedAudioPath,
                     "--output-json",
-                    rawOutputPath
-                ],
+                    rawOutputPath),
                 timeout,
                 cancellationToken,
-                PythonRuntimeEnvironment.Build(paths));
+                runtime.Command.Environment);
         }
         catch (TimeoutException exception)
         {

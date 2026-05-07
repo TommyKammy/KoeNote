@@ -22,7 +22,10 @@ using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
 
-public sealed record AsrEngineOption(string EngineId, string DisplayName);
+public sealed record AsrEngineOption(string EngineId, string DisplayName)
+{
+    public override string ToString() => DisplayName;
+}
 
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
@@ -322,6 +325,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
 
         MarkInterruptedModelDownloads();
+        RegisterDiscoveredManagedModels();
         RefreshModelCatalog();
         RefreshSetupWizard();
         IsSetupWizardModalOpen = !IsSetupComplete;

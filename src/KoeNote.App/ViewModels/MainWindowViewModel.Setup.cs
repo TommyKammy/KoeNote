@@ -456,8 +456,11 @@ public sealed partial class MainWindowViewModel
     private void RefreshDiarizationRuntimeSummary()
     {
         var isInstalled = DiarizationRuntimeLayout.HasPackage(Paths);
+        var installPath = Directory.Exists(Paths.DiarizationPythonEnvironment)
+            ? Paths.DiarizationPythonEnvironment
+            : Paths.PythonPackages;
         SetupDiarizationRuntimeSummary = isInstalled
-            ? $"話者識別ランタイム導入済み: {Paths.PythonPackages}"
+            ? $"話者識別ランタイム導入済み: {installPath}"
             : "話者識別ランタイムは未導入です。必要な場合だけ追加導入できます。";
     }
 }

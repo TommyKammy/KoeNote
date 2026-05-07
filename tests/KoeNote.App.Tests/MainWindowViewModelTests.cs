@@ -109,6 +109,70 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void HeaderModels_RegistersDownloadedSetupAsrFolderWhenInstallRecordIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var asrPath = Path.Combine(paths.UserModels, "asr", "whisper-base");
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "vibevoice-asr-gguf", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "bonsai-8b-q1-0",
+            StorageRoot = paths.UserModels
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("whisper-base", viewModel.SelectedAsrEngineId);
+        Assert.Equal("Whisper base", viewModel.AsrModel);
+        var installed = new InstalledModelRepository(paths).FindInstalledModel("whisper-base");
+        Assert.NotNull(installed);
+        Assert.Equal(asrPath, installed.FilePath);
+    }
+
+    [Fact]
+    public void HeaderModels_RegistersDownloadedSetupReviewFileWhenInstallRecordIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var reviewPath = Path.Combine(paths.UserModels, "review", "bonsai-8b-q1-0", "Bonsai-8B-Q1_0.gguf");
+        Touch(reviewPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "bonsai-8b-q1-0",
+            StorageRoot = paths.UserModels
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("Bonsai 8B Q1_0", viewModel.ReviewModel);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSetupReviewModel?.ModelId);
+        var installed = new InstalledModelRepository(paths).FindInstalledModel("bonsai-8b-q1-0");
+        Assert.NotNull(installed);
+        Assert.Equal(reviewPath, installed.FilePath);
+    }
+
+    [Fact]
+    public void AsrEngineOption_ToStringReturnsDisplayNameForComboBoxFallbackRendering()
+    {
+        var option = new AsrEngineOption("whisper-base", "Whisper base");
+
+        Assert.Equal("Whisper base", option.ToString());
+    }
+
+    [Fact]
     public void SetupInstallSelectedPresetCommand_RemainsEnabledWhenOnlyDiarizationRuntimeIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
