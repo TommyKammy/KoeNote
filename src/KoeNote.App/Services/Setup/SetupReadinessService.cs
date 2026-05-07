@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Models;
 
 namespace KoeNote.App.Services.Setup;
@@ -117,6 +118,7 @@ internal sealed class SetupReadinessService(
         return
         [
             CheckFile("ffmpeg", paths.FfmpegPath),
+            new("faster-whisper runtime", FasterWhisperRuntimeLayout.HasPackage(paths), FasterWhisperRuntimeLayout.HasPackage(paths) ? paths.AsrPythonEnvironment : $"Not installed: {paths.AsrPythonEnvironment}"),
             CheckSelectedModel("ASR model", state.SelectedAsrModelId),
             CheckSelectedModel("Review LLM model", state.SelectedReviewModelId),
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),

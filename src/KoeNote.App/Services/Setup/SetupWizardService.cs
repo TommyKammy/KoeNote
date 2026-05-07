@@ -1,5 +1,6 @@
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Asr;
 
 namespace KoeNote.App.Services.Setup;
 
@@ -10,6 +11,7 @@ public sealed class SetupWizardService
     private readonly SetupModelInstallService _installService;
     private readonly SetupReadinessService _readinessService;
     private readonly SetupPresetRecommendationService _presetRecommendationService;
+    private readonly FasterWhisperRuntimeService _fasterWhisperRuntimeService;
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
     private SetupPresetRecommendation? _presetRecommendation;
     private bool _automaticPresetRecommendationApplied;
@@ -23,9 +25,11 @@ public sealed class SetupWizardService
         ModelInstallService modelInstallService,
         ModelPackImportService modelPackImportService,
         ModelDownloadService modelDownloadService,
+        FasterWhisperRuntimeService fasterWhisperRuntimeService,
         DiarizationRuntimeService diarizationRuntimeService,
         ISetupHostResourceProbe? hostResourceProbe = null)
     {
+        _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
         _diarizationRuntimeService = diarizationRuntimeService;
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
@@ -94,6 +98,12 @@ public sealed class SetupWizardService
             return state;
         }
 
+        if (!GetModelPresets().Any(preset =>
+                preset.PresetId.Equals(recommendation.PresetId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return state;
+        }
+
         return _selectionService.SelectPreset(recommendation.PresetId, advanceToModelStep: false);
     }
 
@@ -156,9 +166,29 @@ public sealed class SetupWizardService
         return _installService.DownloadSelectedPresetModelsAsync(progress, cancellationToken);
     }
 
+    public Task<FasterWhisperRuntimeInstallResult> InstallFasterWhisperRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _fasterWhisperRuntimeService.InstallAsync(cancellationToken);
+    }
+
+    public Task<FasterWhisperRuntimePreflightStatus> CheckFasterWhisperRuntimeInstallPreflightAsync(CancellationToken cancellationToken = default)
+    {
+        return _fasterWhisperRuntimeService.CheckInstallPreflightAsync(cancellationToken);
+    }
+
+    public Task<FasterWhisperRuntimeStatus> CheckFasterWhisperRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _fasterWhisperRuntimeService.CheckAsync(cancellationToken);
+    }
+
     public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
     {
         return _diarizationRuntimeService.InstallAsync(cancellationToken);
+    }
+
+    public Task<DiarizationRuntimePreflightStatus> CheckDiarizationRuntimeInstallPreflightAsync(CancellationToken cancellationToken = default)
+    {
+        return _diarizationRuntimeService.CheckInstallPreflightAsync(cancellationToken);
     }
 
     public Task<DiarizationRuntimeStatus> CheckDiarizationRuntimeAsync(CancellationToken cancellationToken = default)

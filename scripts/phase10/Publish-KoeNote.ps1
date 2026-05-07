@@ -1,7 +1,8 @@
 param(
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
-    [switch]$IncludeLegacyRuntimeTools
+    [switch]$IncludeLegacyRuntimeTools,
+    [switch]$RequireBundledPythonRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,6 +39,17 @@ if (Test-Path -LiteralPath $ffmpegSource) {
 }
 else {
     throw "Missing required Phase 10 core runtime: $ffmpegSource. Place ffmpeg.exe there before publishing KoeNote Core."
+}
+
+$pythonRuntimeSource = Join-Path $toolsSource "python"
+$pythonRuntimeDestination = Join-Path $publishDir "tools\python"
+if (Test-Path -LiteralPath $pythonRuntimeSource -PathType Container) {
+    New-Item -ItemType Directory -Force -Path $pythonRuntimeDestination | Out-Null
+    Get-ChildItem -LiteralPath $pythonRuntimeSource -Force |
+        Copy-Item -Destination $pythonRuntimeDestination -Recurse -Force
+}
+elseif ($RequireBundledPythonRuntime) {
+    throw "Missing bundled Python runtime: $pythonRuntimeSource. Place Python 3.12 x64 runtime there before publishing with -RequireBundledPythonRuntime."
 }
 
 $legacyRuntimeReadme = @"

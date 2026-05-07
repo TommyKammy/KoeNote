@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
@@ -111,20 +112,60 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
+            if (!SetupFasterWhisperRuntimeReady)
+            {
+                ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
+                IsModelDownloadProgressIndeterminate = true;
+                var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync();
+                if (!preflight.IsReady)
+                {
+                    var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    LatestLog = message;
+                    return;
+                }
+
+                ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
+                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync();
+                RefreshSetupWizard();
+                if (!runtimeResult.IsSucceeded)
+                {
+                    var message = BuildFasterWhisperRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    LatestLog = message;
+                    return;
+                }
+
+                LatestLog = runtimeResult.Message;
+            }
+
             if (!SetupDiarizationRuntimeReady)
             {
-                ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime...";
+                ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
                 IsModelDownloadProgressIndeterminate = true;
+                var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync();
+                if (!preflight.IsReady)
+                {
+                    var message = BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    SetupDiarizationRuntimeSummary = message;
+                    LatestLog = message;
+                    return;
+                }
+
+                ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
                 var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync();
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
-                    CompleteModelDownloadProgress(displayName, succeeded: false, runtimeResult.Message);
-                    LatestLog = runtimeResult.Message;
+                    var message = BuildDiarizationRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    SetupDiarizationRuntimeSummary = message;
+                    LatestLog = message;
                     return;
                 }
 
-                SetupDiarizationRuntimeSummary = $"話者識別ランタイム導入済み: {runtimeResult.InstallPath}";
+                SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
                 LatestLog = runtimeResult.Message;
             }
 
@@ -170,25 +211,38 @@ public sealed partial class MainWindowViewModel
     {
         const string displayName = "diarize speaker diarization runtime";
         BeginModelDownloadProgress(displayName);
-        ModelDownloadProgressSummary = "Installing diarize runtime with pip...";
+        ModelDownloadProgressSummary = "Checking bundled Python and pip for diarize runtime...";
         IsModelDownloadProgressIndeterminate = true;
 
         try
         {
+            var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync();
+            if (!preflight.IsReady)
+            {
+                var preflightMessage = BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                RefreshSetupWizard();
+                SetupDiarizationRuntimeSummary = preflightMessage;
+                CompleteModelDownloadProgress(displayName, succeeded: false, preflightMessage);
+                LatestLog = preflightMessage;
+                return;
+            }
+
+            ModelDownloadProgressSummary = "Installing diarize runtime with bundled Python...";
             var result = await _setupWizardService.InstallDiarizationRuntimeAsync();
-            SetupDiarizationRuntimeSummary = result.IsSucceeded
-                ? $"話者識別ランタイムを導入しました: {result.InstallPath}"
-                : $"話者識別ランタイムの導入に失敗しました: {result.Message}";
-            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : result.Message);
-            LatestLog = result.Message;
+            RefreshSetupWizard();
+            var message = result.IsSucceeded
+                ? $"Speaker diarization runtime installed: {result.InstallPath}"
+                : BuildDiarizationRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
+            SetupDiarizationRuntimeSummary = message;
+            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            LatestLog = result.IsSucceeded ? result.Message : message;
         }
         catch (OperationCanceledException)
         {
+            RefreshSetupWizard();
             CompleteModelDownloadProgress(displayName, succeeded: false, "diarize runtime install was cancelled.");
             LatestLog = "diarize runtime install was cancelled.";
         }
-
-        RefreshSetupWizard();
     }
 
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
@@ -383,6 +437,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
         OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
         OnPropertyChanged(nameof(SelectedSetupModelsReady));
+        OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
@@ -460,7 +515,45 @@ public sealed partial class MainWindowViewModel
             ? Paths.DiarizationPythonEnvironment
             : Paths.PythonPackages;
         SetupDiarizationRuntimeSummary = isInstalled
-            ? $"話者識別ランタイム導入済み: {installPath}"
-            : "話者識別ランタイムは未導入です。必要な場合だけ追加導入できます。";
+            ? $"Speaker diarization runtime installed: {installPath}"
+            : $"Speaker diarization runtime is not installed. KoeNote will use bundled Python 3.12 if available: {Paths.BundledPythonPath}";
+    }
+
+    private static string BuildDiarizationRuntimeSetupFailureMessage(string message, string failureCategory)
+    {
+        return failureCategory switch
+        {
+            DiarizationRuntimeService.FailureCategoryPythonSourceUnavailable =>
+                $"Speaker diarization needs bundled Python 3.12. Put python.exe under tools\\python, then retry. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryVenvCreationFailed =>
+                $"KoeNote found Python, but could not create the managed diarization environment. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryTorchWheelUnavailable =>
+                $"diarize could not be installed because compatible torch wheels were not available. Use bundled Python 3.12 and retry. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryNetworkUnavailable =>
+                $"diarize could not be downloaded. Check the network connection or proxy settings, then retry. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryPipInstallFailed =>
+                $"KoeNote found Python, but pip could not install diarize. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryPackageCheckFailed =>
+                $"diarize was installed, but KoeNote could not verify the required version. Details: {message}",
+            _ => message
+        };
+    }
+
+    private static string BuildFasterWhisperRuntimeSetupFailureMessage(string message, string failureCategory)
+    {
+        return failureCategory switch
+        {
+            FasterWhisperRuntimeService.FailureCategoryPythonSourceUnavailable =>
+                $"ASR needs bundled Python 3.12. Put python.exe under tools\\python, then retry. Details: {message}",
+            FasterWhisperRuntimeService.FailureCategoryVenvCreationFailed =>
+                $"KoeNote found Python, but could not create the managed ASR environment. Details: {message}",
+            FasterWhisperRuntimeService.FailureCategoryNetworkUnavailable =>
+                $"faster-whisper could not be downloaded. Check the network connection or proxy settings, then retry. Details: {message}",
+            FasterWhisperRuntimeService.FailureCategoryPipInstallFailed =>
+                $"KoeNote found Python, but pip could not install faster-whisper. Details: {message}",
+            FasterWhisperRuntimeService.FailureCategoryPackageCheckFailed =>
+                $"faster-whisper was installed, but KoeNote could not verify the package. Details: {message}",
+            _ => message
+        };
     }
 }

@@ -42,7 +42,7 @@ public sealed class ToolStatusServiceTests
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
         paths.EnsureCreated();
-        Directory.CreateDirectory(Path.Combine(paths.PythonPackages, "diarize-0.1.1.dist-info"));
+        Directory.CreateDirectory(Path.Combine(paths.PythonPackages, "diarize-0.1.2.dist-info"));
 
         var items = new ToolStatusService(paths).GetStatusItems();
 

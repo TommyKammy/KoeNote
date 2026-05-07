@@ -87,6 +87,18 @@ public sealed class VersioningTests
     }
 
     [Fact]
+    public void BuildMsiScript_RequiresBundledPythonRuntimeForRelease()
+    {
+        var repoRoot = FindRepoRoot();
+        var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
+
+        Assert.Contains("-RequireBundledPythonRuntime", script);
+        Assert.Contains("bundled_python_runtime_verified", script);
+        Assert.Contains("bundled_python_runtime = [ordered]@", script);
+        Assert.Contains("Bundled Python runtime is required for release MSI builds", script);
+    }
+
+    [Fact]
     public void ReleaseVerificationScript_ValidatesCiReleaseArtifacts()
     {
         var repoRoot = FindRepoRoot();
@@ -99,6 +111,9 @@ public sealed class VersioningTests
         Assert.Contains("Manifest SHA256 path does not match", script);
         Assert.Contains("Manifest update log path is missing", script);
         Assert.Contains("Manifest requires signing", script);
+        Assert.Contains("Bundled Python runtime is required", script);
+        Assert.Contains("Release manifest is missing bundled_python_runtime metadata", script);
+        Assert.Contains("bundled_python_runtime.required", script);
     }
 
     [Fact]

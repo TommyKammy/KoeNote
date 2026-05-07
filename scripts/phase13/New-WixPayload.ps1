@@ -34,8 +34,16 @@ function New-WixId {
         [Parameter(Mandatory = $true)][string]$Value
     )
 
+    $maxIdentifierLength = 72
+    $hashLength = 12
+    $separatorLength = 1
+    $maxNormalizedLength = $maxIdentifierLength - $Prefix.Length
+    if ($maxNormalizedLength -lt ($hashLength + $separatorLength + 1)) {
+        throw "Wix identifier prefix is too long: $Prefix"
+    }
+
     $normalized = [Regex]::Replace($Value, '[^A-Za-z0-9_]', '_')
-    if ($normalized.Length -gt 60) {
+    if ($normalized.Length -gt $maxNormalizedLength) {
         $sha = [Security.Cryptography.SHA256]::Create()
         try {
             $hashBytes = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Value))
@@ -44,7 +52,8 @@ function New-WixId {
             $sha.Dispose()
         }
         $hash = [BitConverter]::ToString($hashBytes, 0, 6).Replace('-', '')
-        $normalized = $normalized.Substring(0, 47) + "_" + $hash
+        $prefixLength = $maxNormalizedLength - $hashLength - $separatorLength
+        $normalized = $normalized.Substring(0, $prefixLength) + "_" + $hash
     }
 
     return "$Prefix$normalized"
@@ -144,9 +153,10 @@ foreach ($entry in $directories.GetEnumerator()) {
     $directoryId = $entry.Value
     $cleanupComponentId = New-WixId -Prefix "cmp_remove_dir_" -Value $entry.Key
     $cleanupComponentGuid = New-WixGuid -Value "directory:$($entry.Key)"
+    $cleanupRemoveFolderId = New-WixId -Prefix "rm_" -Value "directory:$($entry.Key)"
     $lines.Add("    <DirectoryRef Id=""$directoryId"">")
     $lines.Add("      <Component Id=""$cleanupComponentId"" Guid=""$cleanupComponentGuid"">")
-    $lines.Add("        <RemoveFolder Id=""rm_$cleanupComponentId"" Directory=""$directoryId"" On=""uninstall"" />")
+    $lines.Add("        <RemoveFolder Id=""$cleanupRemoveFolderId"" Directory=""$directoryId"" On=""uninstall"" />")
     $lines.Add("        <RegistryValue Root=""HKCU"" Key=""$ProductRegistryKey\Directories"" Name=""$cleanupComponentId"" Type=""integer"" Value=""1"" KeyPath=""yes"" />")
     $lines.Add('      </Component>')
     $lines.Add('    </DirectoryRef>')
@@ -162,6 +172,7 @@ foreach ($file in $files) {
     $directoryId = $directories[$directoryPath]
     $componentId = New-WixId -Prefix "cmp_" -Value $relative
     $componentGuid = New-WixGuid -Value $relative
+    $componentRemoveFolderId = New-WixId -Prefix "rm_" -Value $relative
     $fileId = switch -Regex ($relative) {
         '^KoeNote\.App\.exe$' { 'KoeNoteAppExe'; break }
         '^KoeNoteCleanup\.exe$' { 'KoeNoteCleanupExe'; break }
@@ -171,7 +182,7 @@ foreach ($file in $files) {
     $lines.Add("    <DirectoryRef Id=""$directoryId"">")
     $lines.Add("      <Component Id=""$componentId"" Guid=""$componentGuid"">")
     $lines.Add("        <File Id=""$fileId"" Source=""$(Escape-Xml $source)"" />")
-    $lines.Add("        <RemoveFolder Id=""rm_$componentId"" Directory=""$directoryId"" On=""uninstall"" />")
+    $lines.Add("        <RemoveFolder Id=""$componentRemoveFolderId"" Directory=""$directoryId"" On=""uninstall"" />")
     $lines.Add("        <RegistryValue Root=""HKCU"" Key=""$ProductRegistryKey\Components"" Name=""$componentId"" Type=""integer"" Value=""1"" KeyPath=""yes"" />")
     $lines.Add('      </Component>')
     $lines.Add('    </DirectoryRef>')

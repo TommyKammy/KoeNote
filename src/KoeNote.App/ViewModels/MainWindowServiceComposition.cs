@@ -39,6 +39,7 @@ internal static class MainWindowRepositoryComposition
 internal sealed record MainWindowRuntimeServices(
     ExternalProcessRunner ProcessRunner,
     ToolStatusService ToolStatusService,
+    FasterWhisperRuntimeService FasterWhisperRuntimeService,
     DiarizationRuntimeService DiarizationRuntimeService,
     IAudioPlaybackService AudioPlaybackService,
     StatusBarInfoService StatusBarInfoService,
@@ -57,6 +58,7 @@ internal static class MainWindowRuntimeComposition
         return new MainWindowRuntimeServices(
             processRunner,
             new ToolStatusService(paths),
+            new FasterWhisperRuntimeService(paths, processRunner),
             new DiarizationRuntimeService(paths, processRunner),
             new AudioPlaybackService(),
             new StatusBarInfoService(paths),
@@ -137,6 +139,7 @@ internal static class MainWindowSetupComposition
             model.ModelInstallService,
             model.ModelPackImportService,
             model.ModelDownloadService,
+            runtime.FasterWhisperRuntimeService,
             runtime.DiarizationRuntimeService);
     }
 }

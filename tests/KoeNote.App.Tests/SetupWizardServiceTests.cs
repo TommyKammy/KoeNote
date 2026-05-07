@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.IO.Compression;
 using System.Net;
 using KoeNote.App.Services;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
@@ -238,6 +239,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePaths();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
@@ -264,6 +266,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePaths();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
@@ -437,6 +440,7 @@ public sealed class SetupWizardServiceTests
                 new ModelDownloadJobRepository(paths),
                 verificationService,
                 installService),
+            new FasterWhisperRuntimeService(paths, new ExternalProcessRunner()),
             new DiarizationRuntimeService(paths, new ExternalProcessRunner()),
             hostResourceProbe);
     }

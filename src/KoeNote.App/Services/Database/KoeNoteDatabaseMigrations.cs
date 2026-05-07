@@ -17,7 +17,8 @@ internal static class KoeNoteDatabaseMigrations
         new(11, "domain preset metadata", ApplyDomainPresetMetadataSchema),
         new(12, "domain preset deactivation", ApplyDomainPresetDeactivationSchema),
         new(13, "domain preset speaker alias tracking", ApplyDomainPresetSpeakerAliasTrackingSchema),
-        new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema)
+        new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema),
+        new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -454,6 +455,73 @@ internal static class KoeNoteDatabaseMigrations
     {
         migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "previous_display_name", "TEXT");
         migration.AddColumnIfTableExistsAndMissing("domain_preset_speaker_alias_imports", "applied_display_name", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void ApplyTranscriptDerivativesSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS transcript_derivatives (
+                derivative_id TEXT NOT NULL PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                content_format TEXT NOT NULL,
+                content TEXT NOT NULL,
+                source_kind TEXT NOT NULL,
+                source_transcript_hash TEXT NOT NULL,
+                source_segment_range TEXT,
+                source_chunk_ids TEXT,
+                model_id TEXT,
+                prompt_version TEXT NOT NULL,
+                generation_profile TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_transcript_derivatives_job_kind_updated
+            ON transcript_derivatives(job_id, kind, updated_at DESC);
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_transcript_derivatives_job_status
+            ON transcript_derivatives(job_id, status);
+            """);
+
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS transcript_derivative_chunks (
+                chunk_id TEXT NOT NULL PRIMARY KEY,
+                derivative_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                source_kind TEXT NOT NULL,
+                source_segment_ids TEXT NOT NULL,
+                source_start_seconds REAL,
+                source_end_seconds REAL,
+                source_transcript_hash TEXT NOT NULL,
+                content_format TEXT NOT NULL,
+                content TEXT NOT NULL,
+                model_id TEXT,
+                prompt_version TEXT NOT NULL,
+                generation_profile TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_transcript_derivative_chunks_derivative_index
+            ON transcript_derivative_chunks(derivative_id, chunk_index);
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_transcript_derivative_chunks_job_status
+            ON transcript_derivative_chunks(job_id, status);
+            """);
     }
 
 }

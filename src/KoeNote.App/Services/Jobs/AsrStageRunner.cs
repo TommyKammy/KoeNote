@@ -163,28 +163,28 @@ public sealed class AsrStageRunner(
         return engineId switch
         {
             "kotoba-whisper-v2.2-faster" => new AsrEngineConfig(
-                "python",
+                paths.AsrPythonPath,
                 ResolveModelPath("kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath),
                 outputDirectory,
                 "kotoba-whisper-v2.2-faster",
                 paths.FasterWhisperScriptPath,
                 "kotoba-whisper-v2.2"),
             "whisper-base" => new AsrEngineConfig(
-                "python",
+                paths.AsrPythonPath,
                 ResolveModelPath("whisper-base", paths.WhisperBaseModelPath),
                 outputDirectory,
                 "whisper-base",
                 paths.FasterWhisperScriptPath,
                 "base"),
             "faster-whisper-large-v3-turbo" => new AsrEngineConfig(
-                "python",
+                paths.AsrPythonPath,
                 ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),
                 outputDirectory,
                 "faster-whisper-large-v3-turbo",
                 paths.FasterWhisperScriptPath,
                 "large-v3-turbo"),
             "faster-whisper-large-v3" => new AsrEngineConfig(
-                "python",
+                paths.AsrPythonPath,
                 ResolveModelPath("faster-whisper-large-v3", paths.FasterWhisperLargeV3ModelPath),
                 outputDirectory,
                 "faster-whisper-large-v3",
@@ -198,7 +198,7 @@ public sealed class AsrStageRunner(
                 paths.ReazonSpeechK2ScriptPath,
                 "v3-k2"),
             _ => new AsrEngineConfig(
-                "python",
+                paths.AsrPythonPath,
                 ResolveModelPath("faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath),
                 outputDirectory,
                 "faster-whisper-large-v3-turbo",

@@ -1,5 +1,6 @@
 param(
-    [string]$PublishDir = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\..")) "artifacts\publish\KoeNote-win-x64")
+    [string]$PublishDir = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\..")) "artifacts\publish\KoeNote-win-x64"),
+    [switch]$RequireBundledPythonRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +33,13 @@ foreach ($relativePath in $requiredDirectories) {
     $path = Join-Path $PublishDir $relativePath
     if (-not (Test-Path -LiteralPath $path -PathType Container)) {
         throw "Missing required directory: $path"
+    }
+}
+
+if ($RequireBundledPythonRuntime) {
+    $pythonPath = Join-Path $PublishDir "tools\python\python.exe"
+    if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+        throw "Missing bundled Python runtime: $pythonPath"
     }
 }
 

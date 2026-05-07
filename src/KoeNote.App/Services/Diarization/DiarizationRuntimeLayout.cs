@@ -11,9 +11,24 @@ public static class DiarizationRuntimeLayout
 
     public static bool HasManagedPackage(AppPaths paths)
     {
-        return Directory.Exists(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize")) ||
-            File.Exists(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize.py")) ||
-            Directory.Exists(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.1.dist-info"));
+        var sitePackages = Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages");
+        if (!Directory.Exists(sitePackages))
+        {
+            return false;
+        }
+
+        if (Directory.Exists(Path.Combine(sitePackages, $"{DiarizationRuntimeService.PackageName}-{DiarizationRuntimeService.RequiredPackageVersion}.dist-info")))
+        {
+            return true;
+        }
+
+        if (Directory.EnumerateDirectories(sitePackages, $"{DiarizationRuntimeService.PackageName}-*.dist-info").Any())
+        {
+            return false;
+        }
+
+        return Directory.Exists(Path.Combine(sitePackages, DiarizationRuntimeService.PackageName)) ||
+            File.Exists(Path.Combine(sitePackages, $"{DiarizationRuntimeService.PackageName}.py"));
     }
 
     public static bool HasLegacyPackage(AppPaths paths)

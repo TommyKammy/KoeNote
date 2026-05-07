@@ -51,6 +51,8 @@ public sealed class AppPaths
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
         PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
+        AsrPythonEnvironment = Path.Combine(PythonEnvironments, "asr");
+        AsrPythonPath = Path.Combine(AsrPythonEnvironment, "Scripts", "python.exe");
         DiarizationPythonEnvironment = Path.Combine(PythonEnvironments, "diarization");
         DiarizationPythonPath = Path.Combine(DiarizationPythonEnvironment, "Scripts", "python.exe");
         BundledPythonPath = Path.Combine(RuntimeTools, "python", "python.exe");
@@ -63,7 +65,7 @@ public sealed class AppPaths
         DiarizeWorkerScriptPath = Path.Combine(baseDirectory, "scripts", "diarization", "diarize_worker.py");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
-        WhisperBaseModelPath = Path.Combine(Models, "asr", "faster-whisper-base");
+        WhisperBaseModelPath = Path.Combine(Models, "asr", "whisper-base");
         FasterWhisperModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3-turbo");
         FasterWhisperLargeV3ModelPath = Path.Combine(Models, "asr", "faster-whisper-large-v3");
         ReazonSpeechK2ModelPath = Path.Combine(Models, "asr", "reazonspeech-k2-v3");
@@ -101,6 +103,10 @@ public sealed class AppPaths
     public string PythonPackages { get; }
 
     public string PythonEnvironments { get; }
+
+    public string AsrPythonEnvironment { get; }
+
+    public string AsrPythonPath { get; }
 
     public string DiarizationPythonEnvironment { get; }
 

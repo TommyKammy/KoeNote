@@ -79,6 +79,24 @@ if ([bool]$manifest.signing.required -and $manifest.signing.status -ne "signed")
     throw "Manifest requires signing, but signing.status is $($manifest.signing.status)."
 }
 
+$publishDir = Join-Path $repoRoot "artifacts\publish\KoeNote-$($manifest.runtime_identifier)"
+$pythonPath = Join-Path $publishDir "tools\python\python.exe"
+if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+    throw "Bundled Python runtime is required but missing from publish output: $pythonPath"
+}
+
+if (-not ($manifest.PSObject.Properties.Name -contains "bundled_python_runtime")) {
+    throw "Release manifest is missing bundled_python_runtime metadata."
+}
+
+if (-not [bool]$manifest.bundled_python_runtime.required) {
+    throw "Release manifest must mark bundled_python_runtime.required as true."
+}
+
+if ($manifest.bundled_python_runtime.path -ne $pythonPath) {
+    throw "Release manifest bundled Python path does not match. Expected $pythonPath but got $($manifest.bundled_python_runtime.path)."
+}
+
 [pscustomobject]@{
     MsiPath = $msi.Path
     Sha256 = $sidecarSha256

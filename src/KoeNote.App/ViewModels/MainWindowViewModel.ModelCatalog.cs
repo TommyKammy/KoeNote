@@ -340,12 +340,16 @@ public sealed partial class MainWindowViewModel
         return SelectedAsrEngineId switch
         {
             "kotoba-whisper-v2.2-faster" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("kotoba-whisper-v2.2-faster", Paths.KotobaWhisperFasterModelPath),
             "whisper-base" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("whisper-base", Paths.WhisperBaseModelPath),
             "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
             "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
+                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
                 ModelPathExists("faster-whisper-large-v3", Paths.FasterWhisperLargeV3ModelPath),
             "reazonspeech-k2-v3" => File.Exists(Paths.ReazonSpeechK2ScriptPath) &&
                 ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),

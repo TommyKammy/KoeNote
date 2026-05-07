@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using KoeNote.App.Services;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
@@ -296,6 +297,7 @@ public sealed class ModelDownloadServiceTests
             installService,
             new ModelPackImportService(paths, catalogService, installService),
             new ModelDownloadService(new HttpClient(new ThrowingHandler()), new ModelDownloadJobRepository(paths), verification, installService),
+            new FasterWhisperRuntimeService(paths, new ExternalProcessRunner()),
             new DiarizationRuntimeService(paths, new ExternalProcessRunner()));
 
         var result = await setup.DownloadSelectedModelAsync("asr");

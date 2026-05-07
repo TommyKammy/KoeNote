@@ -271,6 +271,11 @@ public sealed class MainWindowViewModelTests
         File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
         installService.RegisterLocalModel(asrItem, asrPath, "download");
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "legacy-asr-engine", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedAsrModelId = "legacy-asr-engine"
+        });
 
         var viewModel = new MainWindowViewModel(paths);
 
@@ -1444,18 +1449,23 @@ public sealed class MainWindowViewModelTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", true));
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
             IsCompleted = true,
             LastSmokeSucceeded = true,
-            LicenseAccepted = true
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster"
         });
 
         var viewModel = new MainWindowViewModel(paths);
@@ -1471,8 +1481,11 @@ public sealed class MainWindowViewModelTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
@@ -1501,8 +1514,11 @@ public sealed class MainWindowViewModelTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
@@ -1536,6 +1552,7 @@ public sealed class MainWindowViewModelTests
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
@@ -1566,6 +1583,7 @@ public sealed class MainWindowViewModelTests
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
@@ -1596,6 +1614,7 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
@@ -1731,6 +1750,11 @@ public sealed class MainWindowViewModelTests
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, string.Empty);
+    }
+
+    private static void CreateFasterWhisperRuntime(AppPaths paths)
+    {
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper-1.2.1.dist-info"));
     }
 
     private sealed class RecordingUpdateInstallerLauncher : IUpdateInstallerLauncher

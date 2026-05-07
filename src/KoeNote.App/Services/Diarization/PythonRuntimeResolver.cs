@@ -137,7 +137,7 @@ public sealed class PythonRuntimeResolver(
 
             return IsSupportedVersion(version)
                 ? PythonRuntimeProbe.Compatible(command)
-                : PythonRuntimeProbe.Failed($"Python {version} is unsupported; use Python 3.9-3.12.");
+                : PythonRuntimeProbe.Failed($"Python {version} is unsupported.");
         }
         catch (OperationCanceledException)
         {
@@ -168,13 +168,31 @@ public sealed class PythonRuntimeResolver(
         return (version, parts[1]);
     }
 
-    private static string BuildNoCompatiblePythonMessage(IReadOnlyList<string> failures)
+    public static string BuildNoCompatiblePythonMessage(IReadOnlyList<string> failures)
     {
-        var detail = failures.Count == 0
-            ? "No Python executable was found."
-            : string.Join(" / ", failures.Take(4));
+        var unsupportedRuntimes = failures
+            .Select(NormalizeFailureDetail)
+            .Where(detail => detail.Contains(" is unsupported.", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToArray();
+        var detected = unsupportedRuntimes.Length == 0
+            ? string.Empty
+            : $" Detected unsupported runtime: {string.Join("; ", unsupportedRuntimes)}";
+
+        var notFound = failures.Count == 0
+            ? " No Python executable was detected."
+            : string.Empty;
+
         return string.Create(CultureInfo.InvariantCulture,
-            $"No compatible Python runtime was found for speaker diarization. Install Python 3.11 or 3.12 x64, then retry. Details: {detail}");
+            $"No compatible Python runtime was found for speaker diarization. Install Python 3.12 x64 (or Python 3.11 x64), then retry. Supported versions are Python 3.9-3.12.{detected}{notFound}");
+    }
+
+    private static string NormalizeFailureDetail(string detail)
+    {
+        return detail
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? detail.Trim();
     }
 
     private static string BuildUnsupportedManagedRuntimeMessage(PythonRuntimeProbe probe)

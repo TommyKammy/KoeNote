@@ -906,9 +906,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool SelectedSetupModelsReady => IsSetupModelReady(SelectedSetupAsrModel) &&
         IsSetupModelReady(SelectedSetupReviewModel);
 
+    public bool SetupFasterWhisperRuntimeReady => FasterWhisperRuntimeLayout.HasPackage(Paths);
+
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
-    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady && SetupDiarizationRuntimeReady;
+    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady && SetupFasterWhisperRuntimeReady && SetupDiarizationRuntimeReady;
 
     public string SetupPrimaryInstallActionText => IsModelDownloadInProgress
         ? "導入中..."
@@ -939,6 +941,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (!IsSetupModelReady(SelectedSetupReviewModel))
             {
                 missing.Add("推敲モデル");
+            }
+
+            if (!SetupFasterWhisperRuntimeReady)
+            {
+                missing.Add("ASR runtime");
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -1031,6 +1038,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateModelCatalogCommandStates();
                 UpdateSetupDownloadCommandStates();
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
+                OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));

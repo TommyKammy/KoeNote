@@ -5,9 +5,9 @@ namespace KoeNote.App.Services;
 
 public sealed record ProcessRunResult(int ExitCode, TimeSpan Duration, string StandardOutput, string StandardError);
 
-public sealed class ExternalProcessRunner
+public class ExternalProcessRunner
 {
-    public async Task<ProcessRunResult> RunAsync(
+    public virtual async Task<ProcessRunResult> RunAsync(
         string fileName,
         string arguments,
         TimeSpan timeout,
@@ -16,7 +16,7 @@ public sealed class ExternalProcessRunner
         return await RunAsync(fileName, SplitArguments(arguments), timeout, cancellationToken);
     }
 
-    public async Task<ProcessRunResult> RunAsync(
+    public virtual async Task<ProcessRunResult> RunAsync(
         string fileName,
         IReadOnlyList<string> arguments,
         TimeSpan timeout,

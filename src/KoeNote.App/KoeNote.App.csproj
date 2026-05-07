@@ -41,6 +41,11 @@
              Link="tools\ffmpeg.exe"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
+    <Content Include="..\..\tools\python\**\*"
+             Link="tools\python\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always"
+             Condition="Exists('..\..\tools\python')" />
     <Content Include="catalog\model-catalog.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />

@@ -142,14 +142,21 @@ Write-UpdateLog "release_build_started" @{
     product_version = $ProductVersion
     output_name = $OutputName
     require_code_signing = [bool]$RequireCodeSigning
+    require_bundled_python_runtime = $true
     log_path = $updateLogPath
 }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier
+& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier -RequireBundledPythonRuntime
 if ($LASTEXITCODE -ne 0) {
     throw "Publish-KoeNote.ps1 failed with exit code $LASTEXITCODE."
 }
 Write-UpdateLog "app_published" @{ publish_dir = $publishDir }
+
+$bundledPythonPath = Join-Path $publishDir "tools\python\python.exe"
+if (-not (Test-Path -LiteralPath $bundledPythonPath -PathType Leaf)) {
+    throw "Bundled Python runtime is required for release MSI builds but was not published: $bundledPythonPath"
+}
+Write-UpdateLog "bundled_python_runtime_verified" @{ path = $bundledPythonPath }
 
 dotnet publish $cleanupProject `
     -c $Configuration `
@@ -231,6 +238,10 @@ $manifest = [ordered]@{
         msi_path = $msiArtifact.FullName
         sha256_path = $hashPath
         update_log_path = $updateLogPath
+    }
+    bundled_python_runtime = [ordered]@{
+        required = $true
+        path = $bundledPythonPath
     }
     sha256 = $hash.Hash.ToLowerInvariant()
     signing = [ordered]@{

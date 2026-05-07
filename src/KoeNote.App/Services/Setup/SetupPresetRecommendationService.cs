@@ -10,7 +10,7 @@ internal sealed class SetupPresetRecommendationService(
     {
         var resources = hostResourceProbe.GetResources();
         var presetId = ChoosePresetId(resources);
-        var preset = FindPreset(presetId) ?? FindPreset("recommended") ?? GetModelPresets().First();
+        var preset = FindPreset(presetId) ?? FindPreset("recommended") ?? BuildFallbackPreset(presetId);
         return new SetupPresetRecommendation(
             preset.PresetId,
             preset.DisplayName,
@@ -27,6 +27,19 @@ internal sealed class SetupPresetRecommendationService(
     {
         return GetModelPresets()
             .FirstOrDefault(preset => preset.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static ModelQualityPreset BuildFallbackPreset(string presetId)
+    {
+        return new ModelQualityPreset(
+            presetId,
+            presetId,
+            presetId,
+            "Model presets are not available.",
+            "faster-whisper-large-v3-turbo",
+            "llm-jp-4-8b-thinking-q4-k-m",
+            [],
+            []);
     }
 
     private static string ChoosePresetId(SetupHostResources resources)

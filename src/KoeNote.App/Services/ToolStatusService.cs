@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 
 namespace KoeNote.App.Services;
@@ -15,6 +16,7 @@ public sealed class ToolStatusService(AppPaths paths)
             CheckFile("ffmpeg", paths.FfmpegPath, required: true),
             CheckCommand("nvidia-smi", "nvidia-smi", "--query-gpu=name,memory.total --format=csv,noheader,nounits", required: false),
             CheckFile("llama-completion", paths.LlamaCompletionPath, required: true),
+            CheckFasterWhisperRuntime(required: false),
             CheckDiarizationRuntime(required: false),
             new("AppData", paths.Root, Directory.Exists(paths.Root)),
             new("SQLite", paths.DatabasePath, File.Exists(paths.DatabasePath))
@@ -27,6 +29,14 @@ public sealed class ToolStatusService(AppPaths paths)
         var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
         var detail = exists ? path : $"配置先: {path}";
         return new StatusItem(name, value, exists || !required, detail);
+    }
+
+    private StatusItem CheckFasterWhisperRuntime(bool required)
+    {
+        var exists = FasterWhisperRuntimeLayout.HasPackage(paths);
+        var value = exists ? "Found" : required ? "Missing" : "Not installed yet";
+        var detail = exists ? paths.AsrPythonEnvironment : $"Install from setup: {paths.AsrPythonEnvironment}";
+        return new StatusItem("faster-whisper runtime", value, exists || !required, detail);
     }
 
     private StatusItem CheckDiarizationRuntime(bool required)
