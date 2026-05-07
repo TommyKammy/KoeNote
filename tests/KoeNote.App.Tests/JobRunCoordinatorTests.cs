@@ -179,6 +179,30 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
+    public async Task RunSummaryOnlyAsync_RunsSummaryWithoutPreprocessAsrOrReview()
+    {
+        var asrStageRunner = new AsrStageRunnerStub(null);
+        var reviewStageRunner = new ReviewStageRunnerStub();
+        var summaryStageRunner = new SummaryStageRunnerStub();
+        var coordinator = new JobRunCoordinator(
+            new PreprocessStageRunnerStub("normalized.wav"),
+            asrStageRunner,
+            reviewStageRunner,
+            summaryStageRunner);
+
+        await coordinator.RunSummaryOnlyAsync(
+            CreateJob(),
+            _ => { },
+            CancellationToken.None);
+
+        Assert.False(asrStageRunner.WasCalled);
+        Assert.False(reviewStageRunner.RunWasCalled);
+        Assert.False(reviewStageRunner.SkipWasCalled);
+        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
+    }
+
+    [Fact]
     public async Task RunAsync_SkipsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();

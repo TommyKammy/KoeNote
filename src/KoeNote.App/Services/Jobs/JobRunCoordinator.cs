@@ -72,4 +72,12 @@ public sealed class JobRunCoordinator(
     {
         return reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
     }
+
+    public Task RunSummaryOnlyAsync(
+        JobSummary job,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken)
+    {
+        return summaryStageRunner.RunAsync(job, report, cancellationToken);
+    }
 }

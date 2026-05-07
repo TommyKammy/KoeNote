@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
 
@@ -17,30 +18,43 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (mode != PostProcessMode.ReviewOnly)
-        {
-            LatestLog = $"{GetPostProcessModeDisplayName(mode)}の後処理実行ルートは次の段階で追加します。";
-            return;
-        }
-
-        if (!ReviewStageAssetsReady)
+        if (mode == PostProcessMode.ReviewOnly && !ReviewStageAssetsReady)
         {
             LatestLog = "整文ランタイムまたは整文モデルが不足しているため、後から整文を実行できません。";
             IsSetupWizardModalOpen = true;
             return;
         }
 
+        if (mode == PostProcessMode.SummaryOnly && !SummaryStageAssetsReady)
+        {
+            LatestLog = "要約ランタイムまたは要約モデルが不足しているため、後から要約を実行できません。";
+            IsSetupWizardModalOpen = true;
+            return;
+        }
+
+        if (mode == PostProcessMode.ReviewAndSummary)
+        {
+            LatestLog = $"{GetPostProcessModeDisplayName(mode)}の後処理実行ルートは次の段階で追加します。";
+            return;
+        }
+
         var segments = _transcriptSegmentRepository.ReadSegments(SelectedJob.JobId);
         if (segments.Count == 0)
         {
-            LatestLog = "素起こし結果がないため、後から整文を実行できません。";
+            LatestLog = $"素起こし結果がないため、後から{GetPostProcessModeDisplayName(mode)}を実行できません。";
             RefreshPostProcessCommandStates();
             return;
         }
 
-        if (HasExistingReviewOutput(SelectedJob.JobId))
+        if (mode == PostProcessMode.ReviewOnly && HasExistingReviewOutput(SelectedJob.JobId))
         {
             LatestLog = "既存の整文候補または適用済み整文があるため、後から整文を実行しませんでした。上書き確認は後続段階で追加します。";
+            return;
+        }
+
+        if (mode == PostProcessMode.SummaryOnly && HasExistingSummaryOutput(SelectedJob.JobId))
+        {
+            LatestLog = "既存の要約があるため、後から要約を実行しませんでした。上書き確認は後続段階で追加します。";
             return;
         }
 
@@ -58,6 +72,10 @@ public sealed partial class MainWindowViewModel
                     ReloadSegmentsForSelectedJob(SelectedSegment?.SegmentId);
                     LoadReviewQueue();
                     break;
+                case PostProcessMode.SummaryOnly:
+                    await _jobRunCoordinator.RunSummaryOnlyAsync(SelectedJob, ApplyRunUpdate, cancellation.Token);
+                    LoadSummaryForSelectedJob();
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
@@ -74,6 +92,11 @@ public sealed partial class MainWindowViewModel
     {
         return _correctionDraftRepository.ReadPendingForJob(jobId).Count > 0 ||
             _transcriptSegmentRepository.ReadPreviews(jobId).Any(static segment => !string.IsNullOrWhiteSpace(segment.FinalText));
+    }
+
+    private bool HasExistingSummaryOutput(string jobId)
+    {
+        return _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Summary) is not null;
     }
 
     private void RefreshPostProcessCommandStates()
