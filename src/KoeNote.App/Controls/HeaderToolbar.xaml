@@ -55,6 +55,13 @@
             <Setter Property="Margin" Value="0,0,10,0" />
         </Style>
 
+        <Style x:Key="HeaderRunMenuButton" TargetType="Button" BasedOn="{StaticResource HeaderOutlineButton}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="-6,0,10,0" />
+        </Style>
+
         <Style x:Key="HeaderGhostButton" TargetType="Button" BasedOn="{StaticResource HeaderButtonBase}">
             <Setter Property="Height" Value="34" />
             <Setter Property="Padding" Value="14,0" />
@@ -189,6 +196,33 @@
                         <TextBlock Text="&#xE768;" Style="{StaticResource HeaderRunIcon}" />
                         <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" />
                     </StackPanel>
+                </Button>
+
+                <Button x:Name="RunMenuButton"
+                        Style="{StaticResource HeaderRunMenuButton}"
+                        Click="OnRunMenuButtonClick"
+                        ToolTip="後から処理を実行">
+                    <Button.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="整文を実行"
+                                      Command="{Binding RunPostReviewCommand}"
+                                      IsEnabled="{Binding CanRunPostReview}"
+                                      Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="要約を実行"
+                                      Command="{Binding RunPostSummaryCommand}"
+                                      IsEnabled="{Binding CanRunPostSummary}"
+                                      Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="整文して要約を実行"
+                                      Command="{Binding RunPostReviewAndSummaryCommand}"
+                                      IsEnabled="{Binding CanRunPostReviewAndSummary}"
+                                      Style="{StaticResource HeaderExportMenuItem}" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                    <TextBlock Text="&#xE70D;"
+                               FontFamily="Segoe MDL2 Assets"
+                               Foreground="{StaticResource HeaderInfoValueBrush}"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
                 </Button>
 
                 <Button Style="{StaticResource HeaderOutlineButton}"

@@ -91,6 +91,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _modelDownloadCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
     private bool _isReviewOperationInProgress;
+    private bool _isPostProcessInProgress;
+    private PostProcessMode? _lastRequestedPostProcessMode;
     private bool _isSelectingSegmentForDraft;
     private bool _isAudioPlaying;
     private bool _isTranscriptAutoScrollEnabled;
@@ -265,6 +267,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);
         PermanentlyDeleteAllDeletedJobsCommand = new RelayCommand(PermanentlyDeleteAllDeletedJobsAsync, () => DeletedJobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
+        RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
+        RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
+        RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
         SkipToPreviousSegmentCommand = new RelayCommand(SkipToPreviousSegmentAsync, CanSkipPlaybackSegment);
@@ -532,7 +537,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _ => "KoeNote の初回利用に必要な準備を案内します。"
     };
 
-    public bool CanRunSelectedJob => !IsRunInProgress && GetRunPreflightIssues().Count == 0;
+    public bool CanRunSelectedJob => !IsRunInProgress && !IsPostProcessInProgress && GetRunPreflightIssues().Count == 0;
+
+    public bool CanRunPostReview => CanRunPostProcessSelectedJob;
+
+    public bool CanRunPostSummary => CanRunPostProcessSelectedJob;
+
+    public bool CanRunPostReviewAndSummary => CanRunPostProcessSelectedJob;
+
+    private bool CanRunPostProcessSelectedJob => SelectedJob is not null && !IsRunInProgress && !IsPostProcessInProgress && Segments.Count > 0;
 
     public string RunPreflightSummary
     {
@@ -632,6 +645,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand PermanentlyDeleteAllDeletedJobsCommand { get; }
 
     public ICommand RunSelectedJobCommand { get; }
+
+    public ICommand RunPostReviewCommand { get; }
+
+    public ICommand RunPostSummaryCommand { get; }
+
+    public ICommand RunPostReviewAndSummaryCommand { get; }
 
     public ICommand CancelCommand { get; }
 
@@ -818,6 +837,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 LoadReviewQueue();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
+                RefreshPostProcessCommandStates();
             }
         }
     }
@@ -1391,6 +1411,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
                 UpdateReviewCommandStates();
                 UpdateSegmentEditCommandStates();
+                RefreshPostProcessCommandStates();
             }
         }
     }
@@ -1509,6 +1530,24 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateReviewCommandStates();
             }
         }
+    }
+
+    public bool IsPostProcessInProgress
+    {
+        get => _isPostProcessInProgress;
+        private set
+        {
+            if (SetField(ref _isPostProcessInProgress, value))
+            {
+                RefreshPostProcessCommandStates();
+            }
+        }
+    }
+
+    public PostProcessMode? LastRequestedPostProcessMode
+    {
+        get => _lastRequestedPostProcessMode;
+        private set => SetField(ref _lastRequestedPostProcessMode, value);
     }
 
     public bool RememberCorrection

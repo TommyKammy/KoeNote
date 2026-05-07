@@ -1,0 +1,116 @@
+using KoeNote.App.Models;
+
+namespace KoeNote.App.ViewModels;
+
+public sealed partial class MainWindowViewModel
+{
+    private Task RequestPostProcessAsync(PostProcessMode mode)
+    {
+        return RunPostProcessAsync(mode);
+    }
+
+    private async Task RunPostProcessAsync(PostProcessMode mode)
+    {
+        LastRequestedPostProcessMode = mode;
+        if (SelectedJob is null || IsRunInProgress || IsPostProcessInProgress)
+        {
+            return;
+        }
+
+        if (mode != PostProcessMode.ReviewOnly)
+        {
+            LatestLog = $"{GetPostProcessModeDisplayName(mode)}の後処理実行ルートは次の段階で追加します。";
+            return;
+        }
+
+        if (!ReviewStageAssetsReady)
+        {
+            LatestLog = "整文ランタイムまたは整文モデルが不足しているため、後から整文を実行できません。";
+            IsSetupWizardModalOpen = true;
+            return;
+        }
+
+        var segments = _transcriptSegmentRepository.ReadSegments(SelectedJob.JobId);
+        if (segments.Count == 0)
+        {
+            LatestLog = "素起こし結果がないため、後から整文を実行できません。";
+            RefreshPostProcessCommandStates();
+            return;
+        }
+
+        if (HasExistingReviewOutput(SelectedJob.JobId))
+        {
+            LatestLog = "既存の整文候補または適用済み整文があるため、後から整文を実行しませんでした。上書き確認は後続段階で追加します。";
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        _runCancellation = cancellation;
+        IsPostProcessInProgress = true;
+        IsRunInProgress = true;
+
+        try
+        {
+            switch (mode)
+            {
+                case PostProcessMode.ReviewOnly:
+                    await _jobRunCoordinator.RunReviewOnlyAsync(SelectedJob, segments, ApplyRunUpdate, cancellation.Token);
+                    ReloadSegmentsForSelectedJob(SelectedSegment?.SegmentId);
+                    LoadReviewQueue();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+        finally
+        {
+            _runCancellation = null;
+            IsRunInProgress = false;
+            IsPostProcessInProgress = false;
+        }
+    }
+
+    private bool HasExistingReviewOutput(string jobId)
+    {
+        return _correctionDraftRepository.ReadPendingForJob(jobId).Count > 0 ||
+            _transcriptSegmentRepository.ReadPreviews(jobId).Any(static segment => !string.IsNullOrWhiteSpace(segment.FinalText));
+    }
+
+    private void RefreshPostProcessCommandStates()
+    {
+        OnPropertyChanged(nameof(CanRunPostReview));
+        OnPropertyChanged(nameof(CanRunPostSummary));
+        OnPropertyChanged(nameof(CanRunPostReviewAndSummary));
+        OnPropertyChanged(nameof(CanRunSelectedJob));
+        if (RunPostReviewCommand is RelayCommand reviewCommand)
+        {
+            reviewCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RunPostSummaryCommand is RelayCommand summaryCommand)
+        {
+            summaryCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RunPostReviewAndSummaryCommand is RelayCommand bothCommand)
+        {
+            bothCommand.RaiseCanExecuteChanged();
+        }
+
+        if (RunSelectedJobCommand is RelayCommand runCommand)
+        {
+            runCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static string GetPostProcessModeDisplayName(PostProcessMode mode)
+    {
+        return mode switch
+        {
+            PostProcessMode.ReviewOnly => "整文",
+            PostProcessMode.SummaryOnly => "要約",
+            PostProcessMode.ReviewAndSummary => "整文・要約",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+    }
+}

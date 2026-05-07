@@ -237,6 +237,9 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedJob is null)
         {
+            Segments.Clear();
+            SelectedSegment = null;
+            RefreshPostProcessCommandStates();
             return;
         }
 
@@ -253,6 +256,7 @@ public sealed partial class MainWindowViewModel
                 FilteredSegments.Refresh();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
+                RefreshPostProcessCommandStates();
                 return;
             }
 
@@ -267,6 +271,7 @@ public sealed partial class MainWindowViewModel
                 ?? Segments.FirstOrDefault();
             UpdateExportCommandStates();
             UpdatePlaybackCommandStates();
+            RefreshPostProcessCommandStates();
         }
         finally
         {

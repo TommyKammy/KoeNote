@@ -5,6 +5,26 @@ namespace KoeNote.App.Services.Asr;
 
 public sealed class TranscriptSegmentRepository(AppPaths paths)
 {
+    public IReadOnlyList<TranscriptSegment> ReadSegments(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return [];
+        }
+
+        var segments = new TranscriptReadRepository(paths).ReadForJob(jobId);
+        return segments
+            .Select(segment => new TranscriptSegment(
+                segment.SegmentId,
+                jobId,
+                segment.StartSeconds,
+                segment.EndSeconds,
+                string.IsNullOrWhiteSpace(segment.SpeakerId) ? null : segment.SpeakerId,
+                segment.RawText,
+                segment.NormalizedText))
+            .ToArray();
+    }
+
     public IReadOnlyList<TranscriptSegmentPreview> ReadPreviews(string jobId)
     {
         if (string.IsNullOrWhiteSpace(jobId))

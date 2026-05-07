@@ -108,6 +108,24 @@ public sealed class TranscriptSegmentRepositoryTests
         Assert.Equal(0, reader.GetInt32(3));
     }
 
+    [Fact]
+    public void ReadSegments_ReturnsStoredSegmentsForPostProcessing()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var repository = new TranscriptSegmentRepository(fixture.Paths);
+        repository.SaveSegments([
+            new TranscriptSegment("000002", "job-001", 2, 3, "Speaker_1", "second raw", "second normalized"),
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "first raw", "first normalized")
+        ]);
+
+        var segments = repository.ReadSegments("job-001");
+
+        Assert.Equal(["000001", "000002"], segments.Select(segment => segment.SegmentId).ToArray());
+        Assert.Equal("first raw", segments[0].RawText);
+        Assert.Equal("first normalized", segments[0].NormalizedText);
+        Assert.Equal("Speaker_0", segments[0].SpeakerId);
+    }
+
     private static void InsertReviewState(RepositoryTestFixture fixture)
     {
         using var connection = fixture.Open();

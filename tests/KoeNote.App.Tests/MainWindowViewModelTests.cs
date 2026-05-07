@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Windows.Input;
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
@@ -731,6 +732,65 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
         Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void PostProcessMenuItems_DisableWhenSelectedJobHasNoTranscriptSegments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.False(viewModel.CanRunPostReview);
+        Assert.False(viewModel.CanRunPostSummary);
+        Assert.False(viewModel.CanRunPostReviewAndSummary);
+    }
+
+    [Fact]
+    public void PostProcessMenuItems_EnableWhenSelectedJobHasTranscriptSegments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.CanRunPostReview);
+        Assert.True(viewModel.CanRunPostSummary);
+        Assert.True(viewModel.CanRunPostReviewAndSummary);
+    }
+
+    [Theory]
+    [InlineData(nameof(MainWindowViewModel.RunPostReviewCommand), PostProcessMode.ReviewOnly)]
+    [InlineData(nameof(MainWindowViewModel.RunPostSummaryCommand), PostProcessMode.SummaryOnly)]
+    [InlineData(nameof(MainWindowViewModel.RunPostReviewAndSummaryCommand), PostProcessMode.ReviewAndSummary)]
+    public void PostProcessCommands_RecordRequestedMode(string commandName, PostProcessMode expectedMode)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var command = (ICommand)typeof(MainWindowViewModel).GetProperty(commandName)!.GetValue(viewModel)!;
+
+        Assert.True(command.CanExecute(null));
+
+        command.Execute(null);
+
+        Assert.Equal(expectedMode, viewModel.LastRequestedPostProcessMode);
     }
 
     [Fact]

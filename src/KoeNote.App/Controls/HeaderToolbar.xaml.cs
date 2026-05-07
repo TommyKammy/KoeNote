@@ -12,6 +12,16 @@ public partial class HeaderToolbar : UserControl
 
     private void OnExportMenuButtonClick(object sender, RoutedEventArgs e)
     {
+        OpenButtonContextMenu(sender);
+    }
+
+    private void OnRunMenuButtonClick(object sender, RoutedEventArgs e)
+    {
+        OpenButtonContextMenu(sender);
+    }
+
+    private static void OpenButtonContextMenu(object sender)
+    {
         if (sender is not Button button || button.ContextMenu is null)
         {
             return;

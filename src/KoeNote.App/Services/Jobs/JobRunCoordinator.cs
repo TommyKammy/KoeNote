@@ -63,4 +63,13 @@ public sealed class JobRunCoordinator(
 
         summaryStageRunner.Skip(job, report, "disabled_by_user");
     }
+
+    public Task<bool> RunReviewOnlyAsync(
+        JobSummary job,
+        IReadOnlyList<TranscriptSegment> segments,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken)
+    {
+        return reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
+    }
 }

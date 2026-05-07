@@ -322,4 +322,5 @@ public sealed partial class MainWindowViewModel
             relayCommand.RaiseCanExecuteChanged();
         }
     }
+
 }

@@ -151,6 +151,34 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
+    public async Task RunReviewOnlyAsync_RunsReviewWithoutPreprocessAsrOrSummary()
+    {
+        var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
+        var asrStageRunner = new AsrStageRunnerStub(null);
+        var reviewStageRunner = new ReviewStageRunnerStub();
+        var summaryStageRunner = new SummaryStageRunnerStub();
+        var coordinator = new JobRunCoordinator(
+            new PreprocessStageRunnerStub("normalized.wav"),
+            asrStageRunner,
+            reviewStageRunner,
+            summaryStageRunner);
+
+        var result = await coordinator.RunReviewOnlyAsync(
+            CreateJob(),
+            segments,
+            _ => { },
+            CancellationToken.None);
+
+        Assert.True(result);
+        Assert.False(asrStageRunner.WasCalled);
+        Assert.True(reviewStageRunner.RunWasCalled);
+        Assert.False(reviewStageRunner.SkipWasCalled);
+        Assert.False(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
+        Assert.Equal(segments, reviewStageRunner.ReceivedSegments);
+    }
+
+    [Fact]
     public async Task RunAsync_SkipsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();
@@ -222,6 +250,8 @@ public sealed class JobRunCoordinatorTests
 
         public bool SkipWasCalled { get; private set; }
 
+        public IReadOnlyList<TranscriptSegment>? ReceivedSegments { get; private set; }
+
         public Task<bool> RunAsync(
             JobSummary job,
             IReadOnlyList<TranscriptSegment> segments,
@@ -229,6 +259,7 @@ public sealed class JobRunCoordinatorTests
             CancellationToken cancellationToken)
         {
             RunWasCalled = true;
+            ReceivedSegments = segments;
             onRun?.Invoke();
             return Task.FromResult(runResult);
         }
