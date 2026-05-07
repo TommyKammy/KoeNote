@@ -54,6 +54,43 @@ public sealed class LlmOutputSanitizerTests
     }
 
     [Fact]
+    public void Strict_IgnoresInlineQuotedHeadingInstruction()
+    {
+        var output = """
+            Begin with "## Overview".
+
+            I will analyze the transcript first.
+
+            ## Overview
+
+            - The source mentions one topic.
+            """;
+
+        var sanitized = LlmOutputSanitizer.SanitizeMarkdown(output, LlmOutputSanitizerProfiles.Strict);
+
+        Assert.StartsWith("## Overview", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("I will analyze", sanitized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Strict_KeepsJapaneseMarkdownHeading()
+    {
+        var output = """
+            <think>
+            まず内容を確認します。
+            </think>
+            ## 概要
+
+            - 日本語の要約です。
+            """;
+
+        var sanitized = LlmOutputSanitizer.SanitizeMarkdown(output, LlmOutputSanitizerProfiles.Strict);
+
+        Assert.StartsWith("## 概要", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("<think", sanitized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SanitizeJsonCandidate_RemovesThinkBlockBeforeJsonExtraction()
     {
         var output = """

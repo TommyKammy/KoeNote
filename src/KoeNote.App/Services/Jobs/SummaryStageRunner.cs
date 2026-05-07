@@ -46,7 +46,7 @@ public sealed class SummaryStageRunner(
                 OutputSanitizerProfile: sanitizerProfile,
                 ContextSize: tuning.ContextSize,
                 GpuLayers: tuning.GpuLayers,
-                MaxTokens: Math.Min(tuning.MaxTokens, 512),
+                MaxTokens: ResolveSummaryMaxTokens(tuning),
                 Threads: tuning.Threads,
                 ThreadsBatch: tuning.ThreadsBatch),
                 cancellationToken);
@@ -201,5 +201,15 @@ public sealed class SummaryStageRunner(
                 model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
                 ModelCatalogCompatibility.IsSelectable(model));
+    }
+
+    private static int ResolveSummaryMaxTokens(ReviewRuntimeTuning tuning)
+    {
+        if (tuning.MaxTokens <= 0)
+        {
+            return 1024;
+        }
+
+        return Math.Clamp(tuning.MaxTokens, 512, 768);
     }
 }

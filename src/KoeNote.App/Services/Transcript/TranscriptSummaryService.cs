@@ -33,7 +33,12 @@ public sealed class TranscriptSummaryService(
                 var chunkResult = await runtime.SummarizeChunkAsync(options, chunk, cancellationToken);
                 if (string.IsNullOrWhiteSpace(chunkResult.Content))
                 {
-                    return SaveFailed(options, source.SourceKind, sourceHash, "Transcript summary returned empty chunk output.", BuildSegmentRange(segments));
+                    return SaveFallback(
+                        options,
+                        source,
+                        sourceHash,
+                        segments,
+                        "Transcript summary returned empty chunk output.");
                 }
 
                 chunkResults.Add(chunkResult with { Chunk = chunk });
@@ -54,12 +59,22 @@ public sealed class TranscriptSummaryService(
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                return SaveFailed(options, source.SourceKind, sourceHash, "Transcript summary returned empty output.", BuildSegmentRange(segments));
+                return SaveFallback(
+                    options,
+                    source,
+                    sourceHash,
+                    segments,
+                    "Transcript summary returned empty output.");
             }
 
             if (IsUnexpectedlyShort(content, source.Chunks))
             {
-                return SaveFailed(options, source.SourceKind, sourceHash, "Transcript summary was unexpectedly short for the source transcript.", BuildSegmentRange(segments));
+                return SaveFallback(
+                    options,
+                    source,
+                    sourceHash,
+                    segments,
+                    "Transcript summary was unexpectedly short for the source transcript.");
             }
 
             var derivative = derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
@@ -120,11 +135,11 @@ public sealed class TranscriptSummaryService(
         }
         catch (ReviewWorkerException exception)
         {
-            return SaveFailed(options, source.SourceKind, sourceHash, exception.Message, BuildSegmentRange(segments));
+            return SaveFallback(options, source, sourceHash, segments, exception.Message);
         }
         catch (TimeoutException exception)
         {
-            return SaveFailed(options, source.SourceKind, sourceHash, exception.Message, BuildSegmentRange(segments));
+            return SaveFallback(options, source, sourceHash, segments, exception.Message);
         }
     }
 
@@ -204,6 +219,56 @@ public sealed class TranscriptSummaryService(
             TimeSpan.Zero);
     }
 
+    private TranscriptSummaryResult SaveFallback(
+        TranscriptSummaryOptions options,
+        SummarySource source,
+        string sourceHash,
+        IReadOnlyList<TranscriptReadModel> segments,
+        string reason)
+    {
+        var content = BuildFallbackSummary(source, segments, reason);
+        var derivative = derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            options.JobId,
+            TranscriptDerivativeKinds.Summary,
+            TranscriptDerivativeFormats.Markdown,
+            content,
+            source.SourceKind,
+            sourceHash,
+            BuildSegmentRange(segments),
+            null,
+            options.ModelId,
+            options.PromptVersion,
+            $"{options.GenerationProfile}-fallback"));
+
+        foreach (var chunk in source.Chunks)
+        {
+            derivativeRepository.SaveChunk(new TranscriptDerivativeChunkSaveRequest(
+                derivative.DerivativeId,
+                options.JobId,
+                chunk.ChunkIndex,
+                chunk.SourceKind,
+                chunk.SourceSegmentIds,
+                chunk.SourceStartSeconds,
+                chunk.SourceEndSeconds,
+                sourceHash,
+                TranscriptDerivativeFormats.Markdown,
+                BuildFallbackChunkSummary(chunk),
+                options.ModelId,
+                options.PromptVersion,
+                $"{options.GenerationProfile}-fallback",
+                ChunkId: BuildChunkId(derivative.DerivativeId, chunk)));
+        }
+
+        return new TranscriptSummaryResult(
+            options.JobId,
+            derivative.DerivativeId,
+            content,
+            source.SourceKind,
+            sourceHash,
+            source.Chunks.Count,
+            TimeSpan.Zero);
+    }
+
     private static IEnumerable<TranscriptSummaryChunk> BuildRawChunks(
         IReadOnlyList<TranscriptReadModel> segments,
         int chunkSegmentCount)
@@ -234,6 +299,92 @@ public sealed class TranscriptSummaryService(
         }
 
         return builder.ToString().Trim();
+    }
+
+    private static string BuildFallbackSummary(
+        SummarySource source,
+        IReadOnlyList<TranscriptReadModel> segments,
+        string reason)
+    {
+        var speakerNames = segments
+            .Select(static segment => segment.Speaker)
+            .Where(static speaker => !string.IsNullOrWhiteSpace(speaker))
+            .Distinct(StringComparer.Ordinal)
+            .Take(8)
+            .ToArray();
+        var excerptSegments = segments
+            .Where(static segment => !string.IsNullOrWhiteSpace(segment.Text))
+            .Take(8)
+            .ToArray();
+
+        var builder = new StringBuilder();
+        builder
+            .AppendLine("## 概要")
+            .AppendLine()
+            .Append("- LLM要約が安定して生成できなかったため、文字起こし本文から簡易要約を作成しました。理由: ")
+            .AppendLine(reason)
+            .Append("- 対象範囲: ")
+            .Append(FormatTimestamp(segments.Min(static segment => segment.StartSeconds)))
+            .Append("..")
+            .AppendLine(FormatTimestamp(segments.Max(static segment => segment.EndSeconds)))
+            .Append("- 話者: ")
+            .AppendLine(speakerNames.Length == 0 ? "Unspecified" : string.Join(", ", speakerNames))
+            .AppendLine()
+            .AppendLine("## 主な内容")
+            .AppendLine();
+
+        foreach (var segment in excerptSegments)
+        {
+            builder
+                .Append("- [")
+                .Append(segment.SegmentId)
+                .Append(" / ")
+                .Append(FormatTimestamp(segment.StartSeconds))
+                .Append("] ")
+                .AppendLine(TrimForSummary(segment.Text, 120));
+        }
+
+        builder
+            .AppendLine()
+            .AppendLine("## 決定事項")
+            .AppendLine()
+            .AppendLine("- 明示された決定事項は検出できませんでした。")
+            .AppendLine()
+            .AppendLine("## アクション項目")
+            .AppendLine()
+            .AppendLine("- 明示されたアクション項目は検出できませんでした。")
+            .AppendLine()
+            .AppendLine("## 未解決の質問")
+            .AppendLine()
+            .AppendLine("- 必要に応じて文字起こし本文を確認してください。")
+            .AppendLine()
+            .AppendLine("## キーワード")
+            .AppendLine()
+            .Append("- source: ")
+            .Append(source.SourceKind)
+            .Append(", segments: ")
+            .AppendLine(BuildSegmentRange(segments));
+
+        return builder.ToString().Trim();
+    }
+
+    private static string BuildFallbackChunkSummary(TranscriptSummaryChunk chunk)
+    {
+        return $"""
+            ## 概要
+
+            LLM要約が利用できなかったため、このチャンクは文字起こし抜粋として保存しました。
+
+            ## 主な内容
+
+            {TrimForSummary(chunk.Content, 1000)}
+            """;
+    }
+
+    private static string TrimForSummary(string text, int maxLength)
+    {
+        var normalized = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength] + "...";
     }
 
     private static bool IsUnexpectedlyShort(

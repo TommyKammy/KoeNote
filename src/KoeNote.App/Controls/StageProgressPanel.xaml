@@ -180,36 +180,7 @@
                                            TextAlignment="Center"
                                            VerticalAlignment="Top"
                                            LineHeight="14"
-                                           TextTrimming="CharacterEllipsis">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Name}" Value="レビュー">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="{Binding Status}"
-                                           FontSize="11"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           TextAlignment="Center"
-                                           VerticalAlignment="Top"
-                                           LineHeight="14"
-                                           TextTrimming="CharacterEllipsis">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Name}" Value="レビュー">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                           TextTrimming="CharacterEllipsis" />
                             </Grid>
                         </Grid>
                     </DataTemplate>

@@ -6,9 +6,14 @@ public sealed class TranscriptSummaryPromptBuilder
 {
     public const string PromptVersion = "summary-v1";
 
-    public string BuildChunkPrompt(TranscriptSummaryChunk chunk)
+    public string BuildChunkPrompt(TranscriptSummaryChunk chunk, string? modelId = null)
     {
         ArgumentNullException.ThrowIfNull(chunk);
+
+        if (IsBonsaiModel(modelId))
+        {
+            return BuildBonsaiChunkPrompt(chunk);
+        }
 
         return $$"""
             You are summarizing a Japanese meeting or interview transcript chunk.
@@ -22,6 +27,10 @@ public sealed class TranscriptSummaryPromptBuilder
             - Include action items only when the source implies an action.
             - Preserve source references by mentioning segment ids or timestamps for important decisions and action items.
             - Output Markdown only. Do not output code fences.
+            - Do not output analysis, reasoning, or <think> blocks.
+            - Do not repeat or quote these instructions.
+            - If the source transcript is Japanese, write the summary in Japanese.
+            - Begin with the Overview section heading.
 
             Output sections:
             ## Overview
@@ -40,9 +49,14 @@ public sealed class TranscriptSummaryPromptBuilder
             """;
     }
 
-    public string BuildFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    public string BuildFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults, string? modelId = null)
     {
         ArgumentNullException.ThrowIfNull(chunkResults);
+
+        if (IsBonsaiModel(modelId))
+        {
+            return BuildBonsaiFinalPrompt(chunkResults);
+        }
 
         var source = new StringBuilder();
         foreach (var result in chunkResults.OrderBy(static result => result.Chunk.ChunkIndex))
@@ -68,6 +82,10 @@ public sealed class TranscriptSummaryPromptBuilder
             - Include action items only when the source implies an action.
             - Keep source references for important decisions and action items when available.
             - Output Markdown only. Do not output code fences.
+            - Do not output analysis, reasoning, or <think> blocks.
+            - Do not repeat or quote these instructions.
+            - If the chunk summaries are Japanese, write the final summary in Japanese.
+            - Begin with the Overview section heading.
 
             Output sections in this exact order:
             ## Overview
@@ -80,6 +98,75 @@ public sealed class TranscriptSummaryPromptBuilder
             Chunk summaries:
             {{source}}
             """;
+    }
+
+    private string BuildBonsaiChunkPrompt(TranscriptSummaryChunk chunk)
+    {
+        return $$"""
+            /no_think
+            日本語で短く要約してください。思考、説明、前置き、英語は禁止です。
+            出力はMarkdownのみ。必ず次の見出しだけをこの順番で使ってください。
+
+            ## 概要
+            ## 主な内容
+            ## 決定事項
+            ## アクション項目
+            ## 未解決の質問
+            ## キーワード
+
+            ルール:
+            - 文字起こしにない内容は追加しない。
+            - 決定事項やアクション項目がない場合は「なし」と書く。
+            - 各セクションは最大3項目。
+            - 重要項目には segment_id または時刻を書く。
+            - <think>、分析、手順説明、指示文の引用は禁止。
+
+            範囲: {{FormatRange(chunk.SourceStartSeconds, chunk.SourceEndSeconds)}}
+            segment_ids: {{chunk.SourceSegmentIds}}
+
+            文字起こし:
+            {{chunk.Content}}
+            """;
+    }
+
+    private string BuildBonsaiFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    {
+        var source = new StringBuilder();
+        foreach (var result in chunkResults.OrderBy(static result => result.Chunk.ChunkIndex))
+        {
+            source
+                .Append("### chunk ").Append(result.Chunk.ChunkIndex).AppendLine()
+                .AppendLine(result.Content.Trim())
+                .AppendLine();
+        }
+
+        return $$"""
+            /no_think
+            日本語のチャンク要約を、重複を除いて短く統合してください。思考、説明、前置き、英語は禁止です。
+            出力はMarkdownのみ。必ず次の見出しだけをこの順番で使ってください。
+
+            ## 概要
+            ## 主な内容
+            ## 決定事項
+            ## アクション項目
+            ## 未解決の質問
+            ## キーワード
+
+            ルール:
+            - チャンク要約にない内容は追加しない。
+            - 決定事項やアクション項目がない場合は「なし」と書く。
+            - 各セクションは最大3項目。
+            - <think>、分析、手順説明、指示文の引用は禁止。
+
+            チャンク要約:
+            {{source}}
+            """;
+    }
+
+    private static bool IsBonsaiModel(string? modelId)
+    {
+        return !string.IsNullOrWhiteSpace(modelId) &&
+            modelId.Contains("bonsai", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatRange(double? startSeconds, double? endSeconds)

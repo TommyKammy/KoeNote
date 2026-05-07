@@ -101,13 +101,7 @@ public sealed partial class MainWindowViewModel
             "要約",
             "M6,4 L18,4 L18,20 L6,20 Z M8.5,8 L15.5,8 M8.5,11.5 L15.5,11.5 M8.5,15 L13,15",
             "#0F766E",
-            "#CCFBF1");
-
-        yield return new StageStatus(
-            "レビュー",
-            "M6,3.5 L15,3.5 L19,7.5 L19,20.5 L6,20.5 Z M15,3.5 L15,7.5 L19,7.5 M8.5,13 L11,15.5 L15.8,10.7 M8.5,18 L15.5,18",
-            "#D97706",
-            "#FEF3C7",
+            "#CCFBF1",
             showConnectorAfter: false);
     }
 }

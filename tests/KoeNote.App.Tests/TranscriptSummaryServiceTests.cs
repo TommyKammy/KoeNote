@@ -169,7 +169,7 @@ public sealed class TranscriptSummaryServiceTests
     }
 
     [Fact]
-    public async Task SummarizeAsync_StoresFailedDerivativeWhenFinalSummaryIsEmpty()
+    public async Task SummarizeAsync_UsesFallbackWhenFinalSummaryIsEmpty()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
         SaveSegments(fixture.Paths, [
@@ -184,16 +184,18 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
 
-        Assert.Empty(result.Content);
+        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
+        Assert.Contains("簡易要約", result.Content, StringComparison.Ordinal);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
         Assert.Equal(TranscriptDerivativeKinds.Summary, derivative.Kind);
-        Assert.Equal(TranscriptDerivativeStatuses.Failed, derivative.Status);
-        Assert.Equal("Transcript summary returned empty output.", derivative.ErrorMessage);
+        Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
+        Assert.Null(derivative.ErrorMessage);
+        Assert.Equal("lightweight-fallback", derivative.GenerationProfile);
     }
 
     [Fact]
-    public async Task SummarizeAsync_StoresFailedDerivativeWhenChunkSummaryIsEmpty()
+    public async Task SummarizeAsync_UsesFallbackWhenChunkSummaryIsEmpty()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
         SaveSegments(fixture.Paths, [
@@ -207,11 +209,12 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001"));
 
-        Assert.Empty(result.Content);
+        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
+        Assert.Contains("Transcript summary returned empty chunk output.", result.Content, StringComparison.Ordinal);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
-        Assert.Equal(TranscriptDerivativeStatuses.Failed, derivative.Status);
-        Assert.Equal("Transcript summary returned empty chunk output.", derivative.ErrorMessage);
+        Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
+        Assert.Null(derivative.ErrorMessage);
     }
 
     [Fact]
@@ -239,7 +242,7 @@ public sealed class TranscriptSummaryServiceTests
     }
 
     [Fact]
-    public async Task SummarizeAsync_StoresFailedDerivativeWhenFinalSummaryIsUnexpectedlyShort()
+    public async Task SummarizeAsync_UsesFallbackWhenFinalSummaryIsUnexpectedlyShort()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
         SaveSegments(fixture.Paths, [
@@ -254,11 +257,12 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
 
-        Assert.Empty(result.Content);
+        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
+        Assert.Contains("Transcript summary was unexpectedly short", result.Content, StringComparison.Ordinal);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
-        Assert.Equal(TranscriptDerivativeStatuses.Failed, derivative.Status);
-        Assert.Equal("Transcript summary was unexpectedly short for the source transcript.", derivative.ErrorMessage);
+        Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
+        Assert.Null(derivative.ErrorMessage);
     }
 
     [Fact]
@@ -290,7 +294,31 @@ public sealed class TranscriptSummaryServiceTests
         Assert.Contains("Unspecified", prompt, StringComparison.Ordinal);
         Assert.Contains("## Overview", prompt, StringComparison.Ordinal);
         Assert.Contains("## Action items", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not output analysis", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not repeat or quote these instructions", prompt, StringComparison.Ordinal);
+        Assert.Contains("If the source transcript is Japanese, write the summary in Japanese", prompt, StringComparison.Ordinal);
+        Assert.Contains("Begin with the Overview section heading", prompt, StringComparison.Ordinal);
         Assert.Contains("Source segment ids: 000001", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_UsesCompactJapaneseNoThinkPromptForBonsai()
+    {
+        var prompt = new TranscriptSummaryPromptBuilder().BuildChunkPrompt(new TranscriptSummaryChunk(
+            1,
+            TranscriptDerivativeSourceKinds.Raw,
+            "000001",
+            0,
+            1,
+            "- segment_id: 000001\n  speaker: Speaker_0\n  text: 次回までに資料を作ります"),
+            "bonsai-8b-q1-0");
+
+        Assert.Contains("/no_think", prompt, StringComparison.Ordinal);
+        Assert.Contains("日本語で短く要約", prompt, StringComparison.Ordinal);
+        Assert.Contains("## 概要", prompt, StringComparison.Ordinal);
+        Assert.Contains("## 主な内容", prompt, StringComparison.Ordinal);
+        Assert.Contains("各セクションは最大3項目", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("## Overview", prompt, StringComparison.Ordinal);
     }
 
     private static TranscriptSummaryOptions CreateOptions(string jobId, int chunkSegmentCount = 80)

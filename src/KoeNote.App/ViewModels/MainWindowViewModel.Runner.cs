@@ -202,25 +202,14 @@ public sealed partial class MainWindowViewModel
 
     private void MarkManualReviewStageWaiting(int pendingCount)
     {
-        var stage = StageStatuses[4];
-        stage.Status = $"確認待ち {pendingCount}";
-        stage.ProgressPercent = 0;
-        stage.DurationText = "00:00:00";
+        _ = pendingCount;
     }
 
     private void MarkManualReviewStageCompleted()
     {
-        var stage = StageStatuses[4];
-        stage.Status = "完了";
-        stage.ProgressPercent = 100;
-        stage.DurationText = "00:00:00";
     }
 
     private void ResetManualReviewStage()
     {
-        var stage = StageStatuses[4];
-        stage.Status = "未開始";
-        stage.ProgressPercent = 0;
-        stage.DurationText = "00:00:00";
     }
 }

@@ -21,12 +21,17 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         Directory.CreateDirectory(options.OutputDirectory);
-        var prompt = promptBuilder.BuildChunkPrompt(chunk);
+        var prompt = promptBuilder.BuildChunkPrompt(chunk, options.ModelId);
         var promptPath = Path.Combine(options.OutputDirectory, $"summary.chunk-{chunk.ChunkIndex:D3}.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
         var start = DateTimeOffset.UtcNow;
         var result = await RunAsync(options, promptPath, cancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(options.OutputDirectory, $"summary.chunk-{chunk.ChunkIndex:D3}.raw.md"),
+            result.StandardOutput,
+            Encoding.UTF8,
+            cancellationToken);
         var content = LlmOutputSanitizer.SanitizeMarkdown(result.StandardOutput, options.OutputSanitizerProfile);
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -50,11 +55,16 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         Directory.CreateDirectory(options.OutputDirectory);
-        var prompt = promptBuilder.BuildFinalPrompt(chunkResults);
+        var prompt = promptBuilder.BuildFinalPrompt(chunkResults, options.ModelId);
         var promptPath = Path.Combine(options.OutputDirectory, "summary.final.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
         var result = await RunAsync(options, promptPath, cancellationToken);
+        await File.WriteAllTextAsync(
+            Path.Combine(options.OutputDirectory, "summary.final.raw.md"),
+            result.StandardOutput,
+            Encoding.UTF8,
+            cancellationToken);
         var content = LlmOutputSanitizer.SanitizeMarkdown(result.StandardOutput, options.OutputSanitizerProfile);
         if (string.IsNullOrWhiteSpace(content))
         {

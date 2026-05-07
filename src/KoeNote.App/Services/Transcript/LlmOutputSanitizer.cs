@@ -58,8 +58,18 @@ public static class LlmOutputSanitizer
         "## Action items",
         "## Open Questions",
         "## Open questions",
-        "## Keywords"
+        "## Keywords",
+        "## 概要",
+        "## 主な内容",
+        "## 決定事項",
+        "## アクション項目",
+        "## 未解決の質問",
+        "## キーワード"
     ];
+
+    private static readonly Regex MarkdownHeadingRegex = new(
+        @"(?im)^[ \t]*(##\s+(Overview|Summary|Key Points|Key points|Decisions|Action Items|Action items|Open Questions|Open questions|Keywords|概要|主な内容|決定事項|アクション項目|未解決の質問|キーワード))\b",
+        RegexOptions.CultureInvariant);
 
     public static string SanitizeMarkdown(string output, string? profile)
     {
@@ -159,10 +169,14 @@ public static class LlmOutputSanitizer
 
     private static int FindFirstMarkdownAnchor(string text, int startIndex = 0)
     {
-        var indexes = DefaultMarkdownAnchors
-            .Select(anchor => text.IndexOf(anchor, startIndex, StringComparison.OrdinalIgnoreCase))
-            .Where(static index => index >= 0)
-            .ToArray();
-        return indexes.Length == 0 ? -1 : indexes.Min();
+        foreach (Match match in MarkdownHeadingRegex.Matches(text))
+        {
+            if (match.Index >= startIndex)
+            {
+                return match.Index;
+            }
+        }
+
+        return -1;
     }
 }

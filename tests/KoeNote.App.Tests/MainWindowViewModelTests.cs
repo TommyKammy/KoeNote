@@ -634,8 +634,8 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
         Assert.Equal("整文完了", viewModel.SelectedJob?.Status);
         Assert.Equal(100, viewModel.SelectedJob?.ProgressPercent);
-        Assert.Equal("完了", viewModel.StageStatuses[4].Status);
-        Assert.Equal(100, viewModel.StageStatuses[4].ProgressPercent);
+        Assert.Equal(4, viewModel.StageStatuses.Count);
+        Assert.Equal("要約", viewModel.StageStatuses.Last().Name);
     }
 
     [Fact]
@@ -1048,6 +1048,17 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void StageStatuses_EndWithSummaryStage()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(4, viewModel.StageStatuses.Count);
+        Assert.Equal("要約", viewModel.StageStatuses.Last().Name);
+        Assert.False(viewModel.StageStatuses.Last().ShowConnectorAfter);
+        Assert.DoesNotContain(viewModel.StageStatuses, stage => stage.Name == "レビュー");
+    }
+
+    [Fact]
     public void ToggleReviewStageCommand_SwitchesReviewStageSettingAndStageStatus()
     {
         var viewModel = CreateViewModel();
@@ -1126,7 +1137,7 @@ public sealed class MainWindowViewModelTests
                 0)
         ]);
 
-        var summaryStage = viewModel.StageStatuses[3];
+        var summaryStage = viewModel.StageStatuses.Last();
         Assert.True(summaryStage.IsRunning);
         Assert.True(summaryStage.IsDoing);
         Assert.False(summaryStage.IsPending);
@@ -1147,7 +1158,7 @@ public sealed class MainWindowViewModelTests
                 100)
         ]);
 
-        var summaryStage = viewModel.StageStatuses[3];
+        var summaryStage = viewModel.StageStatuses.Last();
         Assert.True(summaryStage.IsRunning);
         Assert.True(summaryStage.IsDoing);
         Assert.False(summaryStage.IsDone);
@@ -1168,7 +1179,7 @@ public sealed class MainWindowViewModelTests
                 100)
         ]);
 
-        var summaryStage = viewModel.StageStatuses[3];
+        var summaryStage = viewModel.StageStatuses.Last();
         Assert.True(summaryStage.IsSkipped);
         Assert.False(summaryStage.IsDone);
         Assert.False(summaryStage.IsDoing);
