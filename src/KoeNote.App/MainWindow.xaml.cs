@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
-using KoeNote.App.Dialogs;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.ViewModels;
 
 namespace KoeNote.App;
@@ -34,11 +34,8 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         var isRunning = DataContext is MainWindowViewModel { IsRunInProgress: true };
-        var dialog = new ExitConfirmationDialog(isRunning)
-        {
-            Owner = this
-        };
-
-        e.Cancel = dialog.ShowDialog() != true;
+        e.Cancel = !ConfirmationDialogService.Default.Confirm(
+            this,
+            ConfirmationDialogRequest.Exit(isRunning));
     }
 }

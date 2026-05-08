@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Audio;
 using Microsoft.Win32;
 using System.Globalization;
@@ -577,19 +578,8 @@ public sealed partial class MainWindowViewModel
 
     private static bool ShowConfirmation(string title, string message)
     {
-        var owner = Application.Current?.MainWindow;
-        if (owner is null)
-        {
-            return true;
-        }
-
-        var result = MessageBox.Show(
-            owner,
-            message,
-            title,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        return result == MessageBoxResult.Yes;
+        return ConfirmationDialogService.Default.Confirm(
+            Application.Current?.MainWindow,
+            ConfirmationDialogRequest.Warning(title, message));
     }
 }

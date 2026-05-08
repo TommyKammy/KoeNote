@@ -1,7 +1,7 @@
-<Window x:Class="KoeNote.App.Dialogs.ExitConfirmationDialog"
+<Window x:Class="KoeNote.App.Dialogs.ConfirmationDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="終了の確認"
+        Title="{Binding Title}"
         Width="420"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
@@ -51,7 +51,7 @@
 
                 <StackPanel Grid.Column="1"
                             Margin="12,0,0,0">
-                    <TextBlock Text="KoeNote を終了しますか？"
+                    <TextBlock Text="{Binding Heading}"
                                FontSize="15"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource TextBrush}" />
@@ -72,17 +72,17 @@
             <StackPanel Grid.Row="2"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
-                <Button Content="キャンセル"
+                <Button Content="{Binding CancelText}"
                         Width="96"
                         Padding="0,8"
                         Click="OnCancelClick" />
-                <Button Content="終了"
+                <Button Content="{Binding ConfirmText}"
                         Width="96"
                         Padding="0,8"
                         Margin="8,0,0,0"
-                        Background="#FEF2F2"
-                        BorderBrush="#FECACA"
-                        Foreground="#B91C1C"
+                        Background="{Binding ConfirmBackground}"
+                        BorderBrush="{Binding ConfirmBorderBrush}"
+                        Foreground="{Binding ConfirmForeground}"
                         FontWeight="SemiBold"
                         Click="OnConfirmClick" />
             </StackPanel>
