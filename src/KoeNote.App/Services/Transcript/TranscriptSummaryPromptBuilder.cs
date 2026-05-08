@@ -1,4 +1,5 @@
 using System.Text;
+using KoeNote.App.Services.Presets;
 
 namespace KoeNote.App.Services.Transcript;
 
@@ -6,15 +7,19 @@ public sealed class TranscriptSummaryPromptBuilder
 {
     public const string PromptVersion = "summary-v1";
 
-    public string BuildChunkPrompt(TranscriptSummaryChunk chunk, string? modelId = null)
+    public string BuildChunkPrompt(
+        TranscriptSummaryChunk chunk,
+        string? modelId = null,
+        DomainPromptContext? domainContext = null)
     {
         ArgumentNullException.ThrowIfNull(chunk);
 
         if (IsBonsaiModel(modelId))
         {
-            return BuildBonsaiChunkPrompt(chunk);
+            return BuildBonsaiChunkPrompt(chunk, domainContext);
         }
 
+        var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: false);
         return $$"""
             You are summarizing a Japanese meeting or interview transcript chunk.
 
@@ -43,19 +48,23 @@ public sealed class TranscriptSummaryPromptBuilder
             Source kind: {{chunk.SourceKind}}
             Source segment ids: {{chunk.SourceSegmentIds}}
             Source time range: {{FormatRange(chunk.SourceStartSeconds, chunk.SourceEndSeconds)}}
+            {{domainBlock}}
 
             Source transcript:
             {{chunk.Content}}
             """;
     }
 
-    public string BuildFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults, string? modelId = null)
+    public string BuildFinalPrompt(
+        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
+        string? modelId = null,
+        DomainPromptContext? domainContext = null)
     {
         ArgumentNullException.ThrowIfNull(chunkResults);
 
         if (IsBonsaiModel(modelId))
         {
-            return BuildBonsaiFinalPrompt(chunkResults);
+            return BuildBonsaiFinalPrompt(chunkResults, domainContext);
         }
 
         var source = new StringBuilder();
@@ -69,6 +78,7 @@ public sealed class TranscriptSummaryPromptBuilder
                 .AppendLine();
         }
 
+        var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: false);
         return $$"""
             You are merging transcript chunk summaries into one final Japanese summary.
 
@@ -94,14 +104,16 @@ public sealed class TranscriptSummaryPromptBuilder
             ## Action items
             ## Open questions
             ## Keywords
+            {{domainBlock}}
 
             Chunk summaries:
             {{source}}
             """;
     }
 
-    private string BuildBonsaiChunkPrompt(TranscriptSummaryChunk chunk)
+    private string BuildBonsaiChunkPrompt(TranscriptSummaryChunk chunk, DomainPromptContext? domainContext)
     {
+        var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: true);
         return $$"""
             /no_think
             日本語で短く要約してください。思考、説明、前置き、英語は禁止です。
@@ -123,13 +135,16 @@ public sealed class TranscriptSummaryPromptBuilder
 
             範囲: {{FormatRange(chunk.SourceStartSeconds, chunk.SourceEndSeconds)}}
             segment_ids: {{chunk.SourceSegmentIds}}
+            {{domainBlock}}
 
             文字起こし:
             {{chunk.Content}}
             """;
     }
 
-    private string BuildBonsaiFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    private string BuildBonsaiFinalPrompt(
+        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
+        DomainPromptContext? domainContext)
     {
         var source = new StringBuilder();
         foreach (var result in chunkResults.OrderBy(static result => result.Chunk.ChunkIndex))
@@ -140,6 +155,7 @@ public sealed class TranscriptSummaryPromptBuilder
                 .AppendLine();
         }
 
+        var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: true);
         return $$"""
             /no_think
             日本語のチャンク要約を、重複を除いて短く統合してください。思考、説明、前置き、英語は禁止です。
@@ -157,10 +173,84 @@ public sealed class TranscriptSummaryPromptBuilder
             - 決定事項やアクション項目がない場合は「なし」と書く。
             - 各セクションは最大3項目。
             - <think>、分析、手順説明、指示文の引用は禁止。
+            {{domainBlock}}
 
             チャンク要約:
             {{source}}
             """;
+    }
+
+    private static string BuildDomainContextBlock(DomainPromptContext? domainContext, bool isBonsai)
+    {
+        if (domainContext is null || domainContext.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        var limits = isBonsai
+            ? DomainPromptContextLimits.BonsaiSummary
+            : DomainPromptContextLimits.SummaryDefault;
+        var terms = domainContext.Terms
+            .Select(static term => term.Surface.Trim())
+            .Where(static term => term.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(limits.TermLimit)
+            .ToArray();
+        var pairs = domainContext.CorrectionPairs
+            .Where(static pair => !string.IsNullOrWhiteSpace(pair.WrongText) && !string.IsNullOrWhiteSpace(pair.CorrectText))
+            .Take(limits.CorrectionPairLimit)
+            .ToArray();
+        var guidelines = domainContext.ReviewGuidelines
+            .Select(static guideline => guideline.Trim())
+            .Where(static guideline => guideline.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .Take(limits.ReviewGuidelineLimit)
+            .ToArray();
+
+        if (terms.Length == 0 && pairs.Length == 0 && guidelines.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine();
+        builder.AppendLine(isBonsai ? "辞書ヒント:" : "Domain dictionary hints:");
+        builder.AppendLine(isBonsai
+            ? "- 文脈に合う場合だけ使う。文字起こしにない新情報は追加しない。"
+            : "- Use these hints only when they match the source transcript context. Do not add facts that are not in the source.");
+
+        if (terms.Length > 0)
+        {
+            builder.AppendLine(isBonsai ? "- 専門語彙:" : "- Terms:");
+            foreach (var term in terms)
+            {
+                builder.Append("  - ").AppendLine(term);
+            }
+        }
+
+        if (pairs.Length > 0)
+        {
+            builder.AppendLine(isBonsai ? "- ASR誤認識候補:" : "- ASR correction candidates:");
+            foreach (var pair in pairs)
+            {
+                builder
+                    .Append("  - ")
+                    .Append(pair.WrongText.Trim())
+                    .Append(" -> ")
+                    .AppendLine(pair.CorrectText.Trim());
+            }
+        }
+
+        if (guidelines.Length > 0)
+        {
+            builder.AppendLine(isBonsai ? "- 領域指針:" : "- Domain guidelines:");
+            foreach (var guideline in guidelines)
+            {
+                builder.Append("  - ").AppendLine(guideline);
+            }
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private static bool IsBonsaiModel(string? modelId)

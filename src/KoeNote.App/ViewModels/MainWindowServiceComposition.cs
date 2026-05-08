@@ -130,7 +130,10 @@ internal static class MainWindowReviewComposition
             new TranscriptSummaryService(
                 new TranscriptReadRepository(paths),
                 derivativeRepository,
-                new LlamaTranscriptSummaryRuntime(new ExternalProcessRunner(), new TranscriptSummaryPromptBuilder())));
+                new LlamaTranscriptSummaryRuntime(
+                    new ExternalProcessRunner(),
+                    new TranscriptSummaryPromptBuilder(),
+                    new DomainPromptContextProvider(paths))));
     }
 }
 

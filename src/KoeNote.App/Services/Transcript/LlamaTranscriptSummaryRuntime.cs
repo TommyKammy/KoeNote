@@ -1,12 +1,14 @@
 using System.IO;
 using System.Text;
+using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Transcript;
 
 public sealed class LlamaTranscriptSummaryRuntime(
     ExternalProcessRunner processRunner,
-    TranscriptSummaryPromptBuilder promptBuilder)
+    TranscriptSummaryPromptBuilder promptBuilder,
+    DomainPromptContextProvider? domainPromptContextProvider = null)
     : ITranscriptSummaryRuntime
 {
     public async Task<TranscriptSummaryChunkResult> SummarizeChunkAsync(
@@ -21,7 +23,7 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         Directory.CreateDirectory(options.OutputDirectory);
-        var prompt = promptBuilder.BuildChunkPrompt(chunk, options.ModelId);
+        var prompt = promptBuilder.BuildChunkPrompt(chunk, options.ModelId, LoadDomainContext(options.ModelId, chunk.Content));
         var promptPath = Path.Combine(options.OutputDirectory, $"summary.chunk-{chunk.ChunkIndex:D3}.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
@@ -55,7 +57,10 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         Directory.CreateDirectory(options.OutputDirectory);
-        var prompt = promptBuilder.BuildFinalPrompt(chunkResults, options.ModelId);
+        var prompt = promptBuilder.BuildFinalPrompt(
+            chunkResults,
+            options.ModelId,
+            LoadDomainContext(options.ModelId, BuildFinalSummarySourceText(chunkResults)));
         var promptPath = Path.Combine(options.OutputDirectory, "summary.final.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
@@ -94,6 +99,29 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         return result;
+    }
+
+    private DomainPromptContext? LoadDomainContext(string? modelId, string? sourceText)
+    {
+        return domainPromptContextProvider?.LoadForSummary(sourceText, ResolveDomainContextLimits(modelId));
+    }
+
+    private static DomainPromptContextLimits ResolveDomainContextLimits(string? modelId)
+    {
+        return IsBonsaiModel(modelId)
+            ? DomainPromptContextLimits.BonsaiSummary
+            : DomainPromptContextLimits.SummaryDefault;
+    }
+
+    private static bool IsBonsaiModel(string? modelId)
+    {
+        return !string.IsNullOrWhiteSpace(modelId) &&
+            modelId.Contains("bonsai", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildFinalSummarySourceText(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    {
+        return string.Join(Environment.NewLine, chunkResults.Select(static result => result.Content));
     }
 
     private static IReadOnlyList<string> BuildArguments(TranscriptSummaryOptions options, string promptPath)

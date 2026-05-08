@@ -2,6 +2,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Tests;
@@ -319,6 +320,100 @@ public sealed class TranscriptSummaryServiceTests
         Assert.Contains("## 主な内容", prompt, StringComparison.Ordinal);
         Assert.Contains("各セクションは最大3項目", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("## Overview", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_IncludesDomainDictionaryHintsForSummary()
+    {
+        var context = new DomainPromptContext(
+            [new DomainPromptTerm("甲府盆地", "asr_hotword")],
+            [new DomainPromptCorrectionPair("幸福盆地", "甲府盆地", "ASR誤認識", "global")],
+            ["地名と観光表現は文脈に合う場合だけ正しい表記へ寄せる。"]);
+
+        var prompt = new TranscriptSummaryPromptBuilder().BuildChunkPrompt(
+            new TranscriptSummaryChunk(
+                1,
+                TranscriptDerivativeSourceKinds.Raw,
+                "000001",
+                0,
+                1,
+                "- segment_id: 000001\n  speaker: Speaker_0\n  text: 幸福盆地の桃農園です"),
+            "gemma-4-e4b-it-q4-k-m",
+            context);
+
+        Assert.Contains("Domain dictionary hints:", prompt, StringComparison.Ordinal);
+        Assert.Contains("甲府盆地", prompt, StringComparison.Ordinal);
+        Assert.Contains("幸福盆地 -> 甲府盆地", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not add facts that are not in the source", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_IncludesDomainDictionaryHintsForFinalSummary()
+    {
+        var context = new DomainPromptContext(
+            [new DomainPromptTerm("桃源郷", "asr_hotword")],
+            [new DomainPromptCorrectionPair("桃源橋", "桃源郷", "ASR誤認識", "global")],
+            []);
+
+        var prompt = new TranscriptSummaryPromptBuilder().BuildFinalPrompt(
+            [
+                new TranscriptSummaryChunkResult(
+                    new TranscriptSummaryChunk(1, TranscriptDerivativeSourceKinds.Raw, "000001", 0, 1, "桃源橋の説明"),
+                    "## 概要\n\n- 桃源橋の説明です。",
+                    TimeSpan.FromSeconds(1))
+            ],
+            "bonsai-8b-q1-0",
+            context);
+
+        Assert.Contains("辞書ヒント:", prompt, StringComparison.Ordinal);
+        Assert.Contains("桃源橋 -> 桃源郷", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_IncludesShortJapaneseDictionaryHintsForBonsai()
+    {
+        var context = new DomainPromptContext(
+            Enumerable.Range(1, 12).Select(index => new DomainPromptTerm($"用語{index}", "asr_hotword")).ToArray(),
+            Enumerable.Range(1, 12).Select(index => new DomainPromptCorrectionPair($"誤り{index}", $"正解{index}", "ASR誤認識", "global")).ToArray(),
+            Enumerable.Range(1, 6).Select(index => $"指針{index}").ToArray());
+
+        var prompt = new TranscriptSummaryPromptBuilder().BuildChunkPrompt(
+            new TranscriptSummaryChunk(
+                1,
+                TranscriptDerivativeSourceKinds.Raw,
+                "000001",
+                0,
+                1,
+                "- segment_id: 000001\n  speaker: Speaker_0\n  text: 誤り1の説明です"),
+            "bonsai-8b-q1-0",
+            context);
+
+        Assert.Contains("辞書ヒント:", prompt, StringComparison.Ordinal);
+        Assert.Contains("文脈に合う場合だけ使う", prompt, StringComparison.Ordinal);
+        Assert.Contains("用語10", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("用語11", prompt, StringComparison.Ordinal);
+        Assert.Contains("誤り10 -> 正解10", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("誤り11 -> 正解11", prompt, StringComparison.Ordinal);
+        Assert.Contains("指針5", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("指針6", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_OmitsDomainDictionaryHintsWhenContextIsEmpty()
+    {
+        var prompt = new TranscriptSummaryPromptBuilder().BuildChunkPrompt(
+            new TranscriptSummaryChunk(
+                1,
+                TranscriptDerivativeSourceKinds.Raw,
+                "000001",
+                0,
+                1,
+                "- segment_id: 000001\n  speaker: Speaker_0\n  text: 次回までに資料を作ります"),
+            "bonsai-8b-q1-0",
+            new DomainPromptContext([], [], []));
+
+        Assert.DoesNotContain("辞書ヒント:", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Domain dictionary hints:", prompt, StringComparison.Ordinal);
     }
 
     private static TranscriptSummaryOptions CreateOptions(string jobId, int chunkSegmentCount = 80)
