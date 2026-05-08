@@ -1,6 +1,8 @@
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Review;
+using System.Net.Http;
 
 namespace KoeNote.App.Services.Setup;
 
@@ -13,6 +15,7 @@ public sealed class SetupWizardService
     private readonly SetupPresetRecommendationService _presetRecommendationService;
     private readonly FasterWhisperRuntimeService _fasterWhisperRuntimeService;
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
+    private readonly TernaryReviewRuntimeService _ternaryReviewRuntimeService;
     private SetupPresetRecommendation? _presetRecommendation;
     private bool _automaticPresetRecommendationApplied;
 
@@ -27,10 +30,12 @@ public sealed class SetupWizardService
         ModelDownloadService modelDownloadService,
         FasterWhisperRuntimeService fasterWhisperRuntimeService,
         DiarizationRuntimeService diarizationRuntimeService,
-        ISetupHostResourceProbe? hostResourceProbe = null)
+        ISetupHostResourceProbe? hostResourceProbe = null,
+        TernaryReviewRuntimeService? ternaryReviewRuntimeService = null)
     {
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
         _diarizationRuntimeService = diarizationRuntimeService;
+        _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
         _presetRecommendationService = new SetupPresetRecommendationService(
@@ -47,12 +52,21 @@ public sealed class SetupWizardService
             paths,
             stateService,
             toolStatusService,
+            modelCatalogService,
             installedModelRepository);
     }
 
     public SetupState LoadState()
     {
-        return _selectionService.RepairUnsupportedSelections(_stateService.Load());
+        var state = _selectionService.RepairUnsupportedSelections(_stateService.Load());
+        if (state.IsCompleted && _readinessService.IsSelectedTernaryReviewRuntimeMissing(state))
+        {
+            return _readinessService.CompleteIfReady();
+        }
+
+        return !state.IsCompleted && _readinessService.IsCompleteStateReady(state)
+            ? _readinessService.CompleteIfReady()
+            : state;
     }
 
     public IReadOnlyList<SetupEnvironmentCheck> GetEnvironmentChecks()
@@ -194,6 +208,11 @@ public sealed class SetupWizardService
     public Task<DiarizationRuntimeStatus> CheckDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
     {
         return _diarizationRuntimeService.CheckAsync(cancellationToken);
+    }
+
+    public Task<TernaryReviewRuntimeInstallResult> InstallTernaryReviewRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _ternaryReviewRuntimeService.InstallAsync(cancellationToken);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

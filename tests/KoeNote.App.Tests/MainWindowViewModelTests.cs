@@ -111,6 +111,33 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void HeaderModels_ReflectInstalledReviewModelAfterSetupDownloadWithoutCatalogRefresh()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedModelPresetId = "recommended",
+            SelectedReviewModelId = "gemma-4-e4b-it-q4-k-m",
+            StorageRoot = paths.UserModels
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        Assert.Equal("未設定", viewModel.ReviewModel);
+
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+
+        Assert.Equal("Gemma 4 E4B it Q4_K_M", viewModel.ReviewModel);
+    }
+
+    [Fact]
     public void HeaderModels_RegistersDownloadedSetupAsrFolderWhenInstallRecordIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -1872,6 +1899,53 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void RunSelectedJobCommand_RepairsHiddenTernaryReviewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = CreatePathsWithoutTernaryRuntime(root);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(Path.Combine(paths.KotobaWhisperFasterModelPath, "model.bin"));
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "kotoba-whisper-v2.2-faster");
+        installService.RegisterLocalModel(asrItem, paths.KotobaWhisperFasterModelPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "ternary-bonsai-8b-q2-0");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false, true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+
+        Assert.False(viewModel.SelectedSetupModelsReady);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", viewModel.SelectedSetupReviewModel?.ModelId);
+        Assert.True(viewModel.SetupTernaryReviewRuntimeReady);
+        Assert.False(viewModel.SelectedSetupConfigurationReady);
+        Assert.False(viewModel.ReviewStageAssetsReady);
+        Assert.False(viewModel.RunSelectedJobCommand.CanExecute(null));
+        Assert.DoesNotContain("Ternary review runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain(paths.TernaryLlamaCompletionPath, viewModel.RunPreflightDetail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RunSelectedJobCommand_UsesPresetReviewModelWhenSelectedReviewModelIsEmpty()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -1978,6 +2052,16 @@ public sealed class MainWindowViewModelTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         return new MainWindowViewModel(new AppPaths(root, root, AppContext.BaseDirectory));
+    }
+
+    private static AppPaths CreatePathsWithoutTernaryRuntime(string root)
+    {
+        var appBase = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBase, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBase, "catalog", "model-catalog.json"));
+        return new AppPaths(root, root, appBase);
     }
 
     private static List<T> ViewItems<T>(IEnumerable view)

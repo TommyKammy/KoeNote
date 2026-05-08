@@ -48,7 +48,7 @@
       "license": "MIT",
       "source": "https://github.com/PrismML-Eng/llama.cpp",
       "expectedPath": "tools/review-ternary/llama-completion.exe",
-      "notes": "Bundled separately for Ternary Bonsai Q2_0 models so the standard review runtime remains isolated from Prism-specific GGUF Q2_0 support."
+      "notes": "Optional runtime for hidden/experimental Ternary Bonsai Q2_0 models. It is not required for default release builds."
     }
   ]
 }

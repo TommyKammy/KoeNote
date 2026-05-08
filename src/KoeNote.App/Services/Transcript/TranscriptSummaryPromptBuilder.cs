@@ -10,16 +10,19 @@ public sealed class TranscriptSummaryPromptBuilder
     public string BuildChunkPrompt(
         TranscriptSummaryChunk chunk,
         string? modelId = null,
-        DomainPromptContext? domainContext = null)
+        DomainPromptContext? domainContext = null,
+        string promptTemplateId = "default",
+        int attempt = 1)
     {
         ArgumentNullException.ThrowIfNull(chunk);
 
-        if (IsBonsaiModel(modelId))
+        if (IsCompactBonsaiPrompt(promptTemplateId, modelId))
         {
             return BuildBonsaiChunkPrompt(chunk, domainContext);
         }
 
         var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: false);
+        var modelGuidance = BuildModelGuidance(promptTemplateId, modelId);
         return $$"""
             You are summarizing a Japanese meeting or interview transcript chunk.
 
@@ -36,6 +39,7 @@ public sealed class TranscriptSummaryPromptBuilder
             - Do not repeat or quote these instructions.
             - If the source transcript is Japanese, write the summary in Japanese.
             - Begin with the Overview section heading.
+            {{modelGuidance}}
 
             Output sections:
             ## Overview
@@ -58,11 +62,18 @@ public sealed class TranscriptSummaryPromptBuilder
     public string BuildFinalPrompt(
         IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
         string? modelId = null,
-        DomainPromptContext? domainContext = null)
+        DomainPromptContext? domainContext = null,
+        string promptTemplateId = "default",
+        int attempt = 1)
     {
         ArgumentNullException.ThrowIfNull(chunkResults);
 
-        if (IsBonsaiModel(modelId))
+        if (attempt > 1 && IsGemmaPrompt(promptTemplateId, modelId))
+        {
+            return BuildGemmaRetryFinalPrompt(chunkResults);
+        }
+
+        if (IsCompactBonsaiPrompt(promptTemplateId, modelId))
         {
             return BuildBonsaiFinalPrompt(chunkResults, domainContext);
         }
@@ -79,6 +90,7 @@ public sealed class TranscriptSummaryPromptBuilder
         }
 
         var domainBlock = BuildDomainContextBlock(domainContext, isBonsai: false);
+        var modelGuidance = BuildModelGuidance(promptTemplateId, modelId);
         return $$"""
             You are merging transcript chunk summaries into one final Japanese summary.
 
@@ -96,6 +108,7 @@ public sealed class TranscriptSummaryPromptBuilder
             - Do not repeat or quote these instructions.
             - If the chunk summaries are Japanese, write the final summary in Japanese.
             - Begin with the Overview section heading.
+            {{modelGuidance}}
 
             Output sections in this exact order:
             ## Overview
@@ -253,10 +266,90 @@ public sealed class TranscriptSummaryPromptBuilder
         return builder.ToString().TrimEnd();
     }
 
+    private static bool IsCompactBonsaiPrompt(string? promptTemplateId, string? modelId)
+    {
+        return string.Equals(promptTemplateId, "bonsai-compact", StringComparison.OrdinalIgnoreCase) ||
+            IsBonsaiModel(modelId);
+    }
+
     private static bool IsBonsaiModel(string? modelId)
     {
         return !string.IsNullOrWhiteSpace(modelId) &&
             modelId.Contains("bonsai", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGemmaPrompt(string? promptTemplateId, string? modelId)
+    {
+        return string.Equals(promptTemplateId, "gemma-structured", StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(modelId) && modelId.Contains("gemma", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildGemmaRetryFinalPrompt(IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    {
+        var source = new StringBuilder();
+        foreach (var result in chunkResults.OrderBy(static result => result.Chunk.ChunkIndex))
+        {
+            source
+                .Append("### Chunk ").Append(result.Chunk.ChunkIndex).AppendLine()
+                .AppendLine(TrimForPrompt(result.Content, 350))
+                .AppendLine();
+        }
+
+        return $$"""
+            Merge these chunk summaries into one concise Japanese Markdown summary.
+
+            Rules:
+            - Use only facts written in the chunk summaries.
+            - Do not output prefaces, explanations, reasoning, code fences, or stop markers.
+            - If decisions or action items are unknown, write "- Unspecified."
+            - Output at least the two headings below.
+
+            Output format:
+            ## Overview
+            - 3 to 5 bullets
+
+            ## Key points
+            - 5 to 8 bullets
+
+            Chunk summaries:
+            {{source}}
+            """;
+    }
+
+    private static string TrimForPrompt(string text, int maxLength)
+    {
+        var normalized = (text ?? string.Empty)
+            .Replace("[end of text]", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim();
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength] + "...";
+    }
+
+    private static string BuildModelGuidance(string? promptTemplateId, string? modelId)
+    {
+        if (IsGemmaPrompt(promptTemplateId, modelId))
+        {
+            return """
+
+                Model-specific output discipline:
+                - Keep each section concise, but include at least one bullet in each section.
+                - Never answer with only a greeting, refusal, or meta-commentary.
+                - If no decision, action item, or open question exists, write "- Unspecified." under that section.
+                """;
+        }
+
+        if (string.Equals(promptTemplateId, "llm-jp-structured", StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(modelId) && modelId.Contains("llm-jp", StringComparison.OrdinalIgnoreCase)))
+        {
+            return """
+
+                Model-specific output discipline:
+                - Use short Japanese bullet points.
+                - Do not include prefaces such as "以下に要約します".
+                - If information is missing, use "Unspecified" instead of inventing it.
+                """;
+        }
+
+        return string.Empty;
     }
 
     private static string FormatRange(double? startSeconds, double? endSeconds)

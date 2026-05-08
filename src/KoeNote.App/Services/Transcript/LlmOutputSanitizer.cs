@@ -73,7 +73,7 @@ public static class LlmOutputSanitizer
 
     public static string SanitizeMarkdown(string output, string? profile)
     {
-        var text = StripCodeFence(output);
+        var text = StripStopMarkers(StripCodeFence(output));
         var normalizedProfile = string.IsNullOrWhiteSpace(profile)
             ? LlmOutputSanitizerProfiles.None
             : profile;
@@ -139,6 +139,13 @@ public static class LlmOutputSanitizer
         }
 
         return text.Trim();
+    }
+
+    private static string StripStopMarkers(string output)
+    {
+        return (output ?? string.Empty)
+            .Replace("[end of text]", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim();
     }
 
     private static string StripThink(string text, bool dropUnclosedThinkWhenNoAnchor)

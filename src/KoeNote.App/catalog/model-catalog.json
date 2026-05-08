@@ -273,7 +273,7 @@
       "engine_id": "llama-cpp",
       "display_name": "Ternary Bonsai 8B Q2_0",
       "language": ["ja", "multi"],
-      "recommended_for": ["lightweight_review", "cpu_friendly"],
+      "recommended_for": ["experimental", "hidden"],
       "quality_labels": ["軽量"],
       "runtime": {
         "type": "llama-cpp",
@@ -294,7 +294,7 @@
         "recommended_vram_gb": 0,
         "python_required": false
       },
-      "status": "available",
+      "status": "hidden",
       "output_sanitizer_profile": "strict"
     },
     {

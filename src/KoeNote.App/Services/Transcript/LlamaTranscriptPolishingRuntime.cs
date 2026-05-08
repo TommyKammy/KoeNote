@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Transcript;
@@ -49,37 +50,19 @@ public sealed class LlamaTranscriptPolishingRuntime(
 
     private static IReadOnlyList<string> BuildArguments(TranscriptPolishingOptions options, string promptPath)
     {
-        var arguments = new List<string>
-        {
-            "--model",
+        return LlamaCompletionArgumentBuilder.Build(new LlamaCompletionArgumentOptions(
             options.ModelPath,
-            "--file",
             promptPath,
-            "--ctx-size",
-            options.ContextSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-gpu-layers",
-            options.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-predict",
-            options.MaxTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--temp",
-            "0.1",
-            "--single-turn",
-            "--no-display-prompt"
-        };
-
-        if (options.Threads is { } threads)
-        {
-            arguments.Add("--threads");
-            arguments.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        if (options.ThreadsBatch is { } threadsBatch)
-        {
-            arguments.Add("--threads-batch");
-            arguments.Add(threadsBatch.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        return arguments;
+            options.ContextSize,
+            options.GpuLayers,
+            options.MaxTokens,
+            options.Temperature,
+            options.Threads,
+            options.ThreadsBatch,
+            options.NoConversation,
+            options.TopP,
+            options.TopK,
+            options.RepeatPenalty));
     }
 
     private static void ValidateInputs(TranscriptPolishingOptions options, TranscriptPolishingChunk chunk)

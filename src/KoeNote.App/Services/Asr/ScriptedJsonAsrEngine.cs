@@ -54,7 +54,12 @@ public sealed class ScriptedJsonAsrEngine(
             ValidateInputs(input, config);
             Directory.CreateDirectory(config.OutputDirectory);
             var arguments = BuildArguments(input, config, options, scriptJsonPath);
-            var processResult = await processRunner.RunAsync(config.RuntimePath, arguments, timeout, cancellationToken);
+            var processResult = await processRunner.RunAsync(
+                config.RuntimePath,
+                arguments,
+                timeout,
+                cancellationToken,
+                BuildProcessEnvironment(config));
             if (processResult.ExitCode != 0)
             {
                 if (!File.Exists(scriptJsonPath))
@@ -147,6 +152,38 @@ public sealed class ScriptedJsonAsrEngine(
         return !value.Contains(Path.DirectorySeparatorChar)
             && !value.Contains(Path.AltDirectorySeparatorChar)
             && !Path.IsPathRooted(value);
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildProcessEnvironment(AsrEngineConfig config)
+    {
+        var pathEntries = new List<string>();
+        var appAsrTools = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
+        if (Directory.Exists(appAsrTools))
+        {
+            pathEntries.Add(appAsrTools);
+        }
+
+        var workerDirectory = Path.GetDirectoryName(config.WorkerPath);
+        if (!string.IsNullOrWhiteSpace(workerDirectory))
+        {
+            var siblingAsrTools = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr"));
+            if (Directory.Exists(siblingAsrTools))
+            {
+                pathEntries.Add(siblingAsrTools);
+            }
+        }
+
+        if (pathEntries.Count == 0)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        var existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var environment = new Dictionary<string, string>();
+        pathEntries.Add(existingPath);
+        environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
+        environment["KOENOTE_ASR_TOOLS_DIR"] = pathEntries[0];
+        return environment;
     }
 
     private static void ValidateInputs(AsrInput input, AsrEngineConfig config)

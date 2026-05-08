@@ -9,6 +9,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $artifactIntegrityScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteArtifactIntegrity.ps1"
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
+$expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
+$expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
 
 if (-not $SkipVersioningTests) {
     dotnet test $testProject --configuration Debug --filter "FullyQualifiedName~VersioningTests" --verbosity minimal
@@ -91,9 +93,7 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
 }
 
 $ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
-if (-not (Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf)) {
-    throw "Ternary review runtime is required but missing from publish output: $ternaryReviewRuntimePath"
-}
+$ternaryReviewRuntimePresent = Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf
 
 if (-not ($manifest.PSObject.Properties.Name -contains "bundled_python_runtime")) {
     throw "Release manifest is missing bundled_python_runtime metadata."
@@ -119,8 +119,20 @@ if (-not ($manifest.PSObject.Properties.Name -contains "ternary_review_runtime")
     throw "Release manifest is missing ternary_review_runtime metadata."
 }
 
-if (-not [bool]$manifest.ternary_review_runtime.required) {
-    throw "Release manifest must mark ternary_review_runtime.required as true."
+if ([bool]$manifest.ternary_review_runtime.required) {
+    throw "Release manifest must mark ternary_review_runtime.required as false because Ternary Bonsai is hidden."
+}
+
+if ([bool]$manifest.ternary_review_runtime.present -ne [bool]$ternaryReviewRuntimePresent) {
+    throw "Release manifest ternary review runtime present flag does not match publish output."
+}
+
+if ($manifest.ternary_review_runtime.tag -ne $expectedTernaryReviewRuntimeTag) {
+    throw "Release manifest ternary review runtime tag does not match. Expected $expectedTernaryReviewRuntimeTag but got $($manifest.ternary_review_runtime.tag)."
+}
+
+if ($manifest.ternary_review_runtime.source_url -ne $expectedTernaryReviewRuntimeSourceUrl) {
+    throw "Release manifest ternary review runtime source_url does not match. Expected $expectedTernaryReviewRuntimeSourceUrl but got $($manifest.ternary_review_runtime.source_url)."
 }
 
 if ($manifest.review_runtime.path -ne $reviewRuntimePath) {

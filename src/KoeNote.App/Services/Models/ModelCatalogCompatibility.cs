@@ -5,7 +5,8 @@ public static class ModelCatalogCompatibility
     private static readonly string[] UnsupportedStatuses =
     [
         "unsupported",
-        "runtime-unsupported"
+        "runtime-unsupported",
+        "hidden"
     ];
 
     public static bool IsSelectable(ModelCatalogItem model)

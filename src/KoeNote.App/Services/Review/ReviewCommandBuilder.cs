@@ -1,3 +1,5 @@
+using KoeNote.App.Services.Llm;
+
 namespace KoeNote.App.Services.Review;
 
 public sealed class ReviewCommandBuilder
@@ -9,43 +11,20 @@ public sealed class ReviewCommandBuilder
 
     public IReadOnlyList<string> BuildArgumentList(ReviewRunOptions options, string promptFilePath, string? jsonSchemaFilePath = null)
     {
-        var arguments = new List<string>
-        {
-            "--model",
+        return LlamaCompletionArgumentBuilder.Build(new LlamaCompletionArgumentOptions(
             options.ModelPath,
-            "--file",
             promptFilePath,
-            "--ctx-size",
-            options.ContextSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-gpu-layers",
-            options.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-predict",
-            options.MaxTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--temp",
-            "0.1",
-            "--single-turn",
-            "--no-display-prompt"
-        };
-
-        if (options.Threads is { } threads)
-        {
-            arguments.Add("--threads");
-            arguments.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        if (options.ThreadsBatch is { } threadsBatch)
-        {
-            arguments.Add("--threads-batch");
-            arguments.Add(threadsBatch.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        if (!string.IsNullOrWhiteSpace(jsonSchemaFilePath))
-        {
-            arguments.Add("--json-schema-file");
-            arguments.Add(jsonSchemaFilePath);
-        }
-
-        return arguments;
+            options.ContextSize,
+            options.GpuLayers,
+            options.MaxTokens,
+            options.Temperature,
+            options.Threads,
+            options.ThreadsBatch,
+            options.NoConversation,
+            options.TopP,
+            options.TopK,
+            options.RepeatPenalty,
+            jsonSchemaFilePath));
     }
 
     private static string QuoteForDisplay(string value)

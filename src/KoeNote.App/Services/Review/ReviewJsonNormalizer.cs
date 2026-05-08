@@ -33,8 +33,8 @@ public sealed class ReviewJsonNormalizer
                     continue;
                 }
 
-                var originalText = ReadString(element, "original_text", "originalText", "original")?.Trim();
-                var suggestedText = ReadString(element, "suggested_text", "suggestedText", "suggestion")?.Trim();
+                var originalText = NormalizeCandidateText(ReadString(element, "original_text", "originalText", "original"));
+                var suggestedText = NormalizeCandidateText(ReadString(element, "suggested_text", "suggestedText", "suggestion"));
                 var issueType = ReadString(element, "issue_type", "issueType", "type")?.Trim();
                 var reason = ReadString(element, "reason")?.Trim();
                 var confidence = ReadDouble(element, "confidence") ?? 0;
@@ -99,6 +99,17 @@ public sealed class ReviewJsonNormalizer
     {
         var sourceText = segment.NormalizedText ?? segment.RawText;
         return sourceText.Contains(originalText, StringComparison.Ordinal);
+    }
+
+    private static string? NormalizeCandidateText(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        return text.TrimEnd('[', ']', '「', '『', '（', '(', ' ', '\t', '\r', '\n').Trim();
     }
 
     private static bool LooksLikeUnsupportedAddition(string originalText, string suggestedText)

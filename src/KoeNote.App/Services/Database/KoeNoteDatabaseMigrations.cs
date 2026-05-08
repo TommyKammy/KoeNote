@@ -19,7 +19,8 @@ internal static class KoeNoteDatabaseMigrations
         new(13, "domain preset speaker alias tracking", ApplyDomainPresetSpeakerAliasTrackingSchema),
         new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema),
         new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema),
-        new(16, "summary stage toggle", ApplySummaryStageToggle)
+        new(16, "summary stage toggle", ApplySummaryStageToggle),
+        new(17, "LLM profile task settings", ApplyLlmProfileTaskSettingsSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -545,6 +546,72 @@ internal static class KoeNoteDatabaseMigrations
             );
             """);
         migration.AddColumnIfMissing("asr_settings", "enable_summary_stage", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void ApplyLlmProfileTaskSettingsSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS llm_profiles (
+                profile_id TEXT NOT NULL PRIMARY KEY,
+                model_id TEXT NOT NULL,
+                model_family TEXT,
+                display_name TEXT NOT NULL,
+                runtime_kind TEXT NOT NULL,
+                runtime_package_id TEXT NOT NULL,
+                model_path TEXT NOT NULL,
+                llama_completion_path TEXT NOT NULL,
+                context_size INTEGER NOT NULL,
+                gpu_layers INTEGER NOT NULL,
+                threads INTEGER,
+                threads_batch INTEGER,
+                no_conversation INTEGER NOT NULL DEFAULT 1,
+                output_sanitizer_profile TEXT NOT NULL,
+                timeout_seconds INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_llm_profiles_model
+            ON llm_profiles(model_id);
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_llm_profiles_active
+            ON llm_profiles(is_active, updated_at DESC);
+            """);
+
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS llm_task_settings (
+                settings_id TEXT NOT NULL PRIMARY KEY,
+                profile_id TEXT NOT NULL,
+                task_kind TEXT NOT NULL,
+                prompt_template_id TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                generation_profile TEXT NOT NULL,
+                temperature REAL NOT NULL,
+                top_p REAL,
+                top_k INTEGER,
+                repeat_penalty REAL,
+                max_tokens INTEGER NOT NULL,
+                chunk_segment_count INTEGER NOT NULL,
+                chunk_overlap INTEGER NOT NULL DEFAULT 0,
+                use_json_schema INTEGER NOT NULL DEFAULT 0,
+                enable_repair INTEGER NOT NULL DEFAULT 0,
+                validation_mode TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(profile_id, task_kind)
+            );
+            """);
+
+        migration.Execute("""
+            CREATE INDEX IF NOT EXISTS idx_llm_task_settings_profile
+            ON llm_task_settings(profile_id);
+            """);
     }
 
 }

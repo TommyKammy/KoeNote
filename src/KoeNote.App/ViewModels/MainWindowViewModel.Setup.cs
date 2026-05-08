@@ -2,6 +2,7 @@ using System.IO;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 using Microsoft.Win32;
 
@@ -30,6 +31,7 @@ public sealed partial class MainWindowViewModel
         _setupState = _setupWizardService.UseRecommendedSelections();
         SelectedAsrEngineId = _setupState.SelectedAsrModelId ?? SelectedAsrEngineId;
         RefreshSetupWizard();
+        RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
         LatestLog = "Recommended setup choices selected. Review ASR and LLM choices, then accept licenses.";
         return Task.CompletedTask;
     }
@@ -45,6 +47,7 @@ public sealed partial class MainWindowViewModel
             }
 
             RefreshSetupWizard();
+            RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
             LatestLog = $"Setup model preset selected: {presetId}";
         }
         catch (InvalidOperationException ex)
@@ -166,6 +169,23 @@ public sealed partial class MainWindowViewModel
                 }
 
                 SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
+                LatestLog = runtimeResult.Message;
+            }
+
+            if (!SetupTernaryReviewRuntimeReady)
+            {
+                ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
+                IsModelDownloadProgressIndeterminate = true;
+                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync();
+                RefreshSetupWizard();
+                if (!runtimeResult.IsSucceeded)
+                {
+                    var message = BuildTernaryReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    LatestLog = message;
+                    return;
+                }
+
                 LatestLog = runtimeResult.Message;
             }
 
@@ -362,6 +382,11 @@ public sealed partial class MainWindowViewModel
             }
 
             RefreshSetupWizard();
+            if (role.Equals("review", StringComparison.OrdinalIgnoreCase))
+            {
+                RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+            }
+
             LatestLog = $"Setup {role} model selected: {modelId}";
         }
         catch (InvalidOperationException ex)
@@ -439,6 +464,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupModelsReady));
         OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+        OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
         OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
@@ -553,6 +579,20 @@ public sealed partial class MainWindowViewModel
                 $"KoeNote found Python, but pip could not install faster-whisper. Details: {message}",
             FasterWhisperRuntimeService.FailureCategoryPackageCheckFailed =>
                 $"faster-whisper was installed, but KoeNote could not verify the package. Details: {message}",
+            _ => message
+        };
+    }
+
+    private static string BuildTernaryReviewRuntimeSetupFailureMessage(string message, string failureCategory)
+    {
+        return failureCategory switch
+        {
+            TernaryReviewRuntimeService.FailureCategoryNetworkUnavailable =>
+                $"Ternary review runtime could not be downloaded. Check the network connection or proxy settings, then retry. Details: {message}",
+            TernaryReviewRuntimeService.FailureCategoryArchiveInvalid =>
+                $"Ternary review runtime was downloaded, but the archive was not usable. Details: {message}",
+            TernaryReviewRuntimeService.FailureCategoryInstallFailed =>
+                $"Ternary review runtime could not be installed under tools\\review-ternary. Details: {message}",
             _ => message
         };
     }

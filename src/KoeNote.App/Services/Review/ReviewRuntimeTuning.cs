@@ -18,7 +18,7 @@ public static class ReviewRuntimeTuningProfiles
     {
         return IsTernaryModel(modelId)
             ? new ReviewRuntimeTuning(
-                TimeSpan.FromMinutes(4),
+                TimeSpan.FromMinutes(20),
                 ContextSize: 1024,
                 GpuLayers: 0,
                 MaxTokens: 192,

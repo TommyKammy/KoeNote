@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Setup;
 
@@ -9,6 +10,7 @@ internal sealed class SetupReadinessService(
     AppPaths paths,
     SetupStateService stateService,
     ToolStatusService toolStatusService,
+    ModelCatalogService modelCatalogService,
     InstalledModelRepository installedModelRepository)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -29,6 +31,7 @@ internal sealed class SetupReadinessService(
             EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
             AsrModelReady: IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
             ReviewModelReady: IsSelectedModelReady(state.SelectedReviewModelId, "review"),
+            ReviewRuntimeReady: IsSelectedReviewRuntimeReady(state.SelectedReviewModelId),
             StorageReady: Directory.Exists(state.StorageRoot ?? paths.DefaultModelStorageRoot));
     }
 
@@ -87,16 +90,7 @@ internal sealed class SetupReadinessService(
     public SetupState CompleteIfReady()
     {
         var state = stateService.Load();
-        var checks = BuildSmokeChecks(state);
-        var smokeSucceeded = checks.All(static check => check.IsOk);
-        var selectedModels = GetSelectedInstalledModels(state)
-            .Where(static model => model.Verified && (File.Exists(model.FilePath) || Directory.Exists(model.FilePath)))
-            .ToArray();
-        var ready = state.LicenseAccepted &&
-            smokeSucceeded &&
-            selectedModels.Any(model => model.Role.Equals("asr", StringComparison.OrdinalIgnoreCase)) &&
-            selectedModels.Any(model => model.Role.Equals("review", StringComparison.OrdinalIgnoreCase));
-
+        var ready = IsCompleteStateReady(state, out var checks, out var smokeSucceeded);
         var updated = stateService.Save(state with
         {
             CurrentStep = ready ? SetupStep.Complete : SetupStep.SmokeTest,
@@ -105,6 +99,39 @@ internal sealed class SetupReadinessService(
         });
         WriteReport(updated, checks);
         return updated;
+    }
+
+    public bool IsCompleteStateReady(SetupState state)
+    {
+        return IsCompleteStateReady(state, out _, out _);
+    }
+
+    public bool IsSelectedTernaryReviewRuntimeMissing(SetupState state)
+    {
+        if (string.IsNullOrWhiteSpace(state.SelectedReviewModelId))
+        {
+            return false;
+        }
+
+        var runtimePath = GetSelectedReviewRuntimePath(state.SelectedReviewModelId);
+        return string.Equals(runtimePath, paths.TernaryLlamaCompletionPath, StringComparison.OrdinalIgnoreCase) &&
+            !File.Exists(runtimePath);
+    }
+
+    private bool IsCompleteStateReady(
+        SetupState state,
+        out IReadOnlyList<SetupSmokeCheck> checks,
+        out bool smokeSucceeded)
+    {
+        checks = BuildSmokeChecks(state);
+        smokeSucceeded = checks.All(static check => check.IsOk);
+        var selectedModels = GetSelectedInstalledModels(state)
+            .Where(static model => model.Verified && (File.Exists(model.FilePath) || Directory.Exists(model.FilePath)))
+            .ToArray();
+        return state.LicenseAccepted &&
+            smokeSucceeded &&
+            selectedModels.Any(model => model.Role.Equals("asr", StringComparison.OrdinalIgnoreCase)) &&
+            selectedModels.Any(model => model.Role.Equals("review", StringComparison.OrdinalIgnoreCase));
     }
 
     private SetupSmokeCheck CheckFile(string name, string path)
@@ -121,9 +148,17 @@ internal sealed class SetupReadinessService(
             new("faster-whisper runtime", FasterWhisperRuntimeLayout.HasPackage(paths), FasterWhisperRuntimeLayout.HasPackage(paths) ? paths.AsrPythonEnvironment : $"Not installed: {paths.AsrPythonEnvironment}"),
             CheckSelectedModel("ASR model", state.SelectedAsrModelId),
             CheckSelectedModel("Review LLM model", state.SelectedReviewModelId),
+            CheckSelectedReviewRuntime(state.SelectedReviewModelId),
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+    }
+
+    private SetupSmokeCheck CheckSelectedReviewRuntime(string? modelId)
+    {
+        var runtimePath = GetSelectedReviewRuntimePath(modelId);
+        var exists = File.Exists(runtimePath);
+        return new SetupSmokeCheck("Review LLM runtime", exists, exists ? runtimePath : $"Missing: {runtimePath}");
     }
 
     private SetupSmokeCheck CheckSelectedModel(string name, string? modelId)
@@ -156,6 +191,26 @@ internal sealed class SetupReadinessService(
             installed.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+    }
+
+    private bool IsSelectedReviewRuntimeReady(string? modelId)
+    {
+        return File.Exists(GetSelectedReviewRuntimePath(modelId));
+    }
+
+    private string GetSelectedReviewRuntimePath(string? modelId)
+    {
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var effectiveModelId = !string.IsNullOrWhiteSpace(modelId)
+            ? modelId
+            : catalog.Presets?.FirstOrDefault(preset =>
+                string.Equals(preset.PresetId, "recommended", StringComparison.OrdinalIgnoreCase))?.ReviewModelId;
+        if (string.IsNullOrWhiteSpace(effectiveModelId))
+        {
+            return paths.LlamaCompletionPath;
+        }
+
+        return ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, effectiveModelId);
     }
 
     private void WriteReport(SetupState state, IReadOnlyList<SetupSmokeCheck> checks)

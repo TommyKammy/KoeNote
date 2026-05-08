@@ -51,4 +51,4 @@ foreach ($pattern in $forbiddenModelPatterns) {
 }
 
 Write-Host "Core UI smoke install check passed: $installDirFull"
-Write-Host "Manual UI checklist: docs\phase10\UI_SMOKE.md"
+Write-Host "Manual UI checklist: docs\development\core-ui-smoke.md"

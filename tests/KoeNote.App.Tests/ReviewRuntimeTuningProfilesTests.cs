@@ -9,7 +9,7 @@ public sealed class ReviewRuntimeTuningProfilesTests
     {
         var tuning = ReviewRuntimeTuningProfiles.ForReviewModel("ternary-bonsai-8b-q2-0");
 
-        Assert.Equal(TimeSpan.FromMinutes(4), tuning.Timeout);
+        Assert.Equal(TimeSpan.FromMinutes(20), tuning.Timeout);
         Assert.Equal(1024, tuning.ContextSize);
         Assert.Equal(0, tuning.GpuLayers);
         Assert.Equal(192, tuning.MaxTokens);

@@ -14,8 +14,17 @@ public sealed record TranscriptSummaryOptions(
     int ContextSize = 8192,
     int GpuLayers = 999,
     int MaxTokens = 1024,
+    double Temperature = 0.1,
+    double? TopP = null,
+    int? TopK = null,
+    double? RepeatPenalty = null,
+    bool NoConversation = true,
     int? Threads = null,
-    int? ThreadsBatch = null);
+    int? ThreadsBatch = null,
+    string PromptTemplateId = "default",
+    string ValidationMode = "markdown_non_empty",
+    int MaxAttempts = 2,
+    int Attempt = 1);
 
 public sealed record TranscriptSummaryChunk(
     int ChunkIndex,

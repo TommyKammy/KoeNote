@@ -251,7 +251,7 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
-    public async Task RunReviewAndSummaryAsync_SkipsSummaryWhenManualReviewIsPending()
+    public async Task RunReviewAndSummaryAsync_RunsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();
         var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
@@ -268,13 +268,12 @@ public sealed class JobRunCoordinatorTests
             _ => { },
             CancellationToken.None);
 
-        Assert.False(summaryStageRunner.RunWasCalled);
-        Assert.True(summaryStageRunner.SkipWasCalled);
-        Assert.Equal("manual_review_pending", summaryStageRunner.SkipReason);
+        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
     }
 
     [Fact]
-    public async Task RunAsync_SkipsSummaryWhenManualReviewIsPending()
+    public async Task RunAsync_RunsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();
         var asrStageRunner = new AsrStageRunnerStub([new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text")]);
@@ -293,9 +292,8 @@ public sealed class JobRunCoordinatorTests
             CancellationToken.None);
 
         Assert.True(reviewStageRunner.RunWasCalled);
-        Assert.False(summaryStageRunner.RunWasCalled);
-        Assert.True(summaryStageRunner.SkipWasCalled);
-        Assert.Equal("manual_review_pending", summaryStageRunner.SkipReason);
+        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
         Assert.Equal(2, job.UnreviewedDrafts);
     }
 

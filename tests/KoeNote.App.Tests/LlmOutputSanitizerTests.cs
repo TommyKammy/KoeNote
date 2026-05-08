@@ -113,4 +113,14 @@ public sealed class LlmOutputSanitizerTests
 
         Assert.Equal(LlmOutputSanitizerProfiles.Strict, profile);
     }
+
+    [Fact]
+    public void SanitizeMarkdown_StripsStandaloneEndOfTextMarker()
+    {
+        var sanitized = LlmOutputSanitizer.SanitizeMarkdown(
+            "## Overview\n\n- Summary. [end of text]",
+            LlmOutputSanitizerProfiles.None);
+
+        Assert.Equal("## Overview\n\n- Summary.", sanitized.Replace("\r\n", "\n", StringComparison.Ordinal));
+    }
 }

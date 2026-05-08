@@ -58,7 +58,7 @@ internal static class SetupStepBuilder
             SetupStep.ReviewModel => readiness.ReviewModelReady,
             SetupStep.Storage => readiness.StorageReady,
             SetupStep.License => state.LicenseAccepted,
-            SetupStep.Install => readiness.AsrModelReady && readiness.ReviewModelReady,
+            SetupStep.Install => readiness.AsrModelReady && readiness.ReviewModelReady && readiness.ReviewRuntimeReady,
             SetupStep.SmokeTest => state.LastSmokeSucceeded,
             SetupStep.Complete => state.IsCompleted,
             _ => false
@@ -70,4 +70,5 @@ internal sealed record SetupStepReadiness(
     bool EnvironmentReady,
     bool AsrModelReady,
     bool ReviewModelReady,
+    bool ReviewRuntimeReady,
     bool StorageReady);

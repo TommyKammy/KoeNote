@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
 
@@ -23,8 +24,17 @@ public sealed class LlamaTranscriptSummaryRuntime(
         }
 
         Directory.CreateDirectory(options.OutputDirectory);
-        var prompt = promptBuilder.BuildChunkPrompt(chunk, options.ModelId, LoadDomainContext(options.ModelId, chunk.Content));
-        var promptPath = Path.Combine(options.OutputDirectory, $"summary.chunk-{chunk.ChunkIndex:D3}.prompt.txt");
+        var prompt = promptBuilder.BuildChunkPrompt(
+            chunk,
+            options.ModelId,
+            LoadDomainContext(options.ModelId, chunk.Content),
+            options.PromptTemplateId,
+            options.Attempt);
+        var promptPath = Path.Combine(
+            options.OutputDirectory,
+            options.Attempt <= 1
+                ? $"summary.chunk-{chunk.ChunkIndex:D3}.prompt.txt"
+                : $"summary.chunk-{chunk.ChunkIndex:D3}.retry-{options.Attempt:D3}.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
         var start = DateTimeOffset.UtcNow;
@@ -60,8 +70,12 @@ public sealed class LlamaTranscriptSummaryRuntime(
         var prompt = promptBuilder.BuildFinalPrompt(
             chunkResults,
             options.ModelId,
-            LoadDomainContext(options.ModelId, BuildFinalSummarySourceText(chunkResults)));
-        var promptPath = Path.Combine(options.OutputDirectory, "summary.final.prompt.txt");
+            LoadDomainContext(options.ModelId, BuildFinalSummarySourceText(chunkResults)),
+            options.PromptTemplateId,
+            options.Attempt);
+        var promptPath = Path.Combine(
+            options.OutputDirectory,
+            options.Attempt <= 1 ? "summary.final.prompt.txt" : $"summary.final.retry-{options.Attempt:D3}.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
         var result = await RunAsync(options, promptPath, cancellationToken);
@@ -126,37 +140,19 @@ public sealed class LlamaTranscriptSummaryRuntime(
 
     private static IReadOnlyList<string> BuildArguments(TranscriptSummaryOptions options, string promptPath)
     {
-        var arguments = new List<string>
-        {
-            "--model",
+        return LlamaCompletionArgumentBuilder.Build(new LlamaCompletionArgumentOptions(
             options.ModelPath,
-            "--file",
             promptPath,
-            "--ctx-size",
-            options.ContextSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-gpu-layers",
-            options.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--n-predict",
-            options.MaxTokens.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--temp",
-            "0.1",
-            "--single-turn",
-            "--no-display-prompt"
-        };
-
-        if (options.Threads is { } threads)
-        {
-            arguments.Add("--threads");
-            arguments.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        if (options.ThreadsBatch is { } threadsBatch)
-        {
-            arguments.Add("--threads-batch");
-            arguments.Add(threadsBatch.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        return arguments;
+            options.ContextSize,
+            options.GpuLayers,
+            options.MaxTokens,
+            options.Temperature,
+            options.Threads,
+            options.ThreadsBatch,
+            options.NoConversation,
+            options.TopP,
+            options.TopK,
+            options.RepeatPenalty));
     }
 
     private static void ValidateInputs(TranscriptSummaryOptions options)

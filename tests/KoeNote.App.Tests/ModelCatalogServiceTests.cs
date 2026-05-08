@@ -26,7 +26,9 @@ public sealed class ModelCatalogServiceTests
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported && entry.CatalogItem.Status == "available");
         Assert.Contains(entries, entry => entry.ModelId == "gemma-4-e4b-it-q4-k-m" && entry.Role == "review" && entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
-        Assert.Contains(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0" && entry.Role == "review" && entry.CatalogItem.Runtime.PackageId == "runtime-llama-cpp-ternary");
+        Assert.DoesNotContain(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        Assert.Contains(catalog.Models, model => model.ModelId == "ternary-bonsai-8b-q2-0" && model.Status == "hidden");
     }
 
     [Fact]

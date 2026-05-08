@@ -40,15 +40,6 @@ public sealed class JobRunCoordinator(
                 return;
             }
 
-            if (job.UnreviewedDrafts > 0)
-            {
-                if (asrSettings.EnableSummaryStage)
-                {
-                    summaryStageRunner.Skip(job, report, "manual_review_pending");
-                }
-
-                return;
-            }
         }
         else
         {
@@ -95,12 +86,6 @@ public sealed class JobRunCoordinator(
                 summaryStageRunner.Skip(job, report, "review_not_succeeded");
             }
 
-            return;
-        }
-
-        if (job.UnreviewedDrafts > 0)
-        {
-            summaryStageRunner.Skip(job, report, "manual_review_pending");
             return;
         }
 

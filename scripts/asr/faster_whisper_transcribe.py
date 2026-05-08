@@ -16,6 +16,28 @@ except AttributeError:
     pass
 
 
+def add_windows_dll_directories() -> None:
+    if os.name != "nt" or not hasattr(os, "add_dll_directory"):
+        return
+
+    candidates = []
+    configured = os.environ.get("KOENOTE_ASR_TOOLS_DIR")
+    if configured:
+        candidates.append(configured)
+
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr")))
+
+    for candidate in candidates:
+        if not os.path.isdir(candidate):
+            continue
+
+        try:
+            os.add_dll_directory(candidate)
+        except OSError:
+            continue
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--audio", required=True)
@@ -100,6 +122,8 @@ def assign_speaker(start: float, end: float, diarization_turns: list[dict[str, o
 
 def main() -> int:
     args = parse_args()
+
+    add_windows_dll_directories()
 
     try:
         from faster_whisper import WhisperModel

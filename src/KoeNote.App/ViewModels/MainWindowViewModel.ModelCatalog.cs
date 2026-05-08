@@ -304,6 +304,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SummaryStageAssetsReady));
         OnPropertyChanged(nameof(AsrModel));
         OnPropertyChanged(nameof(ReviewModel));
+        RefreshLlmSettingsDisplay();
         OnPropertyChanged(nameof(CanRunSelectedJob));
         OnPropertyChanged(nameof(RunPreflightSummary));
         OnPropertyChanged(nameof(RunPreflightDetail));
@@ -328,7 +329,16 @@ public sealed partial class MainWindowViewModel
 
     private ModelCatalogEntry? FindInstalledCatalogEntry(string role, Func<ModelCatalogEntry, bool> predicate)
     {
-        return ModelCatalogEntries.FirstOrDefault(entry =>
+        return FindInstalledCatalogEntry(ModelCatalogEntries, role, predicate) ??
+            FindInstalledCatalogEntry(_modelCatalogService.ListEntries(), role, predicate);
+    }
+
+    private static ModelCatalogEntry? FindInstalledCatalogEntry(
+        IEnumerable<ModelCatalogEntry> entries,
+        string role,
+        Func<ModelCatalogEntry, bool> predicate)
+    {
+        return entries.FirstOrDefault(entry =>
             entry.IsInstalled &&
             entry.IsVerified &&
             entry.InstalledModel is { } installed &&

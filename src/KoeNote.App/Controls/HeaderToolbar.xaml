@@ -192,10 +192,16 @@
                            ToolTip="{Binding AsrModel}"
                            Margin="0,0,12,0" />
                 <TextBlock Text="整文" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
-                <TextBlock Text="{Binding ReviewModel}"
+                <TextBlock Text="{Binding HeaderReviewModel}"
                            Style="{StaticResource HeaderInfoValue}"
                            MaxWidth="96"
-                           ToolTip="{Binding ReviewModel}" />
+                           ToolTip="{Binding LlmReviewTaskSummary}"
+                           Margin="0,0,12,0" />
+                <TextBlock Text="要約" Style="{StaticResource HeaderInfoLabel}" Margin="0,0,4,0" />
+                <TextBlock Text="{Binding HeaderSummaryModel}"
+                           Style="{StaticResource HeaderInfoValue}"
+                           MaxWidth="96"
+                           ToolTip="{Binding LlmSummaryTaskSummary}" />
             </StackPanel>
 
             <StackPanel Grid.Column="3"

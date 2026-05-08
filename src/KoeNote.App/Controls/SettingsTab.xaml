@@ -51,6 +51,30 @@
                                   MinHeight="32"
                                   ToolTip="{Binding SelectedSetupReviewModel.SetupDisplayName}"
                                   TextSearch.TextPath="SetupDisplayName" />
+
+                        <TextBlock Text="Active LLM profile" Style="{StaticResource SettingsFieldLabel}" Margin="0,12,0,4" />
+                        <TextBlock Text="{Binding LlmActiveProfileSummary}"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Margin="0,0,0,8" />
+
+                        <Expander Header="Task settings"
+                                  IsExpanded="False"
+                                  Style="{StaticResource CompactEditExpander}">
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock Text="{Binding LlmReviewTaskSummary}"
+                                           TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding LlmSummaryTaskSummary}"
+                                           TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding LlmPolishingTaskSummary}"
+                                           TextWrapping="Wrap"
+                                           FontSize="12" />
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
                 </Border>
 

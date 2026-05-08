@@ -55,7 +55,8 @@ public sealed class ReviewCommandBuilderTests
         Assert.Contains("4096", arguments);
         Assert.Contains("--n-gpu-layers", arguments);
         Assert.Contains("999", arguments);
-        Assert.Contains("--single-turn", arguments);
+        Assert.Contains("--no-conversation", arguments);
+        Assert.DoesNotContain("--single-turn", arguments);
         Assert.Contains("--no-display-prompt", arguments);
         Assert.Contains("--json-schema-file", arguments);
         Assert.Contains(@"C:\out\review.schema.json", arguments);
@@ -73,6 +74,10 @@ public sealed class ReviewCommandBuilderTests
             ContextSize: 1024,
             GpuLayers: 0,
             MaxTokens: 192,
+            Temperature: 0.2,
+            TopP: 0.9,
+            TopK: 40,
+            RepeatPenalty: 1.1,
             Threads: 8,
             ThreadsBatch: 8,
             UseJsonSchema: false);
@@ -84,6 +89,13 @@ public sealed class ReviewCommandBuilderTests
 
         Assert.Contains("1024", arguments);
         Assert.Contains("192", arguments);
+        Assert.Contains("0.2", arguments);
+        Assert.Contains("--top-p", arguments);
+        Assert.Contains("0.9", arguments);
+        Assert.Contains("--top-k", arguments);
+        Assert.Contains("40", arguments);
+        Assert.Contains("--repeat-penalty", arguments);
+        Assert.Contains("1.1", arguments);
         Assert.Contains("--threads", arguments);
         Assert.Contains("8", arguments);
         Assert.Contains("--threads-batch", arguments);

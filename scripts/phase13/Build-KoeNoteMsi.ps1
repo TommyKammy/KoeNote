@@ -27,6 +27,8 @@ $installerProject = Join-Path $repoRoot "src\KoeNote.Installer\KoeNote.Installer
 $publishDir = Join-Path $repoRoot "artifacts\publish\KoeNote-$RuntimeIdentifier"
 $generatedWxs = Join-Path $repoRoot "src\KoeNote.Installer\PayloadFiles.wxs"
 $installerOut = Join-Path $repoRoot "artifacts\msi"
+$ternaryReviewRuntimeTag = "prism-b8846-d104cf1"
+$ternaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$ternaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
 $updateLogDir = Join-Path $repoRoot "artifacts\logs\updates"
 New-Item -ItemType Directory -Force -Path $updateLogDir | Out-Null
 $updateLogPath = Join-Path $updateLogDir "release-build-$([DateTimeOffset]::Now.ToString('yyyyMMdd-HHmmss')).jsonl"
@@ -166,10 +168,13 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
 Write-UpdateLog "review_runtime_verified" @{ path = $reviewRuntimePath }
 
 $ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
-if (-not (Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf)) {
-    throw "Ternary review runtime is required for release MSI builds but was not published: $ternaryReviewRuntimePath"
+$ternaryReviewRuntimePresent = Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf
+if ($ternaryReviewRuntimePresent) {
+    Write-UpdateLog "ternary_review_runtime_verified" @{ path = $ternaryReviewRuntimePath; required = $false }
 }
-Write-UpdateLog "ternary_review_runtime_verified" @{ path = $ternaryReviewRuntimePath }
+else {
+    Write-UpdateLog "ternary_review_runtime_skipped" @{ path = $ternaryReviewRuntimePath; required = $false; reason = "Ternary Bonsai is hidden and not shipped by default." }
+}
 
 dotnet publish $cleanupProject `
     -c $Configuration `
@@ -261,7 +266,10 @@ $manifest = [ordered]@{
         path = $reviewRuntimePath
     }
     ternary_review_runtime = [ordered]@{
-        required = $true
+        required = $false
+        present = [bool]$ternaryReviewRuntimePresent
+        tag = $ternaryReviewRuntimeTag
+        source_url = $ternaryReviewRuntimeSourceUrl
         path = $ternaryReviewRuntimePath
     }
     sha256 = $hash.Hash.ToLowerInvariant()

@@ -34,6 +34,8 @@ internal sealed class SetupModelSelectionService(
         var reviewModel = PickRecommended("review");
         var state = stateService.Load() with
         {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
             CurrentStep = SetupStep.AsrModel,
             SelectedModelPresetId = null,
             SelectedAsrModelId = asrModel?.ModelId,
@@ -59,6 +61,8 @@ internal sealed class SetupModelSelectionService(
         var current = stateService.Load();
         var state = current with
         {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
             CurrentStep = advanceToModelStep ? SetupStep.AsrModel : current.CurrentStep,
             SetupMode = preset.PresetId,
             SelectedModelPresetId = preset.PresetId,
@@ -81,10 +85,15 @@ internal sealed class SetupModelSelectionService(
             throw new InvalidOperationException($"Model is not in the catalog: {modelId}");
         }
 
+        if (!ModelCatalogCompatibility.IsSelectable(catalogItem))
+        {
+            throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
+        }
+
         var state = stateService.Load();
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
-            ? state with { CurrentStep = SetupStep.AsrModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
-            : state with { CurrentStep = SetupStep.ReviewModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
+            ? state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.AsrModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
+            : state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.ReviewModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
         return stateService.Save(state);
     }
 
@@ -94,6 +103,8 @@ internal sealed class SetupModelSelectionService(
         Directory.CreateDirectory(root);
         return stateService.Save(stateService.Load() with
         {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
             CurrentStep = SetupStep.Storage,
             StorageRoot = root
         });
@@ -169,9 +180,19 @@ internal sealed class SetupModelSelectionService(
             ? presetModelId
             : PickRecommended(role)?.ModelId;
 
+        var repairedState = selectedModel is null
+            ? state
+            : state with
+            {
+                IsCompleted = false,
+                LastSmokeSucceeded = false,
+                CurrentStep = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+                    ? SetupStep.AsrModel
+                    : SetupStep.ReviewModel
+            };
         return role.Equals("asr", StringComparison.OrdinalIgnoreCase)
-            ? state with { SelectedAsrModelId = replacementModelId }
-            : state with { SelectedReviewModelId = replacementModelId };
+            ? repairedState with { SelectedAsrModelId = replacementModelId }
+            : repairedState with { SelectedReviewModelId = replacementModelId };
     }
 
     private static bool IsSelectableCatalogModel(ModelCatalog catalog, string? modelId, string role)

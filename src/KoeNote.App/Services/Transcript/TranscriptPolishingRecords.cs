@@ -14,6 +14,11 @@ public sealed record TranscriptPolishingOptions(
     int ContextSize = 8192,
     int GpuLayers = 999,
     int MaxTokens = 4096,
+    double Temperature = 0.1,
+    double? TopP = null,
+    int? TopK = null,
+    double? RepeatPenalty = null,
+    bool NoConversation = true,
     int? Threads = null,
     int? ThreadsBatch = null);
 

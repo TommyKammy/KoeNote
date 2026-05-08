@@ -1,5 +1,6 @@
 using System.IO;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
@@ -34,27 +35,33 @@ public sealed class ReviewStageRunner(
             var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "review");
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId();
-            var sanitizerProfile = ResolveOutputSanitizerProfile(modelId);
-            var tuning = ReviewRuntimeTuningProfiles.ForReviewModel(modelId);
+            var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Review);
+            jobLogRepository.AddEvent(job.JobId, "review", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             var result = await reviewWorker.RunAsync(new ReviewRunOptions(
                 job.JobId,
-                ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId),
-                ResolveReviewModelPath(modelId),
+                profile.LlamaCompletionPath,
+                profile.ModelPath,
                 outputDirectory,
                 segments,
                 MinConfidence: 0.5,
-                Timeout: tuning.Timeout,
-                ModelId: modelId,
-                OutputSanitizerProfile: sanitizerProfile,
-                ContextSize: tuning.ContextSize,
-                GpuLayers: tuning.GpuLayers,
-                MaxTokens: tuning.MaxTokens,
-                ChunkSegmentCount: tuning.ChunkSegmentCount,
-                Threads: tuning.Threads,
-                ThreadsBatch: tuning.ThreadsBatch,
-                UseJsonSchema: tuning.UseJsonSchema,
-                EnableRepair: tuning.EnableRepair,
-                PromptProfile: tuning.PromptProfile),
+                Timeout: profile.Timeout,
+                ModelId: profile.ModelId,
+                OutputSanitizerProfile: profile.OutputSanitizerProfile,
+                ContextSize: profile.ContextSize,
+                GpuLayers: profile.GpuLayers,
+                MaxTokens: taskSettings.MaxTokens,
+                ChunkSegmentCount: taskSettings.ChunkSegmentCount,
+                Temperature: taskSettings.Temperature,
+                TopP: taskSettings.TopP,
+                TopK: taskSettings.TopK,
+                RepeatPenalty: taskSettings.RepeatPenalty,
+                NoConversation: profile.NoConversation,
+                Threads: profile.Threads,
+                ThreadsBatch: profile.ThreadsBatch,
+                UseJsonSchema: taskSettings.UseJsonSchema,
+                EnableRepair: taskSettings.EnableRepair,
+                PromptProfile: taskSettings.PromptTemplateId),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
@@ -159,18 +166,6 @@ public sealed class ReviewStageRunner(
             ClearReviewPreview: true));
     }
 
-    private string ResolveModelPath(string modelId, string fallbackPath)
-    {
-        var installed = installedModelRepository.FindInstalledModel(modelId);
-        if (installed is not null &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
-        {
-            return installed.FilePath;
-        }
-
-        return fallbackPath;
-    }
-
     private string ResolveReviewModelId()
     {
         var state = setupStateService.Load();
@@ -188,33 +183,6 @@ public sealed class ReviewStageRunner(
         return IsSelectableReviewModel(catalog, presetReviewModelId)
             ? presetReviewModelId!
             : "llm-jp-4-8b-thinking-q4-k-m";
-    }
-
-    private string ResolveReviewModelPath(string modelId)
-    {
-        if (!string.IsNullOrWhiteSpace(modelId))
-        {
-            var installed = installedModelRepository.FindInstalledModel(modelId);
-            if (installed is not null &&
-                installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-                (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
-            {
-                return installed.FilePath;
-            }
-        }
-
-        return ResolveModelPath("llm-jp-4-8b-thinking-q4-k-m", paths.ReviewModelPath);
-    }
-
-    private string ResolveOutputSanitizerProfile(string modelId)
-    {
-        var catalogProfile = new ModelCatalogService(paths)
-            .LoadBuiltInCatalog()
-            .Models
-            .FirstOrDefault(model => model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase))
-            ?.OutputSanitizerProfile;
-
-        return LlmOutputSanitizerProfiles.ForReviewModel(modelId, catalogProfile);
     }
 
     private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)

@@ -56,7 +56,7 @@ public sealed class SetupWizardServiceTests
             ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base", "whisper-small"],
             asrModels.Select(entry => entry.ModelId).Order(StringComparer.OrdinalIgnoreCase).ToArray());
         Assert.NotEmpty(reviewModels);
-        Assert.Contains(reviewModels, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
+        Assert.DoesNotContain(reviewModels, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class SetupWizardServiceTests
     [Fact]
     public void SetupWizard_SelectModelPreset_AppliesAsrAndReviewModels()
     {
-        var paths = CreatePaths();
+        var paths = CreatePathsWithoutTernaryRuntime();
         var wizard = CreateWizard(paths);
 
         var presets = wizard.GetModelPresets();
@@ -88,6 +88,64 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("lightweight", state.SetupMode);
         Assert.Equal("whisper-small", state.SelectedAsrModelId);
         Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_SelectModel_InvalidatesCompletedSmokeState()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            CurrentStep = SetupStep.Complete,
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_SelectModel_RejectsHiddenTernaryReviewModel()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        var wizard = CreateWizard(paths);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            wizard.SelectModel("review", "ternary-bonsai-8b-q2-0"));
+
+        Assert.Contains("not selectable", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetupWizard_LoadState_RepairsHiddenTernaryReviewSelection()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            CurrentStep = SetupStep.Complete,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "ternary-bonsai-8b-q2-0"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.LoadState();
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
     }
 
     [Fact]
@@ -280,6 +338,41 @@ public sealed class SetupWizardServiceTests
         Assert.True(smoke.IsSucceeded);
         Assert.True(completed.IsCompleted);
         Assert.Equal(SetupStep.Complete, completed.CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_CompleteIfReady_RequiresTernaryRuntimeForTernaryReviewModel()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        var ternaryModelPath = Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0", "Ternary-Bonsai-8B-Q2_0.gguf");
+        Touch(ternaryModelPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "ternary-bonsai-8b-q2-0", "review", "ternary-bonsai", ternaryModelPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "ternary-bonsai-8b-q2-0"
+        });
+        var wizard = CreateWizard(paths);
+
+        var smoke = wizard.RunSmokeCheck();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
+        var runtimeCheck = Assert.Single(smoke.Checks, check => check.Name == "Review LLM runtime");
+        Assert.False(runtimeCheck.IsOk);
+        Assert.Contains(paths.TernaryLlamaCompletionPath, runtimeCheck.Detail, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -478,6 +571,17 @@ public sealed class SetupWizardServiceTests
                 ProgramDataRoot: Path.Combine(root, "program-data"),
                 AppBaseDirectory: AppContext.BaseDirectory,
                 InstallScope: installScope));
+    }
+
+    private static AppPaths CreatePathsWithoutTernaryRuntime()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBase = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBase, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBase, "catalog", "model-catalog.json"));
+        return new AppPaths(root, root, appBase);
     }
 
     private static void UpsertVerified(InstalledModelRepository repository, string modelId, string role, string engineId, string filePath)

@@ -185,8 +185,8 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
 
-        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
-        Assert.Contains("簡易要約", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Overview", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Key points", result.Content, StringComparison.Ordinal);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
         Assert.Equal(TranscriptDerivativeKinds.Summary, derivative.Kind);
@@ -210,12 +210,43 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001"));
 
-        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
-        Assert.Contains("Transcript summary returned empty chunk output.", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Overview", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Key points", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Transcript summary returned empty output.", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("source:", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("segments:", result.Content, StringComparison.OrdinalIgnoreCase);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
         Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
         Assert.Null(derivative.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SummarizeAsync_TimeoutFallbackDoesNotExposeRuntimeDetails()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 9, 13, "Speaker_0", "妊娠期から考える友育て時代の男性育休", "妊娠期から考える友育て時代の男性育休"),
+            new TranscriptSegment("000002", "job-001", 13, 14, "Speaker_0", "子育て", "子育て"),
+            new TranscriptSegment("000003", "job-001", 14, 19, "Speaker_0", "セミナーと題して延べ2万人のパパママのお悩みから分かった", "セミナーと題して延べ2万人のパパママのお悩みから分かった")
+        ]);
+        var service = new TranscriptSummaryService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            new FakeSummaryRuntime(throwTimeout: true));
+
+        var result = await service.SummarizeAsync(CreateOptions("job-001"));
+
+        Assert.Contains("## Overview", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Key points", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- 妊娠期から考える友育て時代の男性育休", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- 明示された決定事項はありません。", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("timed out", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("llama-completion", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Source range", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("source:", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("segments:", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("[000001 /", result.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -258,12 +289,103 @@ public sealed class TranscriptSummaryServiceTests
 
         var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
 
-        Assert.Contains("## 概要", result.Content, StringComparison.Ordinal);
-        Assert.Contains("Transcript summary was unexpectedly short", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Overview", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Key points", result.Content, StringComparison.Ordinal);
         var derivative = derivativeRepository.ReadById(result.DerivativeId);
         Assert.NotNull(derivative);
         Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
         Assert.Null(derivative.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SummarizeAsync_NormalizesUserFacingFinalSummary()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "text one", "text one"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_1", "text two", "text two")
+        ]);
+        var finalSummary =
+            "## Overview\n\n" +
+            "- **Topic overview** (239).\n\n" +
+            "## Key points\n\n" +
+            "- Important point (segment_id: 10).\n" +
+            "- Range point\u301080\u2011101\u3011\n" +
+            "- Action point\uFF08[362]\uFF09\n\n" +
+            "## Decisions\n\n" +
+            "Unspecified\n\n" +
+            "## Action items\n\n" +
+            "Unspecified\n\n" +
+            "## Open questions\n\n" +
+            "Unspecified\n\n" +
+            "## Keywords\n\n" +
+            "Keyword one\u3001Keyword two\u3001Keyword one\u3001Keyword three\u3001Keyword four\u3001Keyword five\u3001" +
+            "Keyword six\u3001Keyword seven\u3001Keyword eight\u3001Keyword nine\u3001Keyword ten\u3001Keyword eleven\u3001Keyword twelve\u3001Keyword thirteen";
+        var service = new TranscriptSummaryService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            new FakeSummaryRuntime(finalSummary: finalSummary));
+
+        var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1) with
+        {
+            ValidationMode = "markdown_summary_sections"
+        });
+
+        Assert.Contains("- Topic overview.", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Important point.", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Range point", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Action point", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Decisions", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Unspecified.", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Keyword one", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Keyword twelve", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("(239)", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("(segment_id: 10)", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u301080", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("[362]", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Keyword thirteen", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("**", result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SummarizeAsync_StructuredFallbackIncludesAllSummarySections()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "parenting teamwork risk", "parenting teamwork risk"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_1", "childcare support planning", "childcare support planning")
+        ]);
+        var runtime = new FakeSummaryRuntime(
+            finalSummary: "   ",
+            chunkSummary: """
+                ## Overview
+
+                - Parenting teamwork risk.
+
+                ## Key points
+
+                - Childcare support planning.
+                - Review support options before returning to work.
+                """);
+        var service = new TranscriptSummaryService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            runtime);
+
+        var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
+
+        Assert.Contains("## Overview", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Key points", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Decisions", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Action items", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Open questions", result.Content, StringComparison.Ordinal);
+        Assert.Contains("## Keywords", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Review support options before returning to work.", result.Content, StringComparison.Ordinal);
+        Assert.Contains("明示された決定事項はありません。", result.Content, StringComparison.Ordinal);
+        Assert.Contains("明示された未解決事項はありません。", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- Parenting", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("source:", result.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("segments:", result.Content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -436,7 +558,8 @@ public sealed class TranscriptSummaryServiceTests
     private sealed class FakeSummaryRuntime(
         string? finalSummary = null,
         string? chunkSummary = null,
-        bool alterReturnedChunk = false) : ITranscriptSummaryRuntime
+        bool alterReturnedChunk = false,
+        bool throwTimeout = false) : ITranscriptSummaryRuntime
     {
         public List<TranscriptSummaryChunk> SeenChunks { get; } = [];
 
@@ -447,6 +570,11 @@ public sealed class TranscriptSummaryServiceTests
             TranscriptSummaryChunk chunk,
             CancellationToken cancellationToken = default)
         {
+            if (throwTimeout)
+            {
+                throw new TimeoutException("C:\\tools\\review-ternary\\llama-completion.exe timed out after 00:04:00.");
+            }
+
             SeenChunks.Add(chunk);
             var returnedChunk = alterReturnedChunk
                 ? chunk with

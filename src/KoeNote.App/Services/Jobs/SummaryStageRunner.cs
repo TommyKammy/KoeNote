@@ -1,5 +1,6 @@
 using System.IO;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
@@ -32,23 +33,33 @@ public sealed class SummaryStageRunner(
         {
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId();
-            var sanitizerProfile = ResolveOutputSanitizerProfile(modelId);
-            var tuning = ReviewRuntimeTuningProfiles.ForReviewModel(modelId);
+            var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Summary);
+            jobLogRepository.AddEvent(job.JobId, "summary", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             var result = await summaryService.SummarizeAsync(new TranscriptSummaryOptions(
                 job.JobId,
-                ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId),
-                ResolveReviewModelPath(modelId),
+                profile.LlamaCompletionPath,
+                profile.ModelPath,
                 Path.Combine(paths.Jobs, job.JobId, "summary"),
-                modelId,
-                "default",
-                ChunkSegmentCount: tuning.ChunkSegmentCount,
-                Timeout: tuning.Timeout,
-                OutputSanitizerProfile: sanitizerProfile,
-                ContextSize: tuning.ContextSize,
-                GpuLayers: tuning.GpuLayers,
-                MaxTokens: ResolveSummaryMaxTokens(tuning),
-                Threads: tuning.Threads,
-                ThreadsBatch: tuning.ThreadsBatch),
+                profile.ModelId,
+                taskSettings.GenerationProfile,
+                taskSettings.PromptVersion,
+                ChunkSegmentCount: taskSettings.ChunkSegmentCount,
+                Timeout: profile.Timeout,
+                OutputSanitizerProfile: profile.OutputSanitizerProfile,
+                ContextSize: profile.ContextSize,
+                GpuLayers: profile.GpuLayers,
+                MaxTokens: taskSettings.MaxTokens,
+                Temperature: taskSettings.Temperature,
+                TopP: taskSettings.TopP,
+                TopK: taskSettings.TopK,
+                RepeatPenalty: taskSettings.RepeatPenalty,
+                NoConversation: profile.NoConversation,
+                Threads: profile.Threads,
+                ThreadsBatch: profile.ThreadsBatch,
+                PromptTemplateId: taskSettings.PromptTemplateId,
+                ValidationMode: taskSettings.ValidationMode,
+                MaxAttempts: ResolveSummaryMaxAttempts(profile.ModelId, profile.ModelFamily)),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
@@ -170,30 +181,6 @@ public sealed class SummaryStageRunner(
             : "llm-jp-4-8b-thinking-q4-k-m";
     }
 
-    private string ResolveReviewModelPath(string modelId)
-    {
-        var installed = installedModelRepository.FindInstalledModel(modelId);
-        if (installed is not null &&
-            installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
-        {
-            return installed.FilePath;
-        }
-
-        return paths.ReviewModelPath;
-    }
-
-    private string ResolveOutputSanitizerProfile(string modelId)
-    {
-        var catalogProfile = new ModelCatalogService(paths)
-            .LoadBuiltInCatalog()
-            .Models
-            .FirstOrDefault(model => model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase))
-            ?.OutputSanitizerProfile;
-
-        return LlmOutputSanitizerProfiles.ForReviewModel(modelId, catalogProfile);
-    }
-
     private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
     {
         return !string.IsNullOrWhiteSpace(modelId) &&
@@ -203,13 +190,11 @@ public sealed class SummaryStageRunner(
                 ModelCatalogCompatibility.IsSelectable(model));
     }
 
-    private static int ResolveSummaryMaxTokens(ReviewRuntimeTuning tuning)
+    private static int ResolveSummaryMaxAttempts(string modelId, string? modelFamily)
     {
-        if (tuning.MaxTokens <= 0)
-        {
-            return 1024;
-        }
-
-        return Math.Clamp(tuning.MaxTokens, 512, 768);
+        return modelId.Contains("bonsai", StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(modelFamily) && modelFamily.Contains("bonsai", StringComparison.OrdinalIgnoreCase))
+            ? 3
+            : 2;
     }
 }

@@ -84,6 +84,32 @@ public sealed class ReviewJsonNormalizerTests
     }
 
     [Fact]
+    public void Normalize_TrimsTrailingGenerationArtifactsBeforeSourceMatch()
+    {
+        var segments = new[]
+        {
+            new TranscriptSegment("319", "job-001", 0, 1, "Speaker_0", "コミュニケーションを取ることが大切です")
+        };
+        const string rawJson = """
+            [
+              {
+                "segment_id": "319",
+                "issue_type": "文脈上の不自然さ",
+                "original_text": "コミュニケーションを取ることが[",
+                "suggested_text": "コミュニケーションを取ることが大切です。",
+                "reason": "文末が途切れているため。",
+                "confidence": 0.75
+              }
+            ]
+            """;
+
+        var drafts = new ReviewJsonNormalizer().Normalize("job-001", segments, rawJson, minConfidence: 0.5);
+
+        var draft = Assert.Single(drafts);
+        Assert.Equal("コミュニケーションを取ることが", draft.OriginalText);
+    }
+
+    [Fact]
     public void Normalize_DropsNoOpSingleObjectDraft()
     {
         var segments = new[]

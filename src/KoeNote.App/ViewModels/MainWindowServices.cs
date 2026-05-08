@@ -4,6 +4,7 @@ using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
@@ -45,7 +46,9 @@ public sealed record MainWindowServices(
     IUpdateDownloadService UpdateDownloadService,
     IUpdateInstallerLauncher UpdateInstallerLauncher,
     IUpdateHistoryService UpdateHistoryService,
-    DomainPresetImportService DomainPresetImportService)
+    DomainPresetImportService DomainPresetImportService,
+    LlmSettingsSeedService LlmSettingsSeedService,
+    LlmSettingsDisplayService LlmSettingsDisplayService)
 {
     public static MainWindowServices Create(AppPaths paths)
     {
@@ -55,6 +58,14 @@ public sealed record MainWindowServices(
         var repositories = MainWindowRepositoryComposition.Create(paths);
         var runtime = MainWindowRuntimeComposition.Create(paths);
         var model = MainWindowModelComposition.Create(paths);
+        var llmSettingsRepository = new LlmSettingsRepository(paths);
+        var llmSettingsSeedService = new LlmSettingsSeedService(
+            paths,
+            model.ModelCatalogService,
+            model.InstalledModelRepository,
+            new SetupStateService(paths),
+            llmSettingsRepository);
+        llmSettingsSeedService.EnsureActiveProfileFromSetup();
         var review = MainWindowReviewComposition.Create(paths);
         var setupWizardService = MainWindowSetupComposition.Create(paths, runtime, model);
         var workers = MainWindowWorkerComposition.Create(
@@ -107,6 +118,8 @@ public sealed record MainWindowServices(
             runtime.UpdateDownloadService,
             runtime.UpdateInstallerLauncher,
             runtime.UpdateHistoryService,
-            new DomainPresetImportService(paths, repositories.AsrSettingsRepository));
+            new DomainPresetImportService(paths, repositories.AsrSettingsRepository),
+            llmSettingsSeedService,
+            new LlmSettingsDisplayService(llmSettingsRepository));
     }
 }

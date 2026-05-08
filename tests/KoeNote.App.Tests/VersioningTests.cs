@@ -123,6 +123,7 @@ public sealed class VersioningTests
         var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
         var verificationScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleaseVerification.ps1"));
         var publishScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase10", "Publish-KoeNote.ps1"));
+        var ternaryRuntimeService = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Services", "Review", "TernaryReviewRuntimeService.cs"));
 
         Assert.Contains("-RequireReviewRuntime", buildScript);
         Assert.Contains("review_runtime_verified", buildScript);
@@ -131,12 +132,21 @@ public sealed class VersioningTests
         Assert.Contains("Review runtime is required but missing from publish output", verificationScript);
         Assert.Contains("Release manifest is missing review_runtime metadata", verificationScript);
         Assert.Contains("review_runtime.required", verificationScript);
-        Assert.Contains("Ternary review runtime is required for release MSI builds", buildScript);
-        Assert.Contains("ternary_review_runtime_verified", buildScript);
+        Assert.DoesNotContain("Ternary review runtime is required for release MSI builds", buildScript);
+        Assert.Contains("ternary_review_runtime_skipped", buildScript);
         Assert.Contains("ternary_review_runtime = [ordered]@", buildScript);
-        Assert.Contains("Ternary review runtime is required but missing from publish output", verificationScript);
+        Assert.Contains("required = $false", buildScript);
+        Assert.Contains("present = [bool]$ternaryReviewRuntimePresent", buildScript);
+        Assert.Contains("ternaryReviewRuntimeTag = \"prism-b8846-d104cf1\"", buildScript);
+        Assert.Contains("source_url = $ternaryReviewRuntimeSourceUrl", buildScript);
         Assert.Contains("Release manifest is missing ternary_review_runtime metadata", verificationScript);
         Assert.Contains("ternary_review_runtime.required", verificationScript);
+        Assert.Contains("required as false", verificationScript);
+        Assert.Contains("ternary_review_runtime.present", verificationScript);
+        Assert.Contains("expectedTernaryReviewRuntimeTag = \"prism-b8846-d104cf1\"", verificationScript);
+        Assert.Contains("ternary_review_runtime.tag", verificationScript);
+        Assert.Contains("ternary_review_runtime.source_url", verificationScript);
+        Assert.Contains("prism-b8846-d104cf1", ternaryRuntimeService);
         Assert.Contains("[switch]$RequireReviewRuntime", publishScript);
     }
 

@@ -52,6 +52,7 @@ public sealed class ModelCatalogService(AppPaths paths)
 
         return LoadBuiltInCatalog()
             .Models
+            .Where(ModelCatalogCompatibility.IsSelectable)
             .Select(model => new ModelCatalogEntry(
                 model,
                 installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
@@ -69,6 +70,7 @@ public sealed class ModelCatalogService(AppPaths paths)
         var downloadJobs = new ModelDownloadJobRepository(paths);
 
         return catalog.Models
+            .Where(ModelCatalogCompatibility.IsSelectable)
             .Select(model => new ModelCatalogEntry(
                 model,
                 installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,

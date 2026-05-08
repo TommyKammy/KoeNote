@@ -13,6 +13,7 @@ using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Presets;
 using KoeNote.App.Services.Review;
@@ -61,6 +62,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateDownloadService _updateDownloadService;
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
     private readonly IUpdateHistoryService _updateHistoryService;
+    private readonly LlmSettingsSeedService _llmSettingsSeedService;
+    private readonly LlmSettingsDisplayService _llmSettingsDisplayService;
     private readonly MainContentZoomState _mainContentZoomState;
     private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
@@ -151,6 +154,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private double _confidence;
     private int _reviewSegmentFocusRequestId;
     private int _transcriptAutoScrollRequestId;
+    private LlmSettingsDisplaySnapshot _llmSettingsDisplaySnapshot = LlmSettingsDisplaySnapshot.NotConfigured;
 
     public MainWindowViewModel()
         : this(new AppPaths())
@@ -198,6 +202,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateDownloadService = services.UpdateDownloadService;
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _updateHistoryService = services.UpdateHistoryService;
+        _llmSettingsSeedService = services.LlmSettingsSeedService;
+        _llmSettingsDisplayService = services.LlmSettingsDisplayService;
         _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
         _mainContentZoomState = new MainContentZoomState(paths);
         var currentApplication = System.Windows.Application.Current;
@@ -379,6 +385,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         "review",
         entry => string.Equals(entry.ModelId, _setupState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase))
         ?.DisplayName ?? "未設定";
+
+    public string HeaderReviewModel => _llmSettingsDisplaySnapshot.HeaderReviewSummary;
+
+    public string HeaderSummaryModel => _llmSettingsDisplaySnapshot.HeaderSummarySummary;
+
+    public string LlmActiveProfileSummary => _llmSettingsDisplaySnapshot.ActiveProfileSummary;
+
+    public string LlmReviewTaskSummary => _llmSettingsDisplaySnapshot.ReviewTaskSummary;
+
+    public string LlmSummaryTaskSummary => _llmSettingsDisplaySnapshot.SummaryTaskSummary;
+
+    public string LlmPolishingTaskSummary => _llmSettingsDisplaySnapshot.PolishingTaskSummary;
 
     public string StoragePath => Paths.Root;
 
@@ -974,7 +992,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
-    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady && SetupFasterWhisperRuntimeReady && SetupDiarizationRuntimeReady;
+    public bool SetupTernaryReviewRuntimeReady => !SelectedSetupReviewModelRequiresTernaryRuntime() ||
+        File.Exists(Paths.TernaryLlamaCompletionPath);
+
+    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
+        SetupFasterWhisperRuntimeReady &&
+        SetupDiarizationRuntimeReady &&
+        SetupTernaryReviewRuntimeReady;
 
     public string SetupPrimaryInstallActionText => IsModelDownloadInProgress
         ? "導入中..."
@@ -1017,10 +1041,23 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 missing.Add("話者識別ランタイム");
             }
 
+            if (!SetupTernaryReviewRuntimeReady)
+            {
+                missing.Add("Ternary review runtime");
+            }
+
             return missing.Count == 0
                 ? "選択した構成を確認しています。"
                 : $"{string.Join(" / ", missing)} をまとめて導入できます。";
         }
+    }
+
+    private bool SelectedSetupReviewModelRequiresTernaryRuntime()
+    {
+        return string.Equals(
+            SelectedSetupReviewModel?.CatalogItem.Runtime.PackageId,
+            ReviewRuntimeResolver.TernaryRuntimePackageId,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     public string SetupPresetRecommendationSummary => _setupPresetRecommendation is null
@@ -1104,6 +1141,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
                 OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+                OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
                 OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
@@ -1911,6 +1949,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             resetCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private void RefreshLlmSettingsDisplay(bool synchronizeFromSetup = false)
+    {
+        if (synchronizeFromSetup)
+        {
+            _llmSettingsSeedService.EnsureActiveProfileFromSetup(overwriteActive: true);
+        }
+
+        _llmSettingsDisplaySnapshot = _llmSettingsDisplayService.LoadSnapshot();
+        OnPropertyChanged(nameof(HeaderReviewModel));
+        OnPropertyChanged(nameof(HeaderSummaryModel));
+        OnPropertyChanged(nameof(LlmActiveProfileSummary));
+        OnPropertyChanged(nameof(LlmReviewTaskSummary));
+        OnPropertyChanged(nameof(LlmSummaryTaskSummary));
+        OnPropertyChanged(nameof(LlmPolishingTaskSummary));
     }
 
 }

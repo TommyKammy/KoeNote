@@ -1,9 +1,10 @@
-using System.Text;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Transcript;
 
-public sealed class TranscriptSummaryService(
+public sealed partial class TranscriptSummaryService(
     TranscriptReadRepository transcriptReadRepository,
     TranscriptDerivativeRepository derivativeRepository,
     ITranscriptSummaryRuntime runtime)
@@ -30,15 +31,20 @@ public sealed class TranscriptSummaryService(
             foreach (var chunk in source.Chunks)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var chunkResult = await runtime.SummarizeChunkAsync(options, chunk, cancellationToken);
-                if (string.IsNullOrWhiteSpace(chunkResult.Content))
+                var chunkResult = await SummarizeChunkWithRetryAsync(options, chunk, cancellationToken);
+                var chunkValidation = ValidateSummaryContent(
+                    chunkResult.Content,
+                    options,
+                    requireStructuredSections: false);
+                if (!chunkValidation.IsValid)
                 {
                     return SaveFallback(
                         options,
                         source,
                         sourceHash,
                         segments,
-                        "Transcript summary returned empty chunk output.");
+                        chunkValidation.Reason,
+                        chunkResults);
                 }
 
                 chunkResults.Add(chunkResult with { Chunk = chunk });
@@ -52,20 +58,27 @@ public sealed class TranscriptSummaryService(
             }
             else
             {
-                var finalStart = DateTimeOffset.UtcNow;
-                content = (await runtime.MergeSummariesAsync(options, chunkResults, cancellationToken)).Trim();
-                duration += DateTimeOffset.UtcNow - finalStart;
+                var mergeResult = await MergeSummariesWithRetryAsync(options, chunkResults, cancellationToken);
+                content = mergeResult.Content.Trim();
+                duration += mergeResult.Duration;
             }
 
-            if (string.IsNullOrWhiteSpace(content))
+            var finalValidation = ValidateSummaryContent(
+                content,
+                options,
+                requireStructuredSections: true);
+            if (!finalValidation.IsValid)
             {
                 return SaveFallback(
                     options,
                     source,
                     sourceHash,
                     segments,
-                    "Transcript summary returned empty output.");
+                    finalValidation.Reason,
+                    chunkResults);
             }
+
+            content = NormalizeUserFacingSummary(content);
 
             if (IsUnexpectedlyShort(content, source.Chunks))
             {
@@ -74,7 +87,8 @@ public sealed class TranscriptSummaryService(
                     source,
                     sourceHash,
                     segments,
-                    "Transcript summary was unexpectedly short for the source transcript.");
+                    "Transcript summary was unexpectedly short for the source transcript.",
+                    chunkResults);
             }
 
             var derivative = derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
@@ -135,11 +149,11 @@ public sealed class TranscriptSummaryService(
         }
         catch (ReviewWorkerException exception)
         {
-            return SaveFallback(options, source, sourceHash, segments, exception.Message);
+            return SaveFallback(options, source, sourceHash, segments, exception.Message, chunkResults);
         }
         catch (TimeoutException exception)
         {
-            return SaveFallback(options, source, sourceHash, segments, exception.Message);
+            return SaveFallback(options, source, sourceHash, segments, exception.Message, chunkResults);
         }
     }
 
@@ -224,9 +238,10 @@ public sealed class TranscriptSummaryService(
         SummarySource source,
         string sourceHash,
         IReadOnlyList<TranscriptReadModel> segments,
-        string reason)
+        string reason,
+        IReadOnlyList<TranscriptSummaryChunkResult>? chunkResults = null)
     {
-        var content = BuildFallbackSummary(source, segments, reason);
+        var content = BuildFallbackSummary(source, segments, reason, chunkResults);
         var derivative = derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
             options.JobId,
             TranscriptDerivativeKinds.Summary,
@@ -286,6 +301,102 @@ public sealed class TranscriptSummaryService(
         }
     }
 
+    private async Task<TranscriptSummaryChunkResult> SummarizeChunkWithRetryAsync(
+        TranscriptSummaryOptions options,
+        TranscriptSummaryChunk chunk,
+        CancellationToken cancellationToken)
+    {
+        TranscriptSummaryChunkResult? lastResult = null;
+        ReviewWorkerException? lastException = null;
+        var maxAttempts = Math.Max(1, options.MaxAttempts);
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                lastResult = await runtime.SummarizeChunkAsync(
+                    options with { Attempt = attempt },
+                    chunk,
+                    cancellationToken);
+                var validation = ValidateSummaryContent(
+                    lastResult.Content,
+                    options,
+                    requireStructuredSections: false);
+                if (validation.IsValid)
+                {
+                    return lastResult;
+                }
+            }
+            catch (ReviewWorkerException exception)
+            {
+                lastException = exception;
+            }
+        }
+
+        if (lastResult is not null)
+        {
+            return lastResult;
+        }
+
+        throw lastException ?? new ReviewWorkerException(
+            ReviewFailureCategory.JsonParseFailed,
+            "Transcript summary failed validation.");
+    }
+
+    private async Task<MergeSummaryResult> MergeSummariesWithRetryAsync(
+        TranscriptSummaryOptions options,
+        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
+        CancellationToken cancellationToken)
+    {
+        var duration = TimeSpan.Zero;
+        var content = string.Empty;
+        ReviewWorkerException? lastException = null;
+        var maxAttempts = Math.Max(1, options.MaxAttempts);
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                var startedAt = DateTimeOffset.UtcNow;
+                content = (await runtime.MergeSummariesAsync(
+                    options with { Attempt = attempt },
+                    chunkResults,
+                    cancellationToken)).Trim();
+                duration += DateTimeOffset.UtcNow - startedAt;
+                var validation = ValidateSummaryContent(
+                    content,
+                    options,
+                    requireStructuredSections: true);
+                if (validation.IsValid)
+                {
+                    return new MergeSummaryResult(content, duration);
+                }
+            }
+            catch (ReviewWorkerException exception)
+            {
+                lastException = exception;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            return new MergeSummaryResult(content, duration);
+        }
+
+        throw lastException ?? new ReviewWorkerException(
+            ReviewFailureCategory.JsonParseFailed,
+            "Final transcript summary failed validation.");
+    }
+
+    private static TranscriptSummaryValidationResult ValidateSummaryContent(
+        string content,
+        TranscriptSummaryOptions options,
+        bool requireStructuredSections)
+    {
+        return TranscriptSummaryValidator.Validate(
+            content,
+            options.ValidationMode,
+            requireStructuredSections);
+    }
+
     private static string BuildRawChunkContent(IReadOnlyList<TranscriptReadModel> segments)
     {
         var builder = new StringBuilder();
@@ -304,78 +415,385 @@ public sealed class TranscriptSummaryService(
     private static string BuildFallbackSummary(
         SummarySource source,
         IReadOnlyList<TranscriptReadModel> segments,
-        string reason)
+        string reason,
+        IReadOnlyList<TranscriptSummaryChunkResult>? chunkResults = null)
     {
-        var speakerNames = segments
-            .Select(static segment => segment.Speaker)
-            .Where(static speaker => !string.IsNullOrWhiteSpace(speaker))
-            .Distinct(StringComparer.Ordinal)
-            .Take(8)
+        var usableChunkResults = chunkResults?
+            .Where(static result => !string.IsNullOrWhiteSpace(result.Content))
+            .OrderBy(static result => result.Chunk.ChunkIndex)
             .ToArray();
-        var excerptSegments = segments
-            .Where(static segment => !string.IsNullOrWhiteSpace(segment.Text))
-            .Take(8)
-            .ToArray();
+        if (usableChunkResults is { Length: > 0 })
+        {
+            return BuildStructuredChunkFallbackSummary(source, segments, reason, usableChunkResults);
+        }
+
+        var segmentFallbackBullets = BuildSegmentFallbackBullets(segments, 8);
+        var fallbackActions = BuildFallbackActionItems([], segmentFallbackBullets);
+        var fallbackKeywords = BuildFallbackKeywords([], segmentFallbackBullets, segmentFallbackBullets);
 
         var builder = new StringBuilder();
         builder
-            .AppendLine("## 概要")
-            .AppendLine()
-            .Append("- LLM要約が安定して生成できなかったため、文字起こし本文から簡易要約を作成しました。理由: ")
-            .AppendLine(reason)
-            .Append("- 対象範囲: ")
-            .Append(FormatTimestamp(segments.Min(static segment => segment.StartSeconds)))
-            .Append("..")
-            .AppendLine(FormatTimestamp(segments.Max(static segment => segment.EndSeconds)))
-            .Append("- 話者: ")
-            .AppendLine(speakerNames.Length == 0 ? "Unspecified" : string.Join(", ", speakerNames))
-            .AppendLine()
-            .AppendLine("## 主な内容")
+            .AppendLine("## Overview")
             .AppendLine();
-
-        foreach (var segment in excerptSegments)
-        {
-            builder
-                .Append("- [")
-                .Append(segment.SegmentId)
-                .Append(" / ")
-                .Append(FormatTimestamp(segment.StartSeconds))
-                .Append("] ")
-                .AppendLine(TrimForSummary(segment.Text, 120));
-        }
+        AppendBullets(builder, segmentFallbackBullets.Take(4));
+        builder
+            .AppendLine()
+            .AppendLine("## Key points")
+            .AppendLine();
+        AppendBullets(builder, segmentFallbackBullets);
 
         builder
             .AppendLine()
-            .AppendLine("## 決定事項")
+            .AppendLine("## Decisions")
             .AppendLine()
-            .AppendLine("- 明示された決定事項は検出できませんでした。")
+            .AppendLine("- 明示された決定事項はありません。")
             .AppendLine()
-            .AppendLine("## アクション項目")
+            .AppendLine("## Action items")
+            .AppendLine();
+        AppendBullets(builder, fallbackActions);
+        builder
             .AppendLine()
-            .AppendLine("- 明示されたアクション項目は検出できませんでした。")
+            .AppendLine("## Open questions")
             .AppendLine()
-            .AppendLine("## 未解決の質問")
+            .AppendLine("- 明示された未解決事項はありません。")
             .AppendLine()
-            .AppendLine("- 必要に応じて文字起こし本文を確認してください。")
-            .AppendLine()
-            .AppendLine("## キーワード")
-            .AppendLine()
-            .Append("- source: ")
-            .Append(source.SourceKind)
-            .Append(", segments: ")
-            .AppendLine(BuildSegmentRange(segments));
+            .AppendLine("## Keywords")
+            .AppendLine();
+        AppendBullets(builder, fallbackKeywords);
 
         return builder.ToString().Trim();
     }
 
+    private static string BuildStructuredChunkFallbackSummary(
+        SummarySource source,
+        IReadOnlyList<TranscriptReadModel> segments,
+        string reason,
+        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
+    {
+        var overviews = ExtractSectionBullets(chunkResults, "Overview", 4);
+        var keyPoints = ExtractSectionBullets(chunkResults, "Key points", 9);
+        var decisions = ExtractSectionBullets(chunkResults, "Decisions", 4);
+        var actions = ExtractSectionBullets(chunkResults, "Action items", 6);
+        var openQuestions = ExtractSectionBullets(chunkResults, "Open questions", 4);
+        var keywords = ExtractSectionBullets(chunkResults, "Keywords", 10);
+        var segmentFallbackBullets = BuildSegmentFallbackBullets(segments, 8);
+        var fallbackActions = actions.Length > 0
+            ? actions
+            : BuildFallbackActionItems(keyPoints, segmentFallbackBullets);
+
+        var builder = new StringBuilder();
+        builder
+            .AppendLine("## Overview")
+            .AppendLine();
+
+        AppendBullets(builder, overviews.Length > 0
+            ? overviews
+            : keyPoints.Length > 0
+                ? keyPoints.Take(4)
+                : segmentFallbackBullets.Take(4));
+        builder
+            .AppendLine()
+            .AppendLine("## Key points")
+            .AppendLine();
+
+        if (keyPoints.Length == 0)
+        {
+            keyPoints = segmentFallbackBullets;
+        }
+
+        AppendBullets(builder, keyPoints);
+        builder
+            .AppendLine()
+            .AppendLine("## Decisions")
+            .AppendLine();
+        AppendBullets(builder, decisions.Length > 0 ? decisions : ["明示された決定事項はありません。"]);
+
+        builder
+            .AppendLine()
+            .AppendLine("## Action items")
+            .AppendLine();
+        AppendBullets(builder, fallbackActions);
+
+        builder
+            .AppendLine()
+            .AppendLine("## Open questions")
+            .AppendLine();
+        AppendBullets(builder, openQuestions.Length > 0 ? openQuestions : ["明示された未解決事項はありません。"]);
+
+        builder
+            .AppendLine()
+            .AppendLine("## Keywords")
+            .AppendLine();
+        AppendBullets(builder, keywords.Length > 0
+            ? keywords
+            : BuildFallbackKeywords(overviews, keyPoints, segmentFallbackBullets));
+
+        return builder.ToString().Trim();
+    }
+
+    private static string[] BuildFallbackActionItems(
+        IReadOnlyList<string> keyPoints,
+        IReadOnlyList<string> segmentFallbackBullets)
+    {
+        var actions = keyPoints
+            .Concat(segmentFallbackBullets)
+            .Where(ContainsActionCue)
+            .Take(6)
+            .ToArray();
+        return actions.Length > 0 ? actions : ["明示されたアクション項目はありません。"];
+    }
+
+    private static bool ContainsActionCue(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        string[] cues =
+        [
+            "必要",
+            "推奨",
+            "活用",
+            "意識",
+            "調べ",
+            "確認",
+            "準備",
+            "取り組",
+            "話し合",
+            "確保",
+            "使う",
+            "作る",
+            "plan",
+            "prepare",
+            "confirm",
+            "review",
+            "use",
+            "follow"
+        ];
+        return cues.Any(cue => text.Contains(cue, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string[] BuildFallbackKeywords(
+        IReadOnlyList<string> overviews,
+        IReadOnlyList<string> keyPoints,
+        IReadOnlyList<string> segmentFallbackBullets)
+    {
+        return overviews
+            .Concat(keyPoints)
+            .Concat(segmentFallbackBullets)
+            .SelectMany(SplitKeywordCandidates)
+            .Select(static keyword => keyword.Trim())
+            .Where(static keyword => keyword.Length >= 2)
+            .Distinct(StringComparer.Ordinal)
+            .Take(10)
+            .DefaultIfEmpty("summary")
+            .ToArray();
+    }
+
+    private static string[] BuildSegmentFallbackBullets(
+        IReadOnlyList<TranscriptReadModel> segments,
+        int limit)
+    {
+        return segments
+            .Where(static segment => !string.IsNullOrWhiteSpace(segment.Text))
+            .Select(static segment => TrimForSummary(segment.Text, 140))
+            .Take(limit)
+            .ToArray();
+    }
+
+    private static void AppendBullets(StringBuilder builder, IEnumerable<string> bullets)
+    {
+        foreach (var bullet in DeduplicateBullets(bullets))
+        {
+            builder
+                .Append("- ")
+                .AppendLine(bullet);
+        }
+    }
+
+    private static IEnumerable<string> DeduplicateBullets(IEnumerable<string> bullets)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var bullet in bullets)
+        {
+            var normalized = TrimForSummary(StripSourceReferences(bullet), 220).Trim();
+            if (normalized.Length == 0)
+            {
+                continue;
+            }
+
+            var key = normalized.Replace("\u3002", string.Empty, StringComparison.Ordinal);
+            if (seen.Add(key))
+            {
+                yield return normalized;
+            }
+        }
+    }
+
+    private static string[] ExtractSectionBullets(
+        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
+        string sectionName,
+        int limit)
+    {
+        var bullets = new List<string>();
+        foreach (var chunk in chunkResults)
+        {
+            var inSection = false;
+            foreach (var rawLine in chunk.Content.Split('\n'))
+            {
+                var line = rawLine.Trim();
+                if (line.StartsWith("## ", StringComparison.Ordinal))
+                {
+                    inSection = line[3..].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (!inSection || (!line.StartsWith("- ", StringComparison.Ordinal) && !line.StartsWith("* ", StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                var bullet = line[2..].Trim();
+                if (bullet.Length == 0 || bullet.Equals("Unspecified.", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                bullets.Add(TrimForSummary(bullet, 220));
+                if (bullets.Count >= limit)
+                {
+                    return bullets.ToArray();
+                }
+            }
+        }
+
+        return bullets.ToArray();
+    }
+
+    private static string NormalizeUserFacingSummary(string content)
+    {
+        var normalizedLines = new List<string>();
+        var currentSection = string.Empty;
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("## ", StringComparison.Ordinal))
+            {
+                currentSection = trimmed[3..].Trim();
+                normalizedLines.Add(line);
+                continue;
+            }
+
+            if (trimmed.Length == 0)
+            {
+                normalizedLines.Add(line);
+                continue;
+            }
+
+            if (IsUnspecifiedSection(currentSection) && IsUnspecifiedLine(trimmed))
+            {
+                normalizedLines.Add("- Unspecified.");
+                continue;
+            }
+
+            if (currentSection.Equals("Keywords", StringComparison.OrdinalIgnoreCase))
+            {
+                AppendKeywordLines(normalizedLines, trimmed);
+                continue;
+            }
+
+            normalizedLines.Add(NormalizeUserFacingSummaryLine(line));
+        }
+
+        return string.Join(Environment.NewLine, normalizedLines).Trim();
+    }
+
+    private static string NormalizeUserFacingSummaryLine(string line)
+    {
+        var trimmed = line.TrimStart();
+        if (!trimmed.StartsWith("- ", StringComparison.Ordinal) &&
+            !trimmed.StartsWith("* ", StringComparison.Ordinal))
+        {
+            return line;
+        }
+
+        var indentLength = line.Length - trimmed.Length;
+        var prefix = line[..indentLength];
+        return prefix + trimmed[..2] + StripSourceReferences(trimmed[2..]);
+    }
+
+    private static bool IsUnspecifiedSection(string section)
+    {
+        return section.Equals("Decisions", StringComparison.OrdinalIgnoreCase) ||
+            section.Equals("Action items", StringComparison.OrdinalIgnoreCase) ||
+            section.Equals("Open questions", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsUnspecifiedLine(string line)
+    {
+        return line.Trim().TrimEnd('.').Equals("Unspecified", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AppendKeywordLines(List<string> lines, string line)
+    {
+        var keywordSource = line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal)
+            ? line[2..]
+            : line;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var keyword in SplitKeywords(keywordSource))
+        {
+            var normalized = StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ',');
+            if (normalized.Length == 0 || !seen.Add(normalized))
+            {
+                continue;
+            }
+
+            lines.Add("- " + normalized);
+            if (seen.Count >= 12)
+            {
+                return;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SplitKeywords(string text)
+    {
+        return (text ?? string.Empty)
+            .Split([',', '\u3001'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static IEnumerable<string> SplitKeywordCandidates(string text)
+    {
+        return (text ?? string.Empty)
+            .Replace(":", " ", StringComparison.Ordinal)
+            .Replace("\uFF1A", " ", StringComparison.Ordinal)
+            .Split([' ', '\t', ',', '.', '\u3001', '\u3002', '\u30fb', '/', '\u3000'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static token => !token.Equals("Unspecified", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string StripSourceReferences(string text)
+    {
+        var withoutSegmentRefs = SourceReferenceRegex().Replace(text ?? string.Empty, string.Empty);
+        var withoutEmphasis = BoldMarkdownRegex().Replace(withoutSegmentRefs, "$1");
+        return string.Join(" ", withoutEmphasis.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).Trim();
+    }
+
+    [GeneratedRegex(@"\s*(?:[\(\uFF08]\s*\[?\s*(?:segment_id:\s*)?\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\]?\s*[\)\uFF09]|\u3010\s*\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\u3011|\[\s*\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SourceReferenceRegex();
+
+    [GeneratedRegex(@"\*\*([^*]+)\*\*", RegexOptions.CultureInvariant)]
+    private static partial Regex BoldMarkdownRegex();
+
     private static string BuildFallbackChunkSummary(TranscriptSummaryChunk chunk)
     {
         return $"""
-            ## 概要
+            ## 讎りｦ・
 
-            LLM要約が利用できなかったため、このチャンクは文字起こし抜粋として保存しました。
+            LLM隕∫ｴ・′蛻ｩ逕ｨ縺ｧ縺阪↑縺九▲縺溘◆繧√√％縺ｮ繝√Ε繝ｳ繧ｯ縺ｯ譁・ｭ苓ｵｷ縺薙＠謚懃ｲ九→縺励※菫晏ｭ倥＠縺ｾ縺励◆縲・
 
-            ## 主な内容
+            ## 荳ｻ縺ｪ蜀・ｮｹ
 
             {TrimForSummary(chunk.Content, 1000)}
             """;
@@ -436,4 +854,6 @@ public sealed class TranscriptSummaryService(
     private sealed record SummarySource(
         string SourceKind,
         IReadOnlyList<TranscriptSummaryChunk> Chunks);
+
+    private sealed record MergeSummaryResult(string Content, TimeSpan Duration);
 }
