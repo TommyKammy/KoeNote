@@ -1738,6 +1738,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public string SummaryStageToggleText => EnableSummaryStage ? "要約 ON" : "要約 OFF";
+
+    public string SummaryStageToggleToolTip => EnableSummaryStage
+        ? "要約ステージを実行します。クリックでスキップ"
+        : "要約ステージをスキップします。クリックで実行";
+
     public string SummaryStatus
     {
         get => _summaryStatus;
@@ -1863,6 +1869,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RunPreflightDetail));
                 OnPropertyChanged(nameof(FirstRunSummary));
                 OnPropertyChanged(nameof(FirstRunDetail));
+                OnPropertyChanged(nameof(SummaryStageToggleText));
+                OnPropertyChanged(nameof(SummaryStageToggleToolTip));
                 RefreshOptionalStageToggleStatuses();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
