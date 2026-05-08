@@ -25,6 +25,7 @@ public sealed class AsrStageRunner(
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.Now;
+        var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
         report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Running, 10));
         jobRepository.MarkAsrRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true));
@@ -34,7 +35,6 @@ public sealed class AsrStageRunner(
         try
         {
             var effectiveAsrSettings = correctionMemoryService.EnrichAsrSettings(asrSettings);
-            var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
             var engineId = asrEngineRegistry.Contains(effectiveAsrSettings.EngineId)
                 ? effectiveAsrSettings.EngineId
                 : "faster-whisper-large-v3-turbo";
@@ -114,7 +114,11 @@ public sealed class AsrStageRunner(
                 errorCategory: exception.Category.ToString());
             jobRepository.MarkAsrFailed(job, exception.Category.ToString());
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{exception.Category}: {exception.Message}");
+            jobLogRepository.AddEvent(
+                job.JobId,
+                "asr",
+                "error",
+                JobLogDiagnostics.FormatException(exception.Category.ToString(), exception, outputDirectory));
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR failed ({exception.Category}): {exception.Message}"));
             return null;
         }
@@ -133,7 +137,11 @@ public sealed class AsrStageRunner(
                 errorCategory: AsrFailureCategory.Unknown.ToString());
             jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "asr", "error", $"{AsrFailureCategory.Unknown}: {exception.Message}");
+            jobLogRepository.AddEvent(
+                job.JobId,
+                "asr",
+                "error",
+                JobLogDiagnostics.FormatException(AsrFailureCategory.Unknown.ToString(), exception, outputDirectory));
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}"));
             return null;
         }

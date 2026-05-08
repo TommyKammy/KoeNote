@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using Microsoft.Win32;
 
 namespace KoeNote.App.ViewModels;
 
@@ -19,6 +20,89 @@ public sealed partial class MainWindowViewModel
         OpenDetailPanel(3);
         LatestLog = "Logs opened.";
         return Task.CompletedTask;
+    }
+
+    private Task ExportLogsAsync()
+    {
+        if (SelectedJob is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "診断パッケージを出力",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = CreateLogExportFileName(),
+            Filter = "Diagnostic package (*.zip)|*.zip",
+            FilterIndex = 1,
+            DefaultExt = "zip",
+            InitialDirectory = GetOpenableExportFolder()
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return Task.CompletedTask;
+        }
+
+        var outputPath = string.Equals(Path.GetExtension(dialog.FileName), ".zip", StringComparison.OrdinalIgnoreCase)
+            ? dialog.FileName
+            : Path.ChangeExtension(dialog.FileName, "zip");
+
+        try
+        {
+            _jobLogExportService.ExportDiagnosticPackage(SelectedJob, outputPath, SelectedDiagnosticLogScopeValue);
+            LastExportFolder = Path.GetDirectoryName(outputPath) ?? LastExportFolder;
+            LatestLog = $"診断パッケージを出力しました: {outputPath}";
+            RefreshLogs();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            LatestLog = $"ログ出力に失敗しました: {exception.Message}";
+            RefreshLogs();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private bool CanExportLogs()
+    {
+        return SelectedJob is not null;
+    }
+
+    private Task OpenLogFolderAsync()
+    {
+        try
+        {
+            Directory.CreateDirectory(Paths.Logs);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{Paths.Logs}\"",
+                UseShellExecute = true
+            });
+            LatestLog = $"ログフォルダを開きました: {Paths.Logs}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
+        {
+            LatestLog = $"ログフォルダを開けませんでした: {exception.Message}";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void RefreshLogCommandStates()
+    {
+        if (ExportLogsCommand is RelayCommand exportLogsCommand)
+        {
+            exportLogsCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static string CreateLogExportFileName()
+    {
+        return $"koenote-diagnostic-package-{DateTime.Now:yyyyMMdd-HHmmss}.zip";
     }
 
     private Task OpenCleanupToolAsync()

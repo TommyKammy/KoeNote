@@ -43,4 +43,58 @@ public sealed class JobLogRepositoryTests
         Assert.Equal("second", logs[1].Message);
     }
 
+    [Fact]
+    public void ReadForJob_ReturnsAllSelectedJobLogsInChronologicalOrder()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobLogRepository(paths);
+        repository.AddEvent("job-001", "created", "info", "first");
+        Thread.Sleep(5);
+        repository.AddEvent("job-002", "created", "info", "other");
+        Thread.Sleep(5);
+        repository.AddEvent("job-001", "asr", "error", "second");
+
+        var logs = repository.ReadForJob("job-001");
+
+        Assert.Equal(2, logs.Count);
+        Assert.Equal("first", logs[0].Message);
+        Assert.Equal("second", logs[1].Message);
+        Assert.All(logs, entry => Assert.NotEqual("other", entry.Message));
+    }
+
+    [Fact]
+    public void ReadForDiagnostics_WithJobId_ReturnsSelectedJobWithJobId()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobLogRepository(paths);
+        repository.AddEvent("job-001", "created", "info", "first");
+        Thread.Sleep(5);
+        repository.AddEvent("job-002", "created", "info", "other");
+
+        var logs = repository.ReadForDiagnostics("job-001");
+
+        Assert.Single(logs);
+        Assert.Equal("job-001", logs[0].JobId);
+        Assert.Equal("first", logs[0].Message);
+    }
+
+    [Fact]
+    public void ReadForDiagnostics_WithoutJobId_ReturnsRecentLogsAcrossJobs()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobLogRepository(paths);
+        repository.AddEvent("job-001", "created", "info", "first");
+        Thread.Sleep(5);
+        repository.AddEvent("job-002", "asr", "error", "second");
+
+        var logs = repository.ReadForDiagnostics(null);
+
+        Assert.Equal(2, logs.Count);
+        Assert.Equal("job-001", logs[0].JobId);
+        Assert.Equal("job-002", logs[1].JobId);
+    }
+
 }

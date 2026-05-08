@@ -8,3 +8,10 @@ public sealed record JobLogEntry(
 {
     public string CreatedAtDisplay => CreatedAt.ToString("HH:mm:ss");
 }
+
+public sealed record DiagnosticLogEntry(
+    DateTimeOffset CreatedAt,
+    string? JobId,
+    string Level,
+    string Stage,
+    string Message);

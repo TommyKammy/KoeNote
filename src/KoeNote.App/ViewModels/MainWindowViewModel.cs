@@ -29,6 +29,11 @@ public sealed record AsrEngineOption(string EngineId, string DisplayName)
     public override string ToString() => DisplayName;
 }
 
+public sealed record DiagnosticLogScopeOption(DiagnosticLogScope Scope, string DisplayName)
+{
+    public override string ToString() => DisplayName;
+}
+
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private const string DefaultSelectableAsrEngineId = "faster-whisper-large-v3-turbo";
@@ -45,6 +50,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptEditService _transcriptEditService;
     private readonly CorrectionMemoryService _correctionMemoryService;
     private readonly TranscriptExportService _transcriptExportService;
+    private readonly JobLogExportService _jobLogExportService;
     private readonly TranscriptExportDialogService _transcriptExportDialogService;
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
@@ -129,6 +135,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private int _lastModelCatalogProgressRefreshPercent = -1;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
+    private DiagnosticLogScopeOption? _selectedDiagnosticLogScope;
+    private int _selectedTranscriptTabIndex;
     private int _selectedLogPanelTabIndex;
     private int _selectedDetailPanelTabIndex;
     private bool _isDetailPanelOpen;
@@ -147,6 +155,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
     private bool _isSummaryStageRunning;
+    private bool _isSummaryStale;
+    private bool _isPolishedTranscriptTabHighlighted;
+    private CancellationTokenSource? _polishedTranscriptTabHighlightCancellation;
     private string _reviewIssueType = "候補なし";
     private string _originalText = string.Empty;
     private string _suggestedText = string.Empty;
@@ -177,6 +188,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptEditService = services.TranscriptEditService;
         _correctionMemoryService = services.CorrectionMemoryService;
         _transcriptExportService = services.TranscriptExportService;
+        _jobLogExportService = services.JobLogExportService;
         _transcriptExportDialogService = new TranscriptExportDialogService();
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
@@ -251,7 +263,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrContextText = asrSettings.ContextText;
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
-        _enableSummaryStage = asrSettings.EnableSummaryStage;
+        _enableSummaryStage = false;
         RefreshOptionalStageToggleStatuses();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
@@ -262,16 +274,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         FilteredSegments.Filter = FilterSegment;
         LoadJobs();
         RefreshLogs();
+        DiagnosticLogScopes.Add(new DiagnosticLogScopeOption(DiagnosticLogScope.SelectedJob, "選択ジョブ"));
+        DiagnosticLogScopes.Add(new DiagnosticLogScopeOption(DiagnosticLogScope.RecentAllJobs, "全体ログ"));
+        SelectedDiagnosticLogScope = DiagnosticLogScopes[0];
 
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
+        ClearJobSearchCommand = new RelayCommand(ClearJobSearchAsync, () => !string.IsNullOrEmpty(JobSearchText));
+        ClearSegmentSearchCommand = new RelayCommand(ClearSegmentSearchAsync, () => !string.IsNullOrEmpty(SegmentSearchText));
         RestoreJobCommand = new RelayCommand<JobSummary>(RestoreJobAsync, job => job is not null && !IsRunInProgress);
         PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);
         PermanentlyDeleteAllDeletedJobsCommand = new RelayCommand(PermanentlyDeleteAllDeletedJobsAsync, () => DeletedJobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
+        // Compatibility command for non-header callers; the normal UX separates review and summary.
         RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
@@ -279,6 +297,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SkipToNextSegmentCommand = new RelayCommand(SkipToNextSegmentAsync, CanSkipPlaybackSegment);
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
         OpenLogsCommand = new RelayCommand(OpenLogsAsync);
+        ExportLogsCommand = new RelayCommand(ExportLogsAsync, CanExportLogs);
+        OpenLogFolderCommand = new RelayCommand(OpenLogFolderAsync);
         OpenCleanupToolCommand = new RelayCommand(OpenCleanupToolAsync, CanOpenCleanupTool);
         ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
         ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
@@ -487,11 +507,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             issues.Add($"整文ランタイムまたは整文モデルが不足しています: {GetSelectedReviewRuntimePath()}");
         }
 
-        if (EnableSummaryStage && !SummaryStageAssetsReady)
-        {
-            issues.Add($"要約ランタイムまたは要約モデルが不足しています: {GetSelectedReviewRuntimePath()}");
-        }
-
         return issues;
     }
 
@@ -599,6 +614,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ObservableCollection<JobLogEntry> Logs { get; } = [];
 
+    public ObservableCollection<DiagnosticLogScopeOption> DiagnosticLogScopes { get; } = [];
+
     public ObservableCollection<CorrectionDraft> ReviewQueue { get; } = [];
 
     public ObservableCollection<DiffToken> DiffTokens { get; } = [];
@@ -653,6 +670,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ClearAllJobsCommand { get; }
 
+    public ICommand ClearJobSearchCommand { get; }
+
+    public ICommand ClearSegmentSearchCommand { get; }
+
     public ICommand RestoreJobCommand { get; }
 
     public ICommand PermanentlyDeleteJobCommand { get; }
@@ -678,6 +699,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand OpenSettingsCommand { get; }
 
     public ICommand OpenLogsCommand { get; }
+
+    public ICommand ExportLogsCommand { get; }
+
+    public ICommand OpenLogFolderCommand { get; }
 
     public ICommand OpenCleanupToolCommand { get; }
 
@@ -850,6 +875,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 ReloadSegmentsForSelectedJob();
                 LoadSummaryForSelectedJob();
                 LoadReviewQueue();
+                RefreshLogCommandStates();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
                 RefreshPostProcessCommandStates();
@@ -1274,6 +1300,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 FilteredJobs.Refresh();
                 FilteredDeletedJobs.Refresh();
+                if (ClearJobSearchCommand is RelayCommand command)
+                {
+                    command.RaiseCanExecuteChanged();
+                }
             }
         }
     }
@@ -1286,9 +1316,60 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _segmentSearchText, value))
             {
                 FilteredSegments.Refresh();
+                if (ClearSegmentSearchCommand is RelayCommand command)
+                {
+                    command.RaiseCanExecuteChanged();
+                }
             }
         }
     }
+
+    public DiagnosticLogScopeOption? SelectedDiagnosticLogScope
+    {
+        get => _selectedDiagnosticLogScope;
+        set
+        {
+            if (SetField(ref _selectedDiagnosticLogScope, value))
+            {
+                OnPropertyChanged(nameof(SelectedDiagnosticLogScopeValue));
+            }
+        }
+    }
+
+    public DiagnosticLogScope SelectedDiagnosticLogScopeValue =>
+        SelectedDiagnosticLogScope?.Scope ?? DiagnosticLogScope.SelectedJob;
+
+    private Task ClearJobSearchAsync()
+    {
+        JobSearchText = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private Task ClearSegmentSearchAsync()
+    {
+        SegmentSearchText = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    public int SelectedTranscriptTabIndex
+    {
+        get => _selectedTranscriptTabIndex;
+        set => SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 2));
+    }
+
+    public bool IsPolishedTranscriptTabHighlighted
+    {
+        get => _isPolishedTranscriptTabHighlighted;
+        private set
+        {
+            if (SetField(ref _isPolishedTranscriptTabHighlighted, value))
+            {
+                OnPropertyChanged(nameof(PolishedTranscriptTabHighlightTag));
+            }
+        }
+    }
+
+    public string PolishedTranscriptTabHighlightTag => IsPolishedTranscriptTabHighlighted ? "Highlighted" : string.Empty;
 
     public int SelectedLogPanelTabIndex
     {
@@ -1624,6 +1705,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(HasSummaryContent));
                 OnPropertyChanged(nameof(SummaryContentDisplay));
+                OnPropertyChanged(nameof(SummaryActionText));
+                OnPropertyChanged(nameof(SummaryActionToolTip));
                 UpdateExportCommandStates();
             }
         }
@@ -1634,6 +1717,26 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string SummaryContentDisplay => HasSummaryContent
         ? SummaryContent
         : "要約はまだ生成されていません。";
+
+    public string SummaryActionText => HasSummaryContent ? "要約を再生成" : "要約を生成";
+
+    public string SummaryActionToolTip => HasSummaryContent
+        ? IsSummaryStale
+            ? "本文が更新されています。現在の本文から要約を再生成できます。"
+            : "現在の本文から要約を再生成します。既存の要約は上書き確認後に更新されます。"
+        : "現在の本文から要約を生成します。";
+
+    public bool IsSummaryStale
+    {
+        get => _isSummaryStale;
+        private set
+        {
+            if (SetField(ref _isSummaryStale, value))
+            {
+                OnPropertyChanged(nameof(SummaryActionToolTip));
+            }
+        }
+    }
 
     public string SummaryStatus
     {
@@ -1751,7 +1854,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _enableSummaryStage;
         set
         {
-            if (SetField(ref _enableSummaryStage, value))
+            if (SetField(ref _enableSummaryStage, false))
             {
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(SummaryStageAssetsReady));
@@ -1760,8 +1863,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RunPreflightDetail));
                 OnPropertyChanged(nameof(FirstRunSummary));
                 OnPropertyChanged(nameof(FirstRunDetail));
-                OnPropertyChanged(nameof(SummaryStageToggleText));
-                OnPropertyChanged(nameof(SummaryStageToggleToolTip));
                 RefreshOptionalStageToggleStatuses();
                 if (RunSelectedJobCommand is RelayCommand runCommand)
                 {
@@ -1772,12 +1873,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
         }
     }
-
-    public string SummaryStageToggleText => EnableSummaryStage ? "要約 ON" : "要約 OFF";
-
-    public string SummaryStageToggleToolTip => EnableSummaryStage
-        ? "要約ステージを実行します。クリックでスキップ"
-        : "要約ステージをスキップします。クリックで実行";
 
     public string ReviewIssueType
     {

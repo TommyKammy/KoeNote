@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 using KoeNote.App.Services.Export;
+using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.ViewModels;
 
@@ -77,7 +78,11 @@ public sealed partial class MainWindowViewModel
         {
             ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
-            _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
+            _jobLogRepository.AddEvent(
+                SelectedJob.JobId,
+                "export",
+                "error",
+                JobLogDiagnostics.FormatException("transcript_export_failed", exception, outputPath));
             RefreshLogs();
         }
     }
@@ -115,7 +120,11 @@ public sealed partial class MainWindowViewModel
         {
             ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
-            _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
+            _jobLogRepository.AddEvent(
+                SelectedJob.JobId,
+                "export",
+                "error",
+                JobLogDiagnostics.FormatException("transcript_export_failed", exception, outputDirectory));
             RefreshLogs();
         }
     }

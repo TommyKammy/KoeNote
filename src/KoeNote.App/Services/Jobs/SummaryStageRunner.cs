@@ -23,6 +23,7 @@ public sealed class SummaryStageRunner(
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.Now;
+        var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "summary");
         report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Running, 10));
         jobRepository.MarkSummaryRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true));
@@ -40,7 +41,7 @@ public sealed class SummaryStageRunner(
                 job.JobId,
                 profile.LlamaCompletionPath,
                 profile.ModelPath,
-                Path.Combine(paths.Jobs, job.JobId, "summary"),
+                outputDirectory,
                 profile.ModelId,
                 taskSettings.GenerationProfile,
                 taskSettings.PromptVersion,
@@ -111,11 +112,11 @@ public sealed class SummaryStageRunner(
         }
         catch (ReviewWorkerException exception)
         {
-            MarkFailed(job, report, startedAt, exception.Category.ToString(), exception.Message);
+            MarkFailed(job, report, startedAt, exception.Category.ToString(), exception, outputDirectory);
         }
         catch (Exception exception)
         {
-            MarkFailed(job, report, startedAt, ReviewFailureCategory.Unknown.ToString(), exception.Message);
+            MarkFailed(job, report, startedAt, ReviewFailureCategory.Unknown.ToString(), exception, outputDirectory);
         }
     }
 
@@ -144,7 +145,8 @@ public sealed class SummaryStageRunner(
         Action<JobRunUpdate> report,
         DateTimeOffset startedAt,
         string errorCategory,
-        string message)
+        Exception exception,
+        string outputDirectory)
     {
         var finishedAt = DateTimeOffset.Now;
         report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Failed, 100, finishedAt - startedAt, errorCategory));
@@ -158,8 +160,12 @@ public sealed class SummaryStageRunner(
             (finishedAt - startedAt).TotalSeconds,
             errorCategory: errorCategory);
         jobRepository.MarkSummaryFailed(job, errorCategory);
-        jobLogRepository.AddEvent(job.JobId, "summary", "error", $"{errorCategory}: {message}");
-        report(new JobRunUpdate(RefreshJobViews: true, RefreshLogs: true, LatestLog: $"Summary failed ({errorCategory}): {message}"));
+        jobLogRepository.AddEvent(
+            job.JobId,
+            "summary",
+            "error",
+            JobLogDiagnostics.FormatException(errorCategory, exception, outputDirectory));
+        report(new JobRunUpdate(RefreshJobViews: true, RefreshLogs: true, LatestLog: $"Summary failed ({errorCategory}): {exception.Message}"));
     }
 
     private string ResolveReviewModelId()

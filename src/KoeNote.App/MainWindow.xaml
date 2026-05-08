@@ -266,7 +266,43 @@
                             <controls:ModelCatalogTab />
                         </TabItem>
                         <TabItem Header="ログ">
-                            <controls:LogEntriesTab />
+                            <DockPanel>
+                                <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="範囲" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <ComboBox Width="160"
+                                                  ItemsSource="{Binding DiagnosticLogScopes}"
+                                                  SelectedItem="{Binding SelectedDiagnosticLogScope, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2"
+                                            Margin="8,0,0,0"
+                                            Padding="10,6"
+                                            Command="{Binding OpenLogFolderCommand}"
+                                            ToolTip="ローカルログフォルダを開きます">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8B7;" Style="{StaticResource IconText}" />
+                                            <TextBlock Text="フォルダ" FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="3"
+                                            Margin="8,0,0,0"
+                                            Padding="10,6"
+                                            Command="{Binding ExportLogsCommand}"
+                                            ToolTip="診断パッケージを出力します">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE74E;" Style="{StaticResource IconText}" />
+                                            <TextBlock Text="ログ出力" FontSize="12" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <controls:LogEntriesTab />
+                            </DockPanel>
                         </TabItem>
                     </TabControl>
                 </DockPanel>

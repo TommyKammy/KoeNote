@@ -1,5 +1,6 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services.Audio;
+using System.IO;
 
 namespace KoeNote.App.Services.Jobs;
 
@@ -40,7 +41,14 @@ public sealed class PreprocessStageRunner(
             report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Failed, 100));
             jobRepository.MarkPreprocessFailed(job, "ffmpeg_failed");
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "preprocess", "error", exception.Message);
+            jobLogRepository.AddEvent(
+                job.JobId,
+                "preprocess",
+                "error",
+                JobLogDiagnostics.FormatException(
+                    "ffmpeg_failed",
+                    exception,
+                    Path.Combine(paths.Jobs, job.JobId, "logs", "preprocess.log")));
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: exception.Message));
             return null;
         }

@@ -101,4 +101,78 @@ public sealed class JobLogRepository(AppPaths paths)
         return entries;
     }
 
+    public IReadOnlyList<JobLogEntry> ReadForJob(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return [];
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT created_at, level, COALESCE(stage, ''), message
+            FROM job_log_events
+            WHERE job_id = $job_id
+            ORDER BY created_at ASC;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+
+        using var reader = command.ExecuteReader();
+        var entries = new List<JobLogEntry>();
+        while (reader.Read())
+        {
+            entries.Add(new JobLogEntry(
+                DateTimeOffset.Parse(reader.GetString(0)),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3)));
+        }
+
+        return entries;
+    }
+
+    public IReadOnlyList<DiagnosticLogEntry> ReadForDiagnostics(string? jobId, int limit = 500)
+    {
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            command.CommandText = """
+                SELECT created_at, job_id, level, COALESCE(stage, ''), message
+                FROM job_log_events
+                ORDER BY created_at DESC
+                LIMIT $limit;
+                """;
+        }
+        else
+        {
+            command.CommandText = """
+                SELECT created_at, job_id, level, COALESCE(stage, ''), message
+                FROM job_log_events
+                WHERE job_id = $job_id
+                ORDER BY created_at DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$job_id", jobId);
+        }
+
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        var entries = new List<DiagnosticLogEntry>();
+        while (reader.Read())
+        {
+            entries.Add(new DiagnosticLogEntry(
+                DateTimeOffset.Parse(reader.GetString(0)),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4)));
+        }
+
+        entries.Reverse();
+        return entries;
+    }
+
 }

@@ -24,6 +24,7 @@ public sealed class ReviewStageRunner(
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.Now;
+        var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "review");
         report(new JobRunUpdate(JobRunStage.Review, JobRunStageState.Running, 10));
         jobRepository.MarkReviewRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true));
@@ -32,7 +33,6 @@ public sealed class ReviewStageRunner(
 
         try
         {
-            var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "review");
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId();
             var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
@@ -119,7 +119,11 @@ public sealed class ReviewStageRunner(
                 errorCategory: exception.Category.ToString());
             jobRepository.MarkReviewFailed(job, exception.Category.ToString());
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "review", "error", $"{exception.Category}: {exception.Message}");
+            jobLogRepository.AddEvent(
+                job.JobId,
+                "review",
+                "error",
+                JobLogDiagnostics.FormatException(exception.Category.ToString(), exception, outputDirectory));
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review failed ({exception.Category}): {exception.Message}"));
             return false;
         }
@@ -138,7 +142,11 @@ public sealed class ReviewStageRunner(
                 errorCategory: ReviewFailureCategory.Unknown.ToString());
             jobRepository.MarkReviewFailed(job, ReviewFailureCategory.Unknown.ToString());
             report(new JobRunUpdate(RefreshJobViews: true));
-            jobLogRepository.AddEvent(job.JobId, "review", "error", $"{ReviewFailureCategory.Unknown}: {exception.Message}");
+            jobLogRepository.AddEvent(
+                job.JobId,
+                "review",
+                "error",
+                JobLogDiagnostics.FormatException(ReviewFailureCategory.Unknown.ToString(), exception, outputDirectory));
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review failed ({ReviewFailureCategory.Unknown}): {exception.Message}"));
             return false;
         }
