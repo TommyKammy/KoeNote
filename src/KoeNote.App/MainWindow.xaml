@@ -40,7 +40,9 @@
                 </Grid.LayoutTransform>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4*" MinWidth="176" />
+                    <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="15*" MinWidth="540" />
+                    <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="6*" MinWidth="300" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -48,11 +50,17 @@
                     <RowDefinition Height="144" MinHeight="132" />
                 </Grid.RowDefinitions>
 
-                <controls:JobListPanel Grid.RowSpan="2" Grid.Column="0" Margin="0,0,8,0" />
-                <controls:TranscriptPanel Grid.Column="1" Grid.Row="0" Margin="0,0,8,8" />
-                <controls:ReviewPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,8" />
-                <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="1" Margin="0,0,8,0" />
-                <controls:StageProgressPanel Grid.Column="2" Grid.Row="1" />
+                <controls:JobListPanel Grid.RowSpan="2" Grid.Column="0" />
+                <GridSplitter Grid.RowSpan="2"
+                              Grid.Column="1"
+                              Style="{StaticResource ModernVerticalGridSplitter}" />
+                <controls:TranscriptPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,8" />
+                <GridSplitter Grid.RowSpan="2"
+                              Grid.Column="3"
+                              Style="{StaticResource ModernVerticalGridSplitter}" />
+                <controls:ReviewPanel Grid.Column="4" Grid.Row="0" Margin="0,0,0,8" />
+                <controls:TranscriptAudioPlayer Grid.Column="2" Grid.Row="1" />
+                <controls:StageProgressPanel Grid.Column="4" Grid.Row="1" />
             </Grid>
         </ScrollViewer>
 

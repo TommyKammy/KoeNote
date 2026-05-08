@@ -22,4 +22,9 @@ public partial class JobListPanel : UserControl
         viewModel.AddAudioCommand.Execute(null);
         e.Handled = true;
     }
+
+    private void OnJobSearchBoxPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        JobSearchTextBox.Focus();
+    }
 }

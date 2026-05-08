@@ -81,9 +81,10 @@
                     <Grid Width="220"
                           Height="38"
                           Margin="0,0,8,0">
-                        <TextBox Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox x:Name="SegmentSearchTextBox"
+                                 Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  Height="38"
-                                 Padding="34,0,12,0"
+                                 Padding="10,0,34,0"
                                  VerticalContentAlignment="Center"
                                  ToolTip="発話内容を検索" />
                         <TextBlock Text="&#xE721;"
@@ -93,7 +94,35 @@
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Left"
                                    Margin="12,0,0,0"
-                                   IsHitTestVisible="False" />
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="" />
+                                                <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=SegmentSearchTextBox}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Button Content="x"
+                                Command="{Binding ClearSegmentSearchCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SearchClearButton}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                     </Grid>
                     <ComboBox Style="{StaticResource ToolbarComboBox}"
                               ItemsSource="{Binding SpeakerFilters}"

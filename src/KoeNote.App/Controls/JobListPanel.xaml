@@ -20,17 +20,50 @@
                         ToolTip="ジョブ一覧をクリア履歴へ移動" />
             </Grid>
 
-            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Grid DockPanel.Dock="Top"
+                  Margin="0,0,0,12"
+                  Background="Transparent"
+                  PreviewMouseLeftButtonDown="OnJobSearchBoxPreviewMouseLeftButtonDown">
+                <TextBox x:Name="JobSearchTextBox"
+                         Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10,7,34,7"
+                         MinHeight="34"
+                         ToolTip="ジョブ名で検索" />
                 <TextBlock Text="&#xE721;"
                            FontFamily="Segoe MDL2 Assets"
                            Foreground="{StaticResource MutedBrush}"
                            Margin="12,0,0,0"
                            VerticalAlignment="Center"
-                           Panel.ZIndex="1" />
-                <TextBox Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}"
-                         Padding="32,7,10,7"
-                         MinHeight="34"
-                         ToolTip="ジョブ名で検索" />
+                           IsHitTestVisible="False"
+                           Panel.ZIndex="1">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Text, ElementName=JobSearchTextBox}" Value="" />
+                                        <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=JobSearchTextBox}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Content="x"
+                        Command="{Binding ClearJobSearchCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SearchClearButton}">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=JobSearchTextBox}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </Grid>
 
             <TabControl Style="{StaticResource CardTabControl}">

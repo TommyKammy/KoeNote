@@ -85,7 +85,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="整文・要約"
+                        <TextBlock Text="整文"
                                    Style="{StaticResource SectionTitle}"
                                    Margin="0,0,0,4" />
                         <TextBlock Text="{Binding SummaryStatus}"
@@ -204,14 +204,22 @@
                 </StackPanel>
             </Border>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          Padding="18">
-                <StackPanel>
-                    <Border BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="0,0,0,1"
-                            Padding="0,0,0,16"
-                            Margin="0,0,0,16">
-                        <StackPanel>
+            <Grid Margin="18">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="3*" MinHeight="160" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="2*" MinHeight="140" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="2"
+                          Margin="0,8,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0">
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -220,13 +228,41 @@
                                 <TextBlock Text="要約"
                                            FontWeight="SemiBold"
                                            VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1"
-                                           Text="生成中"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="本文が更新されています"
+                                               Foreground="{StaticResource WarningBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSummaryStale}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="生成中"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0"
+                                               Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
+                                    <Button Command="{Binding RunPostSummaryCommand}"
+                                            Content="{Binding SummaryActionText}"
+                                            ToolTip="{Binding SummaryActionToolTip}"
+                                            MinWidth="118"
+                                            Height="34"
+                                            Padding="12,5"
+                                            Style="{StaticResource OutlineSuccessButton}" />
+                                </StackPanel>
                             </Grid>
 
                             <Border Background="#FAFBFC"
@@ -239,27 +275,36 @@
                                     <TextBlock Text="要約はまだありません"
                                                FontWeight="SemiBold"
                                                Margin="0,0,0,6" />
-                                    <TextBlock Text="要約ステージを有効にして実行すると、ここに要約が表示されます。"
+                                    <TextBlock Text="整文結果を確認してから、要約を生成してください。"
                                                Style="{StaticResource MutedText}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
 
-                            <TextBox Text="{Binding SummaryContentDisplay, Mode=OneWay}"
-                                     IsReadOnly="True"
-                                     TextWrapping="Wrap"
-                                     AcceptsReturn="True"
-                                     VerticalScrollBarVisibility="Auto"
-                                     MinHeight="128"
-                                     MaxHeight="260"
-                                     BorderThickness="0"
-                                     Background="#FAFBFC"
-                                     Padding="12"
-                                     Style="{StaticResource VisibleWhenSummaryStyle}" />
                         </StackPanel>
-                    </Border>
 
-                    <Border Style="{StaticResource VisibleWhenNoDraftStyle}"
+                        <TextBox Grid.Row="1"
+                                 Text="{Binding SummaryContentDisplay, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="128"
+                                 BorderThickness="0"
+                                 Background="#FAFBFC"
+                                 Padding="12"
+                                 Style="{StaticResource VisibleWhenSummaryStyle}" />
+                    </Grid>
+
+                    <GridSplitter Grid.Row="1"
+                                  Style="{StaticResource ModernHorizontalGridSplitter}" />
+
+                    <ScrollViewer Grid.Row="0"
+                                  Margin="0,0,0,10"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                    <Border Grid.Row="0"
+                            Style="{StaticResource VisibleWhenNoDraftStyle}"
                             Background="#FAFBFC"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1"
@@ -275,7 +320,8 @@
                         </StackPanel>
                     </Border>
 
-                    <StackPanel Style="{StaticResource VisibleWhenDraftStyle}">
+                    <StackPanel Grid.Row="0"
+                                Style="{StaticResource VisibleWhenDraftStyle}">
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -400,8 +446,10 @@
                                   Margin="0,0,0,18"
                                   Foreground="{StaticResource MutedBrush}" />
                     </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
         </DockPanel>
     </Border>
 </UserControl>

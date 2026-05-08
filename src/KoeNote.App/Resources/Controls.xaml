@@ -5,6 +5,7 @@
         <ResourceDictionary Source="ScrollBars.xaml" />
         <ResourceDictionary Source="Inputs.xaml" />
         <ResourceDictionary Source="Tabs.xaml" />
+        <ResourceDictionary Source="Splitters.xaml" />
         <ResourceDictionary Source="Lists.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
