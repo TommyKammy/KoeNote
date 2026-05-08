@@ -130,80 +130,6 @@
                 </Grid>
             </Border>
 
-            <Border DockPanel.Dock="Bottom"
-                    Padding="14"
-                    BorderBrush="{StaticResource BorderBrushSoft}"
-                    BorderThickness="0,1,0,0"
-                    Background="#FFFFFF"
-                    Style="{StaticResource VisibleWhenDraftStyle}">
-                <StackPanel>
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="この候補への操作"
-                                   Style="{StaticResource ReviewSubheading}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1"
-                                   Text="保存中..."
-                                   Foreground="{StaticResource AccentBrush}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"
-                                   Style="{StaticResource VisibleWhenReviewOperationStyle}" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button Style="{StaticResource ReviewApplyButton}"
-                                Command="{Binding AcceptDraftCommand}"
-                                ToolTip="整文候補を整文へ反映して、次の候補へ進みます">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                <TextBlock Text="適用"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Button>
-
-                        <Button Grid.Column="2"
-                                Style="{StaticResource ReviewSecondaryButton}"
-                                Command="{Binding RejectDraftCommand}"
-                                ToolTip="この候補を反映せず、次の候補へ進みます">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
-                                <TextBlock Text="却下"
-                                           Foreground="{StaticResource DangerBrush}"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Button>
-
-                        <Button Grid.Column="4"
-                                Style="{StaticResource ReviewSecondaryButton}"
-                                Command="{Binding ApplyManualEditCommand}"
-                                ToolTip="編集欄の内容を手修正として適用します">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}" Foreground="{StaticResource TextBrush}" />
-                                <TextBlock Text="手修正"
-                                           Foreground="{StaticResource TextBrush}"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
             <Grid Margin="18">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -299,30 +225,36 @@
                     <GridSplitter Grid.Row="1"
                                   Style="{StaticResource ModernHorizontalGridSplitter}" />
 
-                    <ScrollViewer Grid.Row="0"
-                                  Margin="0,0,0,10"
-                                  VerticalScrollBarVisibility="Auto">
-                        <Grid>
-                    <Border Grid.Row="0"
-                            Style="{StaticResource VisibleWhenNoDraftStyle}"
-                            Background="#FAFBFC"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="16">
-                        <StackPanel>
-                            <TextBlock Text="整文候補はありません"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,6" />
-                            <TextBlock Text="整文が生成済みの場合は中央の整文タブで確認できます。必要な確認候補がある場合だけ、ここに候補が表示されます。"
-                                       Style="{StaticResource MutedText}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
+                    <Grid Grid.Row="0"
+                          Margin="0,0,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0"
-                                Style="{StaticResource VisibleWhenDraftStyle}">
-                        <Grid Margin="0,0,0,10">
+                        <ScrollViewer Grid.Row="0"
+                                      VerticalScrollBarVisibility="Auto">
+                            <Grid>
+                                <Border Grid.Row="0"
+                                        Style="{StaticResource VisibleWhenNoDraftStyle}"
+                                        Background="#FAFBFC"
+                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="整文候補はありません"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,6" />
+                                        <TextBlock Text="整文が生成済みの場合は中央の整文タブで確認できます。必要な確認候補がある場合だけ、ここに候補が表示されます。"
+                                                   Style="{StaticResource MutedText}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <StackPanel Grid.Row="0"
+                                            Style="{StaticResource VisibleWhenDraftStyle}">
+                                    <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -441,13 +373,89 @@
                                    LineHeight="21"
                                    Margin="0,5,0,18" />
 
-                        <CheckBox Content="この修正を今後の候補に使う"
-                                  IsChecked="{Binding RememberCorrection}"
-                                  Margin="0,0,0,18"
-                                  Foreground="{StaticResource MutedBrush}" />
-                    </StackPanel>
-                        </Grid>
-                    </ScrollViewer>
+                                    <CheckBox Content="この修正を今後の候補に使う"
+                                              IsChecked="{Binding RememberCorrection}"
+                                              Margin="0,0,0,18"
+                                              Foreground="{StaticResource MutedBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="1"
+                                Margin="0,10,0,0"
+                                Padding="14"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="0,1,0,0"
+                                Background="#FFFFFF"
+                                Style="{StaticResource VisibleWhenDraftStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="この候補への操作"
+                                               Style="{StaticResource ReviewSubheading}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="保存中..."
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource VisibleWhenReviewOperationStyle}" />
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Style="{StaticResource ReviewApplyButton}"
+                                            Command="{Binding AcceptDraftCommand}"
+                                            ToolTip="整文候補を整文へ反映して、次の候補へ進みます">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                            <TextBlock Text="適用"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Grid.Column="2"
+                                            Style="{StaticResource ReviewSecondaryButton}"
+                                            Command="{Binding RejectDraftCommand}"
+                                            ToolTip="この候補を反映せず、次の候補へ進みます">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
+                                            <TextBlock Text="却下"
+                                                       Foreground="{StaticResource DangerBrush}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Grid.Column="4"
+                                            Style="{StaticResource ReviewSecondaryButton}"
+                                            Command="{Binding ApplyManualEditCommand}"
+                                            ToolTip="編集欄の内容を手修正として適用します">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}" Foreground="{StaticResource TextBrush}" />
+                                            <TextBlock Text="手修正"
+                                                       Foreground="{StaticResource TextBrush}"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Grid>
         </DockPanel>
