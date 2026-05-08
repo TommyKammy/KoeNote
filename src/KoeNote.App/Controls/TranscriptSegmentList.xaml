@@ -240,25 +240,25 @@
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
                                         Style="{StaticResource VisibleWhenPolishedTranscriptMode}">
-                                <Button Width="32"
-                                        Height="32"
+                                <Button Width="24"
+                                        Height="24"
                                         Padding="0"
-                                        Margin="6,0,0,0"
+                                        Margin="4,0,0,0"
                                         ToolTip="セグメントを編集"
                                         Command="{Binding DataContext.BeginSegmentInlineEditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}">
-                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
+                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
                                 </Button>
-                                <Button Width="32"
-                                        Height="32"
+                                <Button Width="24"
+                                        Height="24"
                                         Padding="0"
-                                        Margin="6,0,0,0"
+                                        Margin="4,0,0,0"
                                         Tag="InlineSegmentRevertButton"
                                         ToolTip="編集前に戻す"
                                         PreviewMouseDown="OnInlineSegmentRevertPreviewMouseDown"
                                         Command="{Binding DataContext.RevertSegmentEditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}">
-                                    <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
+                                    <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
                                 </Button>
                             </StackPanel>
                         </Grid>

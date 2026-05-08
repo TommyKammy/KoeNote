@@ -169,8 +169,144 @@
         </Style>
 
         <Style x:Key="HeaderExportMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="MinWidth" Value="178" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="ItemChrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock x:Name="CheckMark"
+                                               Text="&#xE73E;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="11"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed" />
+                                    <ContentPresenter Grid.Column="1"
+                                                      ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,14,0" />
+                                    <TextBlock x:Name="SubmenuArrow"
+                                               Grid.Column="2"
+                                               Text="&#xE76C;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="10"
+                                               Foreground="{StaticResource HeaderInfoValueBrush}"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed" />
+                                </Grid>
+                            </Border>
+
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Right"
+                                   PopupAnimation="Fade">
+                                <Border Background="#FFFFFF"
+                                        BorderBrush="#DDE5EE"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="6"
+                                        Margin="4,0,0,0"
+                                        SnapsToDevicePixels="True">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="18"
+                                                          ShadowDepth="3"
+                                                          Opacity="0.14"
+                                                          Color="#111827" />
+                                    </Border.Effect>
+                                    <StackPanel IsItemsHost="True"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#F8FAFC" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="#E5EAF0" />
+                            </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#F1F5F9" />
+                                <Setter TargetName="ItemChrome" Property="BorderBrush" Value="#DDE5EE" />
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="True">
+                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HeaderDropdownMenu" TargetType="ContextMenu">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#DDE5EE" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="20"
+                                                  ShadowDepth="4"
+                                                  Opacity="0.16"
+                                                  Color="#111827" />
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="HeaderMenuSeparator" TargetType="Separator">
+            <Setter Property="Margin" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1"
+                                Background="{StaticResource HeaderSeparatorBrush}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
@@ -203,7 +339,8 @@
                         Click="OnRunMenuButtonClick"
                         ToolTip="後から処理を実行">
                     <Button.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                     Style="{StaticResource HeaderDropdownMenu}">
                             <MenuItem Header="整文を実行"
                                       Command="{Binding RunPostReviewCommand}"
                                       IsEnabled="{Binding CanRunPostReview}"
@@ -272,7 +409,8 @@
                         Click="OnExportMenuButtonClick"
                         ToolTip="エクスポートメニュー">
                     <Button.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                     Style="{StaticResource HeaderDropdownMenu}">
                             <MenuItem Header="素起こし" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="TXT" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
@@ -290,12 +428,12 @@
                                 <MenuItem Header="Markdown" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="TXT" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
-                            <Separator />
+                            <Separator Style="{StaticResource HeaderMenuSeparator}" />
                             <MenuItem Header="タイムスタンプを含める"
                                       IsCheckable="True"
                                       IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
                                       Style="{StaticResource HeaderExportMenuItem}" />
-                            <Separator />
+                            <Separator Style="{StaticResource HeaderMenuSeparator}" />
                             <MenuItem Header="出力フォルダーを開く"
                                       Command="{Binding OpenExportFolderCommand}"
                                       Style="{StaticResource HeaderExportMenuItem}" />

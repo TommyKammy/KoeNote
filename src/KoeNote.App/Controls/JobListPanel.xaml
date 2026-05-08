@@ -33,9 +33,9 @@
                          ToolTip="ジョブ名で検索" />
             </Grid>
 
-            <TabControl>
+            <TabControl Style="{StaticResource CardTabControl}">
                 <TabItem Header="一覧">
-                    <DockPanel Margin="0,10,0,0">
+                    <DockPanel>
                         <TextBlock DockPanel.Dock="Top"
                                    Text="{Binding JobCountSummary}"
                                    Style="{StaticResource MutedText}"
@@ -164,7 +164,7 @@
                 </TabItem>
 
                 <TabItem Header="クリア履歴">
-                    <DockPanel Margin="0,10,0,0">
+                    <DockPanel>
                         <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
