@@ -31,9 +31,6 @@ public sealed record AsrEngineOption(string EngineId, string DisplayName)
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private const string DefaultSelectableAsrEngineId = "faster-whisper-large-v3-turbo";
-    private const double MinMainContentZoomScale = 0.9;
-    private const double MaxMainContentZoomScale = 1.5;
-    private static readonly double[] MainContentZoomSteps = [0.9, 1.0, 1.1, 1.25, 1.5];
 
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
@@ -47,6 +44,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptEditService _transcriptEditService;
     private readonly CorrectionMemoryService _correctionMemoryService;
     private readonly TranscriptExportService _transcriptExportService;
+    private readonly TranscriptExportDialogService _transcriptExportDialogService;
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
     private readonly ModelDownloadJobRepository _modelDownloadJobRepository;
@@ -63,7 +61,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateDownloadService _updateDownloadService;
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
     private readonly IUpdateHistoryService _updateHistoryService;
-    private readonly UiPreferencesService _uiPreferencesService;
+    private readonly MainContentZoomState _mainContentZoomState;
     private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
@@ -141,7 +139,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _enableSummaryStage;
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
-    private double _mainContentZoomScale = 1.0;
     private bool _isSegmentInlineEditActive;
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
@@ -176,6 +173,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptEditService = services.TranscriptEditService;
         _correctionMemoryService = services.CorrectionMemoryService;
         _transcriptExportService = services.TranscriptExportService;
+        _transcriptExportDialogService = new TranscriptExportDialogService();
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
         _modelDownloadJobRepository = services.ModelDownloadJobRepository;
@@ -201,10 +199,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
         _updateHistoryService = services.UpdateHistoryService;
         _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
-        _uiPreferencesService = new UiPreferencesService(paths);
+        _mainContentZoomState = new MainContentZoomState(paths);
         var currentApplication = System.Windows.Application.Current;
         _shutdownApplication = currentApplication is null ? (() => { }) : currentApplication.Shutdown;
-        _mainContentZoomScale = NormalizeZoomScale(_uiPreferencesService.Load().MainContentZoomScale);
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
         _statusRefreshTimer = new DispatcherTimer
         {
@@ -342,7 +339,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
         ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
         ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);
-        ResetZoomCommand = new RelayCommand(ResetZoomAsync, () => Math.Abs(MainContentZoomScale - 1.0) > 0.001);
+        ResetZoomCommand = new RelayCommand(ResetZoomAsync, () => _mainContentZoomState.CanReset);
         RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
         CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
         DownloadUpdateCommand = new RelayCommand(DownloadUpdateAsync, CanDownloadUpdate);
@@ -1608,27 +1605,21 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public double MainContentZoomScale
     {
-        get => _mainContentZoomScale;
+        get => _mainContentZoomState.Scale;
         private set
         {
-            var normalized = NormalizeZoomScale(value);
-            if (Math.Abs(_mainContentZoomScale - normalized) < 0.001)
+            if (!_mainContentZoomState.SetScale(value))
             {
                 return;
             }
 
-            _mainContentZoomScale = normalized;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(MainContentZoomPercentText));
-            OnPropertyChanged(nameof(MainContentZoomToolTip));
-            UpdateZoomCommandStates();
-            _uiPreferencesService.Save(new UiPreferences(_mainContentZoomScale));
+            NotifyMainContentZoomChanged();
         }
     }
 
-    public string MainContentZoomPercentText => $"{MainContentZoomScale * 100:0}%";
+    public string MainContentZoomPercentText => _mainContentZoomState.PercentText;
 
-    public string MainContentZoomToolTip => $"表示倍率 {MainContentZoomPercentText}";
+    public string MainContentZoomToolTip => _mainContentZoomState.ToolTip;
 
     public string AsrContextText
     {
@@ -1858,30 +1849,50 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     private Task ZoomOutAsync()
     {
-        MainContentZoomScale = GetPreviousZoomStep(MainContentZoomScale);
+        if (_mainContentZoomState.ZoomOut())
+        {
+            NotifyMainContentZoomChanged();
+        }
+
         return Task.CompletedTask;
     }
 
     private Task ZoomInAsync()
     {
-        MainContentZoomScale = GetNextZoomStep(MainContentZoomScale);
+        if (_mainContentZoomState.ZoomIn())
+        {
+            NotifyMainContentZoomChanged();
+        }
+
         return Task.CompletedTask;
     }
 
     private Task ResetZoomAsync()
     {
-        MainContentZoomScale = 1.0;
+        if (_mainContentZoomState.Reset())
+        {
+            NotifyMainContentZoomChanged();
+        }
+
         return Task.CompletedTask;
     }
 
     private bool CanZoomOut()
     {
-        return MainContentZoomScale > MinMainContentZoomScale + 0.001;
+        return _mainContentZoomState.CanZoomOut;
     }
 
     private bool CanZoomIn()
     {
-        return MainContentZoomScale < MaxMainContentZoomScale - 0.001;
+        return _mainContentZoomState.CanZoomIn;
+    }
+
+    private void NotifyMainContentZoomChanged()
+    {
+        OnPropertyChanged(nameof(MainContentZoomScale));
+        OnPropertyChanged(nameof(MainContentZoomPercentText));
+        OnPropertyChanged(nameof(MainContentZoomToolTip));
+        UpdateZoomCommandStates();
     }
 
     private void UpdateZoomCommandStates()
@@ -1902,25 +1913,4 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    private static double GetPreviousZoomStep(double current)
-    {
-        var normalized = NormalizeZoomScale(current);
-        return MainContentZoomSteps.LastOrDefault(step => step < normalized - 0.001, MinMainContentZoomScale);
-    }
-
-    private static double GetNextZoomStep(double current)
-    {
-        var normalized = NormalizeZoomScale(current);
-        return MainContentZoomSteps.FirstOrDefault(step => step > normalized + 0.001, MaxMainContentZoomScale);
-    }
-
-    private static double NormalizeZoomScale(double value)
-    {
-        if (double.IsNaN(value) || double.IsInfinity(value))
-        {
-            return 1.0;
-        }
-
-        return Math.Clamp(value, MinMainContentZoomScale, MaxMainContentZoomScale);
-    }
 }

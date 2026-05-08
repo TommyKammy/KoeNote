@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 using KoeNote.App.Services.Export;
-using Microsoft.Win32;
 
 namespace KoeNote.App.ViewModels;
 
@@ -35,26 +34,17 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        var dialog = new SaveFileDialog
-        {
-            Title = $"{GetExportSourceDisplayName(source)}を出力",
-            AddExtension = true,
-            OverwritePrompt = true,
-            FileName = GetDefaultExportFileName(format ?? TranscriptExportFormat.Text, source),
-            Filter = CreateExportFilter(format),
-            FilterIndex = 1,
-            DefaultExt = GetExtension(format ?? TranscriptExportFormat.Text)
-        };
-
-        dialog.InitialDirectory = GetOpenableExportFolder();
-
-        if (dialog.ShowDialog() != true)
+        var selection = _transcriptExportDialogService.SelectExportFile(
+            SelectedJob.FileName,
+            GetOpenableExportFolder(),
+            format,
+            source);
+        if (selection is null)
         {
             return Task.CompletedTask;
         }
 
-        var selectedFormat = format ?? GetFormatFromFilterIndex(dialog.FilterIndex);
-        ExportSelectedJobToFile(EnsureExtension(dialog.FileName, selectedFormat), selectedFormat, source);
+        ExportSelectedJobToFile(selection.FilePath, selection.Format, selection.Source);
         return Task.CompletedTask;
     }
 
@@ -79,13 +69,13 @@ public sealed partial class MainWindowViewModel
                 new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
-            LatestLog = $"{GetExportSourceDisplayName(source)}を出力しました: {string.Join(", ", result.FilePaths)}";
+            LatestLog = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}を出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"{GetExportSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
+            ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
             RefreshLogs();
@@ -117,13 +107,13 @@ public sealed partial class MainWindowViewModel
                 new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
-            LatestLog = $"{GetExportSourceDisplayName(source)}を{result.FilePaths.Count}件出力しました: {string.Join(", ", result.FilePaths)}";
+            LatestLog = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}を{result.FilePaths.Count}件出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"{GetExportSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
+            ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(SelectedJob.JobId, "export", "error", exception.Message);
             RefreshLogs();
@@ -165,101 +155,11 @@ public sealed partial class MainWindowViewModel
         return Path.Combine(documents, "KoeNote", "Exports");
     }
 
-    private string GetDefaultExportFileName(TranscriptExportFormat format)
-    {
-        return GetDefaultExportFileName(format, TranscriptExportSource.Polished);
-    }
-
-    private string GetDefaultExportFileName(TranscriptExportFormat format, TranscriptExportSource source)
-    {
-        var baseName = SelectedJob is null
-            ? "transcript"
-            : Path.GetFileNameWithoutExtension(SelectedJob.FileName);
-        if (string.IsNullOrWhiteSpace(baseName))
-        {
-            baseName = "transcript";
-        }
-
-        var suffix = source switch
-        {
-            TranscriptExportSource.Raw => ".raw",
-            TranscriptExportSource.Polished => ".polished",
-            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
-        };
-        return $"{baseName}{suffix}.{GetExtension(format)}";
-    }
-
-    private static string CreateExportFilter(TranscriptExportFormat? format)
-    {
-        return format is null
-            ? "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|JSON (*.json)|*.json|SRT subtitles (*.srt)|*.srt|WebVTT subtitles (*.vtt)|*.vtt|Word document (*.docx)|*.docx"
-            : $"{GetFilterLabel(format.Value)} (*.{GetExtension(format.Value)})|*.{GetExtension(format.Value)}";
-    }
-
-    private static TranscriptExportFormat GetFormatFromFilterIndex(int filterIndex)
-    {
-        return filterIndex switch
-        {
-            2 => TranscriptExportFormat.Markdown,
-            3 => TranscriptExportFormat.Json,
-            4 => TranscriptExportFormat.Srt,
-            5 => TranscriptExportFormat.Vtt,
-            6 => TranscriptExportFormat.Docx,
-            _ => TranscriptExportFormat.Text
-        };
-    }
-
-    private static string GetFilterLabel(TranscriptExportFormat format)
-    {
-        return format switch
-        {
-            TranscriptExportFormat.Text => "Text document",
-            TranscriptExportFormat.Markdown => "Markdown",
-            TranscriptExportFormat.Json => "JSON",
-            TranscriptExportFormat.Srt => "SRT subtitles",
-            TranscriptExportFormat.Vtt => "WebVTT subtitles",
-            TranscriptExportFormat.Docx => "Word document",
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
-        };
-    }
-
-    private static string GetExportSourceDisplayName(TranscriptExportSource source)
-    {
-        return source switch
-        {
-            TranscriptExportSource.Raw => "素起こし",
-            TranscriptExportSource.Polished => "整文",
-            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
-        };
-    }
-
     private static string CreateExportWarning(TranscriptExportResult result)
     {
         return result.HasUnresolvedDrafts
             ? $"未処理の整文候補が{result.PendingDraftCount}件残っています。確認用として出力しました。"
             : string.Empty;
-    }
-
-    private static string GetExtension(TranscriptExportFormat format)
-    {
-        return format switch
-        {
-            TranscriptExportFormat.Text => "txt",
-            TranscriptExportFormat.Markdown => "md",
-            TranscriptExportFormat.Json => "json",
-            TranscriptExportFormat.Srt => "srt",
-            TranscriptExportFormat.Vtt => "vtt",
-            TranscriptExportFormat.Docx => "docx",
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
-        };
-    }
-
-    private static string EnsureExtension(string path, TranscriptExportFormat format)
-    {
-        var extension = "." + GetExtension(format);
-        return string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase)
-            ? path
-            : Path.ChangeExtension(path, extension);
     }
 
     private void UpdateExportCommandStates()
