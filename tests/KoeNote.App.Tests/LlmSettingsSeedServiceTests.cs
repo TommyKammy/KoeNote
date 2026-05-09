@@ -163,6 +163,49 @@ public sealed class LlmSettingsSeedServiceTests
     }
 
     [Fact]
+    public void EnsureActiveProfileFromSetup_SwitchesSetupManagedProfileWhenSetupSelectionChanges()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        new SetupStateService(paths).Save(SetupState.Default(paths.DefaultModelStorageRoot) with
+        {
+            SelectedReviewModelId = "bonsai-8b-q1-0",
+            SelectedModelPresetId = "ultra_lightweight"
+        });
+        var repository = new LlmSettingsRepository(paths);
+        repository.UpsertProfile(
+            new LlmRuntimeProfile(
+                "builtin:gemma-4-e4b-it-q4-k-m:gemma:balanced",
+                "gemma-4-e4b-it-q4-k-m",
+                "gemma",
+                "Gemma 4 E4B it Q4_K_M",
+                "llama-cpp",
+                "runtime-llama-cpp",
+                "model.gguf",
+                "llama-completion.exe",
+                8192,
+                999,
+                null,
+                null,
+                true,
+                "markdown_section_only",
+                TimeSpan.FromHours(2)),
+            isActive: true,
+            source: "setup-state");
+        var service = CreateService(paths, repository);
+
+        var refreshed = service.EnsureActiveProfileFromSetup();
+
+        Assert.True(refreshed);
+        var active = repository.FindActiveProfile();
+        Assert.NotNull(active);
+        Assert.Equal("bonsai-8b-q1-0", active.Profile.ModelId);
+        Assert.Equal("builtin:bonsai-8b-q1-0:bonsai:conservative", active.Profile.ProfileId);
+        Assert.Contains(repository.ListTaskSettings(active.Profile.ProfileId), item =>
+            item.Settings.TaskKind == LlmTaskKind.Review &&
+            item.Settings.GenerationProfile == "bonsai-review-conservative");
+    }
+
+    [Fact]
     public void EnsureActiveProfileFromSetup_FallsBackToPresetWhenSelectedReviewModelIsUnsupported()
     {
         var paths = TestDatabase.CreateReadyPaths();

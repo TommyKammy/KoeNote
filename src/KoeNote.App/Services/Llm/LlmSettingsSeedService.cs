@@ -19,7 +19,7 @@ public sealed class LlmSettingsSeedService(
 
         if (!overwriteActive && activeProfile is not null)
         {
-            if (CanRefreshSetupManagedProfile(activeProfile, profile.ProfileId))
+            if (CanRefreshSetupManagedProfile(activeProfile))
             {
                 UpsertSetupProfileAndTasks(profile);
                 return true;
@@ -43,10 +43,9 @@ public sealed class LlmSettingsSeedService(
         }
     }
 
-    private static bool CanRefreshSetupManagedProfile(PersistedLlmRuntimeProfile activeProfile, string resolvedProfileId)
+    private static bool CanRefreshSetupManagedProfile(PersistedLlmRuntimeProfile activeProfile)
     {
-        return activeProfile.Source.Equals("setup-state", StringComparison.OrdinalIgnoreCase) &&
-            activeProfile.Profile.ProfileId.Equals(resolvedProfileId, StringComparison.OrdinalIgnoreCase);
+        return activeProfile.Source.Equals("setup-state", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveReviewModelId(ModelCatalog catalog, SetupState state)
