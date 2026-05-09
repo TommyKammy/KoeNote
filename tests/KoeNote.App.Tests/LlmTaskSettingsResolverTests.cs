@@ -72,11 +72,15 @@ public sealed class LlmTaskSettingsResolverTests
     }
 
     [Fact]
-    public void Resolve_UsesConservativeSummaryAndPolishingSettingsForBonsaiQ1()
+    public void Resolve_UsesConservativeSettingsForBonsaiQ1()
     {
+        var review = Resolve("bonsai-8b-q1-0", LlmTaskKind.Review);
         var summary = Resolve("bonsai-8b-q1-0", LlmTaskKind.Summary);
         var polishing = Resolve("bonsai-8b-q1-0", LlmTaskKind.Polishing);
 
+        Assert.Equal("bonsai-review-conservative", review.GenerationProfile);
+        Assert.Equal(4096, review.MaxTokens);
+        Assert.Equal(40, review.ChunkSegmentCount);
         Assert.Equal("bonsai-summary-conservative", summary.GenerationProfile);
         Assert.Equal("bonsai-compact", summary.PromptTemplateId);
         Assert.Equal(512, summary.MaxTokens);

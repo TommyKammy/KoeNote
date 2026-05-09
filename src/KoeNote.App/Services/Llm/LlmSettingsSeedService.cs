@@ -12,14 +12,28 @@ public sealed class LlmSettingsSeedService(
 {
     public bool EnsureActiveProfileFromSetup(bool overwriteActive = false)
     {
-        if (!overwriteActive && settingsRepository.FindActiveProfile() is not null)
-        {
-            return false;
-        }
-
         var catalog = modelCatalogService.LoadBuiltInCatalog();
         var modelId = ResolveReviewModelId(catalog, setupStateService.Load());
         var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+        var activeProfile = settingsRepository.FindActiveProfile();
+
+        if (!overwriteActive && activeProfile is not null)
+        {
+            if (CanRefreshSetupManagedProfile(activeProfile, profile.ProfileId))
+            {
+                UpsertSetupProfileAndTasks(profile);
+                return true;
+            }
+
+            return false;
+        }
+
+        UpsertSetupProfileAndTasks(profile);
+        return true;
+    }
+
+    private void UpsertSetupProfileAndTasks(LlmRuntimeProfile profile)
+    {
         settingsRepository.UpsertProfile(profile, isActive: true, source: "setup-state");
 
         var taskResolver = new LlmTaskSettingsResolver();
@@ -27,8 +41,12 @@ public sealed class LlmSettingsSeedService(
         {
             settingsRepository.UpsertTaskSettings(profile.ProfileId, taskResolver.Resolve(profile, taskKind));
         }
+    }
 
-        return true;
+    private static bool CanRefreshSetupManagedProfile(PersistedLlmRuntimeProfile activeProfile, string resolvedProfileId)
+    {
+        return activeProfile.Source.Equals("setup-state", StringComparison.OrdinalIgnoreCase) &&
+            activeProfile.Profile.ProfileId.Equals(resolvedProfileId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveReviewModelId(ModelCatalog catalog, SetupState state)

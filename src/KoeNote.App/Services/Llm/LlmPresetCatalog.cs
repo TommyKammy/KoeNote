@@ -77,6 +77,25 @@ public static class LlmPresetCatalog
                 ValidationMode: "json_parse");
         }
 
+        if (IsBonsai(modelId, family))
+        {
+            return new LlmTaskSettings(
+                LlmTaskKind.Review,
+                PromptTemplateId: "default",
+                PromptVersion: "current",
+                GenerationProfile: "bonsai-review-conservative",
+                Temperature: 0.1,
+                TopP: null,
+                TopK: null,
+                RepeatPenalty: null,
+                MaxTokens: 4096,
+                ChunkSegmentCount: 40,
+                ChunkOverlap: 0,
+                UseJsonSchema: true,
+                EnableRepair: true,
+                ValidationMode: "json_schema");
+        }
+
         return new LlmTaskSettings(
             LlmTaskKind.Review,
             PromptTemplateId: "default",

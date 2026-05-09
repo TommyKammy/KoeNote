@@ -30,6 +30,9 @@ public sealed class LlmSettingsSeedServiceTests
         var taskSettings = repository.ListTaskSettings(active.Profile.ProfileId);
         Assert.Equal(3, taskSettings.Count);
         Assert.Contains(taskSettings, item =>
+            item.Settings.TaskKind == LlmTaskKind.Review &&
+            item.Settings.GenerationProfile == "bonsai-review-conservative");
+        Assert.Contains(taskSettings, item =>
             item.Settings.TaskKind == LlmTaskKind.Summary &&
             item.Settings.GenerationProfile == "bonsai-summary-conservative");
     }
@@ -102,6 +105,61 @@ public sealed class LlmSettingsSeedServiceTests
         Assert.NotNull(active);
         Assert.Equal("gemma-4-e4b-it-q4-k-m", active.Profile.ModelId);
         Assert.Equal(3, repository.ListTaskSettings(active.Profile.ProfileId).Count);
+    }
+
+    [Fact]
+    public void EnsureActiveProfileFromSetup_RefreshesSetupManagedTaskSettings()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        new SetupStateService(paths).Save(SetupState.Default(paths.DefaultModelStorageRoot) with
+        {
+            SelectedReviewModelId = "bonsai-8b-q1-0",
+            SelectedModelPresetId = "ultra_lightweight"
+        });
+        var repository = new LlmSettingsRepository(paths);
+        var staleProfile = new LlmRuntimeProfile(
+            "builtin:bonsai-8b-q1-0:bonsai:conservative",
+            "bonsai-8b-q1-0",
+            "bonsai",
+            "Bonsai 8B Q1_0",
+            "llama-cpp",
+            "runtime-llama-cpp",
+            "model.gguf",
+            "llama-completion.exe",
+            8192,
+            999,
+            null,
+            null,
+            true,
+            "strict",
+            TimeSpan.FromHours(2));
+        repository.UpsertProfile(staleProfile, isActive: true, source: "setup-state");
+        repository.UpsertTaskSettings(
+            staleProfile.ProfileId,
+            new LlmTaskSettings(
+                LlmTaskKind.Review,
+                "default",
+                "current",
+                "fallback-review-balanced",
+                0.1,
+                null,
+                null,
+                null,
+                4096,
+                80,
+                0,
+                true,
+                true,
+                "json_schema"));
+        var service = CreateService(paths, repository);
+
+        var refreshed = service.EnsureActiveProfileFromSetup();
+
+        Assert.True(refreshed);
+        var reviewSettings = repository.FindTaskSettings(staleProfile.ProfileId, LlmTaskKind.Review);
+        Assert.NotNull(reviewSettings);
+        Assert.Equal("bonsai-review-conservative", reviewSettings.Settings.GenerationProfile);
+        Assert.Equal(40, reviewSettings.Settings.ChunkSegmentCount);
     }
 
     [Fact]
