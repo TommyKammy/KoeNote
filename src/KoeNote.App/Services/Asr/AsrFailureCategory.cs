@@ -6,6 +6,7 @@ public enum AsrFailureCategory
     MissingRuntime,
     MissingModel,
     MissingAudio,
+    CudaRuntimeMissing,
     ProcessFailed,
     JsonParseFailed,
     NoSegments

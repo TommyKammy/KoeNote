@@ -49,6 +49,7 @@ public sealed class AppPaths
         UpdateDownloads = Path.Combine(localAppData, "KoeNote", "updates");
         UpdateHistoryPath = Path.Combine(UpdateDownloads, "history.jsonl");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
+        AsrRuntimeDirectory = Path.Combine(RuntimeTools, "asr");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
         PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
         AsrPythonEnvironment = Path.Combine(PythonEnvironments, "asr");
@@ -66,6 +67,7 @@ public sealed class AppPaths
         ReviewRuntimeDirectory = Path.Combine(RuntimeTools, "review");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
         CudaReviewRuntimeMarkerPath = Path.Combine(ReviewRuntimeDirectory, ".koenote-cuda-review-runtime");
+        AsrCudaRuntimeMarkerPath = Path.Combine(AsrRuntimeDirectory, ".koenote-cuda-asr-runtime");
         TernaryLlamaCompletionPath = Path.Combine(RuntimeTools, "review-ternary", "llama-completion.exe");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
         WhisperBaseModelPath = Path.Combine(Models, "asr", "whisper-base");
@@ -122,6 +124,8 @@ public sealed class AppPaths
 
     public string RuntimeTools { get; }
 
+    public string AsrRuntimeDirectory { get; }
+
     public string Models { get; }
 
     public string ModelCatalogPath { get; }
@@ -139,6 +143,8 @@ public sealed class AppPaths
     public string LlamaCompletionPath { get; }
 
     public string CudaReviewRuntimeMarkerPath { get; }
+
+    public string AsrCudaRuntimeMarkerPath { get; }
 
     public string TernaryLlamaCompletionPath { get; }
 

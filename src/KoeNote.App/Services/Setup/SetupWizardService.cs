@@ -14,6 +14,7 @@ public sealed class SetupWizardService
     private readonly SetupReadinessService _readinessService;
     private readonly SetupPresetRecommendationService _presetRecommendationService;
     private readonly FasterWhisperRuntimeService _fasterWhisperRuntimeService;
+    private readonly AsrCudaRuntimeService _asrCudaRuntimeService;
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
     private readonly TernaryReviewRuntimeService _ternaryReviewRuntimeService;
     private readonly CudaReviewRuntimeService _cudaReviewRuntimeService;
@@ -32,10 +33,12 @@ public sealed class SetupWizardService
         FasterWhisperRuntimeService fasterWhisperRuntimeService,
         DiarizationRuntimeService diarizationRuntimeService,
         ISetupHostResourceProbe? hostResourceProbe = null,
+        AsrCudaRuntimeService? asrCudaRuntimeService = null,
         TernaryReviewRuntimeService? ternaryReviewRuntimeService = null,
         CudaReviewRuntimeService? cudaReviewRuntimeService = null)
     {
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
+        _asrCudaRuntimeService = asrCudaRuntimeService ?? new AsrCudaRuntimeService(paths, new HttpClient());
         _diarizationRuntimeService = diarizationRuntimeService;
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
@@ -209,6 +212,11 @@ public sealed class SetupWizardService
     public Task<FasterWhisperRuntimeStatus> CheckFasterWhisperRuntimeAsync(CancellationToken cancellationToken = default)
     {
         return _fasterWhisperRuntimeService.CheckAsync(cancellationToken);
+    }
+
+    public Task<AsrCudaRuntimeInstallResult> InstallAsrCudaRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _asrCudaRuntimeService.InstallAsync(cancellationToken);
     }
 
     public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)

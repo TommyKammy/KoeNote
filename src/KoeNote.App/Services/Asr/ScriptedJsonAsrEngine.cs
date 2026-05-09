@@ -64,8 +64,14 @@ public sealed class ScriptedJsonAsrEngine(
             {
                 if (!File.Exists(scriptJsonPath))
                 {
+                    var workerOutput = string.IsNullOrWhiteSpace(processResult.StandardError)
+                        ? processResult.StandardOutput
+                        : processResult.StandardError;
+                    var category = IsCudaRuntimeFailure(workerOutput)
+                        ? AsrFailureCategory.CudaRuntimeMissing
+                        : AsrFailureCategory.ProcessFailed;
                     throw new AsrWorkerException(
-                        AsrFailureCategory.ProcessFailed,
+                        category,
                         $"{DisplayName} exited with code {processResult.ExitCode}: {processResult.StandardError}");
                 }
             }
@@ -152,6 +158,30 @@ public sealed class ScriptedJsonAsrEngine(
         return !value.Contains(Path.DirectorySeparatorChar)
             && !value.Contains(Path.AltDirectorySeparatorChar)
             && !Path.IsPathRooted(value);
+    }
+
+    private static bool IsCudaRuntimeFailure(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var mentionsCudaRuntimeDll =
+            value.Contains("cublas", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("cudnn", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("cudart", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("zlibwapi", StringComparison.OrdinalIgnoreCase);
+        if (!mentionsCudaRuntimeDll)
+        {
+            return false;
+        }
+
+        return value.Contains("could not load", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("failed to load", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("cannot open shared object", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("specified module could not be found", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyDictionary<string, string> BuildProcessEnvironment(AsrEngineConfig config)

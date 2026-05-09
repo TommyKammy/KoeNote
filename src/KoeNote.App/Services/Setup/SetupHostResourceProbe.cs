@@ -14,13 +14,13 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
     public SetupHostResources GetResources()
     {
         var totalMemoryBytes = TryGetTotalMemoryBytes();
-        var maxGpuMemoryGb = TryGetMaxNvidiaGpuMemoryGb();
+        var (maxGpuMemoryGb, nvidiaGpuDetected) = TryGetNvidiaGpuResources();
         var logicalProcessorCount = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : (int?)null;
         var summary = FormatSummary(totalMemoryBytes, maxGpuMemoryGb, logicalProcessorCount);
         return new SetupHostResources(
             totalMemoryBytes,
             maxGpuMemoryGb,
-            NvidiaGpuDetected: maxGpuMemoryGb is not null,
+            nvidiaGpuDetected,
             logicalProcessorCount,
             summary);
     }
@@ -32,9 +32,20 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
         return GlobalMemoryStatusEx(ref status) ? (long)status.ullTotalPhys : null;
     }
 
-    private static int? TryGetMaxNvidiaGpuMemoryGb()
+    private static (int? MaxGpuMemoryGb, bool NvidiaGpuDetected) TryGetNvidiaGpuResources()
     {
-        var nvidiaSmi = ResolveCommand("nvidia-smi");
+        var nvidiaSmiMemory = TryGetMaxNvidiaSmiMemoryGb();
+        if (nvidiaSmiMemory is not null)
+        {
+            return (nvidiaSmiMemory, true);
+        }
+
+        return TryGetNvidiaGpuFromCim();
+    }
+
+    private static int? TryGetMaxNvidiaSmiMemoryGb()
+    {
+        var nvidiaSmi = ResolveCommand("nvidia-smi") ?? ResolveKnownNvidiaSmiPath();
         if (nvidiaSmi is null)
         {
             return null;
@@ -77,6 +88,56 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
         }
     }
 
+    private static (int? MaxGpuMemoryGb, bool NvidiaGpuDetected) TryGetNvidiaGpuFromCim()
+    {
+        var powershell = ResolveCommand("powershell") ?? ResolveCommand("pwsh");
+        if (powershell is null)
+        {
+            return (null, false);
+        }
+
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = powershell,
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' } | ForEach-Object { [string]$_.AdapterRAM }\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (process is null)
+            {
+                return (null, false);
+            }
+
+            if (!process.WaitForExit(2500))
+            {
+                process.Kill(entireProcessTree: true);
+                return (null, false);
+            }
+
+            var lines = process.StandardOutput.ReadToEnd()
+                .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToArray();
+            var values = lines
+                .Select(static line => ulong.TryParse(line, out var bytes) && bytes > 0
+                    ? (int?)Math.Max(1, (int)Math.Ceiling(bytes / 1024d / 1024d / 1024d))
+                    : null)
+                .Where(static value => value is not null)
+                .Select(static value => value!.Value)
+                .ToArray();
+            return values.Length == 0
+                ? (null, lines.Length > 0)
+                : (values.Max(), true);
+        }
+        catch
+        {
+            return (null, false);
+        }
+    }
+
     private static string? ResolveCommand(string commandName)
     {
         var paths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
@@ -93,6 +154,18 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
         }
 
         return null;
+    }
+
+    private static string? ResolveKnownNvidiaSmiPath()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (string.IsNullOrWhiteSpace(programFiles))
+        {
+            return null;
+        }
+
+        var candidate = Path.Combine(programFiles, "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe");
+        return File.Exists(candidate) ? candidate : null;
     }
 
     private static string FormatSummary(long? totalMemoryBytes, int? maxGpuMemoryGb, int? logicalProcessorCount)

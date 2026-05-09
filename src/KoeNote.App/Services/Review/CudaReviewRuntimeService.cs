@@ -9,6 +9,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 {
     public const string RuntimeUrlEnvironmentVariable = "KOENOTE_CUDA_REVIEW_RUNTIME_URL";
     public const string RuntimeSha256EnvironmentVariable = "KOENOTE_CUDA_REVIEW_RUNTIME_SHA256";
+    public const string DefaultRuntimeUrl = "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-review-runtime.zip";
     public const string FailureCategoryConfigurationMissing = "ConfigurationMissing";
     public const string FailureCategoryCpuRuntimeMissing = "CpuRuntimeMissing";
     public const string FailureCategoryNetworkUnavailable = "NetworkUnavailable";
@@ -241,7 +242,8 @@ public sealed record CudaReviewRuntimeOptions(string RuntimeUrl, string? Sha256)
     public static CudaReviewRuntimeOptions FromEnvironment()
     {
         return new CudaReviewRuntimeOptions(
-            Environment.GetEnvironmentVariable(CudaReviewRuntimeService.RuntimeUrlEnvironmentVariable) ?? string.Empty,
+            Environment.GetEnvironmentVariable(CudaReviewRuntimeService.RuntimeUrlEnvironmentVariable) ??
+                CudaReviewRuntimeService.DefaultRuntimeUrl,
             Environment.GetEnvironmentVariable(CudaReviewRuntimeService.RuntimeSha256EnvironmentVariable));
     }
 }

@@ -24,9 +24,13 @@ using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
 
-public sealed record AsrEngineOption(string EngineId, string DisplayName)
+public sealed record AsrEngineOption(string EngineId, string DisplayName, bool IsInstalled = false)
 {
-    public override string ToString() => DisplayName;
+    public string SetupDisplayName => IsInstalled
+        ? $"{DisplayName} (導入済み)"
+        : DisplayName;
+
+    public override string ToString() => SetupDisplayName;
 }
 
 public sealed record DiagnosticLogScopeOption(DiagnosticLogScope Scope, string DisplayName)
@@ -120,6 +124,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isModelDownloadNotificationError;
     private string _setupDiarizationRuntimeSummary = "話者識別runtimeは未導入です。必要になったらここから追加導入できます。";
     private string _setupCudaReviewRuntimeSummary = "CUDA review runtime is optional. KoeNote will use CPU review runtime unless CUDA files are installed.";
+    private string _setupAsrCudaRuntimeSummary = "CUDA ASR runtime is optional. GPU ASR models will prompt for CUDA when an NVIDIA GPU is detected.";
     private string _databaseMaintenanceSummary = string.Empty;
     private string _updateNotificationTitle = string.Empty;
     private string _updateNotificationMessage = string.Empty;
@@ -256,10 +261,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _latestLog = $"Initialized AppData at {Paths.Root}";
-        foreach (var engine in _asrEngineRegistry.Engines.Where(static engine => IsUserSelectableAsrEngine(engine.EngineId)))
-        {
-            AvailableAsrEngines.Add(new AsrEngineOption(engine.EngineId, engine.DisplayName));
-        }
+        RefreshAvailableAsrEngines();
 
         var asrSettings = _asrSettingsRepository.Load();
         _asrContextText = asrSettings.ContextText;
@@ -318,6 +320,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
         SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
         SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, CanInstallDiarizationRuntime);
+        SetupInstallAsrCudaRuntimeCommand = new RelayCommand(SetupInstallAsrCudaRuntimeAsync, CanInstallAsrCudaRuntime);
         SetupInstallCudaReviewRuntimeCommand = new RelayCommand(SetupInstallCudaReviewRuntimeAsync, CanInstallCudaReviewRuntime);
         SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync, CanUseSetupInstallActions);
         SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync, CanUseSetupInstallActions);
@@ -518,6 +521,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _setupDiarizationRuntimeSummary;
         private set => SetField(ref _setupDiarizationRuntimeSummary, value);
+    }
+
+    public string SetupAsrCudaRuntimeSummary
+    {
+        get => _setupAsrCudaRuntimeSummary;
+        private set => SetField(ref _setupAsrCudaRuntimeSummary, value);
     }
 
     public string SetupCudaReviewRuntimeSummary
@@ -757,6 +766,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SetupDownloadReviewCommand { get; }
 
     public ICommand SetupInstallDiarizationRuntimeCommand { get; }
+
+    public ICommand SetupInstallAsrCudaRuntimeCommand { get; }
 
     public ICommand SetupInstallCudaReviewRuntimeCommand { get; }
 
@@ -1042,6 +1053,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
+    public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
+
+    public bool SetupAsrCudaRuntimeReady => AsrCudaRuntimeLayout.HasPackage(Paths);
+
+    public string SetupAsrCudaRuntimeActionText => SetupAsrCudaRuntimeReady
+        ? "導入済み"
+        : "追加導入";
+
     public bool SetupCudaReviewRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 
     public bool SetupCudaReviewRuntimeReady => CudaReviewRuntimeLayout.HasPackage(Paths);
@@ -1055,6 +1074,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
         SetupFasterWhisperRuntimeReady &&
+        (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         SetupDiarizationRuntimeReady &&
         SetupTernaryReviewRuntimeReady;
 
@@ -1128,6 +1148,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (!SetupFasterWhisperRuntimeReady)
             {
                 missing.Add("ASR runtime");
+            }
+
+            if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
+            {
+                missing.Add("ASR GPU runtime");
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -1237,6 +1262,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
                 OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+                OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));
+                OnPropertyChanged(nameof(SetupAsrCudaRuntimeRecommended));
+                OnPropertyChanged(nameof(SetupAsrCudaRuntimeActionText));
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeReady));
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));

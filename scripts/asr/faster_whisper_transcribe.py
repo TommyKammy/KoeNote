@@ -138,11 +138,6 @@ def main() -> int:
         prompt_parts.append(" ".join(args.hotword))
     initial_prompt = "\n".join(prompt_parts) if prompt_parts else None
 
-    model = WhisperModel(
-        args.model,
-        device=args.device,
-        compute_type=args.compute_type,
-        local_files_only=args.local_files_only)
     transcribe_options = {
         "language": args.language,
         "initial_prompt": initial_prompt,
@@ -152,6 +147,11 @@ def main() -> int:
     if args.chunk_length is not None and args.chunk_length > 0:
         transcribe_options["chunk_length"] = args.chunk_length
 
+    model = WhisperModel(
+        args.model,
+        device=args.device,
+        compute_type=args.compute_type,
+        local_files_only=args.local_files_only)
     segments, info = model.transcribe(args.audio, **transcribe_options)
 
     segment_items = [

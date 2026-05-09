@@ -272,9 +272,9 @@ public sealed partial class MainWindowViewModel
 
         if (!result.IsUpdateAvailable || result.LatestRelease is null)
         {
-            LatestLog = result.Message;
             if (showUpToDate)
             {
+                LatestLog = result.Message;
                 _availableUpdate = null;
                 ClearVerifiedUpdateInstallerState();
                 UpdateNotificationTitle = "KoeNote is up to date";

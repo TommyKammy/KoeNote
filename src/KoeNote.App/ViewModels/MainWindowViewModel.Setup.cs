@@ -181,6 +181,15 @@ public sealed partial class MainWindowViewModel
             !SetupCudaReviewRuntimeReady;
     }
 
+    private bool CanInstallAsrCudaRuntime()
+    {
+        return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
+            SetupAsrCudaRuntimeRecommended &&
+            !SetupAsrCudaRuntimeReady;
+    }
+
     private bool CanInstallDiarizationRuntime()
     {
         return !IsModelDownloadInProgress &&
@@ -285,6 +294,32 @@ public sealed partial class MainWindowViewModel
             else
             {
                 SetSetupInstallStatus("ASR runtime", "スキップ", "導入済みです");
+            }
+
+            if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
+            {
+                SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
+                ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA ASR runtime for selected ASR model...";
+                IsModelDownloadProgressIndeterminate = true;
+                var runtimeResult = await _setupWizardService.InstallAsrCudaRuntimeAsync(cancellation.Token);
+                RefreshSetupWizard();
+                if (!runtimeResult.IsSucceeded)
+                {
+                    var message = BuildAsrCudaRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetSetupInstallStatus("ASR GPU runtime", "失敗", message);
+                    SetupAsrCudaRuntimeSummary = message;
+                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                    LatestLog = message;
+                    return;
+                }
+
+                SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {runtimeResult.InstallPath}";
+                SetSetupInstallStatus("ASR GPU runtime", "完了", runtimeResult.InstallPath);
+                LatestLog = runtimeResult.Message;
+            }
+            else if (SetupAsrCudaRuntimeRecommended)
+            {
+                SetSetupInstallStatus("ASR GPU runtime", "スキップ", "導入済みです");
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -526,6 +561,42 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private async Task SetupInstallAsrCudaRuntimeAsync()
+    {
+        const string displayName = "CUDA ASR runtime";
+        ResetSetupInstallStatuses();
+        BeginModelDownloadProgress(displayName);
+        SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
+        ModelDownloadProgressSummary = "Installing CUDA ASR runtime for faster-whisper GPU execution...";
+        IsModelDownloadProgressIndeterminate = true;
+
+        try
+        {
+            var result = await _setupWizardService.InstallAsrCudaRuntimeAsync();
+            RefreshSetupWizard();
+            var message = result.IsSucceeded
+                ? $"CUDA ASR runtime installed: {result.InstallPath}"
+                : BuildAsrCudaRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
+            SetupAsrCudaRuntimeSummary = message;
+            SetSetupInstallStatus("ASR GPU runtime", result.IsSucceeded ? "完了" : "失敗", message);
+            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            if (result.IsSucceeded)
+            {
+                ModelDownloadNotification = "ASR GPU runtimeの導入が完了しました。";
+            }
+
+            LatestLog = result.IsSucceeded ? result.Message : message;
+        }
+        catch (OperationCanceledException)
+        {
+            RefreshSetupWizard();
+            const string message = "ASR GPU runtimeの導入を中止しました。";
+            SetSetupInstallStatus("ASR GPU runtime", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+        }
+    }
+
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
     {
         if (result.IsSucceeded)
@@ -725,6 +796,9 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupModelsReady));
         OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeRecommended));
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeActionText));
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeReady));
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
@@ -750,6 +824,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
+        RefreshAsrCudaRuntimeSummary();
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeSummary));
         RefreshCudaReviewRuntimeSummary();
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
         OnPropertyChanged(nameof(IsSetupComplete));
@@ -822,6 +898,11 @@ public sealed partial class MainWindowViewModel
             diarizationCommand.RaiseCanExecuteChanged();
         }
 
+        if (SetupInstallAsrCudaRuntimeCommand is RelayCommand asrCudaCommand)
+        {
+            asrCudaCommand.RaiseCanExecuteChanged();
+        }
+
         if (SetupInstallCudaReviewRuntimeCommand is RelayCommand cudaReviewCommand)
         {
             cudaReviewCommand.RaiseCanExecuteChanged();
@@ -873,6 +954,19 @@ public sealed partial class MainWindowViewModel
             : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
     }
 
+    private void RefreshAsrCudaRuntimeSummary()
+    {
+        if (SetupAsrCudaRuntimeReady)
+        {
+            SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {Paths.AsrRuntimeDirectory}";
+            return;
+        }
+
+        SetupAsrCudaRuntimeSummary = SetupAsrCudaRuntimeRecommended
+            ? $"NVIDIA GPU detected. The selected ASR model should use CUDA; install CUDA ASR runtime: {Paths.AsrRuntimeDirectory}"
+            : "CUDA ASR runtime is optional for the selected ASR model.";
+    }
+
     private IReadOnlyList<SetupInstallPlanItem> BuildSetupInstallPlanItems()
     {
         var items = new List<SetupInstallPlanItem>
@@ -894,6 +988,14 @@ public sealed partial class MainWindowViewModel
                 "話者分離を使うための追加runtime",
                 SetupDiarizationRuntimeReady ? "導入済み" : "導入します")
         };
+
+        if (SetupAsrCudaRuntimeRecommended)
+        {
+            items.Add(new(
+                "ASR GPU runtime",
+                "NVIDIA GPU向けのASR CUDA runtime",
+                SetupAsrCudaRuntimeReady ? "導入済み" : "導入します"));
+        }
 
         if (SetupCudaReviewRuntimeRecommended)
         {
@@ -991,6 +1093,24 @@ public sealed partial class MainWindowViewModel
                 $"Ternary review runtime was downloaded, but the archive was not usable. Details: {message}",
             TernaryReviewRuntimeService.FailureCategoryInstallFailed =>
                 $"Ternary review runtime could not be installed under tools\\review-ternary. Details: {message}",
+            _ => message
+        };
+    }
+
+    private static string BuildAsrCudaRuntimeSetupFailureMessage(string message, string failureCategory)
+    {
+        return failureCategory switch
+        {
+            AsrCudaRuntimeService.FailureCategoryConfigurationMissing =>
+                $"CUDA ASR runtime source is not configured. Configure {AsrCudaRuntimeService.RuntimeUrlEnvironmentVariable}, then retry. Details: {message}",
+            AsrCudaRuntimeService.FailureCategoryNetworkUnavailable =>
+                $"CUDA ASR runtime could not be downloaded. Check the network connection or proxy settings, then retry. Details: {message}",
+            AsrCudaRuntimeService.FailureCategoryHashMismatch =>
+                $"CUDA ASR runtime failed hash verification and was not installed. Details: {message}",
+            AsrCudaRuntimeService.FailureCategoryArchiveInvalid =>
+                $"CUDA ASR runtime archive was not usable. It must contain cuBLAS and cuDNN DLLs for faster-whisper/CTranslate2. Details: {message}",
+            AsrCudaRuntimeService.FailureCategoryInstallFailed =>
+                $"CUDA ASR runtime could not be installed under tools\\asr. Details: {message}",
             _ => message
         };
     }

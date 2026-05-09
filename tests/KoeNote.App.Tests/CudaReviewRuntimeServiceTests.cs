@@ -10,6 +10,24 @@ namespace KoeNote.App.Tests;
 public sealed class CudaReviewRuntimeServiceTests
 {
     [Fact]
+    public void OptionsFromEnvironment_UsesDefaultReleaseAssetWhenUrlIsUnset()
+    {
+        var originalUrl = Environment.GetEnvironmentVariable(CudaReviewRuntimeService.RuntimeUrlEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(CudaReviewRuntimeService.RuntimeUrlEnvironmentVariable, null);
+
+            var options = CudaReviewRuntimeOptions.FromEnvironment();
+
+            Assert.Equal(CudaReviewRuntimeService.DefaultRuntimeUrl, options.RuntimeUrl);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(CudaReviewRuntimeService.RuntimeUrlEnvironmentVariable, originalUrl);
+        }
+    }
+
+    [Fact]
     public async Task InstallAsync_DownloadsAndInstallsCudaRuntimeFiles()
     {
         var root = CreateRoot();

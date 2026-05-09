@@ -10,7 +10,7 @@ public sealed class ExternalProcessRunnerTests
         var runner = new ExternalProcessRunner();
 
         var result = await runner.RunAsync(
-            "dotnet",
+            ResolveRepoDotnet(),
             "--version",
             TimeSpan.FromSeconds(10));
 
@@ -54,5 +54,22 @@ public sealed class ExternalProcessRunnerTests
             "-NoProfile -Command Start-Sleep -Seconds 5",
             TimeSpan.FromSeconds(10),
             cancellation.Token));
+    }
+
+    private static string ResolveRepoDotnet()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, ".dotnet", "dotnet.exe");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return "dotnet";
     }
 }

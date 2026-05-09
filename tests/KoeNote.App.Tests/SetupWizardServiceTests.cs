@@ -177,6 +177,25 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_GuidedNext_DoesNotDownrankNvidiaGpuWhenVramIsUnknown()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 16L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: true,
+            logicalProcessorCount: 8));
+
+        wizard.MoveNextGuided();
+        var state = wizard.MoveNextGuided();
+
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void SetupWizard_GuidedNext_DoesNotOverrideCustomModelSelection()
     {
         var paths = CreatePaths();
@@ -906,6 +925,10 @@ public sealed class SetupWizardServiceTests
         {
             AddArchiveEntry(archive, "bin/ggml-cuda.dll", "cuda");
             AddArchiveEntry(archive, "bin/cublas64_12.dll", "cublas");
+            AddArchiveEntry(archive, "bin/cublasLt64_12.dll", "cublasLt");
+            AddArchiveEntry(archive, "bin/cudart64_12.dll", "cudart");
+            AddArchiveEntry(archive, "bin/cudnn64_9.dll", "cudnn");
+            AddArchiveEntry(archive, "bin/zlibwapi.dll", "zlib");
         }
 
         return stream.ToArray();

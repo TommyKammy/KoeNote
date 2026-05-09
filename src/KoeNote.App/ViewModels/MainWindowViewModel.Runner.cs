@@ -121,6 +121,15 @@ public sealed partial class MainWindowViewModel
         {
             LatestLog = update.LatestLog;
         }
+
+        if (update.Stage == JobRunStage.Asr &&
+            update.StageState == JobRunStageState.Failed &&
+            string.Equals(update.ErrorCategory, AsrFailureCategory.CudaRuntimeMissing.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            IsSetupWizardModalOpen = true;
+            LatestLog = "ASR GPU実行に必要なCUDA runtimeが不足しています。セットアップからASR GPU runtimeを導入してください。";
+            RefreshSetupWizard();
+        }
     }
 
     private StageStatus GetStageStatus(JobRunStage stage)

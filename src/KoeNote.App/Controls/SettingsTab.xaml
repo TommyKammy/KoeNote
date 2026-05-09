@@ -32,7 +32,7 @@
                         <ComboBox ItemsSource="{Binding AvailableAsrEngines}"
                                   SelectedValue="{Binding SelectedAsrEngineId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   SelectedValuePath="EngineId"
-                                  DisplayMemberPath="DisplayName"
+                                  DisplayMemberPath="SetupDisplayName"
                                   MinHeight="32"
                                   Margin="0,0,0,12" />
 

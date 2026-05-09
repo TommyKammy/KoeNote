@@ -299,6 +299,7 @@ public sealed partial class MainWindowViewModel
             ? ModelCatalogEntries.FirstOrDefault()
             : ModelCatalogEntries.FirstOrDefault(entry =>
                 entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
+        RefreshAvailableAsrEngines();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
         OnPropertyChanged(nameof(SummaryStageAssetsReady));
@@ -412,6 +413,31 @@ public sealed partial class MainWindowViewModel
         }
 
         return DefaultSelectableAsrEngineId;
+    }
+
+    private void RefreshAvailableAsrEngines()
+    {
+        var selectedEngineId = SelectedAsrEngineId;
+        AvailableAsrEngines.Clear();
+        foreach (var engine in _asrEngineRegistry.Engines.Where(static engine => IsUserSelectableAsrEngine(engine.EngineId)))
+        {
+            AvailableAsrEngines.Add(new AsrEngineOption(
+                engine.EngineId,
+                engine.DisplayName,
+                IsAsrEngineInstalled(engine.EngineId)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedEngineId))
+        {
+            _selectedAsrEngineId = selectedEngineId;
+        }
+    }
+
+    private bool IsAsrEngineInstalled(string engineId)
+    {
+        return FindInstalledCatalogEntry(
+            "asr",
+            entry => string.Equals(entry.EngineId, engineId, StringComparison.OrdinalIgnoreCase)) is not null;
     }
 
     private bool IsReviewModelReady()

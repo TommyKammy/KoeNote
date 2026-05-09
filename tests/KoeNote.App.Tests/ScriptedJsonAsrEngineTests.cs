@@ -7,6 +7,17 @@ namespace KoeNote.App.Tests;
 public sealed class ScriptedJsonAsrEngineTests
 {
     [Fact]
+    public void FasterWhisperWorker_DoesNotSilentlyFallbackToCpu()
+    {
+        var scriptPath = FindRepositoryFasterWhisperScriptPath();
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.DoesNotContain("retrying on CPU", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("device=\"cpu\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("compute_type=\"int8\"", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TranscribeAsync_AddsBundledAsrToolsToProcessPath()
     {
         var paths = CreatePaths();
@@ -70,6 +81,64 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Equal("failed", ReadSingleRunStatus(paths));
     }
 
+    [Fact]
+    public async Task TranscribeAsync_ClassifiesCudaRuntimeFailures()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('should fail')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var engine = CreateEngine(paths, new FailingAsrProcessRunner("Could not load library cublas64_12.dll"));
+
+        var exception = await Assert.ThrowsAsync<AsrWorkerException>(() => engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "model",
+                scriptPath),
+            new AsrOptions()));
+
+        Assert.Equal(AsrFailureCategory.CudaRuntimeMissing, exception.Category);
+        Assert.Equal("failed", ReadSingleRunStatus(paths));
+    }
+
+    [Theory]
+    [InlineData("CUDA out of memory while running CTranslate2")]
+    [InlineData("CUDA driver version is insufficient for CUDA runtime version")]
+    [InlineData("CTranslate2 failed before decoding")]
+    public async Task TranscribeAsync_DoesNotClassifyGenericCudaFailuresAsMissingRuntime(string standardError)
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('should fail')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var engine = CreateEngine(paths, new FailingAsrProcessRunner(standardError));
+
+        var exception = await Assert.ThrowsAsync<AsrWorkerException>(() => engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "model",
+                scriptPath),
+            new AsrOptions()));
+
+        Assert.Equal(AsrFailureCategory.ProcessFailed, exception.Category);
+    }
+
     private static ScriptedJsonAsrEngine CreateEngine(AppPaths paths, ExternalProcessRunner? processRunner = null)
     {
         return new ScriptedJsonAsrEngine(
@@ -102,6 +171,23 @@ public sealed class ScriptedJsonAsrEngineTests
         return Convert.ToString(command.ExecuteScalar()) ?? "";
     }
 
+    private static string FindRepositoryFasterWhisperScriptPath()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var candidate = Path.Combine(directory.FullName, "scripts", "asr", "faster_whisper_transcribe.py");
+            if (File.Exists(candidate) && new FileInfo(candidate).Length > 0)
+            {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException("Could not find scripts/asr/faster_whisper_transcribe.py.");
+    }
+
     private sealed class CapturingAsrProcessRunner : ExternalProcessRunner
     {
         public IReadOnlyDictionary<string, string>? Environment { get; private set; }
@@ -128,6 +214,19 @@ public sealed class ScriptedJsonAsrEngineTests
                 }
                 """);
             return Task.FromResult(new ProcessRunResult(0, TimeSpan.FromSeconds(1), "ok", string.Empty));
+        }
+    }
+
+    private sealed class FailingAsrProcessRunner(string standardError) : ExternalProcessRunner
+    {
+        public override Task<ProcessRunResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            return Task.FromResult(new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, standardError));
         }
     }
 }

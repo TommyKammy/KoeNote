@@ -12,6 +12,10 @@ $payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePa
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
 $expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
+$expectedCudaReleaseAssets = @(
+    "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-asr-runtime.zip",
+    "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-review-runtime.zip"
+)
 
 if (-not $SkipVersioningTests) {
     dotnet test $testProject --configuration Debug --filter "FullyQualifiedName~VersioningTests" --verbosity minimal
@@ -155,4 +159,16 @@ if ($manifest.ternary_review_runtime.path -ne $ternaryReviewRuntimePath) {
     SigningStatus = $manifest.signing.status
     ReviewRuntimeMB = $payloadGuardResult.ReviewRuntimeMB
     BundledPythonMB = $payloadGuardResult.BundledPythonMB
+}
+
+foreach ($assetUrl in $expectedCudaReleaseAssets) {
+    try {
+        $response = Invoke-WebRequest -Uri $assetUrl -Method Head -MaximumRedirection 5 -TimeoutSec 30
+        if ([int]$response.StatusCode -lt 200 -or [int]$response.StatusCode -ge 400) {
+            throw "HTTP $($response.StatusCode)"
+        }
+    }
+    catch {
+        throw "Required CUDA release asset is missing or unreachable: $assetUrl. Details: $($_.Exception.Message)"
+    }
 }

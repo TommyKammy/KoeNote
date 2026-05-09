@@ -110,6 +110,9 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("faster-whisper large-v3", viewModel.AsrModel);
         Assert.Equal("llm-jp 4 8B thinking Q4_K_M", viewModel.ReviewModel);
+        Assert.Equal(
+            "faster-whisper large-v3 (導入済み)",
+            viewModel.AvailableAsrEngines.Single(engine => engine.EngineId == asrItem.EngineId).SetupDisplayName);
     }
 
     [Fact]
@@ -204,6 +207,15 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void AsrEngineOption_ToStringShowsInstalledStatusWhenInstalled()
+    {
+        var option = new AsrEngineOption("whisper-base", "Whisper base", IsInstalled: true);
+
+        Assert.Equal("Whisper base (導入済み)", option.ToString());
+        Assert.Equal("Whisper base (導入済み)", option.SetupDisplayName);
+    }
+
+    [Fact]
     public void SetupInstallSelectedPresetCommand_RemainsEnabledWhenOnlyDiarizationRuntimeIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -237,6 +249,54 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.SelectedSetupConfigurationReady);
         Assert.True(viewModel.SetupInstallSelectedPresetCommand.CanExecute(null));
         Assert.Contains("話者識別runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectedSetupConfigurationReady_DoesNotRequireCudaReviewRuntimeWithoutDetectedGpu()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBaseDirectory, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBaseDirectory, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var noGpuRecommendation = new SetupPresetRecommendation(
+            "recommended",
+            "Recommended",
+            "No GPU",
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, LogicalProcessorCount: null, "No GPU"));
+        SetPrivateField(viewModel, "_setupPresetRecommendation", noGpuRecommendation);
+
+        Assert.False(viewModel.SetupCudaReviewRuntimeRecommended);
+        Assert.False(viewModel.SetupCudaReviewRuntimeReady);
+        Assert.True(viewModel.SelectedSetupConfigurationReady);
+        Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
     }
 
     [Fact]
@@ -355,7 +415,11 @@ public sealed class MainWindowViewModelTests
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
             LicenseAccepted = true,
-            CurrentStep = SetupStep.InstallPlan
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "ultra_lightweight",
+            SelectedModelPresetId = "ultra_lightweight",
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
         });
         var viewModel = new MainWindowViewModel(paths);
         var noGpuRecommendation = new SetupPresetRecommendation(
@@ -381,6 +445,52 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
         Assert.Equal("導入済み", viewModel.SetupCudaReviewRuntimeActionText);
+    }
+
+    [Fact]
+    public void SetupInstallAsrCudaRuntimeCommand_RequiresDetectedGpuAndMissingAsrCudaRuntime()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = CreatePathsWithoutTernaryRuntime(root);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "ultra_lightweight",
+            SelectedModelPresetId = "ultra_lightweight",
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var noGpuRecommendation = new SetupPresetRecommendation(
+            "recommended",
+            "Recommended",
+            "No GPU",
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, LogicalProcessorCount: null, "No GPU"));
+        SetPrivateField(viewModel, "_setupPresetRecommendation", noGpuRecommendation);
+
+        Assert.False(viewModel.SetupAsrCudaRuntimeRecommended);
+        Assert.False(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
+
+        var gpuRecommendation = noGpuRecommendation with
+        {
+            Resources = new SetupHostResources(null, 12, NvidiaGpuDetected: true, LogicalProcessorCount: null, "GPU")
+        };
+        SetPrivateField(viewModel, "_setupPresetRecommendation", gpuRecommendation);
+
+        Assert.True(viewModel.SetupAsrCudaRuntimeRecommended);
+        Assert.True(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
+        Assert.Contains("ASR GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "zlibwapi.dll"));
+        Touch(viewModel.Paths.AsrCudaRuntimeMarkerPath);
+
+        Assert.False(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
+        Assert.Equal("導入済み", viewModel.SetupAsrCudaRuntimeActionText);
     }
 
     [Fact]
@@ -2284,6 +2394,27 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void StartupUpToDateUpdateCheck_DoesNotOverwriteLatestLog()
+    {
+        var viewModel = CreateViewModel();
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.LatestLog), "User action completed.");
+
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                false,
+                false,
+                "0.14.0",
+                null,
+                "KoeNote is up to date (0.14.0)."),
+            false);
+
+        Assert.Equal("User action completed.", viewModel.LatestLog);
+    }
+
+    [Fact]
     public async Task InstallVerifiedUpdateCommand_DisablesInstallAfterStartingInstaller()
     {
         var viewModel = CreateViewModel();
@@ -2379,6 +2510,11 @@ public sealed class MainWindowViewModelTests
     private static void CreateFasterWhisperRuntime(AppPaths paths)
     {
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper-1.2.1.dist-info"));
+    }
+
+    private static void CreateDiarizationRuntime(AppPaths paths)
+    {
+        Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
     }
 
     private sealed class RecordingUpdateInstallerLauncher : IUpdateInstallerLauncher

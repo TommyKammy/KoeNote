@@ -55,7 +55,7 @@ internal sealed class SetupPresetRecommendationService(
                 : "ultra_lightweight";
         }
 
-        if (resources.MaxGpuMemoryGb is < 6 ||
+        if (resources.MaxGpuMemoryGb is not null and < 6 ||
             totalMemoryGb is < 12)
         {
             return "ultra_lightweight";
