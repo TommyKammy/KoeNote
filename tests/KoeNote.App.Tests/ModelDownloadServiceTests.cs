@@ -286,7 +286,9 @@ public sealed class ModelDownloadServiceTests
         var stateService = new SetupStateService(paths);
         stateService.Save(SetupState.Default(paths.UserModels) with
         {
-            SelectedAsrModelId = catalogItem.ModelId
+            SelectedAsrModelId = catalogItem.ModelId,
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan
         });
         var setup = new SetupWizardService(
             paths,

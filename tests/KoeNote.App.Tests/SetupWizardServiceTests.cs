@@ -35,6 +35,17 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupStep_ValuesPreservePersistedStateCompatibility()
+    {
+        Assert.Equal(0, (int)SetupStep.Welcome);
+        Assert.Equal(6, (int)SetupStep.License);
+        Assert.Equal(7, (int)SetupStep.Install);
+        Assert.Equal(8, (int)SetupStep.SmokeTest);
+        Assert.Equal(9, (int)SetupStep.Complete);
+        Assert.Equal(10, (int)SetupStep.InstallPlan);
+    }
+
+    [Fact]
     public void SetupStateService_AllUsersScope_DefaultsStorageToMachineModels()
     {
         var paths = CreatePaths(InstallScope.AllUsers);
@@ -73,6 +84,88 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
         Assert.Equal("recommended", state.SelectedModelPresetId);
         Assert.Equal("recommended", state.SetupMode);
+        Assert.Equal(SetupStep.License, state.CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_MoveNext_DoesNotEnterInstallBeforeLicenseAccepted()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.License,
+            LicenseAccepted = false
+        });
+
+        var state = wizard.MoveNext();
+
+        Assert.Equal(SetupStep.License, state.CurrentStep);
+        Assert.False(state.LicenseAccepted);
+    }
+
+    [Fact]
+    public void SetupWizard_AcceptLicenses_MovesToInstallPlan()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.AcceptLicenses();
+
+        Assert.True(state.LicenseAccepted);
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_Navigation_FollowsLicenseInstallPlanInstallOrder()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.AcceptLicenses();
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+
+        state = wizard.MoveNext();
+        Assert.Equal(SetupStep.Install, state.CurrentStep);
+
+        state = wizard.MoveBack();
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+
+        state = wizard.MoveBack();
+        Assert.Equal(SetupStep.License, state.CurrentStep);
+    }
+
+    [Fact]
+    public async Task SetupWizard_InstallSelectedPresetModels_RequiresInstallPlan()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        wizard.SelectModelPreset("ultra_lightweight");
+        new SetupStateService(paths).Save(wizard.LoadState() with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.License
+        });
+
+        var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+
+        Assert.False(result.IsSucceeded);
+        Assert.Contains("installation plan", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SetupStep.License, wizard.LoadState().CurrentStep);
+    }
+
+    [Fact]
+    public async Task SetupWizard_InstallSelectedPresetModels_RequiresLicenseAccepted()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        wizard.SelectModelPreset("ultra_lightweight");
+
+        var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+
+        Assert.False(result.IsSucceeded);
+        Assert.Contains("licenses", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SetupStep.AsrModel, wizard.LoadState().CurrentStep);
     }
 
     [Fact]
@@ -198,6 +291,7 @@ public sealed class SetupWizardServiceTests
         UpsertVerified(installedModels, "bonsai-8b-q1-0", "review", "llama-cpp", reviewPath);
         var wizard = CreateWizard(paths);
         wizard.SelectModelPreset("ultra_lightweight");
+        wizard.AcceptLicenses();
 
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
 
@@ -410,6 +504,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePaths();
         var wizard = CreateWizard(paths);
         wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
         var modelPath = Path.Combine(paths.Root, "local-review.gguf");
         Touch(modelPath);
         File.WriteAllText($"{modelPath}.json", """{"model":"local-review"}""");
@@ -428,6 +523,7 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths);
+        wizard.AcceptLicenses();
         var packPath = CreateOfflinePack(paths, "kotoba-whisper-v2.2-faster", "model.bin");
 
         var result = wizard.ImportOfflineModelPack(packPath);
@@ -442,6 +538,7 @@ public sealed class SetupWizardServiceTests
     {
         var paths = CreatePaths(InstallScope.AllUsers);
         var wizard = CreateWizard(paths);
+        wizard.AcceptLicenses();
         var packPath = CreateOfflinePack(paths, "kotoba-whisper-v2.2-faster", "model.bin");
 
         var result = wizard.ImportOfflineModelPack(packPath);
@@ -524,6 +621,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, new HttpClient(new FailingHandler()));
         wizard.SelectModel("asr", "faster-whisper-large-v3");
+        wizard.AcceptLicenses();
 
         var result = await wizard.DownloadSelectedModelAsync("asr");
 

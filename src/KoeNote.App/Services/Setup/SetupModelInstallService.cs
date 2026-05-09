@@ -23,6 +23,18 @@ internal sealed class SetupModelInstallService(
     {
         try
         {
+            var licenseCheck = EnsureLicenseAccepted();
+            if (licenseCheck is not null)
+            {
+                return licenseCheck;
+            }
+
+            var installPlanCheck = EnsureInstallPlanReached();
+            if (installPlanCheck is not null)
+            {
+                return installPlanCheck;
+            }
+
             var catalogItem = selectionService.GetSelectedCatalogItem(role);
             if (catalogItem is null)
             {
@@ -57,6 +69,18 @@ internal sealed class SetupModelInstallService(
         IProgress<ModelDownloadProgress>? progress,
         CancellationToken cancellationToken = default)
     {
+        var licenseCheck = EnsureLicenseAccepted();
+        if (licenseCheck is not null)
+        {
+            return licenseCheck;
+        }
+
+        var installPlanCheck = EnsureInstallPlanReached();
+        if (installPlanCheck is not null)
+        {
+            return installPlanCheck;
+        }
+
         var results = new List<SetupInstallResult>();
         foreach (var role in new[] { "asr", "review" })
         {
@@ -81,6 +105,18 @@ internal sealed class SetupModelInstallService(
     {
         try
         {
+            var licenseCheck = EnsureLicenseAccepted();
+            if (licenseCheck is not null)
+            {
+                return licenseCheck;
+            }
+
+            var installPlanCheck = EnsureInstallPlanReached();
+            if (installPlanCheck is not null)
+            {
+                return installPlanCheck;
+            }
+
             if (!File.Exists(modelPath) && !Directory.Exists(modelPath))
             {
                 return new SetupInstallResult(false, $"Local model path not found: {modelPath}", []);
@@ -107,6 +143,18 @@ internal sealed class SetupModelInstallService(
     {
         try
         {
+            var licenseCheck = EnsureLicenseAccepted();
+            if (licenseCheck is not null)
+            {
+                return licenseCheck;
+            }
+
+            var installPlanCheck = EnsureInstallPlanReached();
+            if (installPlanCheck is not null)
+            {
+                return installPlanCheck;
+            }
+
             var installed = modelPackImportService.ImportModelPack(modelPackPath);
             MarkInstallStep();
             return new SetupInstallResult(true, $"Offline model pack imported: {installed.Count} model(s).", installed);
@@ -121,5 +169,19 @@ internal sealed class SetupModelInstallService(
     private void MarkInstallStep()
     {
         stateService.Save(stateService.Load() with { CurrentStep = SetupStep.Install });
+    }
+
+    private SetupInstallResult? EnsureLicenseAccepted()
+    {
+        return stateService.Load().LicenseAccepted
+            ? null
+            : new SetupInstallResult(false, "Model licenses must be accepted before installation.", []);
+    }
+
+    private SetupInstallResult? EnsureInstallPlanReached()
+    {
+        return SetupStepFlow.HasReached(stateService.Load().CurrentStep, SetupStep.InstallPlan)
+            ? null
+            : new SetupInstallResult(false, "Review the installation plan before installation.", []);
     }
 }

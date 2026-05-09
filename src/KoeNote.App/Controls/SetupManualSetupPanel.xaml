@@ -1,16 +1,15 @@
 <UserControl x:Class="KoeNote.App.Controls.SetupManualSetupPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Expander Header="手動セットアップ（上級者向け）"
-              Margin="0,0,0,14">
+    <Expander Header="手動セットアップ">
         <Border Background="#FFFFFF"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16"
-                Margin="0,8,0,0">
+                Margin="0,8,0,14">
             <StackPanel>
-                <TextBlock Text="オンライン導入でうまくいかない場合だけ、ローカルモデルまたは offline model pack を指定してください。"
+                <TextBlock Text="オンライン導入が使えない場合は、ローカルモデルやoffline model packを指定できます。"
                            Style="{StaticResource MutedText}"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14" />

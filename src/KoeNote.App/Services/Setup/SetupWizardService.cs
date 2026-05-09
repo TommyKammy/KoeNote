@@ -126,7 +126,8 @@ public sealed class SetupWizardService
 
     public SetupState UseRecommendedSelections()
     {
-        return _selectionService.UseRecommendedSelections();
+        var state = _selectionService.UseRecommendedSelections();
+        return _stateService.Save(state with { CurrentStep = SetupStep.License });
     }
 
     public SetupState SelectModelPreset(string presetId)
@@ -158,7 +159,7 @@ public sealed class SetupWizardService
     {
         return _stateService.Save(_stateService.Load() with
         {
-            CurrentStep = SetupStep.License,
+            CurrentStep = SetupStep.InstallPlan,
             LicenseAccepted = true
         });
     }
@@ -246,15 +247,29 @@ public sealed class SetupWizardService
     public SetupState MoveNext()
     {
         var state = _stateService.Load();
-        var next = state.CurrentStep >= SetupStep.Complete ? SetupStep.Complete : state.CurrentStep + 1;
-        return _stateService.Save(state with { CurrentStep = next });
+        if (SetupStepFlow.HasReached(state.CurrentStep, SetupStep.License) && !state.LicenseAccepted)
+        {
+            return _stateService.Save(state with { CurrentStep = SetupStep.License });
+        }
+
+        return _stateService.Save(state with { CurrentStep = SetupStepFlow.GetNext(state.CurrentStep) });
+    }
+
+    public SetupState MoveToLicense()
+    {
+        return _stateService.Save(_stateService.Load() with { CurrentStep = SetupStep.License });
+    }
+
+    public SetupState MoveToInstallPlan()
+    {
+        var state = _stateService.Load();
+        return _stateService.Save(state with { CurrentStep = state.LicenseAccepted ? SetupStep.InstallPlan : SetupStep.License });
     }
 
     public SetupState MoveBack()
     {
         var state = _stateService.Load();
-        var previous = state.CurrentStep <= SetupStep.Welcome ? SetupStep.Welcome : state.CurrentStep - 1;
-        return _stateService.Save(state with { CurrentStep = previous });
+        return _stateService.Save(state with { CurrentStep = SetupStepFlow.GetPrevious(state.CurrentStep) });
     }
 
     public SetupSmokeResult RunSmokeCheck()

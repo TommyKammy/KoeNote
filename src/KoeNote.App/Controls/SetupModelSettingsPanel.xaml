@@ -35,31 +35,65 @@
                                FontSize="12"
                                TextWrapping="Wrap"
                                Margin="0,6,0,0" />
-                    <TextBlock Text="{Binding SelectedSetupModelPresetModels}"
-                               Foreground="#334155"
-                               FontSize="12"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding SelectedSetupModelPresetModels}"
-                               Margin="0,3,0,0" />
                     <Border Background="#ECFDF5"
                             BorderBrush="#A7F3D0"
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="10"
                             Margin="0,8,0,0">
+                        <TextBlock Text="{Binding SetupPresetRecommendationSummary}"
+                                   Foreground="#047857"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SetupPresetRecommendationDetail}" />
+                    </Border>
+
+                    <Border Background="#F8FAFC"
+                            BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="10"
+                            Margin="0,10,0,0">
                         <StackPanel>
-                            <TextBlock Text="{Binding SetupPresetRecommendationSummary}"
-                                       Foreground="#047857"
+                            <TextBlock Text="導入内容"
+                                       Foreground="#334155"
                                        FontSize="12"
                                        FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding SetupPresetRecommendationDetail}"
-                                       Foreground="#065F46"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,3,0,0" />
+                                       Margin="0,0,0,6" />
+                            <ItemsControl ItemsSource="{Binding SetupInstallPlanItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,3,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="104" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="76" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="#334155"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Summary}"
+                                                       Foreground="#64748B"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Summary}"
+                                                       Margin="8,0,8,0" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding Status}"
+                                                       Foreground="{StaticResource AccentBrush}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       TextAlignment="Right" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </Border>
+
                     <StackPanel Margin="0,10,0,0">
                         <Button Command="{Binding SetupInstallSelectedPresetCommand}"
                                 Padding="14,9"
@@ -78,141 +112,146 @@
                 </StackPanel>
             </Grid>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="ASR"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
-                <ComboBox Grid.Column="1"
-                          ItemsSource="{Binding SetupAsrModelChoices}"
-                          SelectedItem="{Binding SelectedSetupAsrModel, Mode=TwoWay}"
-                          DisplayMemberPath="SetupDisplayName"
-                          MinWidth="0"
-                          MinHeight="34"
-                          HorizontalAlignment="Stretch"
-                          ToolTip="{Binding SelectedSetupAsrModel.SetupDisplayName}"
-                          TextSearch.TextPath="SetupDisplayName" />
-                <Button Grid.Column="2"
-                        Command="{Binding SetupDownloadAsrCommand}"
-                        Padding="10,7"
-                        MinWidth="92"
-                        Margin="10,0,0,0">
-                    <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
-                </Button>
-            </Grid>
+            <Expander Header="モデルと保存先を手動で選ぶ"
+                      Margin="0,0,0,14">
+                <StackPanel Margin="0,10,0,0">
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="ASR"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding SetupAsrModelChoices}"
+                                  SelectedItem="{Binding SelectedSetupAsrModel, Mode=TwoWay}"
+                                  DisplayMemberPath="SetupDisplayName"
+                                  MinWidth="0"
+                                  MinHeight="34"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip="{Binding SelectedSetupAsrModel.SetupDisplayName}"
+                                  TextSearch.TextPath="SetupDisplayName" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupDownloadAsrCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="導入" FontSize="12" FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="CUDA LLM"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1"
-                           Text="{Binding SetupCudaReviewRuntimeSummary}"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"
-                           ToolTip="{Binding SetupCudaReviewRuntimeSummary}" />
-                <Button Grid.Column="2"
-                        Command="{Binding SetupInstallCudaReviewRuntimeCommand}"
-                        Padding="10,7"
-                        MinWidth="92"
-                        Margin="10,0,0,0">
-                    <TextBlock Text="{Binding SetupCudaReviewRuntimeActionText}"
-                               FontSize="12"
-                               FontWeight="SemiBold" />
-                </Button>
-            </Grid>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="GPU高速化"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SetupCudaReviewRuntimeSummary}"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{Binding SetupCudaReviewRuntimeSummary}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupInstallCudaReviewRuntimeCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="{Binding SetupCudaReviewRuntimeActionText}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="話者識別"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1"
-                           Text="{Binding SetupDiarizationRuntimeSummary}"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"
-                           ToolTip="{Binding SetupDiarizationRuntimeSummary}" />
-                <Button Grid.Column="2"
-                        Command="{Binding SetupInstallDiarizationRuntimeCommand}"
-                        Padding="10,7"
-                        MinWidth="92"
-                        Margin="10,0,0,0">
-                    <TextBlock Text="追加導入" FontSize="12" FontWeight="SemiBold" />
-                </Button>
-            </Grid>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="話者識別"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SetupDiarizationRuntimeSummary}"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{Binding SetupDiarizationRuntimeSummary}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupInstallDiarizationRuntimeCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="追加導入" FontSize="12" FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="整文 LLM"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
-                <ComboBox Grid.Column="1"
-                          ItemsSource="{Binding SetupReviewModelChoices}"
-                          SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
-                          DisplayMemberPath="SetupDisplayName"
-                          MinWidth="0"
-                          MinHeight="34"
-                          HorizontalAlignment="Stretch"
-                          ToolTip="{Binding SelectedSetupReviewModel.SetupDisplayName}"
-                          TextSearch.TextPath="SetupDisplayName" />
-                <Button Grid.Column="2"
-                        Command="{Binding SetupDownloadReviewCommand}"
-                        Padding="10,7"
-                        MinWidth="92"
-                        Margin="10,0,0,0">
-                    <TextBlock Text="ダウンロード" FontSize="12" FontWeight="SemiBold" />
-                </Button>
-            </Grid>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="整文LLM"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding SetupReviewModelChoices}"
+                                  SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
+                                  DisplayMemberPath="SetupDisplayName"
+                                  MinWidth="0"
+                                  MinHeight="34"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip="{Binding SelectedSetupReviewModel.SetupDisplayName}"
+                                  TextSearch.TextPath="SetupDisplayName" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupDownloadReviewCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="導入" FontSize="12" FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="保存先"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1"
-                           Text="{Binding SetupStorageRoot}"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"
-                           ToolTip="{Binding SetupStorageRoot}" />
-                <Button Grid.Column="2"
-                        Command="{Binding SetupChooseStorageRootCommand}"
-                        Padding="10,7"
-                        MinWidth="92"
-                        Margin="10,0,0,0">
-                    <TextBlock Text="変更" FontSize="12" />
-                </Button>
-            </Grid>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="保存先"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SetupStorageRoot}"
+                                   Foreground="#64748B"
+                                   FontSize="12"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{Binding SetupStorageRoot}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupChooseStorageRootCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="変更" FontSize="12" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Expander>
 
             <StackPanel Orientation="Horizontal" Margin="92,0,0,14">
                 <Button Command="{Binding SetupAcceptLicensesCommand}"

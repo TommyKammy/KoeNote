@@ -395,7 +395,7 @@
                                         Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                        <TextBlock Text="完了" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding SetupCompleteActionText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>

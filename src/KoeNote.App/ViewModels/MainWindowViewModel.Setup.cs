@@ -32,7 +32,7 @@ public sealed partial class MainWindowViewModel
         SelectedAsrEngineId = _setupState.SelectedAsrModelId ?? SelectedAsrEngineId;
         RefreshSetupWizard();
         RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
-        LatestLog = "Recommended setup choices selected. Review ASR and LLM choices, then accept licenses.";
+        LatestLog = "Recommended setup choices selected. Accept licenses before installation.";
         return Task.CompletedTask;
     }
 
@@ -60,7 +60,7 @@ public sealed partial class MainWindowViewModel
     {
         _setupState = _setupWizardService.AcceptLicenses();
         RefreshSetupWizard();
-        LatestLog = "Setup licenses accepted. Install or import the selected models, then run smoke check.";
+        LatestLog = "Setup licenses accepted. Review the installation plan, then start installation.";
         return Task.CompletedTask;
     }
 
@@ -69,12 +69,16 @@ public sealed partial class MainWindowViewModel
         return !IsModelDownloadInProgress &&
             SelectedSetupAsrModel is not null &&
             SelectedSetupReviewModel is not null &&
-            !SelectedSetupConfigurationReady;
+            (!_setupState.LicenseAccepted ||
+                !SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) ||
+                !SelectedSetupConfigurationReady);
     }
 
     private bool CanDownloadSetupAsr()
     {
         return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
             SelectedSetupAsrModel is not null &&
             !IsSetupModelReady(SelectedSetupAsrModel);
     }
@@ -82,6 +86,8 @@ public sealed partial class MainWindowViewModel
     private bool CanDownloadSetupReview()
     {
         return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
             SelectedSetupReviewModel is not null &&
             !IsSetupModelReady(SelectedSetupReviewModel);
     }
@@ -89,8 +95,25 @@ public sealed partial class MainWindowViewModel
     private bool CanInstallCudaReviewRuntime()
     {
         return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
             SetupCudaReviewRuntimeRecommended &&
             !SetupCudaReviewRuntimeReady;
+    }
+
+    private bool CanInstallDiarizationRuntime()
+    {
+        return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
+            !SetupDiarizationRuntimeReady;
+    }
+
+    private bool CanUseSetupInstallActions()
+    {
+        return !IsModelDownloadInProgress &&
+            _setupState.LicenseAccepted &&
+            SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan);
     }
 
     private async Task SetupInstallSelectedPresetAsync()
@@ -100,9 +123,28 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!_setupState.LicenseAccepted)
+        {
+            _setupState = _setupWizardService.MoveToLicense();
+            RefreshSetupWizard();
+            LatestLog = "Accept licenses before installation.";
+            return;
+        }
+
+        if (!SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan))
+        {
+            _setupState = _setupWizardService.MoveToInstallPlan();
+            RefreshSetupWizard();
+            LatestLog = "Review the installation plan before installation.";
+            return;
+        }
+
         var displayName = SelectedSetupModelPreset?.DisplayName ?? "selected model preset";
+        ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
         ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
+        SetSetupInstallStatus("文字起こしモデル", "導入中", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
+        SetSetupInstallStatus("整文モデル", "導入中", SelectedSetupReviewModel?.DisplayName ?? "Review model");
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
             var modelName = FindSetupModelDisplayName(
@@ -118,18 +160,25 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             if (!modelResult.IsSucceeded)
             {
+                SetSetupInstallStatus("文字起こしモデル", "失敗", modelResult.Message);
+                SetSetupInstallStatus("整文モデル", "失敗", modelResult.Message);
                 CompleteSetupModelDownload(displayName, modelResult);
                 return;
             }
 
+            SetSetupInstallStatus("文字起こしモデル", "完了", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
+            SetSetupInstallStatus("整文モデル", "完了", SelectedSetupReviewModel?.DisplayName ?? "Review model");
+
             if (!SetupFasterWhisperRuntimeReady)
             {
+                SetSetupInstallStatus("ASR runtime", "導入中", "文字起こしに必要な実行環境");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
                 IsModelDownloadProgressIndeterminate = true;
                 var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync();
                 if (!preflight.IsReady)
                 {
                     var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                    SetSetupInstallStatus("ASR runtime", "失敗", message);
                     CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     LatestLog = message;
                     return;
@@ -141,22 +190,30 @@ public sealed partial class MainWindowViewModel
                 if (!runtimeResult.IsSucceeded)
                 {
                     var message = BuildFasterWhisperRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetSetupInstallStatus("ASR runtime", "失敗", message);
                     CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     LatestLog = message;
                     return;
                 }
 
+                SetSetupInstallStatus("ASR runtime", "完了", runtimeResult.InstallPath);
                 LatestLog = runtimeResult.Message;
+            }
+            else
+            {
+                SetSetupInstallStatus("ASR runtime", "スキップ", "導入済みです");
             }
 
             if (!SetupDiarizationRuntimeReady)
             {
+                SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための追加runtime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
                 IsModelDownloadProgressIndeterminate = true;
                 var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync();
                 if (!preflight.IsReady)
                 {
-                    var message = BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                    var message = BuildOptionalDiarizationRuntimeFailureMessage(preflight.Message, preflight.FailureCategory);
+                    SetSetupInstallStatus("話者識別", "失敗", message);
                     CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     SetupDiarizationRuntimeSummary = message;
                     LatestLog = message;
@@ -168,7 +225,8 @@ public sealed partial class MainWindowViewModel
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
-                    var message = BuildDiarizationRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    var message = BuildOptionalDiarizationRuntimeFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetSetupInstallStatus("話者識別", "失敗", message);
                     CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     SetupDiarizationRuntimeSummary = message;
                     LatestLog = message;
@@ -176,30 +234,43 @@ public sealed partial class MainWindowViewModel
                 }
 
                 SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
+                SetSetupInstallStatus("話者識別", "完了", runtimeResult.InstallPath);
                 LatestLog = runtimeResult.Message;
+            }
+            else
+            {
+                SetSetupInstallStatus("話者識別", "スキップ", "導入済みです");
             }
 
             if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
             {
+                SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA review runtime for detected NVIDIA GPU...";
                 IsModelDownloadProgressIndeterminate = true;
                 var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync();
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
-                    var message = BuildCudaReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    var message = BuildOptionalCudaReviewRuntimeFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetSetupInstallStatus("GPU高速化", "失敗", message);
                     SetupCudaReviewRuntimeSummary = message;
-                    LatestLog = $"{message} CPU review runtime remains available.";
+                    LatestLog = message;
                 }
                 else
                 {
                     SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {runtimeResult.InstallPath}";
+                    SetSetupInstallStatus("GPU高速化", "完了", runtimeResult.InstallPath);
                     LatestLog = runtimeResult.Message;
                 }
+            }
+            else if (SetupCudaReviewRuntimeRecommended)
+            {
+                SetSetupInstallStatus("GPU高速化", "スキップ", "導入済みです");
             }
 
             if (!SetupTernaryReviewRuntimeReady)
             {
+                SetSetupInstallStatus("Ternary review runtime", "導入中", "選択した整文モデルに必要なruntime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
                 IsModelDownloadProgressIndeterminate = true;
                 var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync();
@@ -207,15 +278,21 @@ public sealed partial class MainWindowViewModel
                 if (!runtimeResult.IsSucceeded)
                 {
                     var message = BuildTernaryReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetSetupInstallStatus("Ternary review runtime", "失敗", message);
                     CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     LatestLog = message;
                     return;
                 }
 
+                SetSetupInstallStatus("Ternary review runtime", "完了", runtimeResult.InstallPath);
                 LatestLog = runtimeResult.Message;
             }
 
+            SetSetupInstallStatus("保存先", "確認済み", SetupStorageRoot);
             CompleteModelDownloadProgress(displayName, succeeded: true);
+            ModelDownloadProgressSummary = "導入が完了しました。最終確認へ進めます。";
+            ModelDownloadNotification = "導入が完了しました。KoeNoteを使う準備に進めます。";
+            LatestLog = ModelDownloadProgressSummary;
         }
         catch (OperationCanceledException)
         {
@@ -228,7 +305,9 @@ public sealed partial class MainWindowViewModel
     private async Task SetupDownloadAsrAsync()
     {
         var displayName = SelectedSetupAsrModel?.DisplayName ?? "ASR model";
+        ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
+        SetSetupInstallStatus("文字起こしモデル", "導入中", displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
             UpdateModelDownloadProgress(displayName, downloadProgress);
@@ -236,13 +315,16 @@ public sealed partial class MainWindowViewModel
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("asr", progress);
         RefreshSetupWizard();
+        SetSetupInstallStatus("文字起こしモデル", result.IsSucceeded ? "完了" : "失敗", result.Message);
         CompleteSetupModelDownload(displayName, result);
     }
 
     private async Task SetupDownloadReviewAsync()
     {
         var displayName = SelectedSetupReviewModel?.DisplayName ?? "Review LLM model";
+        ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
+        SetSetupInstallStatus("整文モデル", "導入中", displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
             UpdateModelDownloadProgress(displayName, downloadProgress);
@@ -250,13 +332,16 @@ public sealed partial class MainWindowViewModel
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("review", progress);
         RefreshSetupWizard();
+        SetSetupInstallStatus("整文モデル", result.IsSucceeded ? "完了" : "失敗", result.Message);
         CompleteSetupModelDownload(displayName, result);
     }
 
     private async Task SetupInstallDiarizationRuntimeAsync()
     {
         const string displayName = "diarize speaker diarization runtime";
+        ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
+        SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための追加runtime");
         ModelDownloadProgressSummary = "Checking bundled Python and pip for diarize runtime...";
         IsModelDownloadProgressIndeterminate = true;
 
@@ -265,8 +350,9 @@ public sealed partial class MainWindowViewModel
             var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync();
             if (!preflight.IsReady)
             {
-                var preflightMessage = BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+                var preflightMessage = BuildOptionalDiarizationRuntimeFailureMessage(preflight.Message, preflight.FailureCategory);
                 RefreshSetupWizard();
+                SetSetupInstallStatus("話者識別", "失敗", preflightMessage);
                 SetupDiarizationRuntimeSummary = preflightMessage;
                 CompleteModelDownloadProgress(displayName, succeeded: false, preflightMessage);
                 LatestLog = preflightMessage;
@@ -278,23 +364,32 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"Speaker diarization runtime installed: {result.InstallPath}"
-                : BuildDiarizationRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
+                : BuildOptionalDiarizationRuntimeFailureMessage(result.Message, result.FailureCategory);
             SetupDiarizationRuntimeSummary = message;
+            SetSetupInstallStatus("話者識別", result.IsSucceeded ? "完了" : "失敗", message);
             CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            if (result.IsSucceeded)
+            {
+                ModelDownloadNotification = "話者識別runtimeの導入が完了しました。";
+            }
             LatestLog = result.IsSucceeded ? result.Message : message;
         }
         catch (OperationCanceledException)
         {
             RefreshSetupWizard();
-            CompleteModelDownloadProgress(displayName, succeeded: false, "diarize runtime install was cancelled.");
-            LatestLog = "diarize runtime install was cancelled.";
+            const string message = "話者識別runtimeの導入を中止しました。KoeNote本体は利用できます。必要になったら、モデルと保存先の手動設定から後で追加導入できます。";
+            SetSetupInstallStatus("話者識別", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
         }
     }
 
     private async Task SetupInstallCudaReviewRuntimeAsync()
     {
         const string displayName = "CUDA review runtime";
+        ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
+        SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
         ModelDownloadProgressSummary = "Installing CUDA review runtime for LLM acceleration...";
         IsModelDownloadProgressIndeterminate = true;
 
@@ -304,16 +399,23 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"CUDA review runtime installed: {result.InstallPath}"
-                : BuildCudaReviewRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
+                : BuildOptionalCudaReviewRuntimeFailureMessage(result.Message, result.FailureCategory);
             SetupCudaReviewRuntimeSummary = message;
+            SetSetupInstallStatus("GPU高速化", result.IsSucceeded ? "完了" : "失敗", message);
             CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
-            LatestLog = result.IsSucceeded ? result.Message : $"{message} CPU review runtime remains available.";
+            if (result.IsSucceeded)
+            {
+                ModelDownloadNotification = "GPU高速化runtimeの導入が完了しました。";
+            }
+            LatestLog = result.IsSucceeded ? result.Message : message;
         }
         catch (OperationCanceledException)
         {
             RefreshSetupWizard();
-            CompleteModelDownloadProgress(displayName, succeeded: false, "CUDA review runtime install was cancelled.");
-            LatestLog = "CUDA review runtime install was cancelled. CPU review runtime remains available.";
+            const string message = "GPU高速化runtimeの導入を中止しました。KoeNote本体は利用できます。整文はCPU版で続行できます。必要になったら、モデルと保存先の手動設定から後で追加導入できます。";
+            SetSetupInstallStatus("GPU高速化", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
         }
     }
 
@@ -528,6 +630,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupCurrentStep));
         OnPropertyChanged(nameof(SetupStepDisplayName));
         OnPropertyChanged(nameof(SetupStatusSummary));
+        OnPropertyChanged(nameof(SetupCompleteActionText));
         OnPropertyChanged(nameof(SetupWizardModalTitle));
         OnPropertyChanged(nameof(SetupWizardModalGuide));
         OnPropertyChanged(nameof(SetupMode));
@@ -553,6 +656,8 @@ public sealed partial class MainWindowViewModel
         {
             SetupExistingData.Add(item);
         }
+
+        RefreshSetupInstallPlanItems();
 
         if (RunSelectedJobCommand is RelayCommand runCommand)
         {
@@ -588,6 +693,21 @@ public sealed partial class MainWindowViewModel
         {
             cudaReviewCommand.RaiseCanExecuteChanged();
         }
+
+        if (SetupRegisterLocalAsrCommand is RelayCommand registerAsrCommand)
+        {
+            registerAsrCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupRegisterLocalReviewCommand is RelayCommand registerReviewCommand)
+        {
+            registerReviewCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupImportOfflinePackCommand is RelayCommand importPackCommand)
+        {
+            importPackCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private static string FindSetupModelDisplayName(IEnumerable<ModelCatalogEntry> models, string modelId)
@@ -618,6 +738,76 @@ public sealed partial class MainWindowViewModel
         SetupCudaReviewRuntimeSummary = SetupCudaReviewRuntimeRecommended
             ? $"NVIDIA GPU detected. CUDA review runtime will be included in bundled setup when configured. CPU fallback remains available: {Paths.ReviewRuntimeDirectory}"
             : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
+    }
+
+    private IReadOnlyList<SetupInstallPlanItem> BuildSetupInstallPlanItems()
+    {
+        var items = new List<SetupInstallPlanItem>
+        {
+            new(
+                "文字起こしモデル",
+                SelectedSetupAsrModel?.DisplayName ?? "未選択",
+                IsSetupModelReady(SelectedSetupAsrModel) ? "導入済み" : "導入します"),
+            new(
+                "整文モデル",
+                SelectedSetupReviewModel?.DisplayName ?? "未選択",
+                IsSetupModelReady(SelectedSetupReviewModel) ? "導入済み" : "導入します"),
+            new(
+                "ASR runtime",
+                "文字起こしに必要な実行環境",
+                SetupFasterWhisperRuntimeReady ? "導入済み" : "導入します"),
+            new(
+                "話者識別",
+                "話者分離を使うための追加runtime",
+                SetupDiarizationRuntimeReady ? "導入済み" : "導入します")
+        };
+
+        if (SetupCudaReviewRuntimeRecommended)
+        {
+            items.Add(new(
+                "GPU高速化",
+                "検出されたNVIDIA GPU向けのReview runtime",
+                SetupCudaReviewRuntimeReady ? "導入済み" : "導入します"));
+        }
+
+        if (!SetupTernaryReviewRuntimeReady)
+        {
+            items.Add(new(
+                "Ternary review runtime",
+                "選択した整文モデルに必要なruntime",
+                "導入します"));
+        }
+
+        items.Add(new(
+            "保存先",
+            "KoeNoteの標準フォルダー",
+            Directory.Exists(SetupStorageRoot) ? "確認済み" : "作成します"));
+        return items
+            .Select(item => _setupInstallStatusOverrides.TryGetValue(item.Name, out var status)
+                ? status
+                : item)
+            .ToArray();
+    }
+
+    private void ResetSetupInstallStatuses()
+    {
+        _setupInstallStatusOverrides.Clear();
+        RefreshSetupInstallPlanItems();
+    }
+
+    private void SetSetupInstallStatus(string name, string status, string summary)
+    {
+        _setupInstallStatusOverrides[name] = new SetupInstallPlanItem(name, summary, status);
+        RefreshSetupInstallPlanItems();
+    }
+
+    private void RefreshSetupInstallPlanItems()
+    {
+        SetupInstallPlanItems.Clear();
+        foreach (var item in BuildSetupInstallPlanItems())
+        {
+            SetupInstallPlanItems.Add(item);
+        }
     }
 
     private static string BuildDiarizationRuntimeSetupFailureMessage(string message, string failureCategory)
@@ -672,6 +862,11 @@ public sealed partial class MainWindowViewModel
         };
     }
 
+    private static string BuildOptionalDiarizationRuntimeFailureMessage(string message, string failureCategory)
+    {
+        return $"{BuildDiarizationRuntimeSetupFailureMessage(message, failureCategory)} KoeNote本体は利用できます。話者識別は後から追加導入できます。";
+    }
+
     private static string BuildCudaReviewRuntimeSetupFailureMessage(string message, string failureCategory)
     {
         return failureCategory switch
@@ -690,5 +885,10 @@ public sealed partial class MainWindowViewModel
                 $"CUDA review runtime could not be installed. CPU review runtime remains available. Details: {message}",
             _ => message
         };
+    }
+
+    private static string BuildOptionalCudaReviewRuntimeFailureMessage(string message, string failureCategory)
+    {
+        return $"{BuildCudaReviewRuntimeSetupFailureMessage(message, failureCategory)} KoeNote本体は利用できます。整文はCPU版で続行できます。GPU高速化は後から追加導入できます。";
     }
 }

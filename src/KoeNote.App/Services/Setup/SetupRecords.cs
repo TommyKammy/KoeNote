@@ -6,16 +6,17 @@ namespace KoeNote.App.Services.Setup;
 
 public enum SetupStep
 {
-    Welcome,
-    EnvironmentCheck,
-    SetupMode,
-    AsrModel,
-    ReviewModel,
-    Storage,
-    License,
-    Install,
-    SmokeTest,
-    Complete
+    Welcome = 0,
+    EnvironmentCheck = 1,
+    SetupMode = 2,
+    AsrModel = 3,
+    ReviewModel = 4,
+    Storage = 5,
+    License = 6,
+    Install = 7,
+    SmokeTest = 8,
+    Complete = 9,
+    InstallPlan = 10
 }
 
 public sealed record SetupState(
@@ -69,6 +70,8 @@ public sealed record SetupExistingDataItem(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("exists")] bool Exists,
     [property: JsonPropertyName("detail")] string Detail);
+
+public sealed record SetupInstallPlanItem(string Name, string Summary, string Status);
 
 public sealed record SetupHostResources(
     long? TotalMemoryBytes,

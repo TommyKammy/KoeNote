@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Reflection;
@@ -94,6 +94,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private SetupState _setupState;
     private string _setupLocalModelPath = string.Empty;
     private string _setupOfflineModelPackPath = string.Empty;
+    private readonly Dictionary<string, SetupInstallPlanItem> _setupInstallStatusOverrides = [];
     private CancellationTokenSource? _runCancellation;
     private CancellationTokenSource? _modelDownloadCancellation;
     private CancellationTokenSource? _asrSettingsSaveDebounce;
@@ -117,7 +118,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _modelDownloadProgressSummary = "No active model download.";
     private string _modelDownloadNotification = string.Empty;
     private bool _isModelDownloadNotificationError;
-    private string _setupDiarizationRuntimeSummary = "話者識別ランタイムは未導入です。必要になったらここから追加できます。";
+    private string _setupDiarizationRuntimeSummary = "話者識別runtimeは未導入です。必要になったらここから追加導入できます。";
     private string _setupCudaReviewRuntimeSummary = "CUDA review runtime is optional. KoeNote will use CPU review runtime unless CUDA files are installed.";
     private string _databaseMaintenanceSummary = string.Empty;
     private string _updateNotificationTitle = string.Empty;
@@ -315,11 +316,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupInstallSelectedPresetCommand = new RelayCommand(SetupInstallSelectedPresetAsync, CanInstallSelectedPreset);
         SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
         SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
-        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, () => !IsModelDownloadInProgress);
+        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, CanInstallDiarizationRuntime);
         SetupInstallCudaReviewRuntimeCommand = new RelayCommand(SetupInstallCudaReviewRuntimeAsync, CanInstallCudaReviewRuntime);
-        SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
-        SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
-        SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
+        SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync, CanUseSetupInstallActions);
+        SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync, CanUseSetupInstallActions);
+        SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync, CanUseSetupInstallActions);
         SetupChooseStorageRootCommand = new RelayCommand(SetupChooseStorageRootAsync);
         SetupRunSmokeCommand = new RelayCommand(SetupRunSmokeAsync);
         SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
@@ -547,14 +548,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupWizardModalTitle => _setupState.CurrentStep switch
     {
-        SetupStep.Welcome => "KoeNote へようこそ",
-        SetupStep.EnvironmentCheck => "まず動作環境を確認します",
+        SetupStep.Welcome => "KoeNoteへようこそ",
+        SetupStep.EnvironmentCheck => "動作環境を確認します",
         SetupStep.SetupMode => "モデル構成を選びます",
         SetupStep.AsrModel => "文字起こしモデルを選びます",
         SetupStep.ReviewModel => "整文モデルを選びます",
         SetupStep.Storage => "モデルの保存先を確認します",
         SetupStep.License => "ライセンスを確認します",
-        SetupStep.Install => "モデルを導入します",
+        SetupStep.InstallPlan => "導入内容を確認します",
+        SetupStep.Install => "必要なものを導入します",
         SetupStep.SmokeTest => "最後に動作確認します",
         SetupStep.Complete => "準備完了です",
         _ => "初回セットアップ"
@@ -562,19 +564,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupWizardModalGuide => _setupState.CurrentStep switch
     {
-        SetupStep.Welcome => "KoeNote は本体だけ先に起動し、ASR / 整文モデルはあとから導入します。ここでは最初の文字起こしに必要な準備を順番に案内します。",
-        SetupStep.EnvironmentCheck => "足りない runtime やモデルがあってもアプリ本体は壊れません。ここで次に必要な導入操作を確認できます。",
-        SetupStep.SetupMode => "軽量、推奨、高精度、実験的からPC環境に合う構成を選びます。あとからASRと整文モデルを個別に変更できます。",
-        SetupStep.AsrModel => "日本語文字起こしには faster-whisper large-v3-turbo を推奨します。精度優先なら large-v3 も選べます。",
-        SetupStep.ReviewModel => "整文は文字起こし結果を読みやすく整える追加ステージです。不要な場合は Settings でいつでもスキップできます。",
-        SetupStep.Storage => "オンラインダウンロード、ローカルファイル、offline model pack のどれでも導入できます。",
-        SetupStep.License => "モデルごとの license / size / runtime requirement を確認してから導入します。",
-        SetupStep.Install => "ダウンロード中は進捗を表示します。失敗しても本体は起動したままで、別経路から再試行できます。",
-        SetupStep.SmokeTest => "ネットワークなしで startup、sample import、review screen、export path を確認します。",
-        SetupStep.Complete => "セットアップが完了すると Run が有効になります。通常画面からいつでも Setup / Models を開けます。",
-        _ => "KoeNote の初回利用に必要な準備を案内します。"
+        SetupStep.Welcome => "KoeNoteを使い始めるために必要な準備を順番に案内します。",
+        SetupStep.EnvironmentCheck => "不足があってもアプリ本体は利用できます。必要なものはこの後の手順で導入できます。",
+        SetupStep.SetupMode => "迷ったらおすすめ構成で進めてください。モデルは後から変更できます。",
+        SetupStep.AsrModel => "文字起こしに使うモデルを選びます。通常はおすすめのままで大丈夫です。",
+        SetupStep.ReviewModel => "整文や要約に使うモデルを選びます。通常はおすすめのままで大丈夫です。",
+        SetupStep.Storage => "モデルの保存先を確認します。通常は標準フォルダーを使います。",
+        SetupStep.License => "導入前に、選択したモデルのライセンスを確認します。",
+        SetupStep.InstallPlan => "これから導入する内容を確認します。問題なければ導入を開始してください。",
+        SetupStep.Install => "導入中です。完了までこのままお待ちください。",
+        SetupStep.SmokeTest => "最後に、KoeNoteを使う準備が整っているか確認します。",
+        SetupStep.Complete => "準備が完了しました。KoeNoteを開始できます。",
+        _ => "KoeNoteの初回利用に必要な準備を案内します。"
     };
-
     public bool CanRunSelectedJob => !IsRunInProgress && !IsPostProcessInProgress && GetRunPreflightIssues().Count == 0;
 
     public bool CanRunPostReview => CanRunPostProcessSelectedJob;
@@ -643,6 +645,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<SetupModelAudit> SetupModelAudits { get; } = [];
 
     public ObservableCollection<SetupExistingDataItem> SetupExistingData { get; } = [];
+
+    public ObservableCollection<SetupInstallPlanItem> SetupInstallPlanItems { get; } = [];
 
     public ObservableCollection<DomainPresetImportHistoryItem> DomainPresetImports { get; } = [];
 
@@ -1046,9 +1050,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupPrimaryInstallActionText => IsModelDownloadInProgress
         ? "導入中..."
+        : !_setupState.LicenseAccepted
+            ? "ライセンスを確認"
         : SelectedSetupConfigurationReady
             ? "構成は導入済み"
-            : "構成をまとめて導入";
+            : "おすすめ構成を導入";
 
     public string SetupPrimaryInstallSummary
     {
@@ -1056,18 +1062,23 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (IsModelDownloadInProgress)
             {
-                return "選択した構成の導入を進めています。このまま完了を待ってください。";
+                return "選択した構成を導入しています。完了までこのままお待ちください。";
+            }
+
+            if (!_setupState.LicenseAccepted)
+            {
+                return "導入前にライセンスを確認します。";
             }
 
             if (SelectedSetupConfigurationReady)
             {
-                return "ASR、整文モデル、話者識別ランタイムは導入済みです。ライセンス同意と最終確認へ進めます。";
+                return "必要なモデルと実行環境は導入済みです。最終確認へ進めます。";
             }
 
             var missing = new List<string>();
             if (!IsSetupModelReady(SelectedSetupAsrModel))
             {
-                missing.Add("ASR");
+                missing.Add("文字起こしモデル");
             }
 
             if (!IsSetupModelReady(SelectedSetupReviewModel))
@@ -1082,7 +1093,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
             if (!SetupDiarizationRuntimeReady)
             {
-                missing.Add("話者識別ランタイム");
+                missing.Add("話者識別runtime");
             }
 
             if (!SetupTernaryReviewRuntimeReady)
@@ -1091,8 +1102,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
 
             return missing.Count == 0
-                ? "選択した構成を確認しています。"
-                : $"{string.Join(" / ", missing)} をまとめて導入できます。";
+                ? "導入内容を確認しています。"
+                : $"{string.Join(" / ", missing)} を導入します。";
         }
     }
 
@@ -1106,7 +1117,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupPresetRecommendationSummary => _setupPresetRecommendation is null
         ? string.Empty
-        : $"自動判定のおすすめ: {_setupPresetRecommendation.DisplayName}";
+        : $"おすすめ: {_setupPresetRecommendation.DisplayName}";
 
     public string SetupPresetRecommendationDetail => _setupPresetRecommendation?.Detail ?? string.Empty;
 
@@ -1125,8 +1136,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string SetupCurrentStep => _setupState.CurrentStep.ToString();
 
     public string SetupStatusSummary => _setupState.IsCompleted
-        ? "セットアップは完了しています。必要なモデルと実行環境が揃っていれば実行できます。"
-        : $"セットアップは未完了です。現在のステップ: {SetupStepDisplayName}。モデル導入、ライセンス同意、最終確認を完了すると実行できます。";
+        ? "セットアップは完了しています。KoeNoteを開始できます。"
+        : $"現在のステップ: {SetupStepDisplayName}";
 
     public string SetupStepDisplayName => _setupState.CurrentStep switch
     {
@@ -1137,6 +1148,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupStep.ReviewModel => "整文LLM",
         SetupStep.Storage => "保存先",
         SetupStep.License => "ライセンス",
+        SetupStep.InstallPlan => "導入内容",
         SetupStep.Install => "モデル導入",
         SetupStep.SmokeTest => "最終確認",
         SetupStep.Complete => "完了",
@@ -1149,6 +1161,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
 
+    public string SetupCompleteActionText => _setupState.IsCompleted ? "KoeNoteを開始" : "完了";
     private static bool IsSetupModelReady(ModelCatalogEntry? model)
     {
         return model?.InstalledModel is { Verified: true } installed &&
@@ -1209,7 +1222,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public string ModelDownloadProgressText => IsModelDownloadProgressIndeterminate
-        ? "計算中"
+        ? "確認中"
         : $"{ModelDownloadProgressPercent:0}%";
 
     public string ModelDownloadNotification

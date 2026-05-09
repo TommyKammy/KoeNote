@@ -4,7 +4,7 @@ internal static class SetupStepBuilder
 {
     public static IReadOnlyList<SetupStepItem> Build(SetupState state, SetupStepReadiness readiness)
     {
-        return Enum.GetValues<SetupStep>()
+        return SetupStepFlow.OrderedSteps
             .Select(step => new SetupStepItem(step, GetStepTitle(step), GetStepStatus(step, state, readiness)))
             .ToArray();
     }
@@ -20,6 +20,7 @@ internal static class SetupStepBuilder
             SetupStep.ReviewModel => "整文LLM",
             SetupStep.Storage => "保存先",
             SetupStep.License => "ライセンス",
+            SetupStep.InstallPlan => "導入内容",
             SetupStep.Install => "モデル導入",
             SetupStep.SmokeTest => "最終確認",
             SetupStep.Complete => "完了",
@@ -51,13 +52,14 @@ internal static class SetupStepBuilder
 
         return step switch
         {
-            SetupStep.Welcome => state.CurrentStep > SetupStep.Welcome,
+            SetupStep.Welcome => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.Welcome),
             SetupStep.EnvironmentCheck => readiness.EnvironmentReady,
-            SetupStep.SetupMode => state.CurrentStep > SetupStep.SetupMode && !string.IsNullOrWhiteSpace(state.SetupMode),
+            SetupStep.SetupMode => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.SetupMode) && !string.IsNullOrWhiteSpace(state.SetupMode),
             SetupStep.AsrModel => readiness.AsrModelReady,
             SetupStep.ReviewModel => readiness.ReviewModelReady,
             SetupStep.Storage => readiness.StorageReady,
             SetupStep.License => state.LicenseAccepted,
+            SetupStep.InstallPlan => state.LicenseAccepted && SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.InstallPlan),
             SetupStep.Install => readiness.AsrModelReady && readiness.ReviewModelReady && readiness.ReviewRuntimeReady,
             SetupStep.SmokeTest => state.LastSmokeSucceeded,
             SetupStep.Complete => state.IsCompleted,

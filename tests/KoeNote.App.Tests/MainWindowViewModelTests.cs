@@ -1,8 +1,10 @@
 using System.Collections;
+using System.Reflection;
 using System.Windows.Input;
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
@@ -224,7 +226,8 @@ public sealed class MainWindowViewModelTests
             SetupMode = "lightweight",
             SelectedModelPresetId = "lightweight",
             SelectedAsrModelId = asrItem.ModelId,
-            SelectedReviewModelId = reviewItem.ModelId
+            SelectedReviewModelId = reviewItem.ModelId,
+            LicenseAccepted = true
         });
 
         var viewModel = new MainWindowViewModel(paths);
@@ -233,14 +236,101 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.SetupDiarizationRuntimeReady);
         Assert.False(viewModel.SelectedSetupConfigurationReady);
         Assert.True(viewModel.SetupInstallSelectedPresetCommand.CanExecute(null));
-        Assert.Contains("話者識別ランタイム", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+        Assert.Contains("話者識別runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SetupInstallSelectedPresetCommand_OpensLicenseStepBeforeInstalling()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.SetupLicenseAccepted);
+        Assert.True(viewModel.SetupInstallSelectedPresetCommand.CanExecute(null));
+
+        viewModel.SetupInstallSelectedPresetCommand.Execute(null);
+
+        Assert.Equal(nameof(SetupStep.License), viewModel.SetupCurrentStep);
+        Assert.Contains("licenses", viewModel.LatestLog, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetupWizardInstallPlanItems_ShowSelectedConfigurationBeforeInstall()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Contains(viewModel.SetupInstallPlanItems, item => item.Name == "文字起こしモデル");
+        Assert.Contains(viewModel.SetupInstallPlanItems, item => item.Name == "整文モデル");
+        Assert.Contains(viewModel.SetupInstallPlanItems, item => item.Name == "ASR runtime");
+        Assert.Contains(viewModel.SetupInstallPlanItems, item => item.Name == "保存先");
+        Assert.DoesNotContain(viewModel.SetupInstallPlanItems, item => item.Summary.Contains(paths.UserModels, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SetupCompleteActionText_ChangesToStartWhenSetupIsComplete()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            CurrentStep = SetupStep.Complete,
+            LicenseAccepted = true,
+            LastSmokeSucceeded = true
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("KoeNoteを開始", viewModel.SetupCompleteActionText);
+    }
+
+    [Fact]
+    public void SetupWizardModalText_UsesBeginnerFriendlyStage6Copy()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal("KoeNoteへようこそ", viewModel.SetupWizardModalTitle);
+        Assert.Contains("順番に案内", viewModel.SetupWizardModalGuide, StringComparison.Ordinal);
+        Assert.Equal("完了", viewModel.SetupCompleteActionText);
+        Assert.Equal("現在のステップ: ようこそ", viewModel.SetupStatusSummary);
+    }
+
+    [Fact]
+    public void SetupFailureMessages_ExplainOptionalRuntimeFallbacks()
+    {
+        var diarizationMessage = InvokePrivateStatic<string>(
+            "BuildOptionalDiarizationRuntimeFailureMessage",
+            "network unavailable",
+            DiarizationRuntimeService.FailureCategoryNetworkUnavailable);
+        var cudaMessage = InvokePrivateStatic<string>(
+            "BuildOptionalCudaReviewRuntimeFailureMessage",
+            "network unavailable",
+            CudaReviewRuntimeService.FailureCategoryNetworkUnavailable);
+
+        Assert.Contains("KoeNote本体は利用できます", diarizationMessage, StringComparison.Ordinal);
+        Assert.Contains("後から追加導入できます", diarizationMessage, StringComparison.Ordinal);
+        Assert.Contains("CPU版で続行できます", cudaMessage, StringComparison.Ordinal);
+        Assert.Contains("GPU高速化は後から追加導入できます", cudaMessage, StringComparison.Ordinal);
     }
 
     [Fact]
     public void SetupInstallCudaReviewRuntimeCommand_RequiresDetectedGpuAndMissingCudaRuntime()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var viewModel = new MainWindowViewModel(CreatePathsWithoutTernaryRuntime(root));
+        var paths = CreatePathsWithoutTernaryRuntime(root);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan
+        });
+        var viewModel = new MainWindowViewModel(paths);
         var noGpuRecommendation = new SetupPresetRecommendation(
             "recommended",
             "Recommended",
@@ -2241,6 +2331,15 @@ public sealed class MainWindowViewModelTests
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
             ?? throw new InvalidOperationException($"Method not found: {methodName}");
         return (T)method.Invoke(target, arguments)!;
+    }
+
+    private static T InvokePrivateStatic<T>(string methodName, params object[] arguments)
+    {
+        var method = typeof(MainWindowViewModel).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Method not found: {methodName}");
+        return (T)method.Invoke(null, arguments)!;
     }
 
     private static void Touch(string path)
