@@ -1,4 +1,5 @@
 using KoeNote.App.Services.Llm;
+using KoeNote.App.Services;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Transcript;
 
@@ -9,7 +10,7 @@ public sealed class LlmProfileResolverTests
     [Fact]
     public void Resolve_UsesStandardRuntimeAndCurrentDefaultsForGemma()
     {
-        var paths = TestDatabase.CreateReadyPaths();
+        var paths = CreateIsolatedPaths();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
 
@@ -23,6 +24,7 @@ public sealed class LlmProfileResolverTests
         Assert.Equal("runtime-llama-cpp", profile.RuntimePackageId);
         Assert.Equal(paths.ReviewModelPath, profile.ModelPath);
         Assert.Equal(paths.LlamaCompletionPath, profile.LlamaCompletionPath);
+        Assert.Equal("cpu", profile.AccelerationMode);
         Assert.Equal(8192, profile.ContextSize);
         Assert.Equal(999, profile.GpuLayers);
         Assert.Null(profile.Threads);
@@ -34,7 +36,7 @@ public sealed class LlmProfileResolverTests
     [Fact]
     public void Resolve_UsesTernaryRuntimeAndBoundedCpuDefaultsForTernaryBonsai()
     {
-        var paths = TestDatabase.CreateReadyPaths();
+        var paths = CreateIsolatedPaths();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
 
@@ -43,11 +45,44 @@ public sealed class LlmProfileResolverTests
         Assert.Equal("builtin:ternary-bonsai-8b-q2-0:ternary-bonsai:cpu-bounded", profile.ProfileId);
         Assert.Equal("runtime-llama-cpp-ternary", profile.RuntimePackageId);
         Assert.Equal(paths.TernaryLlamaCompletionPath, profile.LlamaCompletionPath);
+        Assert.Equal("cpu", profile.AccelerationMode);
         Assert.Equal(1024, profile.ContextSize);
         Assert.Equal(0, profile.GpuLayers);
         Assert.NotNull(profile.Threads);
         Assert.Equal(LlmOutputSanitizerProfiles.Strict, profile.OutputSanitizerProfile);
         Assert.Equal(TimeSpan.FromMinutes(20), profile.Timeout);
+    }
+
+    [Fact]
+    public void Resolve_UsesCudaAccelerationWhenCudaReviewRuntimeIsInstalled()
+    {
+        var paths = CreateIsolatedPaths();
+        Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+        File.WriteAllText(paths.LlamaCompletionPath, "llama");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "cuda");
+        File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, "test");
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
+
+        var profile = resolver.Resolve(catalog, "gemma-4-e4b-it-q4-k-m");
+
+        Assert.Equal("cuda", profile.AccelerationMode);
+        Assert.Equal(999, profile.GpuLayers);
+        Assert.Equal(paths.LlamaCompletionPath, profile.LlamaCompletionPath);
+    }
+
+    private static AppPaths CreateIsolatedPaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBase = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBase, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBase, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBase);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        return paths;
     }
 
     [Fact]

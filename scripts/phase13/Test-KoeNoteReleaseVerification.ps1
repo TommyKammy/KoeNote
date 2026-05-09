@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $artifactIntegrityScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteArtifactIntegrity.ps1"
+$payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePayloadGuard.ps1"
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
 $expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
@@ -82,6 +83,7 @@ if ([bool]$manifest.signing.required -and $manifest.signing.status -ne "signed")
 }
 
 $publishDir = Join-Path $repoRoot "artifacts\publish\KoeNote-$($manifest.runtime_identifier)"
+$payloadGuardResult = & $payloadGuardScript -PayloadDir $publishDir
 $pythonPath = Join-Path $publishDir "tools\python\python.exe"
 if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
     throw "Bundled Python runtime is required but missing from publish output: $pythonPath"
@@ -151,4 +153,6 @@ if ($manifest.ternary_review_runtime.path -ne $ternaryReviewRuntimePath) {
     RuntimeIdentifier = $manifest.runtime_identifier
     SigningRequired = [bool]$manifest.signing.required
     SigningStatus = $manifest.signing.status
+    ReviewRuntimeMB = $payloadGuardResult.ReviewRuntimeMB
+    BundledPythonMB = $payloadGuardResult.BundledPythonMB
 }

@@ -2,6 +2,7 @@ param(
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$IncludeLegacyRuntimeTools,
+    [switch]$IncludeTernaryReviewRuntime,
     [switch]$RequireBundledPythonRuntime,
     [switch]$RequireReviewRuntime
 )
@@ -11,6 +12,58 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $project = Join-Path $repoRoot "src\KoeNote.App\KoeNote.App.csproj"
 $publishDir = Join-Path $repoRoot "artifacts\publish\KoeNote-$RuntimeIdentifier"
+
+function Get-PayloadRelativePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $rootFull = [IO.Path]::GetFullPath($Root)
+    if (-not $rootFull.EndsWith([IO.Path]::DirectorySeparatorChar)) {
+        $rootFull += [IO.Path]::DirectorySeparatorChar
+    }
+
+    $rootUri = [Uri]$rootFull
+    $pathUri = [Uri]([IO.Path]::GetFullPath($Path))
+    return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('/', '\')
+}
+
+function Copy-FilteredDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceDir,
+        [Parameter(Mandatory = $true)][string]$DestinationDir,
+        [string[]]$ExcludePatterns = @()
+    )
+
+    New-Item -ItemType Directory -Force -Path $DestinationDir | Out-Null
+    $sourceRoot = [IO.Path]::GetFullPath($SourceDir)
+    $files = Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Force
+
+    foreach ($file in $files) {
+        $relative = Get-PayloadRelativePath -Root $sourceRoot -Path $file.FullName
+        $normalized = $relative.Replace('/', '\')
+        $shouldExclude = $false
+        foreach ($pattern in $ExcludePatterns) {
+            if ($normalized -like $pattern) {
+                $shouldExclude = $true
+                break
+            }
+        }
+
+        if ($shouldExclude) {
+            continue
+        }
+
+        $destinationPath = Join-Path $DestinationDir $relative
+        $destinationParent = Split-Path -Parent $destinationPath
+        if (-not (Test-Path -LiteralPath $destinationParent -PathType Container)) {
+            New-Item -ItemType Directory -Force -Path $destinationParent | Out-Null
+        }
+
+        Copy-Item -LiteralPath $file.FullName -Destination $destinationPath -Force
+    }
+}
 
 if (Test-Path -LiteralPath $publishDir) {
     Remove-Item -LiteralPath $publishDir -Recurse -Force
@@ -45,9 +98,26 @@ else {
 $pythonRuntimeSource = Join-Path $toolsSource "python"
 $pythonRuntimeDestination = Join-Path $publishDir "tools\python"
 if (Test-Path -LiteralPath $pythonRuntimeSource -PathType Container) {
-    New-Item -ItemType Directory -Force -Path $pythonRuntimeDestination | Out-Null
-    Get-ChildItem -LiteralPath $pythonRuntimeSource -Force |
-        Copy-Item -Destination $pythonRuntimeDestination -Recurse -Force
+    $pythonRuntimeExcludes = @(
+        "Lib\site-packages\artifact_tool_v2*",
+        "Lib\site-packages\pandas*",
+        "Lib\site-packages\numpy*",
+        "Lib\site-packages\lxml*",
+        "Lib\site-packages\PIL",
+        "Lib\site-packages\PIL\*",
+        "Lib\site-packages\pillow*",
+        "Lib\site-packages\openpyxl*",
+        "Lib\site-packages\pdf2image*",
+        "Lib\site-packages\pypdf*",
+        "Lib\site-packages\docx",
+        "Lib\site-packages\docx\*",
+        "Lib\site-packages\python_docx*",
+        "Lib\site-packages\reportlab*",
+        "**\__pycache__\*",
+        "*.pyc",
+        "*.pyo"
+    )
+    Copy-FilteredDirectory -SourceDir $pythonRuntimeSource -DestinationDir $pythonRuntimeDestination -ExcludePatterns $pythonRuntimeExcludes
 }
 elseif ($RequireBundledPythonRuntime) {
     throw "Missing bundled Python runtime: $pythonRuntimeSource. Place Python 3.12 x64 runtime there before publishing with -RequireBundledPythonRuntime."
@@ -56,9 +126,15 @@ elseif ($RequireBundledPythonRuntime) {
 $reviewRuntimeSource = Join-Path $toolsSource "review"
 $reviewRuntimeDestination = Join-Path $publishDir "tools\review"
 if (Test-Path -LiteralPath $reviewRuntimeSource -PathType Container) {
-    New-Item -ItemType Directory -Force -Path $reviewRuntimeDestination | Out-Null
-    Get-ChildItem -LiteralPath $reviewRuntimeSource -Force |
-        Copy-Item -Destination $reviewRuntimeDestination -Recurse -Force
+    $reviewRuntimeExcludes = @(
+        "ggml-cuda*.dll",
+        "cublas*.dll",
+        "cudart*.dll",
+        "cufft*.dll",
+        "curand*.dll",
+        "cusparse*.dll"
+    )
+    Copy-FilteredDirectory -SourceDir $reviewRuntimeSource -DestinationDir $reviewRuntimeDestination -ExcludePatterns $reviewRuntimeExcludes
 }
 elseif ($RequireReviewRuntime) {
     throw "Missing review runtime: $reviewRuntimeSource. Place llama.cpp CPU x64 runtime files there before publishing with -RequireReviewRuntime."
@@ -66,7 +142,7 @@ elseif ($RequireReviewRuntime) {
 
 $ternaryReviewRuntimeSource = Join-Path $toolsSource "review-ternary"
 $ternaryReviewRuntimeDestination = Join-Path $publishDir "tools\review-ternary"
-if (Test-Path -LiteralPath $ternaryReviewRuntimeSource -PathType Container) {
+if ($IncludeTernaryReviewRuntime -and (Test-Path -LiteralPath $ternaryReviewRuntimeSource -PathType Container)) {
     New-Item -ItemType Directory -Force -Path $ternaryReviewRuntimeDestination | Out-Null
     Get-ChildItem -LiteralPath $ternaryReviewRuntimeSource -Force |
         Copy-Item -Destination $ternaryReviewRuntimeDestination -Recurse -Force

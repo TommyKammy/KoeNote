@@ -16,6 +16,7 @@ public sealed class SetupWizardService
     private readonly FasterWhisperRuntimeService _fasterWhisperRuntimeService;
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
     private readonly TernaryReviewRuntimeService _ternaryReviewRuntimeService;
+    private readonly CudaReviewRuntimeService _cudaReviewRuntimeService;
     private SetupPresetRecommendation? _presetRecommendation;
     private bool _automaticPresetRecommendationApplied;
 
@@ -31,11 +32,13 @@ public sealed class SetupWizardService
         FasterWhisperRuntimeService fasterWhisperRuntimeService,
         DiarizationRuntimeService diarizationRuntimeService,
         ISetupHostResourceProbe? hostResourceProbe = null,
-        TernaryReviewRuntimeService? ternaryReviewRuntimeService = null)
+        TernaryReviewRuntimeService? ternaryReviewRuntimeService = null,
+        CudaReviewRuntimeService? cudaReviewRuntimeService = null)
     {
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
         _diarizationRuntimeService = diarizationRuntimeService;
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
+        _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
         _presetRecommendationService = new SetupPresetRecommendationService(
@@ -213,6 +216,11 @@ public sealed class SetupWizardService
     public Task<TernaryReviewRuntimeInstallResult> InstallTernaryReviewRuntimeAsync(CancellationToken cancellationToken = default)
     {
         return _ternaryReviewRuntimeService.InstallAsync(cancellationToken);
+    }
+
+    public Task<CudaReviewRuntimeInstallResult> InstallCudaReviewRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return _cudaReviewRuntimeService.InstallAsync(cancellationToken);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

@@ -17,7 +17,8 @@ KoeNote.App.exe
 README.distribution.md
 licenses/license-manifest.json
 tools/ffmpeg.exe
-tools/README-runtime-tools-not-included.txt
+tools/python/python.exe
+tools/review/llama-completion.exe
 models/README-models-not-included.txt
 models/asr/README-ASR-models-not-included.txt
 models/review/README-review-models-not-included.txt
@@ -25,9 +26,13 @@ samples/README-sample-audio.txt
 samples/koenote-smoke-1s.wav
 ```
 
-ASR and review model binaries are intentionally excluded. ASR/review runtimes are also excluded by default, except for `ffmpeg.exe` when it is available on the build machine.
+ASR and review model binaries are intentionally excluded. KoeNote Core includes only the minimal Python runtime and the standard CPU llama.cpp review runtime. CUDA review runtime files are installed later through Setup Wizard or an additional runtime install flow.
 
-For local developer checks that need the legacy ASR/review native tools copied into the publish folder, pass `-IncludeLegacyRuntimeTools` to the publish script.
+`Publish-KoeNote.ps1` is responsible for copying runtime tools into the release payload. The app project does not copy `tools/python`, `tools/review`, or `tools/review-ternary` into publish output by default, so release packaging is protected from arbitrary local `tools` contents.
+
+Before MSI generation, `Test-KoeNoteReleasePayloadGuard.ps1` verifies that the normal payload does not contain CUDA review DLLs, host-only Python packages such as `artifact_tool_v2`, `pandas`, `numpy`, or document/image tooling, and that `tools/python` and `tools/review` remain within the normal size budget.
+
+For local developer checks that need the legacy ASR native tools copied into the publish folder, pass `-IncludeLegacyRuntimeTools` to the publish script. The hidden Ternary review runtime is also omitted from the normal package; pass `-IncludeTernaryReviewRuntime` only for explicit runtime-package checks.
 
 ## Commands
 

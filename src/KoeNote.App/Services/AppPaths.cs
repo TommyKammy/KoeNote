@@ -63,7 +63,9 @@ public sealed class AppPaths
         FasterWhisperScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "faster_whisper_transcribe.py");
         ReazonSpeechK2ScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "reazonspeech_k2_transcribe.py");
         DiarizeWorkerScriptPath = Path.Combine(baseDirectory, "scripts", "diarization", "diarize_worker.py");
+        ReviewRuntimeDirectory = Path.Combine(RuntimeTools, "review");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
+        CudaReviewRuntimeMarkerPath = Path.Combine(ReviewRuntimeDirectory, ".koenote-cuda-review-runtime");
         TernaryLlamaCompletionPath = Path.Combine(RuntimeTools, "review-ternary", "llama-completion.exe");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
         WhisperBaseModelPath = Path.Combine(Models, "asr", "whisper-base");
@@ -132,7 +134,11 @@ public sealed class AppPaths
 
     public string DiarizeWorkerScriptPath { get; }
 
+    public string ReviewRuntimeDirectory { get; }
+
     public string LlamaCompletionPath { get; }
+
+    public string CudaReviewRuntimeMarkerPath { get; }
 
     public string TernaryLlamaCompletionPath { get; }
 

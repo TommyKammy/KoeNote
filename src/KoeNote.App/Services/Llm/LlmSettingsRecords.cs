@@ -22,7 +22,10 @@ public sealed record LlmRuntimeProfile(
     int? ThreadsBatch,
     bool NoConversation,
     string OutputSanitizerProfile,
-    TimeSpan Timeout);
+    TimeSpan Timeout)
+{
+    public string AccelerationMode { get; init; } = "cpu";
+}
 
 public sealed record LlmTaskSettings(
     LlmTaskKind TaskKind,

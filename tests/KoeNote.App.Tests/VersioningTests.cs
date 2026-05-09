@@ -105,6 +105,7 @@ public sealed class VersioningTests
         var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleaseVerification.ps1"));
 
         Assert.Contains("Test-KoeNoteArtifactIntegrity.ps1", script);
+        Assert.Contains("Test-KoeNoteReleasePayloadGuard.ps1", script);
         Assert.Contains("FullyQualifiedName~VersioningTests", script);
         Assert.Contains("release-manifest.json", script);
         Assert.Contains("signing.status", script);
@@ -148,6 +149,57 @@ public sealed class VersioningTests
         Assert.Contains("ternary_review_runtime.source_url", verificationScript);
         Assert.Contains("prism-b8846-d104cf1", ternaryRuntimeService);
         Assert.Contains("[switch]$RequireReviewRuntime", publishScript);
+        Assert.Contains("[switch]$IncludeTernaryReviewRuntime", publishScript);
+    }
+
+    [Fact]
+    public void ReleasePayloadGuard_BlocksGpuRuntimeAndHostPythonPackages()
+    {
+        var repoRoot = FindRepoRoot();
+        var guardScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleasePayloadGuard.ps1"));
+        var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
+        var verificationScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleaseVerification.ps1"));
+
+        Assert.Contains("ggml-cuda*.dll", guardScript);
+        Assert.Contains("cublas*.dll", guardScript);
+        Assert.Contains("cudart*.dll", guardScript);
+        Assert.Contains("\"artifact_tool_v2\"", guardScript);
+        Assert.Contains("\"pandas\"", guardScript);
+        Assert.Contains("\"numpy\"", guardScript);
+        Assert.Contains("\"lxml\"", guardScript);
+        Assert.Contains("\"PIL\"", guardScript);
+        Assert.Contains("\"openpyxl\"", guardScript);
+        Assert.Contains("\"pdf2image\"", guardScript);
+        Assert.Contains("\"pypdf\"", guardScript);
+        Assert.Contains("\"reportlab\"", guardScript);
+        Assert.Contains("MaxReviewRuntimeMB = 120", guardScript);
+        Assert.Contains("MaxBundledPythonMB = 120", guardScript);
+        Assert.Contains("Release payload guard failed", guardScript);
+        Assert.Contains("release_payload_guard_verified", buildScript);
+        Assert.Contains("Test-KoeNoteReleasePayloadGuard.ps1", buildScript);
+        Assert.Contains("Test-KoeNoteReleasePayloadGuard.ps1", verificationScript);
+    }
+
+    [Fact]
+    public void PublishScript_FiltersNormalReleaseRuntimePayload()
+    {
+        var repoRoot = FindRepoRoot();
+        var publishScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase10", "Publish-KoeNote.ps1"));
+        var appProject = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "KoeNote.App.csproj"));
+
+        Assert.Contains("Copy-FilteredDirectory", publishScript);
+        Assert.Contains("IncludeTernaryReviewRuntime", publishScript);
+        Assert.Contains("Lib\\site-packages\\artifact_tool_v2*", publishScript);
+        Assert.Contains("Lib\\site-packages\\pandas*", publishScript);
+        Assert.Contains("Lib\\site-packages\\numpy*", publishScript);
+        Assert.Contains("Lib\\site-packages\\lxml*", publishScript);
+        Assert.Contains("ggml-cuda*.dll", publishScript);
+        Assert.Contains("cublas*.dll", publishScript);
+        Assert.Contains("cudart*.dll", publishScript);
+        Assert.Contains("<KoeNoteIncludeRuntimeToolsInProjectPublish>false</KoeNoteIncludeRuntimeToolsInProjectPublish>", appProject);
+        Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\python')", appProject);
+        Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review')", appProject);
+        Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review-ternary')", appProject);
     }
 
     [Fact]

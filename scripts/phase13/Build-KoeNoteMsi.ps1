@@ -21,6 +21,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $publishScript = Join-Path $repoRoot "scripts\phase10\Publish-KoeNote.ps1"
+$payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePayloadGuard.ps1"
 $payloadScript = Join-Path $repoRoot "scripts\phase13\New-WixPayload.ps1"
 $cleanupProject = Join-Path $repoRoot "src\KoeNote.Cleanup\KoeNote.Cleanup.csproj"
 $installerProject = Join-Path $repoRoot "src\KoeNote.Installer\KoeNote.Installer.wixproj"
@@ -188,6 +189,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish for KoeNote.Cleanup failed with exit code $LASTEXITCODE."
 }
 Write-UpdateLog "cleanup_published" @{ publish_dir = $publishDir }
+
+$payloadGuardResult = & $payloadGuardScript -PayloadDir $publishDir
+Write-UpdateLog "release_payload_guard_verified" @{
+    review_runtime_mb = $payloadGuardResult.ReviewRuntimeMB
+    max_review_runtime_mb = $payloadGuardResult.MaxReviewRuntimeMB
+    bundled_python_mb = $payloadGuardResult.BundledPythonMB
+    max_bundled_python_mb = $payloadGuardResult.MaxBundledPythonMB
+}
 
 Invoke-CodeSigningIfConfigured -Paths @(
     (Join-Path $publishDir "KoeNote.App.exe"),

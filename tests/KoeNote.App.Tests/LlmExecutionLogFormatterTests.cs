@@ -23,7 +23,10 @@ public sealed class LlmExecutionLogFormatterTests
             null,
             true,
             LlmOutputSanitizerProfiles.Strict,
-            TimeSpan.FromHours(2));
+            TimeSpan.FromHours(2))
+        {
+            AccelerationMode = "cuda"
+        };
         var settings = LlmPresetCatalog.ResolveTaskSettings("bonsai-8b-q1-0", "bonsai", LlmTaskKind.Summary);
 
         var log = LlmExecutionLogFormatter.Format(profile, settings);
@@ -33,6 +36,8 @@ public sealed class LlmExecutionLogFormatterTests
         Assert.Contains("model=bonsai-8b-q1-0", log, StringComparison.Ordinal);
         Assert.Contains("family=bonsai", log, StringComparison.Ordinal);
         Assert.Contains("runtime=llama-cpp/runtime-llama-cpp", log, StringComparison.Ordinal);
+        Assert.Contains("acceleration=cuda", log, StringComparison.Ordinal);
+        Assert.Contains("runtime_path=\"llama-completion.exe\"", log, StringComparison.Ordinal);
         Assert.Contains("ctx=8192", log, StringComparison.Ordinal);
         Assert.Contains("gpu_layers=999", log, StringComparison.Ordinal);
         Assert.Contains("threads=-", log, StringComparison.Ordinal);

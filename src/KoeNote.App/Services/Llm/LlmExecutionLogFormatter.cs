@@ -14,6 +14,8 @@ public static class LlmExecutionLogFormatter
             $"model={profile.ModelId}",
             $"family={FormatValue(profile.ModelFamily)}",
             $"runtime={profile.RuntimeKind}/{profile.RuntimePackageId}",
+            $"acceleration={profile.AccelerationMode}",
+            $"runtime_path={FormatPath(profile.LlamaCompletionPath)}",
             $"ctx={profile.ContextSize}",
             $"gpu_layers={profile.GpuLayers}",
             $"threads={FormatValue(profile.Threads)}",
@@ -55,6 +57,13 @@ public static class LlmExecutionLogFormatter
     private static string FormatBool(bool value)
     {
         return value ? "true" : "false";
+    }
+
+    private static string FormatPath(string path)
+    {
+        return string.IsNullOrWhiteSpace(path)
+            ? "-"
+            : $"\"{path.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
     }
 
     private static string FormatDouble(double value)

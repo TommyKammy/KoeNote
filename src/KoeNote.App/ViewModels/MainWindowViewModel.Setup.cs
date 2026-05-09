@@ -86,6 +86,13 @@ public sealed partial class MainWindowViewModel
             !IsSetupModelReady(SelectedSetupReviewModel);
     }
 
+    private bool CanInstallCudaReviewRuntime()
+    {
+        return !IsModelDownloadInProgress &&
+            SetupCudaReviewRuntimeRecommended &&
+            !SetupCudaReviewRuntimeReady;
+    }
+
     private async Task SetupInstallSelectedPresetAsync()
     {
         if (IsModelDownloadInProgress)
@@ -170,6 +177,25 @@ public sealed partial class MainWindowViewModel
 
                 SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
                 LatestLog = runtimeResult.Message;
+            }
+
+            if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
+            {
+                ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA review runtime for detected NVIDIA GPU...";
+                IsModelDownloadProgressIndeterminate = true;
+                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync();
+                RefreshSetupWizard();
+                if (!runtimeResult.IsSucceeded)
+                {
+                    var message = BuildCudaReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                    SetupCudaReviewRuntimeSummary = message;
+                    LatestLog = $"{message} CPU review runtime remains available.";
+                }
+                else
+                {
+                    SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {runtimeResult.InstallPath}";
+                    LatestLog = runtimeResult.Message;
+                }
             }
 
             if (!SetupTernaryReviewRuntimeReady)
@@ -262,6 +288,32 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             CompleteModelDownloadProgress(displayName, succeeded: false, "diarize runtime install was cancelled.");
             LatestLog = "diarize runtime install was cancelled.";
+        }
+    }
+
+    private async Task SetupInstallCudaReviewRuntimeAsync()
+    {
+        const string displayName = "CUDA review runtime";
+        BeginModelDownloadProgress(displayName);
+        ModelDownloadProgressSummary = "Installing CUDA review runtime for LLM acceleration...";
+        IsModelDownloadProgressIndeterminate = true;
+
+        try
+        {
+            var result = await _setupWizardService.InstallCudaReviewRuntimeAsync();
+            RefreshSetupWizard();
+            var message = result.IsSucceeded
+                ? $"CUDA review runtime installed: {result.InstallPath}"
+                : BuildCudaReviewRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
+            SetupCudaReviewRuntimeSummary = message;
+            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            LatestLog = result.IsSucceeded ? result.Message : $"{message} CPU review runtime remains available.";
+        }
+        catch (OperationCanceledException)
+        {
+            RefreshSetupWizard();
+            CompleteModelDownloadProgress(displayName, succeeded: false, "CUDA review runtime install was cancelled.");
+            LatestLog = "CUDA review runtime install was cancelled. CPU review runtime remains available.";
         }
     }
 
@@ -464,6 +516,9 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupModelsReady));
         OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeReady));
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
         OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
@@ -479,6 +534,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
+        RefreshCudaReviewRuntimeSummary();
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
         OnPropertyChanged(nameof(IsSetupComplete));
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
@@ -526,6 +583,11 @@ public sealed partial class MainWindowViewModel
         {
             diarizationCommand.RaiseCanExecuteChanged();
         }
+
+        if (SetupInstallCudaReviewRuntimeCommand is RelayCommand cudaReviewCommand)
+        {
+            cudaReviewCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private static string FindSetupModelDisplayName(IEnumerable<ModelCatalogEntry> models, string modelId)
@@ -543,6 +605,19 @@ public sealed partial class MainWindowViewModel
         SetupDiarizationRuntimeSummary = isInstalled
             ? $"Speaker diarization runtime installed: {installPath}"
             : $"Speaker diarization runtime is not installed. KoeNote will use bundled Python 3.12 if available: {Paths.BundledPythonPath}";
+    }
+
+    private void RefreshCudaReviewRuntimeSummary()
+    {
+        if (SetupCudaReviewRuntimeReady)
+        {
+            SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {Paths.ReviewRuntimeDirectory}";
+            return;
+        }
+
+        SetupCudaReviewRuntimeSummary = SetupCudaReviewRuntimeRecommended
+            ? $"NVIDIA GPU detected. CUDA review runtime will be included in bundled setup when configured. CPU fallback remains available: {Paths.ReviewRuntimeDirectory}"
+            : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
     }
 
     private static string BuildDiarizationRuntimeSetupFailureMessage(string message, string failureCategory)
@@ -593,6 +668,26 @@ public sealed partial class MainWindowViewModel
                 $"Ternary review runtime was downloaded, but the archive was not usable. Details: {message}",
             TernaryReviewRuntimeService.FailureCategoryInstallFailed =>
                 $"Ternary review runtime could not be installed under tools\\review-ternary. Details: {message}",
+            _ => message
+        };
+    }
+
+    private static string BuildCudaReviewRuntimeSetupFailureMessage(string message, string failureCategory)
+    {
+        return failureCategory switch
+        {
+            CudaReviewRuntimeService.FailureCategoryConfigurationMissing =>
+                $"CUDA review runtime source is not configured. KoeNote will continue with CPU review runtime. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryCpuRuntimeMissing =>
+                $"CUDA review runtime needs the CPU review runtime first. KoeNote will continue without CUDA. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryNetworkUnavailable =>
+                $"CUDA review runtime could not be downloaded. Check the network connection or proxy settings; CPU review runtime remains available. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryHashMismatch =>
+                $"CUDA review runtime failed hash verification and was not installed. CPU review runtime remains available. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryArchiveInvalid =>
+                $"CUDA review runtime archive was not usable. CPU review runtime remains available. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryInstallFailed =>
+                $"CUDA review runtime could not be installed. CPU review runtime remains available. Details: {message}",
             _ => message
         };
     }

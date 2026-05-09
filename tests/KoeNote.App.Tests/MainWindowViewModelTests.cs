@@ -237,6 +237,36 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SetupInstallCudaReviewRuntimeCommand_RequiresDetectedGpuAndMissingCudaRuntime()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var viewModel = new MainWindowViewModel(CreatePathsWithoutTernaryRuntime(root));
+        var noGpuRecommendation = new SetupPresetRecommendation(
+            "recommended",
+            "Recommended",
+            "No GPU",
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, "No GPU"));
+        SetPrivateField(viewModel, "_setupPresetRecommendation", noGpuRecommendation);
+
+        Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
+
+        var gpuRecommendation = noGpuRecommendation with
+        {
+            Resources = new SetupHostResources(null, 12, NvidiaGpuDetected: true, "GPU")
+        };
+        SetPrivateField(viewModel, "_setupPresetRecommendation", gpuRecommendation);
+
+        Assert.True(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
+
+        Touch(viewModel.Paths.LlamaCompletionPath);
+        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(viewModel.Paths.CudaReviewRuntimeMarkerPath);
+
+        Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
+        Assert.Equal("導入済み", viewModel.SetupCudaReviewRuntimeActionText);
+    }
+
+    [Fact]
     public void SettingsReviewModelSelection_UpdatesSetupReviewModel()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

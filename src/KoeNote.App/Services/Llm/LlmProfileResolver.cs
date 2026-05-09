@@ -24,13 +24,14 @@ public sealed class LlmProfileResolver(
         var preset = LlmPresetCatalog.ResolveRuntimePreset(modelId, catalogItem?.Family);
         var catalogSanitizerProfile = catalogItem?.OutputSanitizerProfile;
 
-        return new LlmRuntimeProfile(
+        var runtimePackageId = catalogItem?.Runtime.PackageId ?? "runtime-llama-cpp";
+        var profile = new LlmRuntimeProfile(
             ProfileId: $"builtin:{modelId}:{preset.PresetId}",
             ModelId: modelId,
             ModelFamily: catalogItem?.Family,
             DisplayName: catalogItem?.DisplayName ?? modelId,
             RuntimeKind: catalogItem?.Runtime.Type ?? "llama-cpp",
-            RuntimePackageId: catalogItem?.Runtime.PackageId ?? "runtime-llama-cpp",
+            RuntimePackageId: runtimePackageId,
             ModelPath: ResolveModelPath(modelId),
             LlamaCompletionPath: ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId),
             ContextSize: preset.ContextSize,
@@ -39,7 +40,11 @@ public sealed class LlmProfileResolver(
             ThreadsBatch: preset.ThreadsBatch,
             NoConversation: preset.NoConversation,
             OutputSanitizerProfile: LlmOutputSanitizerProfiles.ForReviewModel(modelId, catalogSanitizerProfile),
-            Timeout: preset.Timeout);
+            Timeout: preset.Timeout)
+        {
+            AccelerationMode = ResolveAccelerationMode(runtimePackageId, preset.GpuLayers)
+        };
+        return profile;
     }
 
     private string ResolveModelPath(string modelId)
@@ -69,5 +74,16 @@ public sealed class LlmProfileResolver(
         }
 
         return null;
+    }
+
+    private string ResolveAccelerationMode(string runtimePackageId, int gpuLayers)
+    {
+        if (string.Equals(runtimePackageId, ReviewRuntimeResolver.TernaryRuntimePackageId, StringComparison.OrdinalIgnoreCase) ||
+            gpuLayers <= 0)
+        {
+            return "cpu";
+        }
+
+        return CudaReviewRuntimeLayout.HasPackage(paths) ? "cuda" : "cpu";
     }
 }

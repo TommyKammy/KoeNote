@@ -118,6 +118,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _modelDownloadNotification = string.Empty;
     private bool _isModelDownloadNotificationError;
     private string _setupDiarizationRuntimeSummary = "話者識別ランタイムは未導入です。必要になったらここから追加できます。";
+    private string _setupCudaReviewRuntimeSummary = "CUDA review runtime is optional. KoeNote will use CPU review runtime unless CUDA files are installed.";
     private string _databaseMaintenanceSummary = string.Empty;
     private string _updateNotificationTitle = string.Empty;
     private string _updateNotificationMessage = string.Empty;
@@ -315,6 +316,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
         SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
         SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, () => !IsModelDownloadInProgress);
+        SetupInstallCudaReviewRuntimeCommand = new RelayCommand(SetupInstallCudaReviewRuntimeAsync, CanInstallCudaReviewRuntime);
         SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync);
         SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync);
         SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync);
@@ -514,6 +516,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _setupDiarizationRuntimeSummary;
         private set => SetField(ref _setupDiarizationRuntimeSummary, value);
+    }
+
+    public string SetupCudaReviewRuntimeSummary
+    {
+        get => _setupCudaReviewRuntimeSummary;
+        private set => SetField(ref _setupCudaReviewRuntimeSummary, value);
     }
 
     public bool RequiredRuntimeAssetsReady => EnvironmentStatus
@@ -735,6 +743,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SetupDownloadReviewCommand { get; }
 
     public ICommand SetupInstallDiarizationRuntimeCommand { get; }
+
+    public ICommand SetupInstallCudaReviewRuntimeCommand { get; }
 
     public ICommand SetupRegisterLocalAsrCommand { get; }
 
@@ -1018,6 +1028,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
+    public bool SetupCudaReviewRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
+
+    public bool SetupCudaReviewRuntimeReady => CudaReviewRuntimeLayout.HasPackage(Paths);
+
+    public string SetupCudaReviewRuntimeActionText => SetupCudaReviewRuntimeReady
+        ? "導入済み"
+        : "追加導入";
+
     public bool SetupTernaryReviewRuntimeReady => !SelectedSetupReviewModelRequiresTernaryRuntime() ||
         File.Exists(Paths.TernaryLlamaCompletionPath);
 
@@ -1167,6 +1185,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
                 OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
+                OnPropertyChanged(nameof(SetupCudaReviewRuntimeReady));
+                OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
+                OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
                 OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));

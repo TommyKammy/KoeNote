@@ -112,6 +112,34 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <TextBlock Text="CUDA LLM"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SetupCudaReviewRuntimeSummary}"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding SetupCudaReviewRuntimeSummary}" />
+                <Button Grid.Column="2"
+                        Command="{Binding SetupInstallCudaReviewRuntimeCommand}"
+                        Padding="10,7"
+                        MinWidth="92"
+                        Margin="10,0,0,0">
+                    <TextBlock Text="{Binding SetupCudaReviewRuntimeActionText}"
+                               FontSize="12"
+                               FontWeight="SemiBold" />
+                </Button>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="話者識別"
                            Foreground="#64748B"
                            FontSize="12"

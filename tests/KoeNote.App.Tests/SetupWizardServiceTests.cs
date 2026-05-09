@@ -5,6 +5,7 @@ using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.Tests;
@@ -531,10 +532,30 @@ public sealed class SetupWizardServiceTests
         Assert.Equal(SetupStep.Install, wizard.LoadState().CurrentStep);
     }
 
+    [Fact]
+    public async Task SetupWizard_InstallCudaReviewRuntime_DelegatesToRuntimeInstaller()
+    {
+        var paths = CreatePaths();
+        Touch(paths.LlamaCompletionPath);
+        var archive = CreateCudaRuntimeArchive();
+        var cudaService = new CudaReviewRuntimeService(
+            paths,
+            new HttpClient(new ArchiveHandler(archive)),
+            new CudaReviewRuntimeOptions("https://example.test/cuda-review-runtime.zip", null));
+        var wizard = CreateWizard(paths, cudaReviewRuntimeService: cudaService);
+
+        var result = await wizard.InstallCudaReviewRuntimeAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
+        Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll")));
+    }
+
     private static SetupWizardService CreateWizard(
         AppPaths paths,
         HttpClient? httpClient = null,
-        ISetupHostResourceProbe? hostResourceProbe = null)
+        ISetupHostResourceProbe? hostResourceProbe = null,
+        CudaReviewRuntimeService? cudaReviewRuntimeService = null)
     {
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
@@ -557,7 +578,8 @@ public sealed class SetupWizardServiceTests
                 installService),
             new FasterWhisperRuntimeService(paths, new ExternalProcessRunner()),
             new DiarizationRuntimeService(paths, new ExternalProcessRunner()),
-            hostResourceProbe);
+            hostResourceProbe,
+            cudaReviewRuntimeService: cudaReviewRuntimeService);
     }
 
     private static AppPaths CreatePaths(InstallScope installScope = InstallScope.CurrentUser)
@@ -644,11 +666,41 @@ public sealed class SetupWizardServiceTests
         return packPath;
     }
 
+    private static byte[] CreateCudaRuntimeArchive()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddArchiveEntry(archive, "bin/ggml-cuda.dll", "cuda");
+            AddArchiveEntry(archive, "bin/cublas64_12.dll", "cublas");
+        }
+
+        return stream.ToArray();
+    }
+
+    private static void AddArchiveEntry(ZipArchive archive, string path, string content)
+    {
+        var entry = archive.CreateEntry(path);
+        using var writer = new StreamWriter(entry.Open());
+        writer.Write(content);
+    }
+
     private sealed class FailingHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }
+    }
+
+    private sealed class ArchiveHandler(byte[] archive) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(archive)
+            });
         }
     }
 
