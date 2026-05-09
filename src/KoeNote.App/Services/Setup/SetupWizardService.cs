@@ -62,6 +62,11 @@ public sealed class SetupWizardService
     public SetupState LoadState()
     {
         var state = _selectionService.RepairUnsupportedSelections(_stateService.Load());
+        if (!state.IsCompleted && state.CurrentStep is SetupStep.Welcome or SetupStep.EnvironmentCheck)
+        {
+            state = _stateService.Save(state with { CurrentStep = SetupStep.SetupMode });
+        }
+
         if (state.IsCompleted && _readinessService.IsSelectedTernaryReviewRuntimeMissing(state))
         {
             return _readinessService.CompleteIfReady();
@@ -103,7 +108,7 @@ public sealed class SetupWizardService
 
         _automaticPresetRecommendationApplied = true;
         if (state.IsCompleted ||
-            state.CurrentStep != SetupStep.Welcome ||
+            state.CurrentStep is not (SetupStep.Welcome or SetupStep.SetupMode) ||
             !string.Equals(state.SelectedModelPresetId, "recommended", StringComparison.OrdinalIgnoreCase))
         {
             return state;
@@ -127,12 +132,19 @@ public sealed class SetupWizardService
     public SetupState UseRecommendedSelections()
     {
         var state = _selectionService.UseRecommendedSelections();
-        return _stateService.Save(state with { CurrentStep = SetupStep.License });
+        return _stateService.Save(state with
+        {
+            CurrentStep = SetupStep.InstallPlan,
+            LicenseAccepted = true
+        });
     }
 
     public SetupState SelectModelPreset(string presetId)
     {
-        return _selectionService.SelectPreset(presetId);
+        var state = _selectionService.SelectPreset(presetId, advanceToModelStep: false);
+        return state.CurrentStep is SetupStep.Welcome or SetupStep.EnvironmentCheck
+            ? _stateService.Save(state with { CurrentStep = SetupStep.SetupMode })
+            : state;
     }
 
     public SetupState SelectSetupMode(string setupMode)
@@ -255,6 +267,21 @@ public sealed class SetupWizardService
         return _stateService.Save(state with { CurrentStep = SetupStepFlow.GetNext(state.CurrentStep) });
     }
 
+    public SetupState MoveNextGuided()
+    {
+        var state = _stateService.Load();
+        return state.CurrentStep switch
+        {
+            SetupStep.Welcome or SetupStep.EnvironmentCheck => _stateService.Save(state with { CurrentStep = SetupStep.SetupMode }),
+            SetupStep.SetupMode => ApplyGuidedPresetAndMoveToInstallPlan(state),
+            SetupStep.AsrModel or SetupStep.ReviewModel or SetupStep.Storage => MoveToInstallPlanWithAcceptedLicenses(state),
+            SetupStep.License => AcceptLicenses(),
+            SetupStep.InstallPlan when !state.LicenseAccepted => MoveToInstallPlanWithAcceptedLicenses(state),
+            SetupStep.InstallPlan => state,
+            _ => MoveNext()
+        };
+    }
+
     public SetupState MoveToLicense()
     {
         return _stateService.Save(_stateService.Load() with { CurrentStep = SetupStep.License });
@@ -263,13 +290,54 @@ public sealed class SetupWizardService
     public SetupState MoveToInstallPlan()
     {
         var state = _stateService.Load();
-        return _stateService.Save(state with { CurrentStep = state.LicenseAccepted ? SetupStep.InstallPlan : SetupStep.License });
+        return MoveToInstallPlanWithAcceptedLicenses(state);
+    }
+
+    public SetupState MoveToPresetSelection()
+    {
+        var state = _stateService.Load();
+        return _stateService.Save(state with
+        {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
+            CurrentStep = SetupStep.SetupMode
+        });
     }
 
     public SetupState MoveBack()
     {
         var state = _stateService.Load();
         return _stateService.Save(state with { CurrentStep = SetupStepFlow.GetPrevious(state.CurrentStep) });
+    }
+
+    private SetupState ApplyGuidedPresetAndMoveToInstallPlan(SetupState state)
+    {
+        if (string.Equals(state.SetupMode, "custom", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(state.SelectedModelPresetId))
+        {
+            return MoveToInstallPlanWithAcceptedLicenses(state);
+        }
+
+        var presetId = state.SelectedModelPresetId.Equals("recommended", StringComparison.OrdinalIgnoreCase)
+            ? GetPresetRecommendation().PresetId
+            : state.SelectedModelPresetId;
+        if (!GetModelPresets().Any(preset =>
+                preset.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return MoveToInstallPlanWithAcceptedLicenses(state);
+        }
+
+        var selected = _selectionService.SelectPreset(presetId, advanceToModelStep: false);
+        return MoveToInstallPlanWithAcceptedLicenses(selected);
+    }
+
+    private SetupState MoveToInstallPlanWithAcceptedLicenses(SetupState state)
+    {
+        return _stateService.Save(state with
+        {
+            CurrentStep = SetupStep.InstallPlan,
+            LicenseAccepted = true
+        });
     }
 
     public SetupSmokeResult RunSmokeCheck()

@@ -84,7 +84,8 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
         Assert.Equal("recommended", state.SelectedModelPresetId);
         Assert.Equal("recommended", state.SetupMode);
-        Assert.Equal(SetupStep.License, state.CurrentStep);
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.True(state.LicenseAccepted);
     }
 
     [Fact]
@@ -132,7 +133,102 @@ public sealed class SetupWizardServiceTests
         Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
 
         state = wizard.MoveBack();
-        Assert.Equal(SetupStep.License, state.CurrentStep);
+        Assert.Equal(SetupStep.SetupMode, state.CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_GuidedNext_ReachesInstallPlanAndAcceptsLicenses()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 16L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 6,
+            nvidiaGpuDetected: true,
+            logicalProcessorCount: 8));
+
+        var state = wizard.MoveNextGuided();
+        Assert.Equal(SetupStep.SetupMode, state.CurrentStep);
+
+        state = wizard.MoveNextGuided();
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.True(state.LicenseAccepted);
+    }
+
+    [Fact]
+    public void SetupWizard_GuidedNext_AppliesHostRecommendedPresetWhenDefaultRecommendedIsSelected()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 8L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 4));
+
+        wizard.MoveNextGuided();
+        var state = wizard.MoveNextGuided();
+
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.Equal("ultra_lightweight", state.SelectedModelPresetId);
+        Assert.Equal("whisper-base", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_GuidedNext_DoesNotOverrideCustomModelSelection()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        new SetupStateService(paths).Save(wizard.LoadState() with { CurrentStep = SetupStep.SetupMode });
+
+        var state = wizard.MoveNextGuided();
+
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.Equal("custom", state.SetupMode);
+        Assert.Null(state.SelectedModelPresetId);
+        Assert.Equal("kotoba-whisper-v2.2-faster", state.SelectedAsrModelId);
+        Assert.True(state.LicenseAccepted);
+    }
+
+    [Fact]
+    public async Task SetupWizard_GuidedNext_StopsAtInstallPlanWithoutStartingInstallation()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, new HttpClient(new FailingHandler()));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.InstallPlan,
+            LicenseAccepted = true
+        });
+
+        var state = wizard.MoveNextGuided();
+
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.True(state.LicenseAccepted);
+
+        var installResult = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+        Assert.False(installResult.IsSucceeded);
+        Assert.Equal(SetupStep.Install, wizard.LoadState().CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_GuidedNext_RepairsInvalidInstallPlanWithoutAcceptance()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.InstallPlan,
+            LicenseAccepted = false
+        });
+
+        var state = wizard.MoveNextGuided();
+
+        Assert.Equal(SetupStep.InstallPlan, state.CurrentStep);
+        Assert.True(state.LicenseAccepted);
     }
 
     [Fact]
@@ -144,14 +240,14 @@ public sealed class SetupWizardServiceTests
         new SetupStateService(paths).Save(wizard.LoadState() with
         {
             LicenseAccepted = true,
-            CurrentStep = SetupStep.License
+            CurrentStep = SetupStep.SetupMode
         });
 
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
 
         Assert.False(result.IsSucceeded);
         Assert.Contains("installation plan", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(SetupStep.License, wizard.LoadState().CurrentStep);
+        Assert.Equal(SetupStep.SetupMode, wizard.LoadState().CurrentStep);
     }
 
     [Fact]
@@ -165,7 +261,7 @@ public sealed class SetupWizardServiceTests
 
         Assert.False(result.IsSucceeded);
         Assert.Contains("licenses", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(SetupStep.AsrModel, wizard.LoadState().CurrentStep);
+        Assert.Equal(SetupStep.SetupMode, wizard.LoadState().CurrentStep);
     }
 
     [Fact]

@@ -20,10 +20,78 @@ public sealed partial class MainWindowViewModel
 
     private Task SetupNextAsync()
     {
-        _setupState = _setupWizardService.MoveNext();
+        if (_setupState.CurrentStep is SetupStep.InstallPlan or SetupStep.Install)
+        {
+            if (SelectedSetupConfigurationReady)
+            {
+                _setupState = _setupWizardService.MoveNext();
+                RefreshSetupWizard();
+                LatestLog = $"Setup moved to {_setupState.CurrentStep}.";
+                return Task.CompletedTask;
+            }
+
+            return SetupInstallSelectedPresetAsync();
+        }
+
+        if (_setupState.CurrentStep is SetupStep.SmokeTest or SetupStep.Complete && !SelectedSetupConfigurationReady)
+        {
+            _setupState = _setupWizardService.MoveToInstallPlan();
+            RefreshSetupWizard();
+            return SetupInstallSelectedPresetAsync();
+        }
+
+        if (_setupState.CurrentStep == SetupStep.Complete && _setupState.IsCompleted)
+        {
+            IsSetupWizardModalOpen = false;
+            LatestLog = "Setup is complete. KoeNote is ready.";
+            return Task.CompletedTask;
+        }
+
+        if (_setupState.CurrentStep is SetupStep.SmokeTest or SetupStep.Complete)
+        {
+            return SetupCompleteAsync();
+        }
+
+        _setupState = _setupWizardService.MoveNextGuided();
+        if (!string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
+        {
+            SelectedAsrEngineId = _setupState.SelectedAsrModelId;
+        }
+
         RefreshSetupWizard();
         LatestLog = $"Setup moved to {_setupState.CurrentStep}.";
         return Task.CompletedTask;
+    }
+
+    private bool CanUseSetupNextAction()
+    {
+        if (IsModelDownloadInProgress)
+        {
+            return false;
+        }
+
+        if (_setupState.IsCompleted)
+        {
+            return _setupState.CurrentStep == SetupStep.Complete;
+        }
+
+        if (_setupState.CurrentStep is SetupStep.InstallPlan or SetupStep.Install)
+        {
+            return SelectedSetupConfigurationReady || CanInstallSelectedPreset();
+        }
+
+        return true;
+    }
+
+    private bool CanUseSetupBackAction()
+    {
+        return !IsModelDownloadInProgress &&
+            _setupState.CurrentStep is not SetupStep.Install and not SetupStep.Complete;
+    }
+
+    private bool CanCloseSetupWizardModal()
+    {
+        return !IsModelDownloadInProgress;
     }
 
     private Task SetupUseRecommendedAsync()
@@ -72,6 +140,18 @@ public sealed partial class MainWindowViewModel
             (!_setupState.LicenseAccepted ||
                 !SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) ||
                 !SelectedSetupConfigurationReady);
+    }
+
+    private bool CanCancelSetupInstall()
+    {
+        return IsModelDownloadInProgress;
+    }
+
+    private Task SetupCancelInstallAsync()
+    {
+        _modelDownloadCancellation?.Cancel();
+        LatestLog = "Setup installation cancellation requested.";
+        return Task.CompletedTask;
     }
 
     private bool CanDownloadSetupAsr()
@@ -125,10 +205,9 @@ public sealed partial class MainWindowViewModel
 
         if (!_setupState.LicenseAccepted)
         {
-            _setupState = _setupWizardService.MoveToLicense();
+            _setupState = _setupWizardService.AcceptLicenses();
             RefreshSetupWizard();
-            LatestLog = "Accept licenses before installation.";
-            return;
+            LatestLog = "Setup licenses accepted. Review the installation plan, then start installation.";
         }
 
         if (!SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan))
@@ -140,6 +219,9 @@ public sealed partial class MainWindowViewModel
         }
 
         var displayName = SelectedSetupModelPreset?.DisplayName ?? "selected model preset";
+        _modelDownloadCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _modelDownloadCancellation = cancellation;
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
         ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
@@ -157,7 +239,7 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var modelResult = await _setupWizardService.InstallSelectedPresetModelsAsync(progress);
+            var modelResult = await _setupWizardService.InstallSelectedPresetModelsAsync(progress, cancellation.Token);
             RefreshSetupWizard();
             if (!modelResult.IsSucceeded)
             {
@@ -175,7 +257,7 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("ASR runtime", "導入中", "文字起こしに必要な実行環境");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
                 IsModelDownloadProgressIndeterminate = true;
-                var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync();
+                var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync(cancellation.Token);
                 if (!preflight.IsReady)
                 {
                     var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
@@ -186,7 +268,7 @@ public sealed partial class MainWindowViewModel
                 }
 
                 ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
-                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync();
+                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(cancellation.Token);
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -210,7 +292,7 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための追加runtime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
                 IsModelDownloadProgressIndeterminate = true;
-                var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync();
+                var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync(cancellation.Token);
                 if (!preflight.IsReady)
                 {
                     var message = BuildOptionalDiarizationRuntimeFailureMessage(preflight.Message, preflight.FailureCategory);
@@ -222,7 +304,7 @@ public sealed partial class MainWindowViewModel
                 else
                 {
                     ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
-                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync();
+                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(cancellation.Token);
                     RefreshSetupWizard();
                     if (!runtimeResult.IsSucceeded)
                     {
@@ -250,7 +332,7 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA review runtime for detected NVIDIA GPU...";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync();
+                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync(cancellation.Token);
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -277,7 +359,7 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("Ternary review runtime", "導入中", "選択した整文モデルに必要なruntime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync();
+                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(cancellation.Token);
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -305,13 +387,25 @@ public sealed partial class MainWindowViewModel
                 ModelDownloadNotification = "導入が完了しました。KoeNoteを使う準備に進めます。";
             }
 
+            _setupState = _setupWizardService.MoveNext();
+            RefreshSetupWizard();
             LatestLog = ModelDownloadProgressSummary;
         }
         catch (OperationCanceledException)
         {
+            _setupState = _setupWizardService.MoveToPresetSelection();
             RefreshSetupWizard();
-            CompleteModelDownloadProgress(displayName, succeeded: false, "Preset model installation was cancelled.");
-            LatestLog = "Preset model installation was cancelled.";
+            CompleteModelDownloadProgress(displayName, succeeded: false, "セットアップ導入をキャンセルしました。別のプリセットを選べます。");
+            LatestLog = "Setup installation was cancelled. Select a different preset or retry.";
+        }
+        finally
+        {
+            if (ReferenceEquals(_modelDownloadCancellation, cancellation))
+            {
+                _modelDownloadCancellation = null;
+            }
+
+            UpdateSetupDownloadCommandStates();
         }
     }
 
@@ -638,6 +732,12 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
         OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
+        OnPropertyChanged(nameof(SetupNextActionText));
+        OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
+        OnPropertyChanged(nameof(ShowSetupLicenseNotice));
+        OnPropertyChanged(nameof(ShowSetupSmokeAction));
+        OnPropertyChanged(nameof(ShowSetupCompleteAction));
+        OnPropertyChanged(nameof(SetupLicenseNoticeText));
         OnPropertyChanged(nameof(SetupPresetRecommendationSummary));
         OnPropertyChanged(nameof(SetupPresetRecommendationDetail));
         OnPropertyChanged(nameof(SetupCurrentStep));
@@ -685,6 +785,26 @@ public sealed partial class MainWindowViewModel
         if (SetupInstallSelectedPresetCommand is RelayCommand installPresetCommand)
         {
             installPresetCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupCancelInstallCommand is RelayCommand cancelInstallCommand)
+        {
+            cancelInstallCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupNextCommand is RelayCommand nextCommand)
+        {
+            nextCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SetupBackCommand is RelayCommand backCommand)
+        {
+            backCommand.RaiseCanExecuteChanged();
+        }
+
+        if (CloseSetupWizardModalCommand is RelayCommand closeSetupCommand)
+        {
+            closeSetupCommand.RaiseCanExecuteChanged();
         }
 
         if (SetupDownloadAsrCommand is RelayCommand asrCommand)

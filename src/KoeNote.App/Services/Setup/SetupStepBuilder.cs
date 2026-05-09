@@ -13,13 +13,7 @@ internal static class SetupStepBuilder
     {
         return step switch
         {
-            SetupStep.Welcome => "ようこそ",
-            SetupStep.EnvironmentCheck => "環境確認",
-            SetupStep.SetupMode => "セットアップ方式",
-            SetupStep.AsrModel => "ASRモデル",
-            SetupStep.ReviewModel => "整文LLM",
-            SetupStep.Storage => "保存先",
-            SetupStep.License => "ライセンス",
+            SetupStep.SetupMode => "プリセット選択",
             SetupStep.InstallPlan => "導入内容",
             SetupStep.Install => "モデル導入",
             SetupStep.SmokeTest => "最終確認",
@@ -52,13 +46,8 @@ internal static class SetupStepBuilder
 
         return step switch
         {
-            SetupStep.Welcome => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.Welcome),
-            SetupStep.EnvironmentCheck => readiness.EnvironmentReady,
-            SetupStep.SetupMode => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.SetupMode) && !string.IsNullOrWhiteSpace(state.SetupMode),
-            SetupStep.AsrModel => readiness.AsrModelReady,
-            SetupStep.ReviewModel => readiness.ReviewModelReady,
-            SetupStep.Storage => readiness.StorageReady,
-            SetupStep.License => state.LicenseAccepted,
+            SetupStep.SetupMode => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.SetupMode) &&
+                !string.IsNullOrWhiteSpace(state.SelectedModelPresetId),
             SetupStep.InstallPlan => state.LicenseAccepted && SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.InstallPlan),
             SetupStep.Install => readiness.AsrModelReady && readiness.ReviewModelReady && readiness.ReviewRuntimeReady,
             SetupStep.SmokeTest => state.LastSmokeSucceeded,

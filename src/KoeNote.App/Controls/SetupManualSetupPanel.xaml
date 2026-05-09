@@ -1,7 +1,7 @@
 <UserControl x:Class="KoeNote.App.Controls.SetupManualSetupPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Expander Header="手動セットアップ">
+    <Expander Header="詳細設定: オフライン/ローカル導入">
         <Border Background="#FFFFFF"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="1"

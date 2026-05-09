@@ -306,14 +306,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
         ClearDomainPresetCommand = new RelayCommand(ClearSelectedDomainPresetAsync, () => SelectedDomainPresetImport?.DeactivatedAt is null && !IsRunInProgress);
         OpenSetupCommand = new RelayCommand(OpenSetupAsync);
-        CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync);
+        CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync, CanCloseSetupWizardModal);
         OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
         CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
-        SetupBackCommand = new RelayCommand(SetupBackAsync);
-        SetupNextCommand = new RelayCommand(SetupNextAsync);
+        SetupBackCommand = new RelayCommand(SetupBackAsync, CanUseSetupBackAction);
+        SetupNextCommand = new RelayCommand(SetupNextAsync, CanUseSetupNextAction);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
         SetupAcceptLicensesCommand = new RelayCommand(SetupAcceptLicensesAsync);
         SetupInstallSelectedPresetCommand = new RelayCommand(SetupInstallSelectedPresetAsync, CanInstallSelectedPreset);
+        SetupCancelInstallCommand = new RelayCommand(SetupCancelInstallAsync, CanCancelSetupInstall);
         SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
         SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
         SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, CanInstallDiarizationRuntime);
@@ -543,7 +544,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool IsSetupWizardModalOpen
     {
         get => _isSetupWizardModalOpen;
-        private set => SetField(ref _isSetupWizardModalOpen, value);
+        private set
+        {
+            if (SetField(ref _isSetupWizardModalOpen, value))
+            {
+                OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
+                OnPropertyChanged(nameof(ShowSetupSmokeAction));
+            }
+        }
     }
 
     public string SetupWizardModalTitle => _setupState.CurrentStep switch
@@ -741,6 +749,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SetupAcceptLicensesCommand { get; }
 
     public ICommand SetupInstallSelectedPresetCommand { get; }
+
+    public ICommand SetupCancelInstallCommand { get; }
 
     public ICommand SetupDownloadAsrCommand { get; }
 
@@ -1056,6 +1066,35 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             ? "構成は導入済み"
             : "おすすめ構成を導入";
 
+    public string SetupNextActionText => _setupState.CurrentStep switch
+    {
+        SetupStep.License => "同意して次へ",
+        SetupStep.InstallPlan when SelectedSetupConfigurationReady => "最終確認へ",
+        SetupStep.InstallPlan => "ダウンロードとインストール",
+        SetupStep.Install when SelectedSetupConfigurationReady => "最終確認へ",
+        SetupStep.Install => "ダウンロードとインストール",
+        SetupStep.SmokeTest when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
+        SetupStep.SmokeTest => "最終確認を実行",
+        SetupStep.Complete when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
+        SetupStep.Complete when _setupState.IsCompleted => "KoeNoteを開始",
+        SetupStep.Complete => "最終確認を実行",
+        SetupStep.SetupMode => "導入内容へ",
+        _ => "次へ"
+    };
+
+    public bool ShowSetupInlineInstallAction => !IsSetupWizardModalOpen && _setupState.CurrentStep != SetupStep.InstallPlan;
+
+    public bool ShowSetupLicenseNotice => _setupState.CurrentStep == SetupStep.License;
+
+    public bool ShowSetupSmokeAction => !IsSetupWizardModalOpen &&
+        (_setupState.CurrentStep is SetupStep.SmokeTest or SetupStep.Complete);
+
+    public bool ShowSetupCompleteAction => false;
+
+    public string SetupLicenseNoticeText => SetupLicenseAccepted
+        ? "選択したモデルのライセンスは同意済みです。右下の「次へ」で導入内容を確認できます。"
+        : "選択したモデルのライセンスを確認してください。右下の「同意して次へ」を押すと、ライセンス同意を保存して導入内容の確認へ進みます。";
+
     public string SetupPrimaryInstallSummary
     {
         get
@@ -1205,6 +1244,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
                 OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
+                OnPropertyChanged(nameof(SetupNextActionText));
+                OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
+                OnPropertyChanged(nameof(SetupLicenseNoticeText));
+                OnPropertyChanged(nameof(ShowSetupCompleteAction));
             }
         }
     }

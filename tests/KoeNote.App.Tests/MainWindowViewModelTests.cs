@@ -240,7 +240,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SetupInstallSelectedPresetCommand_OpensLicenseStepBeforeInstalling()
+    public void SetupInstallSelectedPresetCommand_AcceptsLicensesAndStartsInstall()
     {
         var viewModel = CreateViewModel();
 
@@ -249,8 +249,11 @@ public sealed class MainWindowViewModelTests
 
         viewModel.SetupInstallSelectedPresetCommand.Execute(null);
 
-        Assert.Equal(nameof(SetupStep.License), viewModel.SetupCurrentStep);
-        Assert.Contains("licenses", viewModel.LatestLog, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(nameof(SetupStep.InstallPlan), viewModel.SetupCurrentStep);
+        Assert.True(viewModel.SetupLicenseAccepted);
+        Assert.True(viewModel.IsModelDownloadInProgress);
+        Assert.True(viewModel.SetupCancelInstallCommand.CanExecute(null));
+        viewModel.SetupCancelInstallCommand.Execute(null);
     }
 
     [Fact]
@@ -292,14 +295,38 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SetupWizardModalText_UsesBeginnerFriendlyStage6Copy()
+    public void SetupWizardModalText_UsesShortPresetFirstFlowCopy()
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal("KoeNoteへようこそ", viewModel.SetupWizardModalTitle);
-        Assert.Contains("順番に案内", viewModel.SetupWizardModalGuide, StringComparison.Ordinal);
+        Assert.Equal("モデル構成を選びます", viewModel.SetupWizardModalTitle);
+        Assert.Contains("おすすめ構成", viewModel.SetupWizardModalGuide, StringComparison.Ordinal);
         Assert.Equal("完了", viewModel.SetupCompleteActionText);
-        Assert.Equal("現在のステップ: ようこそ", viewModel.SetupStatusSummary);
+        Assert.Equal("現在のステップ: モデル構成", viewModel.SetupStatusSummary);
+    }
+
+    [Fact]
+    public void SetupWizardModalText_OffersInstallActionWhenCompletedSelectionIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            CurrentStep = SetupStep.Complete,
+            SetupMode = "ultra_lightweight",
+            SelectedModelPresetId = "ultra_lightweight",
+            LicenseAccepted = true,
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.IsSetupComplete);
+        Assert.Equal(nameof(SetupStep.Complete), viewModel.SetupCurrentStep);
+        Assert.Equal("ダウンロードとインストール", viewModel.SetupNextActionText);
     }
 
     [Fact]
@@ -1160,7 +1187,7 @@ public sealed class MainWindowViewModelTests
         Assert.DoesNotContain("Phase 12", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.True(viewModel.IsSetupWizardModalOpen);
         Assert.False(viewModel.IsDetailPanelOpen);
-        Assert.Contains("KoeNote", viewModel.SetupWizardModalTitle, StringComparison.Ordinal);
+        Assert.Contains("モデル構成", viewModel.SetupWizardModalTitle, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1238,7 +1265,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SetupSteps_DoNotMarkReviewModelReadyWhenOnlyLicenseIsAccepted()
+    public void SetupSteps_DoNotShowHiddenModelAndLicenseStepsInShortFlow()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
@@ -1254,7 +1281,7 @@ public sealed class MainWindowViewModelTests
         var reviewItem = catalog.Models.First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
-            CurrentStep = SetupStep.License,
+            CurrentStep = SetupStep.InstallPlan,
             LicenseAccepted = true,
             SelectedAsrModelId = asrItem.ModelId,
             SelectedReviewModelId = reviewItem.ModelId
@@ -1262,9 +1289,10 @@ public sealed class MainWindowViewModelTests
 
         var viewModel = new MainWindowViewModel(paths);
 
-        Assert.Equal("✓", viewModel.SetupSteps.Single(step => step.Step == SetupStep.AsrModel).Status);
-        Assert.Equal(string.Empty, viewModel.SetupSteps.Single(step => step.Step == SetupStep.ReviewModel).Status);
-        Assert.Equal("✓", viewModel.SetupSteps.Single(step => step.Step == SetupStep.License).Status);
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Step == SetupStep.AsrModel);
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Step == SetupStep.ReviewModel);
+        Assert.DoesNotContain(viewModel.SetupSteps, step => step.Step == SetupStep.License);
+        Assert.Equal("✓", viewModel.SetupSteps.Single(step => step.Step == SetupStep.SetupMode).Status);
         Assert.Equal(string.Empty, viewModel.SetupSteps.Single(step => step.Step == SetupStep.Install).Status);
     }
 

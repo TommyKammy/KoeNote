@@ -4,13 +4,7 @@ internal static class SetupStepFlow
 {
     public static readonly SetupStep[] OrderedSteps =
     [
-        SetupStep.Welcome,
-        SetupStep.EnvironmentCheck,
         SetupStep.SetupMode,
-        SetupStep.AsrModel,
-        SetupStep.ReviewModel,
-        SetupStep.Storage,
-        SetupStep.License,
         SetupStep.InstallPlan,
         SetupStep.Install,
         SetupStep.SmokeTest,
@@ -46,6 +40,16 @@ internal static class SetupStepFlow
     private static int GetIndex(SetupStep step)
     {
         var index = Array.IndexOf(OrderedSteps, step);
-        return index < 0 ? 0 : index;
+        return index < 0 ? GetLegacyIndex(step) : index;
+    }
+
+    private static int GetLegacyIndex(SetupStep step)
+    {
+        return step switch
+        {
+            SetupStep.Welcome or SetupStep.EnvironmentCheck => Array.IndexOf(OrderedSteps, SetupStep.SetupMode),
+            SetupStep.AsrModel or SetupStep.ReviewModel or SetupStep.Storage or SetupStep.License => Array.IndexOf(OrderedSteps, SetupStep.InstallPlan),
+            _ => 0
+        };
     }
 }

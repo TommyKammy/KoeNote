@@ -382,15 +382,28 @@
                                     </StackPanel>
                                 </Button>
                                 <Button Command="{Binding SetupNextCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        ToolTip="{Binding SetupNextActionText}"
                                         Padding="12,8"
                                         Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="次へ" />
-                                        <TextBlock Text="&#xE72A;" FontFamily="Segoe MDL2 Assets" Margin="6,0,0,0" />
+                                        <TextBlock Text="{Binding SetupNextActionText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                        <TextBlock Text="&#xE72A;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding SetupCancelInstallCommand}"
+                                        Visibility="{Binding IsModelDownloadInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        Padding="12,8"
+                                        Margin="8,0,0,0"
+                                        ToolTip="導入をキャンセルしてプリセット選択に戻ります">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" />
+                                        <TextBlock Text="キャンセル" />
                                     </StackPanel>
                                 </Button>
                                 <Button Command="{Binding SetupCompleteCommand}"
                                         Style="{StaticResource PrimaryButton}"
+                                        Visibility="{Binding ShowSetupCompleteAction, Converter={StaticResource BooleanToVisibilityConverter}}"
                                         Padding="13,8"
                                         Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
