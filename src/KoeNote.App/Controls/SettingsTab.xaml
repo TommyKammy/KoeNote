@@ -40,10 +40,6 @@
                                   IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Margin="0,0,0,10" />
 
-                        <CheckBox Content="要約ステージを有効にする"
-                                  IsChecked="{Binding EnableSummaryStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                  Margin="0,0,0,10" />
-
                         <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
                                   SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"

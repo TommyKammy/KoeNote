@@ -507,8 +507,8 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.All(viewModel.StageStatuses.Take(3), stage => Assert.Equal("未開始", stage.Status));
-        Assert.Equal("スキップ", viewModel.StageStatuses.Last().Status);
+        Assert.Equal(3, viewModel.StageStatuses.Count);
+        Assert.All(viewModel.StageStatuses, stage => Assert.Equal("未開始", stage.Status));
     }
 
     [Fact]
@@ -694,8 +694,8 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
         Assert.Equal("整文完了", viewModel.SelectedJob?.Status);
         Assert.Equal(100, viewModel.SelectedJob?.ProgressPercent);
-        Assert.Equal(4, viewModel.StageStatuses.Count);
-        Assert.Equal("要約", viewModel.StageStatuses.Last().Name);
+        Assert.Equal(3, viewModel.StageStatuses.Count);
+        Assert.True(viewModel.StageStatuses.Last().IsToggleable);
     }
 
     [Fact]
@@ -827,6 +827,90 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.CanRunPostReviewAndSummary);
     }
 
+    [Fact]
+    public void EnableSummaryStage_RemainsDisabledForManualSummaryFlow()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.EnableSummaryStage = true;
+
+        Assert.False(viewModel.EnableSummaryStage);
+    }
+
+    [Fact]
+    public void SummaryActionText_ReflectsWhetherSummaryExists()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+
+        var viewModelWithoutSummary = new MainWindowViewModel(paths);
+
+        Assert.False(viewModelWithoutSummary.HasSummaryContent);
+        Assert.Equal("要約を生成", viewModelWithoutSummary.SummaryActionText);
+
+        new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Summary,
+            TranscriptDerivativeFormats.Markdown,
+            "# summary",
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModelWithSummary = new MainWindowViewModel(paths);
+
+        Assert.True(viewModelWithSummary.HasSummaryContent);
+        Assert.Equal("要約を再生成", viewModelWithSummary.SummaryActionText);
+    }
+
+    [Fact]
+    public void SummaryStatus_BecomesStaleAfterInlineSegmentEdit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Summary,
+            TranscriptDerivativeFormats.Markdown,
+            "# summary",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+        var segment = Assert.Single(viewModel.Segments);
+
+        Assert.False(viewModel.IsSummaryStale);
+        Assert.Contains("要約済み", viewModel.SummaryStatus, StringComparison.Ordinal);
+
+        viewModel.BeginSegmentInlineEditCommand.Execute(segment);
+        viewModel.SelectedSegmentEditText = "edited raw";
+        viewModel.SaveSegmentInlineEditCommand.Execute(null);
+
+        Assert.True(viewModel.IsSummaryStale);
+        Assert.Contains("古い要約", viewModel.SummaryStatus, StringComparison.Ordinal);
+        Assert.Contains("本文が更新", viewModel.SummaryActionToolTip, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(nameof(MainWindowViewModel.RunPostReviewCommand), PostProcessMode.ReviewOnly)]
     [InlineData(nameof(MainWindowViewModel.RunPostSummaryCommand), PostProcessMode.SummaryOnly)]
@@ -884,7 +968,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void PostProcessOverwriteConfirmation_CoversSummaryOutputForCombinedRun()
+    public void PostProcessOverwriteConfirmation_CoversSummaryOutputForLegacyCombinedRun()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
@@ -1240,12 +1324,12 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void StageStatuses_EndWithSummaryStage()
+    public void StageStatuses_EndWithReviewStage()
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(4, viewModel.StageStatuses.Count);
-        Assert.Equal("要約", viewModel.StageStatuses.Last().Name);
+        Assert.Equal(3, viewModel.StageStatuses.Count);
+        Assert.True(viewModel.StageStatuses.Last().IsToggleable);
         Assert.False(viewModel.StageStatuses.Last().ShowConnectorAfter);
         Assert.DoesNotContain(viewModel.StageStatuses, stage => stage.Name == "レビュー");
     }
@@ -1272,43 +1356,6 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SummaryStageToggleText_ReflectsSummaryStageSetting()
-    {
-        var viewModel = CreateViewModel();
-
-        viewModel.EnableSummaryStage = true;
-
-        Assert.Equal("要約 ON", viewModel.SummaryStageToggleText);
-        Assert.Contains("スキップ", viewModel.SummaryStageToggleToolTip, StringComparison.Ordinal);
-
-        viewModel.EnableSummaryStage = false;
-
-        Assert.Equal("要約 OFF", viewModel.SummaryStageToggleText);
-        Assert.Contains("実行", viewModel.SummaryStageToggleToolTip, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void SummaryStageToggle_UpdatesStageStatusForHeaderToggle()
-    {
-        var viewModel = CreateViewModel();
-        var summaryStage = viewModel.StageStatuses.Last();
-
-        Assert.False(viewModel.EnableSummaryStage);
-        Assert.Equal("スキップ", summaryStage.Status);
-        Assert.True(summaryStage.IsSkipped);
-
-        viewModel.EnableSummaryStage = true;
-
-        Assert.Equal("未開始", summaryStage.Status);
-        Assert.False(summaryStage.IsSkipped);
-
-        viewModel.EnableSummaryStage = false;
-
-        Assert.Equal("スキップ", summaryStage.Status);
-        Assert.True(summaryStage.IsSkipped);
-    }
-
-    [Fact]
     public void ReviewStageSkippedRunUpdate_UsesLocalizedSkippedStatus()
     {
         var viewModel = CreateViewModel();
@@ -1329,7 +1376,67 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void StageRunUpdate_MarksStageDoingEvenWhenProgressIsZero()
+    public void ReviewSucceededRunUpdate_SelectsAndHighlightsPolishedTranscriptTab()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SelectedTranscriptTabIndex = 0;
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Review,
+                JobRunStageState.Succeeded,
+                100)
+        ]);
+
+        Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
+        Assert.True(viewModel.IsPolishedTranscriptTabHighlighted);
+        Assert.Equal("Highlighted", viewModel.PolishedTranscriptTabHighlightTag);
+    }
+
+    [Theory]
+    [InlineData(JobRunStageState.Skipped)]
+    [InlineData(JobRunStageState.Failed)]
+    [InlineData(JobRunStageState.Cancelled)]
+    public void ReviewNonSucceededRunUpdate_KeepsCurrentTranscriptTabAndHighlightState(JobRunStageState state)
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SelectedTranscriptTabIndex = 2;
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Review,
+                state,
+                100)
+        ]);
+
+        Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
+        Assert.False(viewModel.IsPolishedTranscriptTabHighlighted);
+        Assert.Equal(string.Empty, viewModel.PolishedTranscriptTabHighlightTag);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 2)]
+    public void SelectedTranscriptTabIndex_ClampsToAvailableTabs(int value, int expected)
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedTranscriptTabIndex = value;
+
+        Assert.Equal(expected, viewModel.SelectedTranscriptTabIndex);
+    }
+
+    [Fact]
+    public void SummaryRunUpdate_SetsSummaryRunningFlagWithoutChangingTimeline()
     {
         var viewModel = CreateViewModel();
         var method = typeof(MainWindowViewModel).GetMethod(
@@ -1343,14 +1450,13 @@ public sealed class MainWindowViewModelTests
                 0)
         ]);
 
-        var summaryStage = viewModel.StageStatuses.Last();
-        Assert.True(summaryStage.IsRunning);
-        Assert.True(summaryStage.IsDoing);
-        Assert.False(summaryStage.IsPending);
+        Assert.True(viewModel.IsSummaryStageRunning);
+        Assert.Equal(3, viewModel.StageStatuses.Count);
+        Assert.DoesNotContain(viewModel.StageStatuses, stage => stage.IsRunning);
     }
 
     [Fact]
-    public void StageRunUpdate_DoesNotMarkRunningStageDoneAtOneHundredPercent()
+    public void SummaryRunUpdate_ClearsSummaryRunningFlagWhenSucceeded()
     {
         var viewModel = CreateViewModel();
         var method = typeof(MainWindowViewModel).GetMethod(
@@ -1363,15 +1469,19 @@ public sealed class MainWindowViewModelTests
                 JobRunStageState.Running,
                 100)
         ]);
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Summary,
+                JobRunStageState.Succeeded,
+                100)
+        ]);
 
-        var summaryStage = viewModel.StageStatuses.Last();
-        Assert.True(summaryStage.IsRunning);
-        Assert.True(summaryStage.IsDoing);
-        Assert.False(summaryStage.IsDone);
+        Assert.False(viewModel.IsSummaryStageRunning);
+        Assert.DoesNotContain(viewModel.StageStatuses, stage => stage.IsDone);
     }
 
     [Fact]
-    public void StageRunUpdate_DoesNotMarkSkippedStageDone()
+    public void StageRunUpdate_DoesNotMarkSkippedReviewStageDone()
     {
         var viewModel = CreateViewModel();
         var method = typeof(MainWindowViewModel).GetMethod(
@@ -1380,15 +1490,15 @@ public sealed class MainWindowViewModelTests
 
         method?.Invoke(viewModel, [
             new JobRunUpdate(
-                JobRunStage.Summary,
+                JobRunStage.Review,
                 JobRunStageState.Skipped,
                 100)
         ]);
 
-        var summaryStage = viewModel.StageStatuses.Last();
-        Assert.True(summaryStage.IsSkipped);
-        Assert.False(summaryStage.IsDone);
-        Assert.False(summaryStage.IsDoing);
+        var reviewStage = viewModel.StageStatuses.Last();
+        Assert.True(reviewStage.IsSkipped);
+        Assert.False(reviewStage.IsDone);
+        Assert.False(reviewStage.IsDoing);
     }
 
     [Fact]

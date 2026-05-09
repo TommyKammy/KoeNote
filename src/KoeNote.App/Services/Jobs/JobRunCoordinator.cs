@@ -32,11 +32,6 @@ public sealed class JobRunCoordinator(
             var reviewSucceeded = await reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
             if (!reviewSucceeded)
             {
-                if (!cancellationToken.IsCancellationRequested && asrSettings.EnableSummaryStage)
-                {
-                    summaryStageRunner.Skip(job, report, "review_not_succeeded");
-                }
-
                 return;
             }
 
@@ -45,14 +40,6 @@ public sealed class JobRunCoordinator(
         {
             reviewStageRunner.Skip(job, report);
         }
-
-        if (asrSettings.EnableSummaryStage)
-        {
-            await summaryStageRunner.RunAsync(job, report, cancellationToken);
-            return;
-        }
-
-        summaryStageRunner.Skip(job, report, "disabled_by_user");
     }
 
     public Task<bool> RunReviewOnlyAsync(
@@ -72,6 +59,7 @@ public sealed class JobRunCoordinator(
         return summaryStageRunner.RunAsync(job, report, cancellationToken);
     }
 
+    // Kept for legacy callers and tests. The normal run flow no longer auto-generates summaries.
     public async Task RunReviewAndSummaryAsync(
         JobSummary job,
         IReadOnlyList<TranscriptSegment> segments,

@@ -32,10 +32,6 @@ public sealed partial class MainWindowViewModel
             StageStatuses.FirstOrDefault(static item => item.IsToggleable),
             EnableReviewStage,
             "整文");
-        RefreshOptionalStageToggleStatus(
-            StageStatuses.ElementAtOrDefault(3),
-            EnableSummaryStage,
-            "要約");
     }
 
     private void RefreshOptionalStageToggleStatus(StageStatus? stage, bool isEnabled, string stageName)
@@ -92,13 +88,7 @@ public sealed partial class MainWindowViewModel
             "M5,16.5 L4,20 L7.5,19 L17.8,8.7 C18.6,7.9 18.6,6.7 17.8,5.9 L16.1,4.2 C15.3,3.4 14.1,3.4 13.3,4.2 Z M12.5,5 L17,9.5 M17.5,15 L20,15 M18.75,13.75 L18.75,16.25 M6.5,6.5 L8.5,6.5 M7.5,5.5 L7.5,7.5",
             "#7C3AED",
             "#F3E8FF",
-            isToggleable: true);
-
-        yield return new StageStatus(
-            "要約",
-            "M6,4 L18,4 L18,20 L6,20 Z M8.5,8 L15.5,8 M8.5,11.5 L15.5,11.5 M8.5,15 L13,15",
-            "#0F766E",
-            "#CCFBF1",
+            isToggleable: true,
             showConnectorAfter: false);
     }
 }

@@ -33,13 +33,12 @@ public sealed partial class MainWindowViewModel
         try
         {
             var enableReviewForRun = EnableReviewStage && ReviewStageAssetsReady;
-            var enableSummaryForRun = EnableSummaryStage && SummaryStageAssetsReady;
             if (EnableReviewStage && !enableReviewForRun)
             {
                 LatestLog = "整文ステージの準備が未完了のため、この実行では整文をスキップします。";
             }
 
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, enableSummaryForRun);
+            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, EnableSummaryStage: false);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
             LoadSummaryForSelectedJob();
         }
@@ -62,22 +61,31 @@ public sealed partial class MainWindowViewModel
     {
         if (update.Stage is { } stage && update.StageState is { } state && update.ProgressPercent is { } progressPercent)
         {
-            var stageStatus = GetStageStatus(stage);
-            stageStatus.IsRunning = state == JobRunStageState.Running;
-            stageStatus.Status = GetStageStatusText(state, update.ErrorCategory);
-            stageStatus.ProgressPercent = progressPercent;
             if (stage == JobRunStage.Summary)
             {
                 IsSummaryStageRunning = state == JobRunStageState.Running;
             }
+            else
+            {
+                var stageStatus = GetStageStatus(stage);
+                stageStatus.IsRunning = state == JobRunStageState.Running;
+                stageStatus.Status = GetStageStatusText(state, update.ErrorCategory);
+                stageStatus.ProgressPercent = progressPercent;
 
-            if (state == JobRunStageState.Running)
-            {
-                stageStatus.DurationText = "00:00:00";
-            }
-            else if (update.Duration is { } duration)
-            {
-                stageStatus.DurationText = FormatStageDuration(duration);
+                if (state == JobRunStageState.Running)
+                {
+                    stageStatus.DurationText = "00:00:00";
+                }
+                else if (update.Duration is { } duration)
+                {
+                    stageStatus.DurationText = FormatStageDuration(duration);
+                }
+
+                if (stage == JobRunStage.Review && state == JobRunStageState.Succeeded)
+                {
+                    SelectedTranscriptTabIndex = 1;
+                    StartPolishedTranscriptTabHighlight();
+                }
             }
         }
 
@@ -122,7 +130,6 @@ public sealed partial class MainWindowViewModel
             JobRunStage.Preprocess => StageStatuses[0],
             JobRunStage.Asr => StageStatuses.First(item => item.Name == "ASR"),
             JobRunStage.Review => StageStatuses[2],
-            JobRunStage.Summary => StageStatuses[3],
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, null)
         };
     }
@@ -153,6 +160,39 @@ public sealed partial class MainWindowViewModel
         }
 
         return duration.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private void StartPolishedTranscriptTabHighlight()
+    {
+        _polishedTranscriptTabHighlightCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _polishedTranscriptTabHighlightCancellation = cancellation;
+        IsPolishedTranscriptTabHighlighted = true;
+        _ = ClearPolishedTranscriptTabHighlightAfterDelayAsync(cancellation);
+    }
+
+    private async Task ClearPolishedTranscriptTabHighlightAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellation.Token);
+            if (!cancellation.IsCancellationRequested)
+            {
+                IsPolishedTranscriptTabHighlighted = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_polishedTranscriptTabHighlightCancellation, cancellation))
+            {
+                _polishedTranscriptTabHighlightCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
     }
 
     private void ReplaceSegments(IReadOnlyList<TranscriptSegment> segments)

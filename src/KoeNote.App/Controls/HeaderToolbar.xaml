@@ -48,10 +48,6 @@
                                       Command="{Binding RunPostSummaryCommand}"
                                       IsEnabled="{Binding CanRunPostSummary}"
                                       Style="{StaticResource HeaderExportMenuItem}" />
-                            <MenuItem Header="整文して要約を実行"
-                                      Command="{Binding RunPostReviewAndSummaryCommand}"
-                                      IsEnabled="{Binding CanRunPostReviewAndSummary}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
                         </ContextMenu>
                     </Button.ContextMenu>
                     <TextBlock Text="&#xE70D;"
@@ -80,22 +76,6 @@
                                    Margin="0,0,7,0"
                                    VerticalAlignment="Center" />
                         <TextBlock Text="{Binding ReviewStageToggleText}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </ToggleButton>
-
-                <ToggleButton Style="{StaticResource HeaderReviewToggle}"
-                              IsChecked="{Binding EnableSummaryStage, Mode=TwoWay}"
-                              ToolTip="{Binding SummaryStageToggleToolTip}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="13"
-                                   Margin="0,0,7,0"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding SummaryStageToggleText}"
                                    FontSize="12"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />

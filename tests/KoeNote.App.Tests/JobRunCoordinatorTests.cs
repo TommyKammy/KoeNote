@@ -78,11 +78,12 @@ public sealed class JobRunCoordinatorTests
         Assert.True(asrStageRunner.WasCalled);
         Assert.False(reviewStageRunner.RunWasCalled);
         Assert.True(reviewStageRunner.SkipWasCalled);
-        Assert.True(summaryStageRunner.SkipWasCalled);
+        Assert.False(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
     }
 
     [Fact]
-    public async Task RunAsync_RunsSummaryAfterAsrWhenSummaryEnabledAndReviewDisabled()
+    public async Task RunAsync_DoesNotRunSummaryWhenSummaryEnabledAndReviewDisabled()
     {
         var asrStageRunner = new AsrStageRunnerStub([new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text")]);
         var reviewStageRunner = new ReviewStageRunnerStub();
@@ -100,12 +101,12 @@ public sealed class JobRunCoordinatorTests
             CancellationToken.None);
 
         Assert.True(reviewStageRunner.SkipWasCalled);
-        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.RunWasCalled);
         Assert.False(summaryStageRunner.SkipWasCalled);
     }
 
     [Fact]
-    public async Task RunAsync_SkipsSummaryWhenReviewFails()
+    public async Task RunAsync_DoesNotTouchSummaryWhenReviewFails()
     {
         var asrStageRunner = new AsrStageRunnerStub([new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text")]);
         var reviewStageRunner = new ReviewStageRunnerStub(runResult: false);
@@ -124,7 +125,7 @@ public sealed class JobRunCoordinatorTests
 
         Assert.True(reviewStageRunner.RunWasCalled);
         Assert.False(summaryStageRunner.RunWasCalled);
-        Assert.True(summaryStageRunner.SkipWasCalled);
+        Assert.False(summaryStageRunner.SkipWasCalled);
     }
 
     [Fact]
@@ -203,7 +204,7 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
-    public async Task RunReviewAndSummaryAsync_RunsSummaryAfterSuccessfulReview()
+    public async Task LegacyRunReviewAndSummaryAsync_RunsSummaryAfterSuccessfulReview()
     {
         var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
         var asrStageRunner = new AsrStageRunnerStub(null);
@@ -229,7 +230,7 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
-    public async Task RunReviewAndSummaryAsync_SkipsSummaryWhenReviewFails()
+    public async Task LegacyRunReviewAndSummaryAsync_SkipsSummaryWhenReviewFails()
     {
         var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
         var summaryStageRunner = new SummaryStageRunnerStub();
@@ -251,7 +252,7 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
-    public async Task RunReviewAndSummaryAsync_RunsSummaryWhenManualReviewIsPending()
+    public async Task LegacyRunReviewAndSummaryAsync_RunsSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();
         var segments = new[] { new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text") };
@@ -273,7 +274,7 @@ public sealed class JobRunCoordinatorTests
     }
 
     [Fact]
-    public async Task RunAsync_RunsSummaryWhenManualReviewIsPending()
+    public async Task RunAsync_DoesNotRunSummaryWhenManualReviewIsPending()
     {
         var job = CreateJob();
         var asrStageRunner = new AsrStageRunnerStub([new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "text")]);
@@ -292,7 +293,7 @@ public sealed class JobRunCoordinatorTests
             CancellationToken.None);
 
         Assert.True(reviewStageRunner.RunWasCalled);
-        Assert.True(summaryStageRunner.RunWasCalled);
+        Assert.False(summaryStageRunner.RunWasCalled);
         Assert.False(summaryStageRunner.SkipWasCalled);
         Assert.Equal(2, job.UnreviewedDrafts);
     }

@@ -10,6 +10,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedJob is null)
         {
+            IsSummaryStale = false;
             SummaryContent = string.Empty;
             SummaryStatus = "要約はまだありません。";
             return;
@@ -18,13 +19,15 @@ public sealed partial class MainWindowViewModel
         var summary = _transcriptDerivativeRepository.ReadLatestSuccessful(SelectedJob.JobId, TranscriptDerivativeKinds.Summary);
         if (summary is null)
         {
+            IsSummaryStale = false;
             SummaryContent = string.Empty;
             SummaryStatus = "要約はまだありません。";
             return;
         }
 
         SummaryContent = summary.Content;
-        SummaryStatus = _transcriptDerivativeRepository.IsStale(summary)
+        IsSummaryStale = _transcriptDerivativeRepository.IsStale(summary);
+        SummaryStatus = IsSummaryStale
             ? "古い要約があります。再実行すると更新できます。"
             : $"要約済み: {summary.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
