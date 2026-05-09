@@ -119,7 +119,8 @@
                         </ContextMenu>
                     </Button.ContextMenu>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE78F;" Style="{StaticResource HeaderToolIcon}" />
+                        <Path Style="{StaticResource HeaderToolPathIcon}"
+                              Data="M14 2v4a2 2 0 0 0 2 2h4M4 7V4a2 2 0 0 1 2-2h8l6 6v12a2 2 0 0 1-2 2H4M2 15h10M9 18l3-3-3-3" />
                         <TextBlock Text="エクスポート" Style="{StaticResource HeaderToolText}" />
                         <TextBlock Text="&#xE70D;"
                                    FontFamily="Segoe MDL2 Assets"

@@ -49,11 +49,21 @@
 
     <Border Style="{StaticResource PanelBorder}" Padding="14,12">
         <DockPanel>
-            <TextBlock DockPanel.Dock="Top"
-                       Text="処理ステージ"
-                       Style="{StaticResource SectionTitle}"
-                       FontSize="15"
-                       Margin="0,0,0,8" />
+            <StackPanel DockPanel.Dock="Top"
+                        Orientation="Horizontal"
+                        Margin="0,0,0,8">
+                <Border Style="{StaticResource LucideInlineIconBadge}">
+                    <Path Style="{StaticResource LucidePathIcon}"
+                          Width="14"
+                          Height="14"
+                          Data="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+                </Border>
+                <TextBlock Text="処理ステージ"
+                           Style="{StaticResource SectionTitle}"
+                           FontSize="15"
+                           Margin="0"
+                           VerticalAlignment="Center" />
+            </StackPanel>
 
             <ItemsControl ItemsSource="{Binding StageStatuses}">
                 <ItemsControl.ItemsPanel>

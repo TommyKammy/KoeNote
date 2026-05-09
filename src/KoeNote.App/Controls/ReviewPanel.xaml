@@ -85,9 +85,16 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="整文"
-                                   Style="{StaticResource SectionTitle}"
-                                   Margin="0,0,0,4" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Border Style="{StaticResource LucideCardIconBadge}">
+                                <Path Style="{StaticResource LucidePathIcon}"
+                                      Data="M21.64 3.64l-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72M14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9" />
+                            </Border>
+                            <TextBlock Text="整文"
+                                       Style="{StaticResource SectionTitle}"
+                                       Margin="0"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                         <TextBlock Text="{Binding SummaryStatus}"
                                    Style="{StaticResource MutedText}"
                                    TextWrapping="Wrap" />
@@ -151,9 +158,17 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="要約"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Style="{StaticResource LucideInlineIconBadge}">
+                                        <Path Style="{StaticResource LucidePathIcon}"
+                                              Width="14"
+                                              Height="14"
+                                              Data="M10 5h11M10 12h11M10 19h11M3 10l3-3-3-3M3 20l3-3-3-3" />
+                                    </Border>
+                                    <TextBlock Text="要約"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center">

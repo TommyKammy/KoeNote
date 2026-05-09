@@ -8,9 +8,16 @@
             Padding="16"
             Margin="0,0,0,14">
         <StackPanel>
-            <TextBlock Text="モデル設定"
-                       Style="{StaticResource SectionTitle}"
-                       Margin="0,0,0,12" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <Border Style="{StaticResource LucideCardIconBadge}">
+                    <Path Style="{StaticResource LucidePathIcon}"
+                          Data="M12 20v2M12 2v2M17 20v2M17 2v2M2 12h2M2 17h2M2 7h2M20 12h2M20 17h2M20 7h2M7 20v2M7 2v2M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2M9 8h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1" />
+                </Border>
+                <TextBlock Text="モデル設定"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0"
+                           VerticalAlignment="Center" />
+            </StackPanel>
 
             <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
@@ -56,11 +63,22 @@
                             Padding="10"
                             Margin="0,10,0,0">
                         <StackPanel>
-                            <TextBlock Text="導入内容"
-                                       Foreground="#334155"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,6" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <Border Style="{StaticResource LucideInlineIconBadge}"
+                                        Width="22"
+                                        Height="22"
+                                        CornerRadius="11">
+                                    <Path Style="{StaticResource LucidePathIcon}"
+                                          Width="13"
+                                          Height="13"
+                                          Data="M10 16h.01M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM21.946 12.013H2.054M6 16h.01" />
+                                </Border>
+                                <TextBlock Text="導入内容"
+                                           Foreground="#334155"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
                             <ItemsControl ItemsSource="{Binding SetupInstallPlanItems}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>

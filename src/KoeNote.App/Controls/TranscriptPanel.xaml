@@ -63,10 +63,16 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="文字起こし"
-                           Style="{StaticResource SectionTitle}"
-                           Margin="0"
-                           VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Style="{StaticResource LucideCardIconBadge}">
+                        <Path Style="{StaticResource LucidePathIcon}"
+                              Data="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2M7 15h4M15 15h2M7 11h2M13 11h4" />
+                    </Border>
+                    <TextBlock Text="文字起こし"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
                 <CheckBox Grid.Column="1"
                           Content="自動スクロール"
                           IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"

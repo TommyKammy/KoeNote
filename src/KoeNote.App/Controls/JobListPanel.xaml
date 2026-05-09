@@ -8,10 +8,16 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="ジョブ"
-                           Style="{StaticResource SectionTitle}"
-                           Margin="0"
-                           VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Style="{StaticResource LucideCardIconBadge}">
+                        <Path Style="{StaticResource LucidePathIcon}"
+                              Data="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16M4 6h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2" />
+                    </Border>
+                    <TextBlock Text="ジョブ"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0"
+                               VerticalAlignment="Center" />
+                </StackPanel>
                 <Button Grid.Column="1"
                         Content="クリア"
                         Command="{Binding ClearAllJobsCommand}"
@@ -104,12 +110,17 @@
                             </Border.Style>
                             <Grid MinHeight="112">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE898;"
-                                               FontFamily="Segoe MDL2 Assets"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontSize="24"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,10" />
+                                    <Border Style="{StaticResource LucideCardIconBadge}"
+                                            Width="34"
+                                            Height="34"
+                                            CornerRadius="17"
+                                            Margin="0,0,0,10"
+                                            HorizontalAlignment="Center">
+                                        <Path Style="{StaticResource LucidePathIcon}"
+                                              Width="17"
+                                              Height="17"
+                                              Data="M12 15V3M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5" />
+                                    </Border>
                                     <TextBlock Text="ファイルをドラッグ &amp; ドロップ"
                                                Foreground="{StaticResource TextBrush}"
                                                FontSize="13"
