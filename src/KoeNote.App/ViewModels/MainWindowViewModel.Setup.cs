@@ -145,6 +145,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
         SetSetupInstallStatus("文字起こしモデル", "導入中", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
         SetSetupInstallStatus("整文モデル", "導入中", SelectedSetupReviewModel?.DisplayName ?? "Review model");
+        var optionalFailureMessages = new List<string>();
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
             var modelName = FindSetupModelDisplayName(
@@ -214,28 +215,30 @@ public sealed partial class MainWindowViewModel
                 {
                     var message = BuildOptionalDiarizationRuntimeFailureMessage(preflight.Message, preflight.FailureCategory);
                     SetSetupInstallStatus("話者識別", "失敗", message);
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
                     SetupDiarizationRuntimeSummary = message;
+                    optionalFailureMessages.Add(message);
                     LatestLog = message;
-                    return;
                 }
-
-                ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
-                var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync();
-                RefreshSetupWizard();
-                if (!runtimeResult.IsSucceeded)
+                else
                 {
-                    var message = BuildOptionalDiarizationRuntimeFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
-                    SetSetupInstallStatus("話者識別", "失敗", message);
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    SetupDiarizationRuntimeSummary = message;
-                    LatestLog = message;
-                    return;
+                    ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
+                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync();
+                    RefreshSetupWizard();
+                    if (!runtimeResult.IsSucceeded)
+                    {
+                        var message = BuildOptionalDiarizationRuntimeFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+                        SetSetupInstallStatus("話者識別", "失敗", message);
+                        SetupDiarizationRuntimeSummary = message;
+                        optionalFailureMessages.Add(message);
+                        LatestLog = message;
+                    }
+                    else
+                    {
+                        SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
+                        SetSetupInstallStatus("話者識別", "完了", runtimeResult.InstallPath);
+                        LatestLog = runtimeResult.Message;
+                    }
                 }
-
-                SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
-                SetSetupInstallStatus("話者識別", "完了", runtimeResult.InstallPath);
-                LatestLog = runtimeResult.Message;
             }
             else
             {
@@ -254,6 +257,7 @@ public sealed partial class MainWindowViewModel
                     var message = BuildOptionalCudaReviewRuntimeFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
                     SetSetupInstallStatus("GPU高速化", "失敗", message);
                     SetupCudaReviewRuntimeSummary = message;
+                    optionalFailureMessages.Add(message);
                     LatestLog = message;
                 }
                 else
@@ -290,8 +294,17 @@ public sealed partial class MainWindowViewModel
 
             SetSetupInstallStatus("保存先", "確認済み", SetupStorageRoot);
             CompleteModelDownloadProgress(displayName, succeeded: true);
-            ModelDownloadProgressSummary = "導入が完了しました。最終確認へ進めます。";
-            ModelDownloadNotification = "導入が完了しました。KoeNoteを使う準備に進めます。";
+            if (optionalFailureMessages.Count > 0)
+            {
+                ModelDownloadProgressSummary = "基本構成の導入が完了しました。一部の追加機能は後から追加導入できます。";
+                ModelDownloadNotification = ModelDownloadProgressSummary;
+            }
+            else
+            {
+                ModelDownloadProgressSummary = "導入が完了しました。最終確認へ進めます。";
+                ModelDownloadNotification = "導入が完了しました。KoeNoteを使う準備に進めます。";
+            }
+
             LatestLog = ModelDownloadProgressSummary;
         }
         catch (OperationCanceledException)
