@@ -309,7 +309,8 @@ public sealed class SetupWizardServiceTests
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
             totalMemoryBytes: 8L * 1024 * 1024 * 1024,
             maxGpuMemoryGb: null,
-            nvidiaGpuDetected: false));
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 4));
 
         var recommendation = wizard.GetPresetRecommendation();
         var state = wizard.ApplyAutomaticModelPresetRecommendation();
@@ -322,13 +323,50 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsLightweightForCapableCpuOnlyHost()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 16L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 8));
+
+        var recommendation = wizard.GetPresetRecommendation();
+        var state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Equal("lightweight", recommendation.PresetId);
+        Assert.Contains("CPU/RAM", recommendation.Detail, StringComparison.Ordinal);
+        Assert.Equal(SetupStep.Welcome, state.CurrentStep);
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("whisper-small", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_UsesRamFallbackWhenCpuCountIsUnknown()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 16L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: null));
+
+        var recommendation = wizard.GetPresetRecommendation();
+
+        Assert.Equal("lightweight", recommendation.PresetId);
+    }
+
+    [Fact]
     public void SetupWizard_AutomaticPresetRecommendation_DoesNotOverrideManualModelChoice()
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
             totalMemoryBytes: 8L * 1024 * 1024 * 1024,
             maxGpuMemoryGb: null,
-            nvidiaGpuDetected: false));
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 4));
 
         wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
         var state = wizard.ApplyAutomaticModelPresetRecommendation();
@@ -345,7 +383,8 @@ public sealed class SetupWizardServiceTests
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
             totalMemoryBytes: 8L * 1024 * 1024 * 1024,
             maxGpuMemoryGb: null,
-            nvidiaGpuDetected: false));
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 4));
 
         wizard.ApplyAutomaticModelPresetRecommendation();
         wizard.SelectModelPreset("recommended");
@@ -802,7 +841,11 @@ public sealed class SetupWizardServiceTests
         }
     }
 
-    private sealed class FixedHostResourceProbe(long? totalMemoryBytes, int? maxGpuMemoryGb, bool nvidiaGpuDetected) : ISetupHostResourceProbe
+    private sealed class FixedHostResourceProbe(
+        long? totalMemoryBytes,
+        int? maxGpuMemoryGb,
+        bool nvidiaGpuDetected,
+        int? logicalProcessorCount = null) : ISetupHostResourceProbe
     {
         public SetupHostResources GetResources()
         {
@@ -810,7 +853,8 @@ public sealed class SetupWizardServiceTests
                 totalMemoryBytes,
                 maxGpuMemoryGb,
                 nvidiaGpuDetected,
-                $"RAM {totalMemoryBytes} / VRAM {maxGpuMemoryGb}");
+                logicalProcessorCount,
+                $"RAM {totalMemoryBytes} / CPU {logicalProcessorCount} / VRAM {maxGpuMemoryGb}");
         }
     }
 }

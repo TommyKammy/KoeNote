@@ -48,8 +48,14 @@ internal sealed class SetupPresetRecommendationService(
             ? bytes / 1024d / 1024d / 1024d
             : (double?)null;
 
-        if (!resources.NvidiaGpuDetected ||
-            resources.MaxGpuMemoryGb is < 6 ||
+        if (!resources.NvidiaGpuDetected)
+        {
+            return IsCapableCpuOnlyHost(totalMemoryGb, resources.LogicalProcessorCount)
+                ? "lightweight"
+                : "ultra_lightweight";
+        }
+
+        if (resources.MaxGpuMemoryGb is < 6 ||
             totalMemoryGb is < 12)
         {
             return "ultra_lightweight";
@@ -63,11 +69,24 @@ internal sealed class SetupPresetRecommendationService(
         return "recommended";
     }
 
+    private static bool IsCapableCpuOnlyHost(double? totalMemoryGb, int? logicalProcessorCount)
+    {
+        if (totalMemoryGb is null)
+        {
+            return false;
+        }
+
+        return totalMemoryGb >= 12 &&
+            (logicalProcessorCount >= 6 ||
+                (logicalProcessorCount is null && totalMemoryGb >= 16));
+    }
+
     private static string BuildDetail(string presetId, SetupHostResources resources)
     {
         var reason = presetId switch
         {
-            "lightweight" => "GPU/VRAM または RAM が控えめな環境として、Whisper base と Bonsai 8B の軽量構成を推奨します。",
+            "ultra_lightweight" => "CPU/RAM または GPU 条件が控えめな環境として、Whisper base と Bonsai 8B の超軽量構成を推奨します。",
+            "lightweight" => "GPUなしでも CPU/RAM に余裕があるため、Whisper small と Bonsai 8B の軽量構成を推奨します。",
             "high_accuracy" => "十分な VRAM と RAM が見込めるため、日本語精度を優先する高精度構成も選べます。",
             _ => "標準的な GPU/RAM が見込めるため、速度と品質のバランスを取る推奨構成を選びます。"
         };

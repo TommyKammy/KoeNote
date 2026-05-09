@@ -77,6 +77,7 @@ public sealed record SetupHostResources(
     long? TotalMemoryBytes,
     int? MaxGpuMemoryGb,
     bool NvidiaGpuDetected,
+    int? LogicalProcessorCount,
     string Summary);
 
 public sealed record SetupPresetRecommendation(

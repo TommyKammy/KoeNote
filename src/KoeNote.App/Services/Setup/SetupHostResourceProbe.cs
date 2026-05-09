@@ -15,11 +15,13 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
     {
         var totalMemoryBytes = TryGetTotalMemoryBytes();
         var maxGpuMemoryGb = TryGetMaxNvidiaGpuMemoryGb();
-        var summary = FormatSummary(totalMemoryBytes, maxGpuMemoryGb);
+        var logicalProcessorCount = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : (int?)null;
+        var summary = FormatSummary(totalMemoryBytes, maxGpuMemoryGb, logicalProcessorCount);
         return new SetupHostResources(
             totalMemoryBytes,
             maxGpuMemoryGb,
             NvidiaGpuDetected: maxGpuMemoryGb is not null,
+            logicalProcessorCount,
             summary);
     }
 
@@ -93,15 +95,18 @@ internal sealed class WindowsSetupHostResourceProbe : ISetupHostResourceProbe
         return null;
     }
 
-    private static string FormatSummary(long? totalMemoryBytes, int? maxGpuMemoryGb)
+    private static string FormatSummary(long? totalMemoryBytes, int? maxGpuMemoryGb, int? logicalProcessorCount)
     {
         var memorySummary = totalMemoryBytes is { } bytes
             ? $"RAM {Math.Max(1, (int)Math.Round(bytes / 1024d / 1024d / 1024d))}GB"
             : "RAM 不明";
+        var cpuSummary = logicalProcessorCount is { } cores
+            ? $"CPU {cores}論理コア"
+            : "CPU 不明";
         var gpuSummary = maxGpuMemoryGb is { } vramGb
             ? $"NVIDIA GPU VRAM {vramGb}GB"
             : "NVIDIA GPU 未検出";
-        return $"{memorySummary} / {gpuSummary}";
+        return $"{memorySummary} / {cpuSummary} / {gpuSummary}";
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

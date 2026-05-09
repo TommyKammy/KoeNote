@@ -335,14 +335,14 @@ public sealed class MainWindowViewModelTests
             "recommended",
             "Recommended",
             "No GPU",
-            new SetupHostResources(null, null, NvidiaGpuDetected: false, "No GPU"));
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, LogicalProcessorCount: null, "No GPU"));
         SetPrivateField(viewModel, "_setupPresetRecommendation", noGpuRecommendation);
 
         Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
 
         var gpuRecommendation = noGpuRecommendation with
         {
-            Resources = new SetupHostResources(null, 12, NvidiaGpuDetected: true, "GPU")
+            Resources = new SetupHostResources(null, 12, NvidiaGpuDetected: true, LogicalProcessorCount: null, "GPU")
         };
         SetPrivateField(viewModel, "_setupPresetRecommendation", gpuRecommendation);
 
