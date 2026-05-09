@@ -201,6 +201,7 @@ public sealed class VersioningTests
         Assert.Contains("cublas*.dll", publishScript);
         Assert.Contains("cudart*.dll", publishScript);
         Assert.Contains("<KoeNoteIncludeRuntimeToolsInProjectPublish>false</KoeNoteIncludeRuntimeToolsInProjectPublish>", appProject);
+        Assert.Contains("Condition=\"Exists('..\\..\\tools\\ffmpeg.exe')\"", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\python')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review-ternary')", appProject);

@@ -41,7 +41,8 @@
     <Content Include="..\..\tools\ffmpeg.exe"
              Link="tools\ffmpeg.exe"
              CopyToOutputDirectory="PreserveNewest"
-             CopyToPublishDirectory="Always" />
+             CopyToPublishDirectory="Always"
+             Condition="Exists('..\..\tools\ffmpeg.exe')" />
     <Content Include="..\..\tools\python\**\*"
              Link="tools\python\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
