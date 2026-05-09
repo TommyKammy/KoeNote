@@ -9,7 +9,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
 {
     public const string RuntimeUrlEnvironmentVariable = "KOENOTE_CUDA_ASR_RUNTIME_URL";
     public const string RuntimeSha256EnvironmentVariable = "KOENOTE_CUDA_ASR_RUNTIME_SHA256";
-    public const string DefaultRuntimeUrl = "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-asr-runtime.zip";
+    public const string DefaultRuntimeUrl = "https://github.com/TommyKammy/KoeNote/releases/download/runtime-cuda-12.9-cudnn-9.22-v1/koenote-cuda-asr-runtime.zip";
     public const string FailureCategoryConfigurationMissing = "ConfigurationMissing";
     public const string FailureCategoryNetworkUnavailable = "NetworkUnavailable";
     public const string FailureCategoryHashMismatch = "HashMismatch";
@@ -63,7 +63,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
                 if (!AsrCudaRuntimeLayout.HasRequiredFiles(cudaEntries.Select(static entry => entry.Name)))
                 {
                     return AsrCudaRuntimeInstallResult.Failed(
-                        "CUDA ASR runtime archive must contain cuBLAS, cuBLASLt, CUDA runtime, cuDNN, and zlib DLLs.",
+                        "CUDA ASR runtime archive must contain cuBLAS, cuBLASLt, CUDA runtime, and cuDNN DLLs.",
                         paths.AsrRuntimeDirectory,
                         FailureCategoryArchiveInvalid,
                         actualSha256);

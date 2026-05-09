@@ -38,7 +38,6 @@ public sealed class AsrCudaRuntimeServiceTests
             ("bin/cublasLt64_12.dll", "cublasLt"),
             ("bin/cudart64_12.dll", "cudart"),
             ("bin/cudnn64_9.dll", "cudnn"),
-            ("bin/zlibwapi.dll", "zlib"),
             ("bin/readme.txt", "ignored"));
         var expectedSha256 = ComputeSha256(archive);
         var service = new AsrCudaRuntimeService(
@@ -55,7 +54,6 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "zlibwapi.dll")));
         Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "readme.txt")));
         Assert.True(File.Exists(paths.AsrCudaRuntimeMarkerPath));
     }
@@ -87,8 +85,7 @@ public sealed class AsrCudaRuntimeServiceTests
         paths.EnsureCreated();
         var archive = CreateArchive(
             ("bin/cublas64_12.dll", "cublas"),
-            ("bin/cudnn64_9.dll", "cudnn"),
-            ("bin/zlibwapi.dll", "zlib"));
+            ("bin/cudnn64_9.dll", "cudnn"));
         var service = new AsrCudaRuntimeService(
             paths,
             new HttpClient(new ArchiveHandler(archive)),

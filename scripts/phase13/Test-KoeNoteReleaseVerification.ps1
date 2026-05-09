@@ -12,9 +12,10 @@ $payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePa
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
 $expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
+$expectedCudaRuntimeTag = "runtime-cuda-12.9-cudnn-9.22-v1"
 $expectedCudaReleaseAssets = @(
-    "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-asr-runtime.zip",
-    "https://github.com/TommyKammy/KoeNote/releases/latest/download/koenote-cuda-review-runtime.zip"
+    "https://github.com/TommyKammy/KoeNote/releases/download/$expectedCudaRuntimeTag/koenote-cuda-asr-runtime.zip",
+    "https://github.com/TommyKammy/KoeNote/releases/download/$expectedCudaRuntimeTag/koenote-cuda-review-runtime.zip"
 )
 
 if (-not $SkipVersioningTests) {

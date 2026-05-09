@@ -928,7 +928,6 @@ public sealed class SetupWizardServiceTests
             AddArchiveEntry(archive, "bin/cublasLt64_12.dll", "cublasLt");
             AddArchiveEntry(archive, "bin/cudart64_12.dll", "cudart");
             AddArchiveEntry(archive, "bin/cudnn64_9.dll", "cudnn");
-            AddArchiveEntry(archive, "bin/zlibwapi.dll", "zlib");
         }
 
         return stream.ToArray();

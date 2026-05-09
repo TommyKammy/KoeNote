@@ -486,7 +486,6 @@ public sealed class MainWindowViewModelTests
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudart64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
-        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "zlibwapi.dll"));
         Touch(viewModel.Paths.AsrCudaRuntimeMarkerPath);
 
         Assert.False(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));

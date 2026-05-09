@@ -9,8 +9,7 @@ public static class AsrCudaRuntimeLayout
         "cublas64_*.dll",
         "cublasLt64_*.dll",
         "cudart64_*.dll",
-        "cudnn*.dll",
-        "zlibwapi.dll"
+        "cudnn*.dll"
     ];
 
     public static bool HasPackage(AppPaths paths)

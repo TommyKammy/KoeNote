@@ -115,6 +115,7 @@ public sealed class VersioningTests
         Assert.Contains("Bundled Python runtime is required", script);
         Assert.Contains("Release manifest is missing bundled_python_runtime metadata", script);
         Assert.Contains("bundled_python_runtime.required", script);
+        Assert.Contains("runtime-cuda-12.9-cudnn-9.22-v1", script);
         Assert.Contains("koenote-cuda-asr-runtime.zip", script);
         Assert.Contains("koenote-cuda-review-runtime.zip", script);
         Assert.Contains("Required CUDA release asset is missing or unreachable", script);
