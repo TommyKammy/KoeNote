@@ -431,6 +431,20 @@ public sealed partial class MainWindowViewModel
         {
             _selectedAsrEngineId = selectedEngineId;
         }
+
+        UpdateSelectedSettingsAsrEngine();
+        OnPropertyChanged(nameof(SelectedAsrEngineId));
+    }
+
+    private void UpdateSelectedSettingsAsrEngine()
+    {
+        var selected = AvailableAsrEngines.FirstOrDefault(engine =>
+            engine.EngineId.Equals(_selectedAsrEngineId, StringComparison.OrdinalIgnoreCase));
+        if (!ReferenceEquals(_selectedSettingsAsrEngine, selected))
+        {
+            _selectedSettingsAsrEngine = selected;
+            OnPropertyChanged(nameof(SelectedSettingsAsrEngine));
+        }
     }
 
     private bool IsAsrEngineInstalled(string engineId)

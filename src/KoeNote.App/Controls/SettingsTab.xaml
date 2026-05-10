@@ -30,8 +30,7 @@
 
                         <TextBlock Text="ASRモデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding AvailableAsrEngines}"
-                                  SelectedValue="{Binding SelectedAsrEngineId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                  SelectedValuePath="EngineId"
+                                  SelectedItem="{Binding SelectedSettingsAsrEngine, Mode=TwoWay}"
                                   DisplayMemberPath="SetupDisplayName"
                                   MinHeight="32"
                                   Margin="0,0,0,12" />
@@ -42,10 +41,10 @@
 
                         <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
-                                  SelectedItem="{Binding SelectedSetupReviewModel, Mode=TwoWay}"
+                                  SelectedItem="{Binding SelectedSettingsReviewModel, Mode=TwoWay}"
                                   DisplayMemberPath="SetupDisplayName"
                                   MinHeight="32"
-                                  ToolTip="{Binding SelectedSetupReviewModel.SetupDisplayName}"
+                                  ToolTip="{Binding SelectedSettingsReviewModel.SetupDisplayName}"
                                   TextSearch.TextPath="SetupDisplayName" />
 
                         <TextBlock Text="Active LLM profile" Style="{StaticResource SettingsFieldLabel}" Margin="0,12,0,4" />

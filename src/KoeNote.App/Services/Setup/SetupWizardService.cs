@@ -167,6 +167,23 @@ public sealed class SetupWizardService
         return _selectionService.SelectModel(role, modelId);
     }
 
+    public SetupState CommitSelectionDraft(SetupState draft)
+    {
+        var current = _stateService.Load();
+        var candidate = draft with
+        {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
+            StorageRoot = string.IsNullOrWhiteSpace(draft.StorageRoot)
+                ? current.StorageRoot
+                : draft.StorageRoot
+        };
+        var repaired = _selectionService.RepairUnsupportedSelections(candidate);
+        return repaired.Equals(candidate)
+            ? _stateService.Save(candidate)
+            : repaired;
+    }
+
     public SetupState SetStorageRoot(string storageRoot)
     {
         return _selectionService.SetStorageRoot(storageRoot);

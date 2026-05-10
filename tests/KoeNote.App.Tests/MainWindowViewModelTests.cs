@@ -560,7 +560,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SettingsReviewModelSelection_UpdatesSetupReviewModel()
+    public void SettingsReviewModelSelection_DraftsSetupReviewModelUntilNext()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
@@ -577,8 +577,223 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedSetupReviewModel = bonsai;
 
         var state = new SetupStateService(paths).Load();
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", state.SelectedReviewModelId);
+        Assert.NotEqual("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSetupReviewModel?.ModelId);
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", viewModel.SelectedSettingsReviewModel?.ModelId);
+        Assert.Equal("未設定", viewModel.ReviewModel);
+
+        viewModel.SetupNextCommand.Execute(null);
+
+        state = new SetupStateService(paths).Load();
         Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
         Assert.Equal("custom", state.SetupMode);
+    }
+
+    [Fact]
+    public void SettingsReviewModelSelection_UpdatesCommittedReviewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.ReviewModel,
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSettingsReviewModel = bonsai;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.Equal("custom", state.SetupMode);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSettingsReviewModel?.ModelId);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSetupReviewModel?.ModelId);
+    }
+
+    [Fact]
+    public void SettingsModelSelections_IgnoreTransientNullFromComboBoxRefresh()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "whisper-base", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.ReviewModel,
+            SelectedAsrModelId = "whisper-base",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var selectedSettingsReview = viewModel.SelectedSettingsReviewModel;
+        var selectedSettingsAsr = viewModel.SelectedSettingsAsrEngine;
+        var selectedSetupReview = viewModel.SelectedSetupReviewModel;
+        var selectedSetupAsr = viewModel.SelectedSetupAsrModel;
+        var selectedPreset = viewModel.SelectedSetupModelPreset;
+
+        viewModel.SelectedAsrEngineId = string.Empty;
+        viewModel.SelectedSettingsAsrEngine = null;
+        viewModel.SelectedSettingsReviewModel = null;
+        viewModel.SelectedSetupReviewModel = null;
+        viewModel.SelectedSetupAsrModel = null;
+        viewModel.SelectedSetupModelPreset = null;
+
+        Assert.Equal("whisper-base", viewModel.SelectedAsrEngineId);
+        Assert.Same(selectedSettingsAsr, viewModel.SelectedSettingsAsrEngine);
+        Assert.Same(selectedSettingsReview, viewModel.SelectedSettingsReviewModel);
+        Assert.Same(selectedSetupReview, viewModel.SelectedSetupReviewModel);
+        Assert.Same(selectedSetupAsr, viewModel.SelectedSetupAsrModel);
+        Assert.Same(selectedPreset, viewModel.SelectedSetupModelPreset);
+    }
+
+    [Fact]
+    public void SettingsAsrSelection_UsesCommittedEngineWhileSetupPresetIsDrafted()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "whisper-base", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SetupMode,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = "faster-whisper-large-v3-turbo",
+            SelectedReviewModelId = "gemma-4-e4b-it-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var lightweight = viewModel.SetupModelPresetChoices.Single(preset => preset.PresetId == "lightweight");
+
+        viewModel.SelectedSetupModelPreset = lightweight;
+
+        Assert.Equal("whisper-base", viewModel.SelectedAsrEngineId);
+        Assert.Equal("whisper-base", viewModel.SelectedSettingsAsrEngine?.EngineId);
+        Assert.Equal("whisper-small", viewModel.SelectedSetupAsrModel?.ModelId);
+    }
+
+    [Fact]
+    public void SettingsPresetSelection_DraftsSetupModelsUntilNext()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SetupMode,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = "faster-whisper-large-v3-turbo",
+            SelectedReviewModelId = "gemma-4-e4b-it-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var lightweight = viewModel.SetupModelPresetChoices.Single(preset => preset.PresetId == "lightweight");
+
+        viewModel.SelectedSetupModelPreset = lightweight;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("lightweight", viewModel.SelectedSetupModelPreset?.PresetId);
+        Assert.Equal("whisper-small", viewModel.SelectedSetupAsrModel?.ModelId);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSetupReviewModel?.ModelId);
+        Assert.NotEqual("whisper-small", viewModel.SelectedAsrEngineId);
+
+        viewModel.SetupNextCommand.Execute(null);
+
+        state = new SetupStateService(paths).Load();
+        Assert.Equal("lightweight", state.SelectedModelPresetId);
+        Assert.Equal("whisper-small", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.Equal("whisper-small", viewModel.SelectedAsrEngineId);
+    }
+
+    [Fact]
+    public void SetupWizardNext_NotifiesSettingsReviewModelAfterPresetCommit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SetupMode,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = "faster-whisper-large-v3-turbo",
+            SelectedReviewModelId = "gemma-4-e4b-it-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var lightweight = viewModel.SetupModelPresetChoices.Single(preset => preset.PresetId == "lightweight");
+        var changed = new List<string>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                changed.Add(args.PropertyName);
+            }
+        };
+
+        viewModel.SelectedSetupModelPreset = lightweight;
+        viewModel.SetupNextCommand.Execute(null);
+        viewModel.CloseSetupWizardModalCommand.Execute(null);
+
+        Assert.Contains(nameof(MainWindowViewModel.SelectedSettingsReviewModel), changed);
+        Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSettingsReviewModel?.ModelId);
+    }
+
+    [Fact]
+    public void SetupWizardClose_DiscardsUncommittedModelSelectionDraft()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.ReviewModel,
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSetupReviewModel = bonsai;
+        viewModel.CloseSetupWizardModalCommand.Execute(null);
+        viewModel.OpenSetupCommand.Execute(null);
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", viewModel.SelectedSetupReviewModel?.ModelId);
+    }
+
+    [Fact]
+    public void SetupWizardRefresh_DoesNotPersistAutomaticPresetRecommendation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SetupMode,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = "faster-whisper-large-v3-turbo",
+            SelectedReviewModelId = "gemma-4-e4b-it-q4-k-m"
+        });
+
+        _ = new MainWindowViewModel(paths);
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
     }
 
     [Fact]

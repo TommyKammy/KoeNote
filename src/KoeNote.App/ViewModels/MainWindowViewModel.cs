@@ -95,7 +95,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private ModelQualityPreset? _selectedSetupModelPreset;
     private ModelCatalogEntry? _selectedSetupAsrModel;
     private ModelCatalogEntry? _selectedSetupReviewModel;
+    private ModelCatalogEntry? _selectedSettingsReviewModel;
     private SetupState _setupState;
+    private SetupState? _setupSelectionDraft;
     private string _setupLocalModelPath = string.Empty;
     private string _setupOfflineModelPackPath = string.Empty;
     private readonly Dictionary<string, SetupInstallPlanItem> _setupInstallStatusOverrides = [];
@@ -154,6 +156,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
     private string _selectedAsrEngineId = "faster-whisper-large-v3-turbo";
+    private AsrEngineOption? _selectedSettingsAsrEngine;
     private bool _enableReviewStage = true;
     private bool _enableSummaryStage;
     private string _selectedSegmentEditText = string.Empty;
@@ -271,6 +274,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _enableSummaryStage = false;
         RefreshOptionalStageToggleStatuses();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
+        UpdateSelectedSettingsAsrEngine();
         FilteredJobs = CollectionViewSource.GetDefaultView(Jobs);
         FilteredJobs.Filter = FilterJob;
         FilteredDeletedJobs = CollectionViewSource.GetDefaultView(DeletedJobs);
@@ -558,6 +562,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isSetupWizardModalOpen, value))
             {
+                if (!value)
+                {
+                    _setupSelectionDraft = null;
+                }
+
                 OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
                 OnPropertyChanged(nameof(ShowSetupSmokeAction));
             }
@@ -1022,9 +1031,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedSetupAsrModel;
         set
         {
-            if (SetField(ref _selectedSetupAsrModel, value) && value is not null)
+            if (value is null)
             {
-                ApplySetupModelSelection("asr", value.ModelId);
+                return;
+            }
+
+            if (SetField(ref _selectedSetupAsrModel, value))
+            {
+                ApplySetupModelSelectionDraft("asr", value.ModelId);
             }
         }
     }
@@ -1034,9 +1048,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedSetupModelPreset;
         set
         {
-            if (SetField(ref _selectedSetupModelPreset, value) && value is not null)
+            if (value is null)
             {
-                ApplySetupModelPreset(value.PresetId);
+                return;
+            }
+
+            if (SetField(ref _selectedSetupModelPreset, value))
+            {
+                ApplySetupModelPresetDraft(value.PresetId);
             }
         }
     }
@@ -1200,9 +1219,48 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedSetupReviewModel;
         set
         {
-            if (SetField(ref _selectedSetupReviewModel, value) && value is not null)
+            if (value is null)
             {
-                ApplySetupModelSelection("review", value.ModelId);
+                return;
+            }
+
+            if (SetField(ref _selectedSetupReviewModel, value))
+            {
+                ApplySetupModelSelectionDraft("review", value.ModelId);
+            }
+        }
+    }
+
+    public ModelCatalogEntry? SelectedSettingsReviewModel
+    {
+        get => _selectedSettingsReviewModel;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            if (SetField(ref _selectedSettingsReviewModel, value))
+            {
+                ApplySettingsReviewModelSelection(value.ModelId);
+            }
+        }
+    }
+
+    public AsrEngineOption? SelectedSettingsAsrEngine
+    {
+        get => _selectedSettingsAsrEngine;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            if (SetField(ref _selectedSettingsAsrEngine, value))
+            {
+                SelectedAsrEngineId = value.EngineId;
             }
         }
     }
@@ -1229,9 +1287,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _ => _setupState.CurrentStep.ToString()
     };
 
-    public string SetupMode => _setupState.SetupMode;
+    public string SetupMode => (_setupSelectionDraft ?? _setupState).SetupMode;
 
-    public string SetupStorageRoot => _setupState.StorageRoot ?? Paths.DefaultModelStorageRoot;
+    public string SetupStorageRoot => (_setupSelectionDraft ?? _setupState).StorageRoot ?? Paths.DefaultModelStorageRoot;
 
     public bool SetupLicenseAccepted => _setupState.LicenseAccepted;
 
@@ -1926,9 +1984,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedAsrEngineId;
         set
         {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
             var engineId = IsUserSelectableAsrEngine(value) ? value : DefaultSelectableAsrEngineId;
             if (SetField(ref _selectedAsrEngineId, engineId))
             {
+                UpdateSelectedSettingsAsrEngine();
                 OnPropertyChanged(nameof(AsrModel));
                 OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
                 OnPropertyChanged(nameof(ReviewStageAssetsReady));

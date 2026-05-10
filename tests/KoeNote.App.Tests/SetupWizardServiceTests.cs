@@ -393,6 +393,34 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_CommitSelectionDraft_PersistsDraftWithoutLosingStorageRoot()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        var customRoot = Path.Combine(paths.Root, "custom-model-storage");
+        wizard.SetStorageRoot(customRoot);
+        var draft = wizard.LoadState() with
+        {
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = "whisper-small",
+            SelectedReviewModelId = "bonsai-8b-q1-0",
+            LicenseAccepted = true,
+            LastSmokeSucceeded = true
+        };
+
+        var state = wizard.CommitSelectionDraft(draft);
+
+        Assert.Equal("custom", state.SetupMode);
+        Assert.Null(state.SelectedModelPresetId);
+        Assert.Equal("whisper-small", state.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.Equal(customRoot, state.StorageRoot);
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+    }
+
+    [Fact]
     public async Task SetupWizard_InstallSelectedPresetModels_SkipsAlreadyInstalledAsrAndReviewModels()
     {
         var paths = CreatePaths();

@@ -21,6 +21,8 @@ public sealed partial class MainWindowViewModel
 
     private Task SetupNextAsync()
     {
+        CommitSetupSelectionDraft();
+
         if (_setupState.CurrentStep is SetupStep.InstallPlan or SetupStep.Install)
         {
             if (SelectedSetupConfigurationReady)
@@ -97,27 +99,27 @@ public sealed partial class MainWindowViewModel
 
     private Task SetupUseRecommendedAsync()
     {
-        _setupState = _setupWizardService.UseRecommendedSelections();
-        SelectedAsrEngineId = _setupState.SelectedAsrModelId ?? SelectedAsrEngineId;
-        RefreshSetupWizard();
-        RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+        var recommendation = _setupWizardService.GetPresetRecommendation();
+        ApplySetupModelPresetDraft(recommendation.PresetId);
         LatestLog = "Recommended setup choices selected. Accept licenses before installation.";
         return Task.CompletedTask;
     }
 
-    private void ApplySetupModelPreset(string presetId)
+    private void ApplySetupModelPresetDraft(string presetId)
     {
         try
         {
-            _setupState = _setupWizardService.SelectModelPreset(presetId);
-            if (!string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
-            {
-                SelectedAsrEngineId = _setupState.SelectedAsrModelId;
-            }
+            var draft = CreateSetupPresetDraft(_setupSelectionDraft ?? _setupState, presetId);
+            _setupSelectionDraft = draft;
+            _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
+                entry.ModelId.Equals(draft.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase));
+            _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
+                entry.ModelId.Equals(draft.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase));
+            _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
+                preset.PresetId.Equals(draft.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
 
-            RefreshSetupWizard();
-            RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
-            LatestLog = $"Setup model preset selected: {presetId}";
+            RefreshSetupSelectionPreview();
+            LatestLog = $"Setup model preset drafted: {presetId}";
         }
         catch (InvalidOperationException ex)
         {
@@ -127,6 +129,7 @@ public sealed partial class MainWindowViewModel
 
     private Task SetupAcceptLicensesAsync()
     {
+        CommitSetupSelectionDraft();
         _setupState = _setupWizardService.AcceptLicenses();
         RefreshSetupWizard();
         LatestLog = "Setup licenses accepted. Review the installation plan, then start installation.";
@@ -212,6 +215,8 @@ public sealed partial class MainWindowViewModel
         {
             return;
         }
+
+        CommitSetupSelectionDraft();
 
         if (!_setupState.LicenseAccepted)
         {
@@ -469,6 +474,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task SetupDownloadAsrAsync()
     {
+        CommitSetupSelectionDraft();
         var displayName = SelectedSetupAsrModel?.DisplayName ?? "ASR model";
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
@@ -486,6 +492,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task SetupDownloadReviewAsync()
     {
+        CommitSetupSelectionDraft();
         var displayName = SelectedSetupReviewModel?.DisplayName ?? "Review LLM model";
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
@@ -722,6 +729,7 @@ public sealed partial class MainWindowViewModel
 
     private Task SetupCompleteAsync()
     {
+        CommitSetupSelectionDraft();
         var checkResult = _setupWizardService.RunSmokeCheck();
         SetupSmokeChecks.Clear();
         foreach (var check in checkResult.Checks)
@@ -745,23 +753,52 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private void ApplySetupModelSelection(string role, string modelId)
+    private void ApplySetupModelSelectionDraft(string role, string modelId)
     {
         try
         {
-            _setupState = _setupWizardService.SelectModel(role, modelId);
-            if (role.Equals("asr", StringComparison.OrdinalIgnoreCase) && SelectedSetupAsrModel is not null)
+            var selected = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+                ? SetupAsrModelChoices.FirstOrDefault(entry =>
+                    entry.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase))
+                : SetupReviewModelChoices.FirstOrDefault(entry =>
+                    entry.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+            if (selected is null)
             {
-                SelectedAsrEngineId = SelectedSetupAsrModel.EngineId;
+                throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
             }
 
-            RefreshSetupWizard();
-            if (role.Equals("review", StringComparison.OrdinalIgnoreCase))
+            var current = _setupSelectionDraft ?? _setupState;
+            _setupSelectionDraft = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+                ? current with
+                {
+                    IsCompleted = false,
+                    LastSmokeSucceeded = false,
+                    CurrentStep = SetupStep.AsrModel,
+                    SetupMode = "custom",
+                    SelectedModelPresetId = null,
+                    SelectedAsrModelId = selected.ModelId
+                }
+                : current with
+                {
+                    IsCompleted = false,
+                    LastSmokeSucceeded = false,
+                    CurrentStep = SetupStep.ReviewModel,
+                    SetupMode = "custom",
+                    SelectedModelPresetId = null,
+                    SelectedReviewModelId = selected.ModelId
+                };
+            _selectedSetupModelPreset = null;
+            if (role.Equals("asr", StringComparison.OrdinalIgnoreCase))
             {
-                RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+                _selectedSetupAsrModel = selected;
+            }
+            else
+            {
+                _selectedSetupReviewModel = selected;
             }
 
-            LatestLog = $"Setup {role} model selected: {modelId}";
+            RefreshSetupSelectionPreview();
+            LatestLog = $"Setup {role} model drafted: {modelId}";
         }
         catch (InvalidOperationException ex)
         {
@@ -769,19 +806,24 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private void ApplySettingsReviewModelSelection(string modelId)
+    {
+        try
+        {
+            _setupSelectionDraft = null;
+            _setupState = _setupWizardService.SelectModel("review", modelId);
+            RefreshSetupWizard();
+            RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+            LatestLog = $"Settings review model selected: {modelId}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            LatestLog = $"Settings review model selection failed: {ex.Message}";
+        }
+    }
+
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
-        var stateBeforeRecommendation = _setupWizardService.LoadState();
-        _setupState = _setupWizardService.ApplyAutomaticModelPresetRecommendation();
-        if (!string.Equals(
-                stateBeforeRecommendation.SelectedModelPresetId,
-                _setupState.SelectedModelPresetId,
-                StringComparison.OrdinalIgnoreCase) &&
-            !string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
-        {
-            SelectedAsrEngineId = _setupState.SelectedAsrModelId;
-        }
-
         _setupPresetRecommendation = _setupWizardService.GetPresetRecommendation();
         _setupState = _setupWizardService.LoadState();
         RefreshDiarizationRuntimeSummary();
@@ -809,14 +851,18 @@ public sealed partial class MainWindowViewModel
             SetupModelPresetChoices.Add(preset);
         }
 
+        var displayState = _setupSelectionDraft ?? CreateAutomaticRecommendationDraft(_setupState);
         _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(_setupState.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase)) ??
+            entry.ModelId.Equals(displayState.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase)) ??
             SetupAsrModelChoices.FirstOrDefault();
         _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
+            entry.ModelId.Equals(displayState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase)) ??
+            SetupReviewModelChoices.FirstOrDefault();
+        _selectedSettingsReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
             entry.ModelId.Equals(_setupState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase)) ??
             SetupReviewModelChoices.FirstOrDefault();
         _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
-            preset.PresetId.Equals(_setupState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
+            preset.PresetId.Equals(displayState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
 
         if (refreshSmokeChecks)
         {
@@ -830,6 +876,7 @@ public sealed partial class MainWindowViewModel
 
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
+        OnPropertyChanged(nameof(SelectedSettingsReviewModel));
         OnPropertyChanged(nameof(SelectedSetupModelPreset));
         OnPropertyChanged(nameof(AsrModel));
         OnPropertyChanged(nameof(ReviewModel));
@@ -896,6 +943,102 @@ public sealed partial class MainWindowViewModel
             runCommand.RaiseCanExecuteChanged();
         }
 
+        UpdateSetupDownloadCommandStates();
+    }
+
+    private SetupState CreateAutomaticRecommendationDraft(SetupState state)
+    {
+        if (state.IsCompleted ||
+            state.CurrentStep is not (SetupStep.Welcome or SetupStep.SetupMode) ||
+            !string.Equals(state.SelectedModelPresetId, "recommended", StringComparison.OrdinalIgnoreCase))
+        {
+            return state;
+        }
+
+        var presetId = _setupPresetRecommendation?.PresetId;
+        if (string.IsNullOrWhiteSpace(presetId) ||
+            presetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase) ||
+            !SetupModelPresetChoices.Any(preset => preset.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return state;
+        }
+
+        _setupSelectionDraft = CreateSetupPresetDraft(state, presetId);
+        return _setupSelectionDraft;
+    }
+
+    private SetupState CreateSetupPresetDraft(SetupState state, string presetId)
+    {
+        var preset = SetupModelPresetChoices.FirstOrDefault(candidate =>
+            candidate.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase));
+        if (preset is null)
+        {
+            throw new InvalidOperationException($"Model preset is not in the catalog: {presetId}");
+        }
+
+        if (!SetupAsrModelChoices.Any(entry => entry.ModelId.Equals(preset.AsrModelId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Preset references missing asr model: {preset.AsrModelId}");
+        }
+
+        if (!SetupReviewModelChoices.Any(entry => entry.ModelId.Equals(preset.ReviewModelId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Preset references missing review model: {preset.ReviewModelId}");
+        }
+
+        return state with
+        {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
+            SetupMode = preset.PresetId,
+            SelectedModelPresetId = preset.PresetId,
+            SelectedAsrModelId = preset.AsrModelId,
+            SelectedReviewModelId = preset.ReviewModelId,
+            StorageRoot = string.IsNullOrWhiteSpace(state.StorageRoot)
+                ? Paths.DefaultModelStorageRoot
+                : state.StorageRoot
+        };
+    }
+
+    private void CommitSetupSelectionDraft()
+    {
+        if (_setupSelectionDraft is null)
+        {
+            return;
+        }
+
+        _setupState = _setupWizardService.CommitSelectionDraft(_setupSelectionDraft);
+        _setupSelectionDraft = null;
+        if (!string.IsNullOrWhiteSpace(_setupState.SelectedAsrModelId))
+        {
+            SelectedAsrEngineId = _setupState.SelectedAsrModelId;
+        }
+
+        RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+    }
+
+    private void RefreshSetupSelectionPreview()
+    {
+        OnPropertyChanged(nameof(SelectedSetupAsrModel));
+        OnPropertyChanged(nameof(SelectedSetupReviewModel));
+        OnPropertyChanged(nameof(SelectedSettingsReviewModel));
+        OnPropertyChanged(nameof(SelectedSetupModelPreset));
+        OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
+        OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
+        OnPropertyChanged(nameof(SelectedSetupModelsReady));
+        OnPropertyChanged(nameof(SetupMode));
+        OnPropertyChanged(nameof(SetupStorageRoot));
+        OnPropertyChanged(nameof(SetupReviewRuntimeReady));
+        OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
+        OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
+        OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
+        OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
+        OnPropertyChanged(nameof(SetupNextActionText));
+        RefreshCudaReviewRuntimeSummary();
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
+        RefreshAsrCudaRuntimeSummary();
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeSummary));
+        RefreshSetupInstallPlanItems();
         UpdateSetupDownloadCommandStates();
     }
 
