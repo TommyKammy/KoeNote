@@ -470,13 +470,15 @@ public sealed partial class TranscriptSummaryService(
         string reason,
         IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
     {
-        var overviews = ExtractSectionBullets(chunkResults, "Overview", 4);
-        var keyPoints = ExtractSectionBullets(chunkResults, "Key points", 9);
-        var decisions = ExtractSectionBullets(chunkResults, "Decisions", 4);
-        var actions = ExtractSectionBullets(chunkResults, "Action items", 6);
-        var openQuestions = ExtractSectionBullets(chunkResults, "Open questions", 4);
-        var keywords = ExtractSectionBullets(chunkResults, "Keywords", 10);
+        var overviews = ExtractSectionBullets(chunkResults, ["Overview", "概要"], 4);
+        var keyPoints = ExtractSectionBullets(chunkResults, ["Key points", "主な内容"], 9);
+        var decisions = ExtractSectionBullets(chunkResults, ["Decisions", "決定事項"], 4);
+        var actions = ExtractSectionBullets(chunkResults, ["Action items", "アクション項目"], 6);
+        var openQuestions = ExtractSectionBullets(chunkResults, ["Open questions", "未解決の質問"], 4);
         var segmentFallbackBullets = BuildSegmentFallbackBullets(segments, 8);
+        var keywords = NormalizeKeywordBullets(
+            ExtractSectionBullets(chunkResults, ["Keywords", "キーワード"], 10),
+            overviews.Concat(keyPoints).Concat(segmentFallbackBullets));
         var fallbackActions = actions.Length > 0
             ? actions
             : BuildFallbackActionItems(keyPoints, segmentFallbackBullets);
@@ -579,15 +581,40 @@ public sealed partial class TranscriptSummaryService(
         IReadOnlyList<string> keyPoints,
         IReadOnlyList<string> segmentFallbackBullets)
     {
+        var sourceSentences = overviews
+            .Concat(keyPoints)
+            .Concat(segmentFallbackBullets)
+            .Select(static sentence => NormalizeKeywordComparisonKey(sentence))
+            .Where(static sentence => sentence.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+
         return overviews
             .Concat(keyPoints)
             .Concat(segmentFallbackBullets)
             .SelectMany(SplitKeywordCandidates)
-            .Select(static keyword => keyword.Trim())
-            .Where(static keyword => keyword.Length >= 2)
+            .Select(NormalizeKeywordCandidate)
+            .Where(keyword => IsUsefulKeyword(keyword, sourceSentences))
             .Distinct(StringComparer.Ordinal)
             .Take(10)
             .DefaultIfEmpty("summary")
+            .ToArray();
+    }
+
+    private static string[] NormalizeKeywordBullets(
+        IReadOnlyList<string> keywordBullets,
+        IEnumerable<string> sourceSentences)
+    {
+        var sourceSentenceKeys = sourceSentences
+            .Select(static sentence => NormalizeKeywordComparisonKey(sentence))
+            .Where(static sentence => sentence.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return keywordBullets
+            .SelectMany(SplitKeywords)
+            .Select(static keyword => StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ','))
+            .Where(keyword => IsUsefulKeyword(keyword, sourceSentenceKeys))
+            .Distinct(StringComparer.Ordinal)
+            .Take(10)
             .ToArray();
     }
 
@@ -633,7 +660,7 @@ public sealed partial class TranscriptSummaryService(
 
     private static string[] ExtractSectionBullets(
         IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
-        string sectionName,
+        IReadOnlyCollection<string> sectionNames,
         int limit)
     {
         var bullets = new List<string>();
@@ -645,7 +672,8 @@ public sealed partial class TranscriptSummaryService(
                 var line = rawLine.Trim();
                 if (line.StartsWith("## ", StringComparison.Ordinal))
                 {
-                    inSection = line[3..].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase);
+                    var heading = line[3..].Trim();
+                    inSection = sectionNames.Any(sectionName => heading.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
                     continue;
                 }
 
@@ -698,7 +726,7 @@ public sealed partial class TranscriptSummaryService(
                 continue;
             }
 
-            if (currentSection.Equals("Keywords", StringComparison.OrdinalIgnoreCase))
+            if (IsKeywordSection(currentSection))
             {
                 AppendKeywordLines(normalizedLines, trimmed);
                 continue;
@@ -729,6 +757,12 @@ public sealed partial class TranscriptSummaryService(
         return section.Equals("Decisions", StringComparison.OrdinalIgnoreCase) ||
             section.Equals("Action items", StringComparison.OrdinalIgnoreCase) ||
             section.Equals("Open questions", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsKeywordSection(string section)
+    {
+        return section.Equals("Keywords", StringComparison.OrdinalIgnoreCase) ||
+            section.Equals("キーワード", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsUnspecifiedLine(string line)
@@ -770,7 +804,75 @@ public sealed partial class TranscriptSummaryService(
             .Replace(":", " ", StringComparison.Ordinal)
             .Replace("\uFF1A", " ", StringComparison.Ordinal)
             .Split([' ', '\t', ',', '.', '\u3001', '\u3002', '\u30fb', '/', '\u3000'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .SelectMany(SplitJapaneseKeywordToken)
             .Where(static token => !token.Equals("Unspecified", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> SplitJapaneseKeywordToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            yield break;
+        }
+
+        yield return token;
+
+        foreach (var part in JapaneseKeywordParticleRegex()
+            .Split(token)
+            .Select(NormalizeKeywordCandidate)
+            .Where(static part => part.Length >= 2))
+        {
+            yield return part;
+        }
+    }
+
+    private static string NormalizeKeywordCandidate(string keyword)
+    {
+        var normalized = StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ',');
+        foreach (var prefix in new[] { "この", "その", "あの" })
+        {
+            if (normalized.StartsWith(prefix, StringComparison.Ordinal) && normalized.Length > prefix.Length + 1)
+            {
+                normalized = normalized[prefix.Length..];
+                break;
+            }
+        }
+
+        return normalized;
+    }
+
+    private static bool IsUsefulKeyword(string keyword, IReadOnlySet<string> sourceSentenceKeys)
+    {
+        var normalized = NormalizeKeywordCandidate(keyword);
+        if (normalized.Length < 2)
+        {
+            return false;
+        }
+
+        if (sourceSentenceKeys.Contains(NormalizeKeywordComparisonKey(normalized)))
+        {
+            return false;
+        }
+
+        return normalized.Length <= 28 &&
+            CountJapaneseParticles(normalized) <= 1 &&
+            !normalized.Contains("です", StringComparison.Ordinal) &&
+            !normalized.Contains("ます", StringComparison.Ordinal);
+    }
+
+    private static string NormalizeKeywordComparisonKey(string text)
+    {
+        return StripSourceReferences(text)
+            .Trim()
+            .TrimStart('-', '*')
+            .Trim()
+            .TrimEnd('\u3002', '.', ',');
+    }
+
+    private static int CountJapaneseParticles(string text)
+    {
+        string[] particles = ["は", "が", "を", "に", "で", "と", "も", "へ", "から", "まで", "より"];
+        return particles.Count(particle => text.Contains(particle, StringComparison.Ordinal));
     }
 
     private static string StripSourceReferences(string text)
@@ -785,6 +887,9 @@ public sealed partial class TranscriptSummaryService(
 
     [GeneratedRegex(@"\*\*([^*]+)\*\*", RegexOptions.CultureInvariant)]
     private static partial Regex BoldMarkdownRegex();
+
+    [GeneratedRegex("(?:には|では|から|まで|より|という|って|は|が|を|に|で|と|も|へ|の)", RegexOptions.CultureInvariant)]
+    private static partial Regex JapaneseKeywordParticleRegex();
 
     private static string BuildFallbackChunkSummary(TranscriptSummaryChunk chunk)
     {

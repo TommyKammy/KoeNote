@@ -1,3 +1,4 @@
+using System.Text;
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
@@ -393,6 +394,83 @@ public sealed class TranscriptSummaryServiceTests
     }
 
     [Fact]
+    public async Task SummarizeAsync_StructuredFallbackUsesJapaneseKeywordSectionWithoutRepeatingKeyPoints()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "コロナでスポーツの練習量が変わった", "コロナでスポーツの練習量が変わった"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_0", "成長期の学生には休息が重要だった", "成長期の学生には休息が重要だった")
+        ]);
+        var repeatedKeyPoint = "コロナでこのスポーツのだいぶ変わったと思うんですけど";
+        var runtime = new FakeSummaryRuntime(
+            finalSummary: "   ",
+            chunkSummary: $$"""
+                ## 概要
+
+                - {{repeatedKeyPoint}}
+
+                ## 主な内容
+
+                - {{repeatedKeyPoint}}
+                - 練習量が少なくなったということですね
+
+                ## キーワード
+
+                - コロナ、スポーツ、練習量、成長期、学生
+                """);
+        var service = new TranscriptSummaryService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            runtime);
+
+        var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
+
+        Assert.Contains("## Keywords", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- コロナ", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- スポーツ", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- 練習量", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- 成長期", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- 学生", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("- " + repeatedKeyPoint, GetSection(result.Content, "Keywords"), StringComparison.Ordinal);
+        Assert.DoesNotContain("- 練習量が少なくなったということですね", GetSection(result.Content, "Keywords"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SummarizeAsync_StructuredFallbackBuildsShortKeywordsWhenKeywordSectionIsMissing()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "コロナでスポーツの練習量が変わった", "コロナでスポーツの練習量が変わった"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_0", "成長期の学生には休息が重要だった", "成長期の学生には休息が重要だった")
+        ]);
+        var sentenceKeyword = "コロナでこのスポーツのだいぶ変わったと思うんですけど";
+        var runtime = new FakeSummaryRuntime(
+            finalSummary: "   ",
+            chunkSummary: $$"""
+                ## Overview
+
+                - {{sentenceKeyword}}
+
+                ## Key points
+
+                - {{sentenceKeyword}}
+                - 練習量が少なくなったということですね
+                """);
+        var service = new TranscriptSummaryService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            runtime);
+
+        var result = await service.SummarizeAsync(CreateOptions("job-001", chunkSegmentCount: 1));
+
+        Assert.Contains("## Keywords", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- コロナ", result.Content, StringComparison.Ordinal);
+        Assert.Contains("- スポーツ", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("- " + sentenceKeyword, GetSection(result.Content, "Keywords"), StringComparison.Ordinal);
+        Assert.DoesNotContain("- 練習量が少なくなったということですね", GetSection(result.Content, "Keywords"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SummarizeAsync_RejectsMissingSegments()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
@@ -587,6 +665,28 @@ public sealed class TranscriptSummaryServiceTests
     private static void SaveSegments(AppPaths paths, IReadOnlyList<TranscriptSegment> segments)
     {
         new TranscriptSegmentRepository(paths).SaveSegments(segments);
+    }
+
+    private static string GetSection(string content, string sectionName)
+    {
+        var builder = new StringBuilder();
+        var inSection = false;
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.Trim().StartsWith("## ", StringComparison.Ordinal))
+            {
+                inSection = line.Trim()[3..].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase);
+                continue;
+            }
+
+            if (inSection)
+            {
+                builder.AppendLine(line);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private sealed class FakeSummaryRuntime(
