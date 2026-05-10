@@ -4,7 +4,8 @@ param(
     [switch]$IncludeLegacyRuntimeTools,
     [switch]$IncludeTernaryReviewRuntime,
     [switch]$RequireBundledPythonRuntime,
-    [switch]$RequireReviewRuntime
+    [switch]$RequireReviewRuntime,
+    [switch]$RequireGpuReadyRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +28,30 @@ function Get-PayloadRelativePath {
     $rootUri = [Uri]$rootFull
     $pathUri = [Uri]([IO.Path]::GetFullPath($Path))
     return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('/', '\')
+}
+
+function Test-AnyFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [Parameter(Mandatory = $true)][string]$Pattern
+    )
+
+    return (Test-Path -LiteralPath $Directory -PathType Container) -and
+        $null -ne (Get-ChildItem -LiteralPath $Directory -File -Filter $Pattern -ErrorAction SilentlyContinue | Select-Object -First 1)
+}
+
+function Assert-RequiredRuntimeFiles {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [Parameter(Mandatory = $true)][string[]]$Patterns,
+        [Parameter(Mandatory = $true)][string]$RuntimeName
+    )
+
+    foreach ($pattern in $Patterns) {
+        if (-not (Test-AnyFile -Directory $Directory -Pattern $pattern)) {
+            throw "Missing $RuntimeName GPU-ready runtime file matching '$pattern' in $Directory."
+        }
+    }
 }
 
 function Copy-FilteredDirectory {
@@ -127,14 +152,17 @@ $reviewRuntimeSource = Join-Path $toolsSource "review"
 $reviewRuntimeDestination = Join-Path $publishDir "tools\review"
 if (Test-Path -LiteralPath $reviewRuntimeSource -PathType Container) {
     $reviewRuntimeExcludes = @(
-        "ggml-cuda*.dll",
-        "cublas*.dll",
-        "cudart*.dll",
-        "cufft*.dll",
-        "curand*.dll",
-        "cusparse*.dll"
+        "*cublas*.dll",
+        "*cudart*.dll",
+        "*cudnn*.dll",
+        "*cufft*.dll",
+        "*curand*.dll",
+        "*cusparse*.dll"
     )
     Copy-FilteredDirectory -SourceDir $reviewRuntimeSource -DestinationDir $reviewRuntimeDestination -ExcludePatterns $reviewRuntimeExcludes
+    if ($RequireGpuReadyRuntime) {
+        Assert-RequiredRuntimeFiles -Directory $reviewRuntimeDestination -Patterns @("llama-completion.exe", "ggml-cuda*.dll") -RuntimeName "review"
+    }
 }
 elseif ($RequireReviewRuntime) {
     throw "Missing review runtime: $reviewRuntimeSource. Place llama.cpp CPU x64 runtime files there before publishing with -RequireReviewRuntime."
@@ -155,11 +183,24 @@ ASR uses the bundled Python runtime and installs faster-whisper into a managed e
 For local developer smoke tests, rerun Publish-KoeNote.ps1 with -IncludeLegacyRuntimeTools to copy the current tools/asr folder.
 "@
 
-if ($IncludeLegacyRuntimeTools -and (Test-Path -LiteralPath $toolsSource)) {
-    $asrTools = Join-Path $toolsSource "asr"
-    if (Test-Path -LiteralPath $asrTools) {
-        Copy-Item -LiteralPath $asrTools -Destination (Join-Path $publishDir "tools\asr") -Recurse -Force
+$asrRuntimeSource = Join-Path $toolsSource "asr"
+$asrRuntimeDestination = Join-Path $publishDir "tools\asr"
+if (($IncludeLegacyRuntimeTools -or $RequireGpuReadyRuntime) -and (Test-Path -LiteralPath $asrRuntimeSource -PathType Container)) {
+    $asrRuntimeExcludes = @(
+        "*cublas*.dll",
+        "*cudart*.dll",
+        "*cudnn*.dll",
+        "*cufft*.dll",
+        "*curand*.dll",
+        "*cusparse*.dll"
+    )
+    Copy-FilteredDirectory -SourceDir $asrRuntimeSource -DestinationDir $asrRuntimeDestination -ExcludePatterns $asrRuntimeExcludes
+    if ($RequireGpuReadyRuntime) {
+        Assert-RequiredRuntimeFiles -Directory $asrRuntimeDestination -Patterns @("crispasr*.exe", "crispasr*.dll", "whisper.dll", "ggml-cuda.dll") -RuntimeName "ASR"
     }
+}
+elseif ($RequireGpuReadyRuntime) {
+    throw "Missing ASR GPU-ready runtime: $asrRuntimeSource. Place KoeNote ASR GPU runtime files there before publishing with -RequireGpuReadyRuntime."
 }
 elseif (-not (Test-Path -LiteralPath $reviewRuntimeDestination -PathType Container)) {
     Set-Content -LiteralPath (Join-Path $publishDir "tools\README-runtime-tools-not-included.txt") -Value $legacyRuntimeReadme -Encoding UTF8

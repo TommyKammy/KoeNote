@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PayloadDir,
-    [int]$MaxReviewRuntimeMB = 120,
+    [int]$MaxReviewRuntimeMB = 700,
+    [int]$MaxAsrRuntimeMB = 180,
     [int]$MaxBundledPythonMB = 120
 )
 
@@ -50,23 +51,28 @@ function Get-RelativePath {
 
 $failures = New-Object System.Collections.Generic.List[string]
 $reviewRuntimeDir = Join-Path $payloadRoot "tools\review"
+$asrRuntimeDir = Join-Path $payloadRoot "tools\asr"
 $bundledPythonDir = Join-Path $payloadRoot "tools\python"
 
-$cudaRuntimePatterns = @(
-    "ggml-cuda*.dll",
+$nvidiaRedistributablePatterns = @(
     "cublas*.dll",
     "cudart*.dll",
+    "cudnn*.dll",
     "cufft*.dll",
     "curand*.dll",
     "cusparse*.dll"
 )
 
-if (Test-Path -LiteralPath $reviewRuntimeDir -PathType Container) {
-    foreach ($pattern in $cudaRuntimePatterns) {
-        $matches = Get-ChildItem -LiteralPath $reviewRuntimeDir -Recurse -File -Filter $pattern
+foreach ($runtimeDir in @($reviewRuntimeDir, $asrRuntimeDir)) {
+    if (-not (Test-Path -LiteralPath $runtimeDir -PathType Container)) {
+        continue
+    }
+
+    foreach ($pattern in $nvidiaRedistributablePatterns) {
+        $matches = Get-ChildItem -LiteralPath $runtimeDir -Recurse -File -Filter $pattern
         foreach ($match in $matches) {
             $relative = Get-RelativePath -Root $payloadRoot -Path $match.FullName
-            $failures.Add("CUDA review runtime file is not allowed in the normal MSI payload: $relative ($(Format-Size $match.Length))")
+            $failures.Add("NVIDIA redistributable runtime file is not allowed in the GPU-ready MSI payload: $relative ($(Format-Size $match.Length))")
         }
     }
 }
@@ -101,22 +107,28 @@ if (Test-Path -LiteralPath $sitePackagesDir -PathType Container) {
         foreach ($packageMatch in $packageMatches) {
             $packagePath = Join-Path $sitePackagesDir $packageMatch
             $relative = Get-RelativePath -Root $payloadRoot -Path $packagePath
-            $failures.Add("Forbidden Python package is not allowed in the normal MSI payload: $relative")
+            $failures.Add("Forbidden Python package is not allowed in the GPU-ready MSI payload: $relative")
         }
     }
 }
 
 $reviewRuntimeBytes = Get-DirectorySizeBytes -Path $reviewRuntimeDir
+$asrRuntimeBytes = Get-DirectorySizeBytes -Path $asrRuntimeDir
 $bundledPythonBytes = Get-DirectorySizeBytes -Path $bundledPythonDir
 $maxReviewRuntimeBytes = [int64]$MaxReviewRuntimeMB * 1MB
+$maxAsrRuntimeBytes = [int64]$MaxAsrRuntimeMB * 1MB
 $maxBundledPythonBytes = [int64]$MaxBundledPythonMB * 1MB
 
 if ($reviewRuntimeBytes -gt $maxReviewRuntimeBytes) {
-    $failures.Add("Review runtime payload is too large for the normal MSI: $(Format-Size $reviewRuntimeBytes), limit $(Format-Size $maxReviewRuntimeBytes).")
+    $failures.Add("Review runtime payload is too large for the GPU-ready MSI: $(Format-Size $reviewRuntimeBytes), limit $(Format-Size $maxReviewRuntimeBytes).")
+}
+
+if ($asrRuntimeBytes -gt $maxAsrRuntimeBytes) {
+    $failures.Add("ASR runtime payload is too large for the GPU-ready MSI: $(Format-Size $asrRuntimeBytes), limit $(Format-Size $maxAsrRuntimeBytes).")
 }
 
 if ($bundledPythonBytes -gt $maxBundledPythonBytes) {
-    $failures.Add("Bundled Python payload is too large for the normal MSI: $(Format-Size $bundledPythonBytes), limit $(Format-Size $maxBundledPythonBytes).")
+    $failures.Add("Bundled Python payload is too large for the GPU-ready MSI: $(Format-Size $bundledPythonBytes), limit $(Format-Size $maxBundledPythonBytes).")
 }
 
 if ($failures.Count -gt 0) {
@@ -128,6 +140,8 @@ if ($failures.Count -gt 0) {
     PayloadDir = $payloadRoot
     ReviewRuntimeMB = [math]::Round($reviewRuntimeBytes / 1MB, 2)
     MaxReviewRuntimeMB = $MaxReviewRuntimeMB
+    AsrRuntimeMB = [math]::Round($asrRuntimeBytes / 1MB, 2)
+    MaxAsrRuntimeMB = $MaxAsrRuntimeMB
     BundledPythonMB = [math]::Round($bundledPythonBytes / 1MB, 2)
     MaxBundledPythonMB = $MaxBundledPythonMB
 }

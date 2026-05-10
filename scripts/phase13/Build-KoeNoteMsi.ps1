@@ -147,10 +147,11 @@ Write-UpdateLog "release_build_started" @{
     require_code_signing = [bool]$RequireCodeSigning
     require_bundled_python_runtime = $true
     require_review_runtime = $true
+    require_gpu_ready_runtime = $true
     log_path = $updateLogPath
 }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier -RequireBundledPythonRuntime -RequireReviewRuntime
+& powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -RuntimeIdentifier $RuntimeIdentifier -RequireBundledPythonRuntime -RequireReviewRuntime -RequireGpuReadyRuntime
 if ($LASTEXITCODE -ne 0) {
     throw "Publish-KoeNote.ps1 failed with exit code $LASTEXITCODE."
 }
@@ -167,6 +168,26 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
     throw "Review runtime is required for release MSI builds but was not published: $reviewRuntimePath"
 }
 Write-UpdateLog "review_runtime_verified" @{ path = $reviewRuntimePath }
+
+$reviewGpuBridgePath = Join-Path $publishDir "tools\review\ggml-cuda.dll"
+if (-not (Test-Path -LiteralPath $reviewGpuBridgePath -PathType Leaf)) {
+    throw "Review GPU bridge is required for GPU-ready release MSI builds but was not published: $reviewGpuBridgePath"
+}
+Write-UpdateLog "review_gpu_bridge_verified" @{ path = $reviewGpuBridgePath }
+
+$asrRuntimePath = Join-Path $publishDir "tools\asr\crispasr.exe"
+$asrGpuBridgePath = Join-Path $publishDir "tools\asr\ggml-cuda.dll"
+foreach ($requiredAsrRuntimePath in @(
+    $asrRuntimePath,
+    (Join-Path $publishDir "tools\asr\crispasr.dll"),
+    (Join-Path $publishDir "tools\asr\whisper.dll"),
+    $asrGpuBridgePath
+)) {
+    if (-not (Test-Path -LiteralPath $requiredAsrRuntimePath -PathType Leaf)) {
+        throw "ASR GPU-ready runtime is required for release MSI builds but was not published: $requiredAsrRuntimePath"
+    }
+}
+Write-UpdateLog "asr_gpu_runtime_verified" @{ path = $asrRuntimePath; gpu_bridge_path = $asrGpuBridgePath }
 
 $ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
 $ternaryReviewRuntimePresent = Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf
@@ -194,6 +215,8 @@ $payloadGuardResult = & $payloadGuardScript -PayloadDir $publishDir
 Write-UpdateLog "release_payload_guard_verified" @{
     review_runtime_mb = $payloadGuardResult.ReviewRuntimeMB
     max_review_runtime_mb = $payloadGuardResult.MaxReviewRuntimeMB
+    asr_runtime_mb = $payloadGuardResult.AsrRuntimeMB
+    max_asr_runtime_mb = $payloadGuardResult.MaxAsrRuntimeMB
     bundled_python_mb = $payloadGuardResult.BundledPythonMB
     max_bundled_python_mb = $payloadGuardResult.MaxBundledPythonMB
 }
@@ -273,6 +296,15 @@ $manifest = [ordered]@{
     review_runtime = [ordered]@{
         required = $true
         path = $reviewRuntimePath
+    }
+    gpu_ready_runtime = [ordered]@{
+        required = $true
+        nvidia_redistributables_included = $false
+        review_gpu_bridge_path = $reviewGpuBridgePath
+        asr_runtime_path = $asrRuntimePath
+        asr_gpu_bridge_path = $asrGpuBridgePath
+        cuda_redist_manifest_url = "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.0.json"
+        cudnn_redist_manifest_url = "https://developer.download.nvidia.com/compute/cudnn/redist/redistrib_9.22.0.json"
     }
     ternary_review_runtime = [ordered]@{
         required = $false

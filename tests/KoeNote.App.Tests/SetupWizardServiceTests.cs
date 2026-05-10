@@ -563,9 +563,9 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_CompletesAfterVerifiedModelsAndSmokePass()
+    public void SetupWizard_CompleteIfReady_RequiresGpuRuntimesWhenNvidiaGpuIsDetected()
     {
-        var paths = CreatePaths();
+        var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
@@ -576,7 +576,56 @@ public sealed class SetupWizardServiceTests
         var installedModels = new InstalledModelRepository(paths);
         UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
         UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
-        var wizard = CreateWizard(paths);
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 24,
+            nvidiaGpuDetected: true));
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = wizard.RunSmokeCheck();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
+        Assert.Contains(smoke.Checks, check => check.Name == "ASR CUDA runtime" && !check.IsOk);
+        Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && !check.IsOk);
+    }
+
+    [Fact]
+    public void SetupWizard_CompletesAfterVerifiedModelsSmokeAndGpuRuntimesPass()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(paths.CudaReviewRuntimeMarkerPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 24,
+            nvidiaGpuDetected: true));
         wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
         wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
         wizard.AcceptLicenses();
@@ -627,7 +676,7 @@ public sealed class SetupWizardServiceTests
     [Fact]
     public void SetupWizard_CompleteIfReady_RechecksCurrentModelFiles()
     {
-        var paths = CreatePaths();
+        var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
@@ -793,7 +842,10 @@ public sealed class SetupWizardServiceTests
         var cudaService = new CudaReviewRuntimeService(
             paths,
             new HttpClient(new ArchiveHandler(archive)),
-            new CudaReviewRuntimeOptions("https://example.test/cuda-review-runtime.zip", null));
+            new CudaReviewRuntimeOptions(
+                "https://example.test/redist.json",
+                "https://example.test/redist/",
+                LegacyRuntimeUrl: "https://example.test/cuda-review-runtime.zip"));
         var wizard = CreateWizard(paths, cudaReviewRuntimeService: cudaService);
 
         var result = await wizard.InstallCudaReviewRuntimeAsync();
@@ -830,7 +882,7 @@ public sealed class SetupWizardServiceTests
                 installService),
             new FasterWhisperRuntimeService(paths, new ExternalProcessRunner()),
             new DiarizationRuntimeService(paths, new ExternalProcessRunner()),
-            hostResourceProbe,
+            hostResourceProbe ?? new FixedHostResourceProbe(null, null, nvidiaGpuDetected: false),
             cudaReviewRuntimeService: cudaReviewRuntimeService);
     }
 
@@ -928,6 +980,9 @@ public sealed class SetupWizardServiceTests
             AddArchiveEntry(archive, "bin/cublasLt64_12.dll", "cublasLt");
             AddArchiveEntry(archive, "bin/cudart64_12.dll", "cudart");
             AddArchiveEntry(archive, "bin/cudnn64_9.dll", "cudnn");
+            AddArchiveEntry(archive, "bin/crispasr.exe", "crisp exe");
+            AddArchiveEntry(archive, "bin/crispasr.dll", "crisp dll");
+            AddArchiveEntry(archive, "bin/whisper.dll", "whisper");
         }
 
         return stream.ToArray();

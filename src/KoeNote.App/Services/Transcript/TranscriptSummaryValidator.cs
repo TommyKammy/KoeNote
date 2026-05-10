@@ -44,6 +44,11 @@ public static class TranscriptSummaryValidator
             return new TranscriptSummaryValidationResult(false, "Transcript summary output repeated the same Markdown section heading.");
         }
 
+        if (RequiresKeywordsSection(validationMode) && !HasNonEmptyMarkdownSection(normalized, "Keywords"))
+        {
+            return new TranscriptSummaryValidationResult(false, "Transcript summary output did not contain a non-empty Keywords section.");
+        }
+
         if (HasIncompleteTrailingBullet(normalized))
         {
             return new TranscriptSummaryValidationResult(false, "Transcript summary output ended with an incomplete bullet.");
@@ -86,6 +91,32 @@ public static class TranscriptSummaryValidator
             .Select(static line => line[3..].Trim().ToUpperInvariant())
             .GroupBy(static heading => heading, StringComparer.Ordinal)
             .Any(static group => group.Count() > 1);
+    }
+
+    private static bool RequiresKeywordsSection(string validationMode)
+    {
+        return string.Equals(validationMode, "markdown_summary_sections", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasNonEmptyMarkdownSection(string content, string sectionName)
+    {
+        var inSection = false;
+        foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                inSection = line[3..].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase);
+                continue;
+            }
+
+            if (inSection && line.Length > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasIncompleteTrailingBullet(string content)

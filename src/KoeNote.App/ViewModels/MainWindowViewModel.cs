@@ -120,6 +120,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _summaryStatus = "要約はまだありません。";
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
+    private string _modelDownloadProgressStageText = string.Empty;
     private string _modelDownloadNotification = string.Empty;
     private bool _isModelDownloadNotificationError;
     private string _setupDiarizationRuntimeSummary = "話者識別runtimeは未導入です。必要になったらここから追加導入できます。";
@@ -1053,6 +1054,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
+    public bool SetupReviewRuntimeReady => SelectedSetupReviewModelRequiresTernaryRuntime() ||
+        File.Exists(Paths.LlamaCompletionPath);
+
     public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 
     public bool SetupAsrCudaRuntimeReady => AsrCudaRuntimeLayout.HasPackage(Paths);
@@ -1074,7 +1078,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
         SetupFasterWhisperRuntimeReady &&
+        SetupReviewRuntimeReady &&
         (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
+        (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady) &&
         SetupDiarizationRuntimeReady &&
         SetupTernaryReviewRuntimeReady;
 
@@ -1150,9 +1156,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 missing.Add("ASR runtime");
             }
 
+            if (!SetupReviewRuntimeReady)
+            {
+                missing.Add("Review runtime");
+            }
+
             if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
             {
                 missing.Add("ASR GPU runtime");
+            }
+
+            if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
+            {
+                missing.Add("Review GPU runtime");
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -1238,6 +1254,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         private set => SetField(ref _modelDownloadProgressSummary, value);
     }
 
+    public string ModelDownloadProgressStageText
+    {
+        get => _modelDownloadProgressStageText;
+        private set
+        {
+            if (SetField(ref _modelDownloadProgressStageText, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(ModelDownloadProgressText));
+            }
+        }
+    }
+
     public double ModelDownloadProgressPercent
     {
         get => _modelDownloadProgressPercent;
@@ -1292,7 +1320,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ModelDownloadProgressText => IsModelDownloadProgressIndeterminate
+    public string ModelDownloadProgressText => !string.IsNullOrWhiteSpace(ModelDownloadProgressStageText)
+        ? ModelDownloadProgressStageText
+        : IsModelDownloadProgressIndeterminate
         ? "確認中"
         : $"{ModelDownloadProgressPercent:0}%";
 

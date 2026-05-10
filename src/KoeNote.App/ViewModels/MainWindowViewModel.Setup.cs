@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
@@ -265,6 +266,7 @@ public sealed partial class MainWindowViewModel
             {
                 SetSetupInstallStatus("ASR runtime", "導入中", "文字起こしに必要な実行環境");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
+                ModelDownloadProgressStageText = "確認中";
                 IsModelDownloadProgressIndeterminate = true;
                 var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync(cancellation.Token);
                 if (!preflight.IsReady)
@@ -277,6 +279,7 @@ public sealed partial class MainWindowViewModel
                 }
 
                 ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
+                ModelDownloadProgressStageText = "インストール中";
                 var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(cancellation.Token);
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
@@ -296,12 +299,26 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("ASR runtime", "スキップ", "導入済みです");
             }
 
+            if (!SetupReviewRuntimeReady)
+            {
+                const string message = "CPU版Review runtimeが見つかりません。tools\\review\\llama-completion.exe を含むKoeNote Core runtimeを配置してから、もう一度セットアップを実行してください。";
+                SetSetupInstallStatus("Review runtime", "失敗", message);
+                CompleteModelDownloadProgress(displayName, succeeded: false, message);
+                LatestLog = message;
+                return;
+            }
+
+            SetSetupInstallStatus("Review runtime", "確認済み", Paths.LlamaCompletionPath);
+
             if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
             {
                 SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA ASR runtime for selected ASR model...";
+                ModelDownloadProgressSummary = $"Installing {displayName}: preparing NVIDIA CUDA/cuDNN runtime for selected ASR model...";
+                ModelDownloadProgressStageText = "確認中";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallAsrCudaRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallAsrCudaRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress());
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -326,6 +343,7 @@ public sealed partial class MainWindowViewModel
             {
                 SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための追加runtime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
+                ModelDownloadProgressStageText = "確認中";
                 IsModelDownloadProgressIndeterminate = true;
                 var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync(cancellation.Token);
                 if (!preflight.IsReady)
@@ -339,6 +357,7 @@ public sealed partial class MainWindowViewModel
                 else
                 {
                     ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
+                    ModelDownloadProgressStageText = "インストール中";
                     var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(cancellation.Token);
                     RefreshSetupWizard();
                     if (!runtimeResult.IsSucceeded)
@@ -365,9 +384,12 @@ public sealed partial class MainWindowViewModel
             if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
             {
                 SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: downloading CUDA review runtime for detected NVIDIA GPU...";
+                ModelDownloadProgressSummary = $"Installing {displayName}: preparing NVIDIA CUDA runtime for detected NVIDIA GPU...";
+                ModelDownloadProgressStageText = "確認中";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress());
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -393,6 +415,7 @@ public sealed partial class MainWindowViewModel
             {
                 SetSetupInstallStatus("Ternary review runtime", "導入中", "選択した整文モデルに必要なruntime");
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
+                ModelDownloadProgressStageText = "ダウンロード中";
                 IsModelDownloadProgressIndeterminate = true;
                 var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(cancellation.Token);
                 RefreshSetupWizard();
@@ -485,6 +508,7 @@ public sealed partial class MainWindowViewModel
         BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための追加runtime");
         ModelDownloadProgressSummary = "Checking bundled Python and pip for diarize runtime...";
+        ModelDownloadProgressStageText = "確認中";
         IsModelDownloadProgressIndeterminate = true;
 
         try
@@ -502,6 +526,7 @@ public sealed partial class MainWindowViewModel
             }
 
             ModelDownloadProgressSummary = "Installing diarize runtime with bundled Python...";
+            ModelDownloadProgressStageText = "インストール中";
             var result = await _setupWizardService.InstallDiarizationRuntimeAsync();
             RefreshSetupWizard();
             var message = result.IsSucceeded
@@ -532,12 +557,13 @@ public sealed partial class MainWindowViewModel
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
-        ModelDownloadProgressSummary = "Installing CUDA review runtime for LLM acceleration...";
+        ModelDownloadProgressSummary = "Installing CUDA review runtime: preparing NVIDIA CUDA redist...";
+        ModelDownloadProgressStageText = "確認中";
         IsModelDownloadProgressIndeterminate = true;
 
         try
         {
-            var result = await _setupWizardService.InstallCudaReviewRuntimeAsync();
+            var result = await _setupWizardService.InstallCudaReviewRuntimeAsync(progress: CreateRuntimeInstallProgress());
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"CUDA review runtime installed: {result.InstallPath}"
@@ -567,12 +593,13 @@ public sealed partial class MainWindowViewModel
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
-        ModelDownloadProgressSummary = "Installing CUDA ASR runtime for faster-whisper GPU execution...";
+        ModelDownloadProgressSummary = "Installing CUDA ASR runtime: preparing NVIDIA CUDA/cuDNN redist...";
+        ModelDownloadProgressStageText = "確認中";
         IsModelDownloadProgressIndeterminate = true;
 
         try
         {
-            var result = await _setupWizardService.InstallAsrCudaRuntimeAsync();
+            var result = await _setupWizardService.InstallAsrCudaRuntimeAsync(progress: CreateRuntimeInstallProgress());
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"CUDA ASR runtime installed: {result.InstallPath}"
@@ -595,6 +622,16 @@ public sealed partial class MainWindowViewModel
             CompleteModelDownloadProgress(displayName, succeeded: false, message);
             LatestLog = message;
         }
+    }
+
+    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress()
+    {
+        return new Progress<RuntimeInstallProgress>(progress =>
+        {
+            ModelDownloadProgressStageText = progress.StageText;
+            ModelDownloadProgressSummary = progress.Message;
+            LatestLog = progress.Message;
+        });
     }
 
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
@@ -671,6 +708,11 @@ public sealed partial class MainWindowViewModel
         }
 
         _setupState = _setupWizardService.LoadState();
+        if (result.IsSucceeded)
+        {
+            _setupState = _setupWizardService.CompleteIfReady();
+        }
+
         RefreshSetupWizard(refreshSmokeChecks: false);
         LatestLog = result.IsSucceeded
             ? $"最終確認に成功しました。Report: {result.ReportPath}"
@@ -795,6 +837,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
         OnPropertyChanged(nameof(SelectedSetupModelsReady));
         OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
+        OnPropertyChanged(nameof(SetupReviewRuntimeReady));
         OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
         OnPropertyChanged(nameof(SetupAsrCudaRuntimeRecommended));
         OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));
@@ -950,7 +993,7 @@ public sealed partial class MainWindowViewModel
         }
 
         SetupCudaReviewRuntimeSummary = SetupCudaReviewRuntimeRecommended
-            ? $"NVIDIA GPU detected. CUDA review runtime will be included in bundled setup when configured. CPU fallback remains available: {Paths.ReviewRuntimeDirectory}"
+            ? $"NVIDIA GPU detected. KoeNote GPU bridge is bundled; Setup Wizard will download NVIDIA CUDA redist DLLs if needed. CPU review fallback remains available: {Paths.ReviewRuntimeDirectory}"
             : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
     }
 
@@ -963,7 +1006,7 @@ public sealed partial class MainWindowViewModel
         }
 
         SetupAsrCudaRuntimeSummary = SetupAsrCudaRuntimeRecommended
-            ? $"NVIDIA GPU detected. The selected ASR model should use CUDA; install CUDA ASR runtime: {Paths.AsrRuntimeDirectory}"
+            ? $"NVIDIA GPU detected. KoeNote ASR GPU files are bundled; Setup Wizard will download NVIDIA CUDA/cuDNN redist DLLs if needed: {Paths.AsrRuntimeDirectory}"
             : "CUDA ASR runtime is optional for the selected ASR model.";
     }
 
@@ -983,6 +1026,10 @@ public sealed partial class MainWindowViewModel
                 "ASR runtime",
                 "文字起こしに必要な実行環境",
                 SetupFasterWhisperRuntimeReady ? "導入済み" : "導入します"),
+            new(
+                "Review runtime",
+                "整文と要約に必要なCPU版Review runtime",
+                SetupReviewRuntimeReady ? "導入済み" : "同梱runtimeが必要です"),
             new(
                 "話者識別",
                 "話者分離を使うための追加runtime",
@@ -1102,13 +1149,15 @@ public sealed partial class MainWindowViewModel
         return failureCategory switch
         {
             AsrCudaRuntimeService.FailureCategoryConfigurationMissing =>
-                $"CUDA ASR runtime source is not configured. Configure {AsrCudaRuntimeService.RuntimeUrlEnvironmentVariable}, then retry. Details: {message}",
+                $"CUDA ASR runtime source is not configured. Configure NVIDIA CUDA/cuDNN redist sources, then retry. Details: {message}",
+            AsrCudaRuntimeService.FailureCategoryBundledRuntimeMissing =>
+                $"CUDA ASR runtime needs the bundled KoeNote ASR GPU files first. CPU ASR remains available where supported. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryNetworkUnavailable =>
-                $"CUDA ASR runtime could not be downloaded. Check the network connection or proxy settings, then retry. Details: {message}",
+                $"CUDA ASR runtime could not download NVIDIA CUDA/cuDNN redist files. Check the network connection or proxy settings, then retry. CPU ASR fallback remains available where supported. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryHashMismatch =>
-                $"CUDA ASR runtime failed hash verification and was not installed. Details: {message}",
+                $"CUDA ASR runtime failed NVIDIA redist hash verification and was not installed. CPU ASR fallback remains available where supported. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryArchiveInvalid =>
-                $"CUDA ASR runtime archive was not usable. It must contain cuBLAS and cuDNN DLLs for faster-whisper/CTranslate2. Details: {message}",
+                $"CUDA ASR runtime archive was not usable. Setup Wizard needs NVIDIA CUDA/cuDNN DLLs for faster-whisper/CTranslate2. CPU ASR fallback remains available where supported. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryInstallFailed =>
                 $"CUDA ASR runtime could not be installed under tools\\asr. Details: {message}",
             _ => message
@@ -1128,10 +1177,12 @@ public sealed partial class MainWindowViewModel
                 $"CUDA review runtime source is not configured. KoeNote will continue with CPU review runtime. Details: {message}",
             CudaReviewRuntimeService.FailureCategoryCpuRuntimeMissing =>
                 $"CUDA review runtime needs the CPU review runtime first. KoeNote will continue without CUDA. Details: {message}",
+            CudaReviewRuntimeService.FailureCategoryBundledRuntimeMissing =>
+                $"CUDA review runtime needs the bundled KoeNote GPU bridge first. KoeNote will continue with CPU review runtime. Details: {message}",
             CudaReviewRuntimeService.FailureCategoryNetworkUnavailable =>
-                $"CUDA review runtime could not be downloaded. Check the network connection or proxy settings; CPU review runtime remains available. Details: {message}",
+                $"CUDA review runtime could not download NVIDIA CUDA redist files. Check the network connection or proxy settings, then retry; CPU review runtime remains available. Details: {message}",
             CudaReviewRuntimeService.FailureCategoryHashMismatch =>
-                $"CUDA review runtime failed hash verification and was not installed. CPU review runtime remains available. Details: {message}",
+                $"CUDA review runtime failed NVIDIA redist hash verification and was not installed. CPU review runtime remains available. Details: {message}",
             CudaReviewRuntimeService.FailureCategoryArchiveInvalid =>
                 $"CUDA review runtime archive was not usable. CPU review runtime remains available. Details: {message}",
             CudaReviewRuntimeService.FailureCategoryInstallFailed =>

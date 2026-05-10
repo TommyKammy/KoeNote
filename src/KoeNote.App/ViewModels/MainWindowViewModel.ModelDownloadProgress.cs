@@ -11,6 +11,7 @@ public sealed partial class MainWindowViewModel
         _modelDownloadNotificationTimer.Stop();
         IsModelDownloadInProgress = true;
         IsModelDownloadProgressIndeterminate = false;
+        ModelDownloadProgressStageText = string.Empty;
         ModelDownloadProgressPercent = 0;
         ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
         IsModelDownloadNotificationError = false;
@@ -22,11 +23,13 @@ public sealed partial class MainWindowViewModel
     {
         if (GetUsableDownloadTotal(progress) is { } totalBytes)
         {
+            ModelDownloadProgressStageText = string.Empty;
             IsModelDownloadProgressIndeterminate = false;
             ModelDownloadProgressPercent = progress.BytesDownloaded * 100d / totalBytes;
         }
         else
         {
+            ModelDownloadProgressStageText = "ダウンロード中";
             IsModelDownloadProgressIndeterminate = IsModelDownloadInProgress;
             ModelDownloadProgressPercent = 0;
         }
@@ -68,6 +71,7 @@ public sealed partial class MainWindowViewModel
     {
         IsModelDownloadInProgress = false;
         IsModelDownloadProgressIndeterminate = false;
+        ModelDownloadProgressStageText = string.Empty;
         if (succeeded)
         {
             ModelDownloadProgressPercent = 100;

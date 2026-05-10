@@ -44,9 +44,10 @@ public sealed class SetupWizardService
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
+        var resourceProbe = hostResourceProbe ?? new WindowsSetupHostResourceProbe();
         _presetRecommendationService = new SetupPresetRecommendationService(
             modelCatalogService,
-            hostResourceProbe ?? new WindowsSetupHostResourceProbe());
+            resourceProbe);
         _installService = new SetupModelInstallService(
             stateService,
             _selectionService,
@@ -59,7 +60,8 @@ public sealed class SetupWizardService
             stateService,
             toolStatusService,
             modelCatalogService,
-            installedModelRepository);
+            installedModelRepository,
+            resourceProbe);
     }
 
     public SetupState LoadState()
@@ -214,9 +216,11 @@ public sealed class SetupWizardService
         return _fasterWhisperRuntimeService.CheckAsync(cancellationToken);
     }
 
-    public Task<AsrCudaRuntimeInstallResult> InstallAsrCudaRuntimeAsync(CancellationToken cancellationToken = default)
+    public Task<AsrCudaRuntimeInstallResult> InstallAsrCudaRuntimeAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
-        return _asrCudaRuntimeService.InstallAsync(cancellationToken);
+        return _asrCudaRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
     public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
@@ -239,9 +243,11 @@ public sealed class SetupWizardService
         return _ternaryReviewRuntimeService.InstallAsync(cancellationToken);
     }
 
-    public Task<CudaReviewRuntimeInstallResult> InstallCudaReviewRuntimeAsync(CancellationToken cancellationToken = default)
+    public Task<CudaReviewRuntimeInstallResult> InstallCudaReviewRuntimeAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
-        return _cudaReviewRuntimeService.InstallAsync(cancellationToken);
+        return _cudaReviewRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

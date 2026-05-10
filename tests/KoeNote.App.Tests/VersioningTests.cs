@@ -115,10 +115,13 @@ public sealed class VersioningTests
         Assert.Contains("Bundled Python runtime is required", script);
         Assert.Contains("Release manifest is missing bundled_python_runtime metadata", script);
         Assert.Contains("bundled_python_runtime.required", script);
-        Assert.Contains("runtime-cuda-12.9-cudnn-9.22-v1", script);
-        Assert.Contains("koenote-cuda-asr-runtime.zip", script);
-        Assert.Contains("koenote-cuda-review-runtime.zip", script);
-        Assert.Contains("Required CUDA release asset is missing or unreachable", script);
+        Assert.Contains("gpu_ready_runtime", script);
+        Assert.Contains("nvidia_redistributables_included", script);
+        Assert.Contains("redistrib_12.9.0.json", script);
+        Assert.Contains("redistrib_9.22.0.json", script);
+        Assert.DoesNotContain("koenote-cuda-asr-runtime.zip", script);
+        Assert.DoesNotContain("koenote-cuda-review-runtime.zip", script);
+        Assert.DoesNotContain("Required CUDA release asset is missing or unreachable", script);
     }
 
     [Fact]
@@ -131,11 +134,18 @@ public sealed class VersioningTests
         var ternaryRuntimeService = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Services", "Review", "TernaryReviewRuntimeService.cs"));
 
         Assert.Contains("-RequireReviewRuntime", buildScript);
+        Assert.Contains("-RequireGpuReadyRuntime", buildScript);
         Assert.Contains("review_runtime_verified", buildScript);
+        Assert.Contains("review_gpu_bridge_verified", buildScript);
+        Assert.Contains("asr_gpu_runtime_verified", buildScript);
         Assert.Contains("review_runtime = [ordered]@", buildScript);
+        Assert.Contains("gpu_ready_runtime = [ordered]@", buildScript);
         Assert.Contains("Review runtime is required for release MSI builds", buildScript);
         Assert.Contains("Review runtime is required but missing from publish output", verificationScript);
+        Assert.Contains("Review GPU bridge is required but missing from publish output", verificationScript);
+        Assert.Contains("ASR GPU-ready runtime is required but missing from publish output", verificationScript);
         Assert.Contains("Release manifest is missing review_runtime metadata", verificationScript);
+        Assert.Contains("Release manifest is missing gpu_ready_runtime metadata", verificationScript);
         Assert.Contains("review_runtime.required", verificationScript);
         Assert.DoesNotContain("Ternary review runtime is required for release MSI builds", buildScript);
         Assert.Contains("ternary_review_runtime_skipped", buildScript);
@@ -153,20 +163,22 @@ public sealed class VersioningTests
         Assert.Contains("ternary_review_runtime.source_url", verificationScript);
         Assert.Contains("prism-b8846-d104cf1", ternaryRuntimeService);
         Assert.Contains("[switch]$RequireReviewRuntime", publishScript);
+        Assert.Contains("[switch]$RequireGpuReadyRuntime", publishScript);
         Assert.Contains("[switch]$IncludeTernaryReviewRuntime", publishScript);
     }
 
     [Fact]
-    public void ReleasePayloadGuard_BlocksGpuRuntimeAndHostPythonPackages()
+    public void ReleasePayloadGuard_BlocksNvidiaRedistributablesAndHostPythonPackages()
     {
         var repoRoot = FindRepoRoot();
         var guardScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleasePayloadGuard.ps1"));
         var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
         var verificationScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteReleaseVerification.ps1"));
 
-        Assert.Contains("ggml-cuda*.dll", guardScript);
         Assert.Contains("cublas*.dll", guardScript);
         Assert.Contains("cudart*.dll", guardScript);
+        Assert.Contains("cudnn*.dll", guardScript);
+        Assert.Contains("NVIDIA redistributable runtime file is not allowed", guardScript);
         Assert.Contains("\"artifact_tool_v2\"", guardScript);
         Assert.Contains("\"pandas\"", guardScript);
         Assert.Contains("\"numpy\"", guardScript);
@@ -176,7 +188,8 @@ public sealed class VersioningTests
         Assert.Contains("\"pdf2image\"", guardScript);
         Assert.Contains("\"pypdf\"", guardScript);
         Assert.Contains("\"reportlab\"", guardScript);
-        Assert.Contains("MaxReviewRuntimeMB = 120", guardScript);
+        Assert.Contains("MaxReviewRuntimeMB = 700", guardScript);
+        Assert.Contains("MaxAsrRuntimeMB = 180", guardScript);
         Assert.Contains("MaxBundledPythonMB = 120", guardScript);
         Assert.Contains("Release payload guard failed", guardScript);
         Assert.Contains("release_payload_guard_verified", buildScript);
@@ -193,6 +206,7 @@ public sealed class VersioningTests
 
         Assert.Contains("Copy-FilteredDirectory", publishScript);
         Assert.Contains("IncludeTernaryReviewRuntime", publishScript);
+        Assert.Contains("RequireGpuReadyRuntime", publishScript);
         Assert.Contains("Lib\\site-packages\\artifact_tool_v2*", publishScript);
         Assert.Contains("Lib\\site-packages\\pandas*", publishScript);
         Assert.Contains("Lib\\site-packages\\numpy*", publishScript);
@@ -200,6 +214,9 @@ public sealed class VersioningTests
         Assert.Contains("ggml-cuda*.dll", publishScript);
         Assert.Contains("cublas*.dll", publishScript);
         Assert.Contains("cudart*.dll", publishScript);
+        Assert.Contains("cudnn*.dll", publishScript);
+        Assert.Contains("crispasr*.exe", publishScript);
+        Assert.Contains("whisper.dll", publishScript);
         Assert.Contains("<KoeNoteIncludeRuntimeToolsInProjectPublish>false</KoeNoteIncludeRuntimeToolsInProjectPublish>", appProject);
         Assert.Contains("Condition=\"Exists('..\\..\\tools\\ffmpeg.exe')\"", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\python')", appProject);

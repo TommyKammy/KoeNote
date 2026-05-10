@@ -11,7 +11,8 @@ internal sealed class SetupReadinessService(
     SetupStateService stateService,
     ToolStatusService toolStatusService,
     ModelCatalogService modelCatalogService,
-    InstalledModelRepository installedModelRepository)
+    InstalledModelRepository installedModelRepository,
+    ISetupHostResourceProbe hostResourceProbe)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -142,7 +143,7 @@ internal sealed class SetupReadinessService(
 
     private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state)
     {
-        return
+        List<SetupSmokeCheck> checks =
         [
             CheckFile("ffmpeg", paths.FfmpegPath),
             new("faster-whisper runtime", FasterWhisperRuntimeLayout.HasPackage(paths), FasterWhisperRuntimeLayout.HasPackage(paths) ? paths.AsrPythonEnvironment : $"Not installed: {paths.AsrPythonEnvironment}"),
@@ -152,6 +153,20 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+
+        if (hostResourceProbe.GetResources().NvidiaGpuDetected)
+        {
+            checks.Add(new SetupSmokeCheck(
+                "ASR CUDA runtime",
+                AsrCudaRuntimeLayout.HasPackage(paths),
+                AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrRuntimeDirectory : $"Not installed: {paths.AsrRuntimeDirectory}"));
+            checks.Add(new SetupSmokeCheck(
+                "Review CUDA runtime",
+                CudaReviewRuntimeLayout.HasPackage(paths),
+                CudaReviewRuntimeLayout.HasPackage(paths) ? paths.ReviewRuntimeDirectory : $"Not installed: {paths.ReviewRuntimeDirectory}"));
+        }
+
+        return checks;
     }
 
     private SetupSmokeCheck CheckSelectedReviewRuntime(string? modelId)

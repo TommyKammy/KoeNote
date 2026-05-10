@@ -43,7 +43,7 @@ public sealed class TranscriptSummaryValidatorTests
     public void Validate_AcceptsStructuredMarkdown()
     {
         var result = TranscriptSummaryValidator.Validate(
-            "## Overview\n\n- Summary.\n\n## Key points\n\n- Point.",
+            "## Overview\n\n- Summary.\n\n## Key points\n\n- Point.\n\n## Keywords\n\n- topic",
             "markdown_summary_sections",
             requireStructuredSections: true);
 
@@ -51,10 +51,34 @@ public sealed class TranscriptSummaryValidatorTests
     }
 
     [Fact]
+    public void Validate_RejectsStructuredSummaryWithoutKeywords()
+    {
+        var result = TranscriptSummaryValidator.Validate(
+            "## Overview\n\n- Summary.\n\n## Key points\n\n- Point.",
+            "markdown_summary_sections",
+            requireStructuredSections: true);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Keywords", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validate_RejectsStructuredSummaryWithEmptyKeywords()
+    {
+        var result = TranscriptSummaryValidator.Validate(
+            "## Overview\n\n- Summary.\n\n## Key points\n\n- Point.\n\n## Keywords\n\n",
+            "markdown_summary_sections",
+            requireStructuredSections: true);
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Keywords", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Validate_RejectsRepeatedStructuredHeading()
     {
         var result = TranscriptSummaryValidator.Validate(
-            "## Key points\n\n- One.\n\n## Key points\n\n- Two.",
+            "## Key points\n\n- One.\n\n## Key points\n\n- Two.\n\n## Keywords\n\n- topic",
             "markdown_summary_sections",
             requireStructuredSections: true);
 
@@ -66,7 +90,7 @@ public sealed class TranscriptSummaryValidatorTests
     public void Validate_RejectsIncompleteTrailingBullet()
     {
         var result = TranscriptSummaryValidator.Validate(
-            "## Overview\n\n- Summary.\n\n## Key points\n\n- 育児の",
+            "## Overview\n\n- Summary.\n\n## Key points\n\n- Point.\n\n## Keywords\n\n- 育児の",
             "markdown_summary_sections",
             requireStructuredSections: true);
 

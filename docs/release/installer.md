@@ -11,6 +11,7 @@ KoeNote is distributed as a lightweight per-user MSI. The core package installs 
   - `KoeNote`
   - `KoeNote Cleanup`
 - Model binaries are not bundled in the core MSI.
+- The MSI is GPU-ready: KoeNote-specific GPU runtime files are bundled, while NVIDIA redistributable CUDA/cuDNN DLLs are downloaded or reused by Setup Wizard.
 
 The MSI removes the application payload on uninstall. KoeNote user data is intentionally kept unless the user explicitly chooses cleanup.
 
@@ -26,6 +27,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Build-KoeNot
 The script publishes the app and cleanup tool, generates `src\KoeNote.Installer\PayloadFiles.wxs`, builds `artifacts\msi\KoeNote-v<version>-<rid>.msi`, writes a SHA256 sidecar, writes an update/release JSONL log, and writes a release manifest.
 
 The default product version comes from `Directory.Build.props` `VersionPrefix`. Pass `-ProductVersion` only for an intentional one-off override.
+
+Release MSI builds call `Publish-KoeNote.ps1` with `-RequireGpuReadyRuntime`. The publish step must find:
+
+- `tools\review\llama-completion.exe`
+- `tools\review\ggml-cuda.dll`
+- `tools\asr\crispasr.exe`
+- `tools\asr\crispasr.dll`
+- `tools\asr\whisper.dll`
+- `tools\asr\ggml-cuda.dll`
+
+The publish step excludes NVIDIA redistributable DLLs from the MSI payload, including `cublas*`, `cudart*`, `cudnn*`, `cufft*`, `curand*`, and `cusparse*`.
 
 ## Code signing
 
@@ -48,7 +60,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNote
   -MsiPath artifacts\msi\KoeNote-v0.15.0-win-x64.msi
 ```
 
-The verification command runs versioning/release tests, verifies the SHA256 sidecar, and checks that the release manifest matches the MSI, SHA sidecar, update log, version, runtime identifier, and signing state.
+The verification command runs versioning/release tests, verifies the SHA256 sidecar, and checks that the release manifest matches the MSI, SHA sidecar, update log, version, runtime identifier, signing state, bundled Python runtime, Review runtime, and GPU-ready runtime metadata.
+
+`Test-KoeNoteReleasePayloadGuard.ps1` also checks that NVIDIA redistributable DLLs are not present in `tools\review` or `tools\asr`. The release manifest records `gpu_ready_runtime.nvidia_redistributables_included = false` and the NVIDIA manifest URLs used by Setup Wizard:
+
+- CUDA: `https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.0.json`
+- cuDNN: `https://developer.download.nvidia.com/compute/cudnn/redist/redistrib_9.22.0.json`
+
+## GPU runtime setup troubleshooting
+
+On NVIDIA GPU hosts, Setup Wizard may download or reuse NVIDIA redistributable DLLs after installation. The progress UI uses these stages:
+
+- `確認中`: bundled KoeNote GPU files and local CUDA/cuDNN DLLs are checked.
+- `ダウンロード中`: NVIDIA redist manifests or package zips are being downloaded.
+- `検証中`: manifest/package hashes and final install layout are being verified.
+- `展開中`: required DLLs are being extracted from NVIDIA packages.
+- `インストール中`: verified DLLs are being copied into `tools\review` or `tools\asr`.
+
+If this fails, check network/proxy access to `developer.download.nvidia.com`, ensure there is enough disk space, and retry Setup Wizard. Review can continue with the CPU runtime. ASR CPU fallback depends on the selected ASR model and installed Python packages.
 
 ## Uninstall policy
 

@@ -118,6 +118,10 @@ public sealed class TranscriptSummaryServiceTests
             ## Key points
 
             - Key point from source.
+
+            ## Keywords
+
+            - transcript
             """);
         var service = new TranscriptSummaryService(
             new TranscriptReadRepository(fixture.Paths),
@@ -422,6 +426,36 @@ public sealed class TranscriptSummaryServiceTests
         Assert.Contains("If the source transcript is Japanese, write the summary in Japanese", prompt, StringComparison.Ordinal);
         Assert.Contains("Begin with the Overview section heading", prompt, StringComparison.Ordinal);
         Assert.Contains("Source segment ids: 000001", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_GemmaFinalRetryRequiresKeywords()
+    {
+        var prompt = new TranscriptSummaryPromptBuilder().BuildFinalPrompt(
+            [
+                new TranscriptSummaryChunkResult(
+                    new TranscriptSummaryChunk(1, TranscriptDerivativeSourceKinds.Raw, "000001", 0, 1, "source"),
+                    """
+                    ## Overview
+
+                    - Summary.
+
+                    ## Key points
+
+                    - Point.
+
+                    ## Keywords
+
+                    - topic
+                    """,
+                    TimeSpan.FromSeconds(1))
+            ],
+            "gemma-4-e4b-it-q4-k-m",
+            promptTemplateId: "gemma-structured",
+            attempt: 2);
+
+        Assert.Contains("Always include a non-empty Keywords section", prompt, StringComparison.Ordinal);
+        Assert.Contains("## Keywords", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

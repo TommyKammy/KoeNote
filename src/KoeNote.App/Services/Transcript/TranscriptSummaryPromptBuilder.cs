@@ -302,7 +302,8 @@ public sealed class TranscriptSummaryPromptBuilder
             - Use only facts written in the chunk summaries.
             - Do not output prefaces, explanations, reasoning, code fences, or stop markers.
             - If decisions or action items are unknown, write "- Unspecified."
-            - Output at least the two headings below.
+            - Include every heading below in the exact order.
+            - Always include a non-empty Keywords section with concise topic terms from the chunk summaries.
 
             Output format:
             ## Overview
@@ -310,6 +311,18 @@ public sealed class TranscriptSummaryPromptBuilder
 
             ## Key points
             - 5 to 8 bullets
+
+            ## Decisions
+            - 1 to 3 bullets, or "- Unspecified."
+
+            ## Action items
+            - 1 to 3 bullets, or "- Unspecified."
+
+            ## Open questions
+            - 1 to 3 bullets, or "- Unspecified."
+
+            ## Keywords
+            - 5 to 10 comma-separated keywords
 
             Chunk summaries:
             {{source}}

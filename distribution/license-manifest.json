@@ -43,6 +43,30 @@
       "notes": "Bundled so the Review stage can run after a Review GGUF model is installed. KoeNote uses the CPU x64 binary to avoid adding a GPU driver dependency."
     },
     {
+      "name": "llama.cpp CUDA bridge for Review",
+      "type": "runtime tool",
+      "license": "MIT",
+      "source": "https://github.com/ggml-org/llama.cpp",
+      "expectedPath": "tools/review/ggml-cuda.dll",
+      "notes": "Bundled in the GPU-ready MSI as KoeNote-specific Review GPU runtime glue. NVIDIA redistributable DLLs such as cuBLAS and CUDA runtime are not bundled and are resolved by Setup Wizard."
+    },
+    {
+      "name": "Crisp ASR / whisper GPU runtime files",
+      "type": "runtime tool",
+      "license": "Verify upstream runtime licenses during release packaging",
+      "source": "KoeNote runtime payload under tools/asr",
+      "expectedPath": "tools/asr/crispasr.exe; tools/asr/crispasr.dll; tools/asr/whisper.dll; tools/asr/ggml-cuda.dll",
+      "notes": "Bundled in the GPU-ready MSI so ASR GPU setup only needs NVIDIA redistributable CUDA/cuDNN DLLs at setup time."
+    },
+    {
+      "name": "NVIDIA CUDA/cuDNN redistributable DLLs",
+      "type": "setup-time runtime dependency",
+      "license": "NVIDIA CUDA Toolkit / cuDNN license terms",
+      "source": "https://developer.download.nvidia.com/compute/cuda/redist/ and https://developer.download.nvidia.com/compute/cudnn/redist/",
+      "expectedPath": "Downloaded or reused by Setup Wizard; not bundled in the MSI",
+      "notes": "Setup Wizard resolves URLs, sizes, and SHA256 hashes from NVIDIA redistributable manifests, then installs required DLLs such as cudart64_12.dll, cublas64_12.dll, cublasLt64_12.dll, and cudnn*.dll."
+    },
+    {
       "name": "Prism llama.cpp CPU x64 runtime",
       "type": "runtime tool",
       "license": "MIT",

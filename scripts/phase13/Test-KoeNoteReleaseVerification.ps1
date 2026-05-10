@@ -12,11 +12,8 @@ $payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePa
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
 $expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
-$expectedCudaRuntimeTag = "runtime-cuda-12.9-cudnn-9.22-v1"
-$expectedCudaReleaseAssets = @(
-    "https://github.com/TommyKammy/KoeNote/releases/download/$expectedCudaRuntimeTag/koenote-cuda-asr-runtime.zip",
-    "https://github.com/TommyKammy/KoeNote/releases/download/$expectedCudaRuntimeTag/koenote-cuda-review-runtime.zip"
-)
+$expectedCudaRedistManifestUrl = "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.0.json"
+$expectedCudnnRedistManifestUrl = "https://developer.download.nvidia.com/compute/cudnn/redist/redistrib_9.22.0.json"
 
 if (-not $SkipVersioningTests) {
     dotnet test $testProject --configuration Debug --filter "FullyQualifiedName~VersioningTests" --verbosity minimal
@@ -99,6 +96,24 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
     throw "Review runtime is required but missing from publish output: $reviewRuntimePath"
 }
 
+$reviewGpuBridgePath = Join-Path $publishDir "tools\review\ggml-cuda.dll"
+if (-not (Test-Path -LiteralPath $reviewGpuBridgePath -PathType Leaf)) {
+    throw "Review GPU bridge is required but missing from publish output: $reviewGpuBridgePath"
+}
+
+$asrRuntimePath = Join-Path $publishDir "tools\asr\crispasr.exe"
+$asrGpuBridgePath = Join-Path $publishDir "tools\asr\ggml-cuda.dll"
+foreach ($requiredAsrRuntimePath in @(
+    $asrRuntimePath,
+    (Join-Path $publishDir "tools\asr\crispasr.dll"),
+    (Join-Path $publishDir "tools\asr\whisper.dll"),
+    $asrGpuBridgePath
+)) {
+    if (-not (Test-Path -LiteralPath $requiredAsrRuntimePath -PathType Leaf)) {
+        throw "ASR GPU-ready runtime is required but missing from publish output: $requiredAsrRuntimePath"
+    }
+}
+
 $ternaryReviewRuntimePath = Join-Path $publishDir "tools\review-ternary\llama-completion.exe"
 $ternaryReviewRuntimePresent = Test-Path -LiteralPath $ternaryReviewRuntimePath -PathType Leaf
 
@@ -146,6 +161,38 @@ if ($manifest.review_runtime.path -ne $reviewRuntimePath) {
     throw "Release manifest review runtime path does not match. Expected $reviewRuntimePath but got $($manifest.review_runtime.path)."
 }
 
+if (-not ($manifest.PSObject.Properties.Name -contains "gpu_ready_runtime")) {
+    throw "Release manifest is missing gpu_ready_runtime metadata."
+}
+
+if (-not [bool]$manifest.gpu_ready_runtime.required) {
+    throw "Release manifest must mark gpu_ready_runtime.required as true."
+}
+
+if ([bool]$manifest.gpu_ready_runtime.nvidia_redistributables_included) {
+    throw "Release manifest must mark gpu_ready_runtime.nvidia_redistributables_included as false."
+}
+
+if ($manifest.gpu_ready_runtime.review_gpu_bridge_path -ne $reviewGpuBridgePath) {
+    throw "Release manifest review GPU bridge path does not match. Expected $reviewGpuBridgePath but got $($manifest.gpu_ready_runtime.review_gpu_bridge_path)."
+}
+
+if ($manifest.gpu_ready_runtime.asr_runtime_path -ne $asrRuntimePath) {
+    throw "Release manifest ASR runtime path does not match. Expected $asrRuntimePath but got $($manifest.gpu_ready_runtime.asr_runtime_path)."
+}
+
+if ($manifest.gpu_ready_runtime.asr_gpu_bridge_path -ne $asrGpuBridgePath) {
+    throw "Release manifest ASR GPU bridge path does not match. Expected $asrGpuBridgePath but got $($manifest.gpu_ready_runtime.asr_gpu_bridge_path)."
+}
+
+if ($manifest.gpu_ready_runtime.cuda_redist_manifest_url -ne $expectedCudaRedistManifestUrl) {
+    throw "Release manifest CUDA redist manifest URL does not match. Expected $expectedCudaRedistManifestUrl but got $($manifest.gpu_ready_runtime.cuda_redist_manifest_url)."
+}
+
+if ($manifest.gpu_ready_runtime.cudnn_redist_manifest_url -ne $expectedCudnnRedistManifestUrl) {
+    throw "Release manifest cuDNN redist manifest URL does not match. Expected $expectedCudnnRedistManifestUrl but got $($manifest.gpu_ready_runtime.cudnn_redist_manifest_url)."
+}
+
 if ($manifest.ternary_review_runtime.path -ne $ternaryReviewRuntimePath) {
     throw "Release manifest ternary review runtime path does not match. Expected $ternaryReviewRuntimePath but got $($manifest.ternary_review_runtime.path)."
 }
@@ -159,17 +206,6 @@ if ($manifest.ternary_review_runtime.path -ne $ternaryReviewRuntimePath) {
     SigningRequired = [bool]$manifest.signing.required
     SigningStatus = $manifest.signing.status
     ReviewRuntimeMB = $payloadGuardResult.ReviewRuntimeMB
+    AsrRuntimeMB = $payloadGuardResult.AsrRuntimeMB
     BundledPythonMB = $payloadGuardResult.BundledPythonMB
-}
-
-foreach ($assetUrl in $expectedCudaReleaseAssets) {
-    try {
-        $response = Invoke-WebRequest -Uri $assetUrl -Method Head -MaximumRedirection 5 -TimeoutSec 30
-        if ([int]$response.StatusCode -lt 200 -or [int]$response.StatusCode -ge 400) {
-            throw "HTTP $($response.StatusCode)"
-        }
-    }
-    catch {
-        throw "Required CUDA release asset is missing or unreachable: $assetUrl. Details: $($_.Exception.Message)"
-    }
 }

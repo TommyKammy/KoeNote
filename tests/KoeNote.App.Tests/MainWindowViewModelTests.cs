@@ -275,6 +275,7 @@ public sealed class MainWindowViewModelTests
         Touch(reviewPath);
         installService.RegisterLocalModel(reviewItem, reviewPath, "download");
         CreateFasterWhisperRuntime(paths);
+        Touch(paths.LlamaCompletionPath);
         CreateDiarizationRuntime(paths);
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
@@ -441,6 +442,9 @@ public sealed class MainWindowViewModelTests
 
         Touch(viewModel.Paths.LlamaCompletionPath);
         Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(viewModel.Paths.CudaReviewRuntimeMarkerPath);
 
         Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
@@ -486,6 +490,10 @@ public sealed class MainWindowViewModelTests
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudart64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
         Touch(viewModel.Paths.AsrCudaRuntimeMarkerPath);
 
         Assert.False(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
@@ -1414,6 +1422,92 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.IsSetupComplete);
         Assert.Contains("不足項目", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SetupRunSmokeCommand_CompletesSetupWhenFinalCheckPasses()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(paths.CudaReviewRuntimeMarkerPath);
+        Directory.CreateDirectory(paths.UserModels);
+
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var asrItem = catalog.Models.First(model => model.ModelId == "kotoba-whisper-v2.2-faster");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "llm-jp-4-8b-thinking-q4-k-m");
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(Path.Combine(paths.KotobaWhisperFasterModelPath, "model.bin"));
+        Touch(paths.ReviewModelPath);
+        var now = DateTimeOffset.Now;
+        var installedModels = new InstalledModelRepository(paths);
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            asrItem.ModelId,
+            asrItem.Role,
+            asrItem.EngineId,
+            asrItem.DisplayName,
+            asrItem.Family,
+            null,
+            paths.KotobaWhisperFasterModelPath,
+            null,
+            null,
+            null,
+            true,
+            asrItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            reviewItem.ModelId,
+            reviewItem.Role,
+            reviewItem.EngineId,
+            reviewItem.DisplayName,
+            reviewItem.Family,
+            null,
+            paths.ReviewModelPath,
+            null,
+            null,
+            null,
+            true,
+            reviewItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            LicenseAccepted = true,
+            LastSmokeSucceeded = false,
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId,
+            StorageRoot = paths.UserModels
+        });
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.SetupRunSmokeCommand.Execute(null);
+
+        Assert.True(viewModel.IsSetupComplete);
+        Assert.Equal("Complete", viewModel.SetupCurrentStep);
+        Assert.True(viewModel.SetupSmokeChecks.All(check => check.IsOk));
     }
 
     [Fact]
