@@ -51,6 +51,17 @@ public sealed class TranscriptSummaryValidatorTests
     }
 
     [Fact]
+    public void Validate_AcceptsStructuredMarkdownWithJapaneseKeywordHeading()
+    {
+        var result = TranscriptSummaryValidator.Validate(
+            "## 概要\n\n- Summary.\n\n## 主な内容\n\n- Point.\n\n## キーワード\n\n- topic",
+            "markdown_summary_sections",
+            requireStructuredSections: true);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_RejectsStructuredSummaryWithoutKeywords()
     {
         var result = TranscriptSummaryValidator.Validate(

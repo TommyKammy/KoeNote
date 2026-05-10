@@ -1080,7 +1080,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupFasterWhisperRuntimeReady &&
         SetupReviewRuntimeReady &&
         (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
-        (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady) &&
         SetupDiarizationRuntimeReady &&
         SetupTernaryReviewRuntimeReady;
 
@@ -1164,11 +1163,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
             {
                 missing.Add("ASR GPU runtime");
-            }
-
-            if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
-            {
-                missing.Add("Review GPU runtime");
             }
 
             if (!SetupDiarizationRuntimeReady)

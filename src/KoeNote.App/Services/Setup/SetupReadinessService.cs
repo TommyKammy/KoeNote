@@ -160,10 +160,6 @@ internal sealed class SetupReadinessService(
                 "ASR CUDA runtime",
                 AsrCudaRuntimeLayout.HasPackage(paths),
                 AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrRuntimeDirectory : $"Not installed: {paths.AsrRuntimeDirectory}"));
-            checks.Add(new SetupSmokeCheck(
-                "Review CUDA runtime",
-                CudaReviewRuntimeLayout.HasPackage(paths),
-                CudaReviewRuntimeLayout.HasPackage(paths) ? paths.ReviewRuntimeDirectory : $"Not installed: {paths.ReviewRuntimeDirectory}"));
         }
 
         return checks;

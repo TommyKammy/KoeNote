@@ -7,6 +7,12 @@ public sealed record TranscriptSummaryValidationResult(bool IsValid, string Reas
 
 public static class TranscriptSummaryValidator
 {
+    private static readonly string[] KeywordSectionNames =
+    [
+        "Keywords",
+        "キーワード"
+    ];
+
     public static TranscriptSummaryValidationResult Validate(
         string content,
         string validationMode,
@@ -44,7 +50,7 @@ public static class TranscriptSummaryValidator
             return new TranscriptSummaryValidationResult(false, "Transcript summary output repeated the same Markdown section heading.");
         }
 
-        if (RequiresKeywordsSection(validationMode) && !HasNonEmptyMarkdownSection(normalized, "Keywords"))
+        if (RequiresKeywordsSection(validationMode) && !HasNonEmptyMarkdownSection(normalized, KeywordSectionNames))
         {
             return new TranscriptSummaryValidationResult(false, "Transcript summary output did not contain a non-empty Keywords section.");
         }
@@ -98,7 +104,7 @@ public static class TranscriptSummaryValidator
         return string.Equals(validationMode, "markdown_summary_sections", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool HasNonEmptyMarkdownSection(string content, string sectionName)
+    private static bool HasNonEmptyMarkdownSection(string content, IReadOnlyCollection<string> sectionNames)
     {
         var inSection = false;
         foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
@@ -106,7 +112,8 @@ public static class TranscriptSummaryValidator
             var line = rawLine.Trim();
             if (line.StartsWith("## ", StringComparison.Ordinal))
             {
-                inSection = line[3..].Trim().Equals(sectionName, StringComparison.OrdinalIgnoreCase);
+                var heading = line[3..].Trim();
+                inSection = sectionNames.Any(sectionName => heading.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
                 continue;
             }
 

@@ -301,6 +301,65 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SelectedSetupConfigurationReady_DoesNotRequireCudaReviewRuntimeWithDetectedGpu()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBaseDirectory, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBaseDirectory, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        CreateFasterWhisperRuntime(paths);
+        Touch(paths.LlamaCompletionPath);
+        CreateDiarizationRuntime(paths);
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var gpuRecommendation = new SetupPresetRecommendation(
+            "recommended",
+            "Recommended",
+            "GPU",
+            new SetupHostResources(null, 12, NvidiaGpuDetected: true, LogicalProcessorCount: null, "GPU"));
+        SetPrivateField(viewModel, "_setupPresetRecommendation", gpuRecommendation);
+
+        Assert.True(viewModel.SetupCudaReviewRuntimeRecommended);
+        Assert.False(viewModel.SetupCudaReviewRuntimeReady);
+        Assert.True(viewModel.SelectedSetupConfigurationReady);
+        Assert.DoesNotContain("Review GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+        Assert.True(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void SetupInstallSelectedPresetCommand_AcceptsLicensesAndStartsInstall()
     {
         var viewModel = CreateViewModel();

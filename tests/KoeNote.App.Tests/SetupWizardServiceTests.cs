@@ -563,7 +563,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_CompleteIfReady_RequiresGpuRuntimesWhenNvidiaGpuIsDetected()
+    public void SetupWizard_CompleteIfReady_RequiresAsrGpuRuntimeWhenNvidiaGpuIsDetected()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
@@ -591,11 +591,11 @@ public sealed class SetupWizardServiceTests
         Assert.False(completed.IsCompleted);
         Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
         Assert.Contains(smoke.Checks, check => check.Name == "ASR CUDA runtime" && !check.IsOk);
-        Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && !check.IsOk);
+        Assert.DoesNotContain(smoke.Checks, check => check.Name == "Review CUDA runtime");
     }
 
     [Fact]
-    public void SetupWizard_CompletesAfterVerifiedModelsSmokeAndGpuRuntimesPass()
+    public void SetupWizard_CompletesAfterVerifiedModelsSmokeAndAsrGpuRuntimePass()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
@@ -612,11 +612,6 @@ public sealed class SetupWizardServiceTests
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
         Touch(paths.AsrCudaRuntimeMarkerPath);
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
-        Touch(paths.CudaReviewRuntimeMarkerPath);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var installedModels = new InstalledModelRepository(paths);
@@ -634,6 +629,7 @@ public sealed class SetupWizardServiceTests
         var completed = wizard.CompleteIfReady();
 
         Assert.True(smoke.IsSucceeded);
+        Assert.DoesNotContain(smoke.Checks, check => check.Name == "Review CUDA runtime");
         Assert.True(completed.IsCompleted);
         Assert.Equal(SetupStep.Complete, completed.CurrentStep);
     }
