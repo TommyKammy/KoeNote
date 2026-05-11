@@ -161,6 +161,7 @@
                                        TextWrapping="Wrap"
                                        TextTrimming="None"
                                        FontSize="14"
+                                       FontWeight="Normal"
                                        LineHeight="22"
                                        Style="{StaticResource InlineDisplayTextStyle}"
                                        MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
@@ -169,6 +170,7 @@
                                        TextWrapping="Wrap"
                                        TextTrimming="None"
                                        FontSize="14"
+                                       FontWeight="Normal"
                                        LineHeight="22"
                                        Style="{StaticResource VisibleWhenRawTranscriptMode}" />
                             <Grid Grid.Column="2"
@@ -191,6 +193,7 @@
                                                    Margin="0,0,0,4" />
                                         <TextBlock Text="{Binding RawTranscriptText}"
                                                    TextWrapping="Wrap"
+                                                   FontWeight="Normal"
                                                    LineHeight="21" />
                                     </StackPanel>
                                 </Border>
@@ -219,6 +222,7 @@
                                                    Margin="0,0,0,4" />
                                         <TextBlock Text="{Binding PolishedTranscriptText}"
                                                    TextWrapping="Wrap"
+                                                   FontWeight="Normal"
                                                    LineHeight="21" />
                                     </StackPanel>
                                 </Border>

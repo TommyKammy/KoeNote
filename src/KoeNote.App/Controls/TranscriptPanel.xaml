@@ -264,6 +264,7 @@
                                           HorizontalScrollBarVisibility="Disabled">
                                 <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
                                            FontSize="14"
+                                           FontWeight="Normal"
                                            LineHeight="23"
                                            Foreground="{StaticResource TextBrush}"
                                            TextWrapping="Wrap" />
