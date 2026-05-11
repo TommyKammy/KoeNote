@@ -149,67 +149,6 @@
                        TextWrapping="Wrap"
                        Margin="0,8,0,0" />
 
-            <Border DockPanel.Dock="Top"
-                    Background="#F8FAFC"
-                    BorderBrush="{StaticResource BorderBrushSoft}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="12,8"
-                    Margin="0,0,0,12">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Grid VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Ellipse Width="8"
-                                 Height="8"
-                                 Fill="{StaticResource AccentBrush}"
-                                 VerticalAlignment="Center"
-                                 Margin="0,0,8,0" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding ReadablePolishedStatus}"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   TextWrapping="Wrap" />
-                    </Grid>
-                    <Button Grid.Column="1"
-                            Style="{StaticResource OutlineSuccessButton}"
-                            Command="{Binding RunReadablePolishingCommand}"
-                            ToolTip="{Binding ReadablePolishedActionToolTip}"
-                            Padding="14,8"
-                            Margin="12,0,0,0">
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock Text="&#xE70F;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="13"
-                                       Margin="0,0,7,0"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding ReadablePolishedActionText}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <ProgressBar Grid.Row="1"
-                                 Grid.ColumnSpan="2"
-                                 Height="4"
-                                 Margin="0,8,0,0"
-                                 IsIndeterminate="True"
-                                 Visibility="{Binding IsReadablePolishingInProgress, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </Grid>
-            </Border>
-
             <TabControl Style="{StaticResource CardTabControl}"
                         ItemContainerStyle="{StaticResource TranscriptTabItem}"
                         SelectedIndex="{Binding SelectedTranscriptTabIndex, Mode=TwoWay}">
@@ -278,34 +217,25 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                             <DockPanel Grid.Row="0" LastChildFill="True">
-                                <StackPanel DockPanel.Dock="Right"
-                                            Orientation="Horizontal"
-                                            Margin="12,0,0,0">
-                                    <Button Style="{StaticResource ToolbarButton}"
-                                            Command="{Binding ExportReadablePolishedTxtCommand}"
-                                            Padding="10,6"
-                                            ToolTip="読みやすく整文をTXTで出力">
-                                        <TextBlock Text="TXT"
+                                <Button DockPanel.Dock="Right"
+                                        Style="{StaticResource OutlineSuccessButton}"
+                                        Command="{Binding RunReadablePolishingCommand}"
+                                        ToolTip="{Binding ReadablePolishedActionToolTip}"
+                                        Padding="14,8"
+                                        Margin="12,0,0,0">
+                                    <StackPanel Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE70F;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="13"
+                                                   Margin="0,0,7,0"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding ReadablePolishedActionText}"
                                                    FontSize="12"
-                                                   FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Style="{StaticResource ToolbarButton}"
-                                            Command="{Binding ExportReadablePolishedMarkdownCommand}"
-                                            Padding="10,6"
-                                            ToolTip="読みやすく整文をMarkdownで出力">
-                                        <TextBlock Text="Markdown"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Style="{StaticResource ToolbarButton}"
-                                            Command="{Binding ExportReadablePolishedDocxCommand}"
-                                            Padding="10,6"
-                                            ToolTip="読みやすく整文をDOCXで出力">
-                                        <TextBlock Text="DOCX"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold" />
-                                    </Button>
-                                </StackPanel>
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
                                 <Ellipse DockPanel.Dock="Left"
                                          Width="8"
                                          Height="8"
