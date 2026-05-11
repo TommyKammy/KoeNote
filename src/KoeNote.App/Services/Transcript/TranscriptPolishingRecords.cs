@@ -6,6 +6,7 @@ public sealed record TranscriptPolishingOptions(
     string ModelPath,
     string OutputDirectory,
     string ModelId,
+    string PromptTemplateId = TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
     string GenerationProfile = "recommended",
     string PromptVersion = TranscriptPolishingPromptBuilder.PromptVersion,
     int ChunkSegmentCount = 80,
@@ -34,7 +35,9 @@ public sealed record TranscriptPolishingChunk(
 public sealed record TranscriptPolishingChunkResult(
     TranscriptPolishingChunk Chunk,
     string Content,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    bool UsedFallback = false,
+    string? FallbackReason = null);
 
 public sealed record TranscriptPolishingResult(
     string JobId,

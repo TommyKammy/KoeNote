@@ -101,6 +101,7 @@ public sealed partial class MainWindowViewModel
             LatestLog = "選択セグメントの直近編集を戻しました。";
             ReloadSegmentsForSelectedJob(segment.SegmentId);
             LoadSummaryForSelectedJob();
+            LoadReadablePolishedForSelectedJob();
         }
         else
         {
@@ -141,6 +142,7 @@ public sealed partial class MainWindowViewModel
         }
 
         LoadSummaryForSelectedJob();
+        LoadReadablePolishedForSelectedJob();
         return true;
     }
 
@@ -178,6 +180,7 @@ public sealed partial class MainWindowViewModel
         }
 
         LoadSummaryForSelectedJob();
+        LoadReadablePolishedForSelectedJob();
         return true;
     }
 
@@ -227,6 +230,7 @@ public sealed partial class MainWindowViewModel
             LoadReviewQueue();
             ReloadSegmentsForSelectedJob(selectedSegmentId);
             LoadSummaryForSelectedJob();
+            LoadReadablePolishedForSelectedJob();
             RefreshJobViews();
         }
         else

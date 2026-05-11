@@ -32,6 +32,38 @@ public sealed partial class MainWindowViewModel
             : $"要約済み: {summary.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
 
+    private void LoadReadablePolishedForSelectedJob()
+    {
+        if (SelectedJob is null)
+        {
+            ReadablePolishedContent = string.Empty;
+            ReadablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+            return;
+        }
+
+        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(
+            SelectedJob.JobId,
+            TranscriptDerivativeKinds.Polished);
+        if (derivative is null)
+        {
+            ReadablePolishedContent = string.Empty;
+            ReadablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+            return;
+        }
+
+        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out var reason))
+        {
+            ReadablePolishedContent = string.Empty;
+            ReadablePolishedStatus = $"読みやすく整文の最新結果は破損しているため表示できません。再生成してください。({reason})";
+            return;
+        }
+
+        ReadablePolishedContent = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        ReadablePolishedStatus = _transcriptDerivativeRepository.IsStale(derivative)
+            ? "古い読みやすく整文があります。再生成すると更新できます。"
+            : $"読みやすく整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+    }
+
     private Task ExportSummaryMarkdownAsync()
     {
         return ExportSummaryAsync("Markdown (*.md)|*.md", "md", "markdown");

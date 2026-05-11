@@ -115,7 +115,8 @@ internal sealed record MainWindowReviewServices(
     TranscriptEditService TranscriptEditService,
     CorrectionMemoryService CorrectionMemoryService,
     TranscriptExportService TranscriptExportService,
-    TranscriptSummaryService TranscriptSummaryService);
+    TranscriptSummaryService TranscriptSummaryService,
+    TranscriptPolishingService TranscriptPolishingService);
 
 internal static class MainWindowReviewComposition
 {
@@ -133,7 +134,13 @@ internal static class MainWindowReviewComposition
                 new LlamaTranscriptSummaryRuntime(
                     new ExternalProcessRunner(),
                     new TranscriptSummaryPromptBuilder(),
-                    new DomainPromptContextProvider(paths))));
+                    new DomainPromptContextProvider(paths))),
+            new TranscriptPolishingService(
+                new TranscriptReadRepository(paths),
+                derivativeRepository,
+                new LlamaTranscriptPolishingRuntime(
+                    new ExternalProcessRunner(),
+                    new TranscriptPolishingPromptBuilder())));
     }
 }
 

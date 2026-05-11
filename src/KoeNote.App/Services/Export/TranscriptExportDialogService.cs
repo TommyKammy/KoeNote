@@ -42,6 +42,7 @@ public sealed class TranscriptExportDialogService
         {
             TranscriptExportSource.Raw => "素起こし",
             TranscriptExportSource.Polished => "整文",
+            TranscriptExportSource.ReadablePolished => "読みやすく整文",
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }
@@ -70,6 +71,7 @@ public sealed class TranscriptExportDialogService
             {
                 TranscriptExportSource.Raw => ".raw",
                 TranscriptExportSource.Polished => ".polished",
+                TranscriptExportSource.ReadablePolished => ".readable-polished",
                 _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
             };
         return $"{baseName}{suffix}.{GetExtension(format)}";

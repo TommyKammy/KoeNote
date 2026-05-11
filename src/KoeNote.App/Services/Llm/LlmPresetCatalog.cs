@@ -145,23 +145,37 @@ public static class LlmPresetCatalog
         if (IsTernaryBonsai(modelId, family))
         {
             return Polishing(
+                TranscriptPolishingPromptBuilder.BonsaiCompactPromptTemplateId,
                 "ternary-bonsai-polishing",
                 maxTokens: 192,
-                chunkSegmentCount: 3);
+                chunkSegmentCount: 3,
+                repeatPenalty: 1.15);
         }
 
         if (IsBonsai(modelId, family))
         {
             return Polishing(
+                TranscriptPolishingPromptBuilder.BonsaiCompactPromptTemplateId,
                 "bonsai-polishing-conservative",
+                maxTokens: 1024,
+                chunkSegmentCount: 8,
+                repeatPenalty: 1.15);
+        }
+
+        if (IsLlmJp(modelId, family))
+        {
+            return Polishing(
+                TranscriptPolishingPromptBuilder.LlmJpPromptTemplateId,
+                ResolveGenerationProfile(modelId, family, "polishing"),
                 maxTokens: 2048,
-                chunkSegmentCount: 40);
+                chunkSegmentCount: 20);
         }
 
         return Polishing(
+            IsGemma(modelId, family) ? TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId : "default",
             ResolveGenerationProfile(modelId, family, "polishing"),
             maxTokens: 4096,
-            chunkSegmentCount: 80);
+            chunkSegmentCount: 40);
     }
 
     private static LlmTaskSettings Summary(
@@ -188,19 +202,21 @@ public static class LlmPresetCatalog
     }
 
     private static LlmTaskSettings Polishing(
+        string promptTemplateId,
         string generationProfile,
         int maxTokens,
-        int chunkSegmentCount)
+        int chunkSegmentCount,
+        double? repeatPenalty = null)
     {
         return new LlmTaskSettings(
             LlmTaskKind.Polishing,
-            PromptTemplateId: "default",
+            PromptTemplateId: promptTemplateId,
             PromptVersion: TranscriptPolishingPromptBuilder.PromptVersion,
             GenerationProfile: generationProfile,
             Temperature: 0.1,
             TopP: null,
             TopK: null,
-            RepeatPenalty: null,
+            RepeatPenalty: repeatPenalty,
             MaxTokens: maxTokens,
             ChunkSegmentCount: chunkSegmentCount,
             ChunkOverlap: 0,

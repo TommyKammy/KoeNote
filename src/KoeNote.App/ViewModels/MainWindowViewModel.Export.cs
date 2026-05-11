@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows.Input;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
 
@@ -160,6 +161,20 @@ public sealed partial class MainWindowViewModel
         return SelectedJob is not null && Segments.Count > 0 && !IsRunInProgress;
     }
 
+    private bool CanExportReadablePolishing()
+    {
+        if (SelectedJob is null || IsRunInProgress)
+        {
+            return false;
+        }
+
+        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(
+            SelectedJob.JobId,
+            TranscriptDerivativeKinds.Polished);
+        return derivative is { Content.Length: > 0 } &&
+            TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out _);
+    }
+
     private bool CanOpenExportFolder()
     {
         return true;
@@ -220,6 +235,9 @@ public sealed partial class MainWindowViewModel
         RaiseExportCommandState(ExportPolishedTxtCommand);
         RaiseExportCommandState(ExportPolishedMarkdownCommand);
         RaiseExportCommandState(ExportPolishedDocxCommand);
+        RaiseExportCommandState(ExportReadablePolishedTxtCommand);
+        RaiseExportCommandState(ExportReadablePolishedMarkdownCommand);
+        RaiseExportCommandState(ExportReadablePolishedDocxCommand);
 
         if (ExportSummaryMarkdownCommand is RelayCommand summaryCommand)
         {

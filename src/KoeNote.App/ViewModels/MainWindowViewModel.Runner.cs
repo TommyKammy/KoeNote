@@ -41,6 +41,7 @@ public sealed partial class MainWindowViewModel
             var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, EnableSummaryStage: false);
             await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
             LoadSummaryForSelectedJob();
+            LoadReadablePolishedForSelectedJob();
         }
         finally
         {

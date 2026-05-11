@@ -44,6 +44,10 @@
                                       Command="{Binding RunPostReviewCommand}"
                                       IsEnabled="{Binding CanRunPostReview}"
                                       Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="読みやすく整文"
+                                      Command="{Binding RunReadablePolishingCommand}"
+                                      IsEnabled="{Binding CanRunReadablePolishing}"
+                                      Style="{StaticResource HeaderExportMenuItem}" />
                             <MenuItem Header="要約を実行"
                                       Command="{Binding RunPostSummaryCommand}"
                                       IsEnabled="{Binding CanRunPostSummary}"
@@ -105,6 +109,11 @@
                                 <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            </MenuItem>
+                            <MenuItem Header="読みやすく整文" Style="{StaticResource HeaderExportMenuItem}">
+                                <MenuItem Header="TXT" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Markdown" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="DOCX" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
                             <MenuItem Header="要約" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="Markdown" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />

@@ -1302,6 +1302,26 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
         Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
         Assert.True(viewModel.ExportTranscriptXlsxCommand.CanExecute(null));
+        Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
+
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: readable polished",
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        viewModel.SelectedJob = job;
+
+        Assert.True(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
+        Assert.True(viewModel.ExportReadablePolishedMarkdownCommand.CanExecute(null));
+        Assert.True(viewModel.ExportReadablePolishedDocxCommand.CanExecute(null));
     }
 
     [Fact]
@@ -1317,7 +1337,9 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.CanRunPostReview);
         Assert.False(viewModel.CanRunPostSummary);
+        Assert.False(viewModel.CanRunReadablePolishing);
         Assert.False(viewModel.CanRunPostReviewAndSummary);
+        Assert.False(viewModel.RunReadablePolishingCommand.CanExecute(null));
     }
 
     [Fact]
@@ -1336,7 +1358,48 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.CanRunPostReview);
         Assert.True(viewModel.CanRunPostSummary);
+        Assert.True(viewModel.CanRunReadablePolishing);
         Assert.True(viewModel.CanRunPostReviewAndSummary);
+        Assert.True(viewModel.RunReadablePolishingCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReadablePolishingState_ShowsRunningActionAndDisablesReadableExports()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: readable",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsReadablePolishingInProgress), true);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+
+        Assert.True(viewModel.IsReadablePolishingInProgress);
+        Assert.Equal("生成中", viewModel.ReadablePolishedActionText);
+        Assert.Contains("生成しています", viewModel.ReadablePolishedActionToolTip, StringComparison.Ordinal);
+        Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
+        Assert.False(viewModel.ExportReadablePolishedMarkdownCommand.CanExecute(null));
+        Assert.False(viewModel.ExportReadablePolishedDocxCommand.CanExecute(null));
     }
 
     [Fact]
@@ -1385,6 +1448,123 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ReadablePolishedTab_LoadsLatestPolishedDerivativeForSelectedJob()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            """
+            # meeting
+
+            。
+
+            Output:
+            [00:00 - 00:01] Speaker_0: 読みやすい本文です。
+            """,
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.HasReadablePolishedContent);
+        Assert.Equal("[00:00 - 00:01] Speaker_0: 読みやすい本文です。", viewModel.ReadablePolishedContent);
+        Assert.Contains("読みやすく整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.Equal("再生成", viewModel.ReadablePolishedActionText);
+        Assert.Contains("再生成", viewModel.ReadablePolishedActionToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadablePolishedTab_RejectsBrokenSuccessfulDerivative()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            """
+            壊れた出力です。
+            �
+            同じ行です。
+            同じ行です。
+            同じ行です。
+            同じ行です。
+            """,
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.False(viewModel.HasReadablePolishedContent);
+        Assert.Contains("破損", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReadablePolishedTab_UpdatesWhenSelectedJobChanges()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var repository = new JobRepository(paths);
+        var first = repository.CreateFromAudio(Path.Combine(root, "first.wav"));
+        var second = repository.CreateFromAudio(Path.Combine(root, "second.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", first.JobId, 0, 1, "Speaker_0", "first raw"),
+            new TranscriptSegment("segment-002", second.JobId, 0, 1, "Speaker_0", "second raw")
+        ]);
+        new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
+            second.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: second readable",
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "segment-002..segment-002",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.SelectedJob = first;
+        Assert.False(viewModel.HasReadablePolishedContent);
+        Assert.Equal("読みやすい文書を生成", viewModel.ReadablePolishedActionText);
+
+        viewModel.SelectedJob = second;
+        Assert.True(viewModel.HasReadablePolishedContent);
+        Assert.Contains("second readable", viewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        Assert.Equal("再生成", viewModel.ReadablePolishedActionText);
+    }
+
+    [Fact]
     public void SummaryStatus_BecomesStaleAfterInlineSegmentEdit()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -1408,11 +1588,24 @@ public sealed class MainWindowViewModelTests
             "model",
             "prompt",
             "profile"));
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: readable",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
         var viewModel = new MainWindowViewModel(paths);
         var segment = Assert.Single(viewModel.Segments);
 
         Assert.False(viewModel.IsSummaryStale);
         Assert.Contains("要約済み", viewModel.SummaryStatus, StringComparison.Ordinal);
+        Assert.Contains("読みやすく整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
 
         viewModel.BeginSegmentInlineEditCommand.Execute(segment);
         viewModel.SelectedSegmentEditText = "edited raw";
@@ -1421,6 +1614,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsSummaryStale);
         Assert.Contains("古い要約", viewModel.SummaryStatus, StringComparison.Ordinal);
         Assert.Contains("本文が更新", viewModel.SummaryActionToolTip, StringComparison.Ordinal);
+        Assert.Contains("古い読みやすく整文", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -2063,7 +2257,8 @@ public sealed class MainWindowViewModelTests
     [InlineData(0, 0)]
     [InlineData(1, 1)]
     [InlineData(2, 2)]
-    [InlineData(3, 2)]
+    [InlineData(3, 3)]
+    [InlineData(4, 3)]
     public void SelectedTranscriptTabIndex_ClampsToAvailableTabs(int value, int expected)
     {
         var viewModel = CreateViewModel();

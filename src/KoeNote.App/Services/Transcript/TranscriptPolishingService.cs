@@ -30,7 +30,18 @@ public sealed class TranscriptPolishingService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var chunkResult = await runtime.PolishChunkAsync(options, chunk, cancellationToken);
-                chunkResults.Add(chunkResult);
+                var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
+                if (!IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
+                {
+                    normalizedContent = BuildFallbackChunkContent(chunk);
+                    chunkResult = chunkResult with
+                    {
+                        UsedFallback = true,
+                        FallbackReason = fallbackReason
+                    };
+                }
+
+                chunkResults.Add(chunkResult with { Content = normalizedContent });
                 duration += chunkResult.Duration;
             }
         }
@@ -78,7 +89,7 @@ public sealed class TranscriptPolishingService(
                 chunkResult.Content,
                 options.ModelId,
                 options.PromptVersion,
-                options.GenerationProfile,
+                BuildChunkGenerationProfile(options.GenerationProfile, chunkResult),
                 ChunkId: BuildChunkId(derivative.DerivativeId, chunkResult.Chunk)));
         }
 
@@ -140,11 +151,65 @@ public sealed class TranscriptPolishingService(
         IReadOnlyList<TranscriptReadModel> segments,
         int chunkSegmentCount)
     {
-        for (var index = 0; index < segments.Count; index += chunkSegmentCount)
+        var chunkIndex = 1;
+        var currentChunk = new List<TranscriptReadModel>();
+
+        foreach (var speakerBlock in BuildSpeakerBlocks(segments))
         {
-            yield return new TranscriptPolishingChunk(
-                (index / chunkSegmentCount) + 1,
-                segments.Skip(index).Take(chunkSegmentCount).ToArray());
+            if (speakerBlock.Count > chunkSegmentCount)
+            {
+                if (currentChunk.Count > 0)
+                {
+                    yield return new TranscriptPolishingChunk(chunkIndex++, currentChunk.ToArray());
+                    currentChunk.Clear();
+                }
+
+                for (var index = 0; index < speakerBlock.Count; index += chunkSegmentCount)
+                {
+                    yield return new TranscriptPolishingChunk(
+                        chunkIndex++,
+                        speakerBlock.Skip(index).Take(chunkSegmentCount).ToArray());
+                }
+
+                continue;
+            }
+
+            if (currentChunk.Count > 0 && currentChunk.Count + speakerBlock.Count > chunkSegmentCount)
+            {
+                yield return new TranscriptPolishingChunk(chunkIndex++, currentChunk.ToArray());
+                currentChunk.Clear();
+            }
+
+            currentChunk.AddRange(speakerBlock);
+        }
+
+        if (currentChunk.Count > 0)
+        {
+            yield return new TranscriptPolishingChunk(chunkIndex, currentChunk.ToArray());
+        }
+    }
+
+    private static IEnumerable<IReadOnlyList<TranscriptReadModel>> BuildSpeakerBlocks(
+        IReadOnlyList<TranscriptReadModel> segments)
+    {
+        var currentBlock = new List<TranscriptReadModel>();
+        var currentSpeaker = string.Empty;
+
+        foreach (var segment in segments)
+        {
+            if (currentBlock.Count > 0 && !string.Equals(currentSpeaker, segment.Speaker, StringComparison.Ordinal))
+            {
+                yield return currentBlock.ToArray();
+                currentBlock.Clear();
+            }
+
+            currentSpeaker = segment.Speaker;
+            currentBlock.Add(segment);
+        }
+
+        if (currentBlock.Count > 0)
+        {
+            yield return currentBlock.ToArray();
         }
     }
 
@@ -156,6 +221,65 @@ public sealed class TranscriptPolishingService(
     private static string BuildChunkId(string derivativeId, TranscriptPolishingChunk chunk)
     {
         return $"{derivativeId}-chunk-{chunk.ChunkIndex:D3}";
+    }
+
+    private static string BuildChunkGenerationProfile(
+        string generationProfile,
+        TranscriptPolishingChunkResult chunkResult)
+    {
+        return chunkResult.UsedFallback
+            ? $"{generationProfile}; fallback={chunkResult.FallbackReason}"
+            : generationProfile;
+    }
+
+    private static bool IsChunkOutputUsable(TranscriptPolishingChunk chunk, string content, out string reason)
+    {
+        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out reason))
+        {
+            return false;
+        }
+
+        var sourceLength = chunk.Segments.Sum(static segment => Math.Max(0, segment.Text.Length));
+        if (sourceLength > 0 && content.Length > 2000 && content.Length > sourceLength * 6)
+        {
+            reason = "expanded far beyond the source chunk";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
+    private static string BuildFallbackChunkContent(TranscriptPolishingChunk chunk)
+    {
+        var blocks = new List<string>();
+        foreach (var speakerBlock in BuildSpeakerBlocks(chunk.Segments))
+        {
+            var first = speakerBlock[0];
+            var last = speakerBlock[^1];
+            var text = string.Join(
+                Environment.NewLine,
+                speakerBlock
+                    .Select(static segment => segment.Text.Trim())
+                    .Where(static text => text.Length > 0));
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            blocks.Add($"[{FormatTimestamp(first.StartSeconds)} - {FormatTimestamp(last.EndSeconds)}] {first.Speaker}: {text}");
+        }
+
+        return string.Join(Environment.NewLine + Environment.NewLine, blocks);
+    }
+
+    private static string FormatTimestamp(double seconds)
+    {
+        var clamped = Math.Max(0, seconds);
+        var time = TimeSpan.FromSeconds(clamped);
+        return time.TotalHours >= 1
+            ? $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}"
+            : $"{time.Minutes:00}:{time.Seconds:00}";
     }
 
     private static void ValidateOptions(TranscriptPolishingOptions options)

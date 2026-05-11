@@ -52,4 +52,24 @@ public sealed class LlmPresetCatalogTests
         Assert.Equal(promptTemplateId, settings.PromptTemplateId);
         Assert.Equal(validationMode, settings.ValidationMode);
     }
+
+    [Theory]
+    [InlineData("gemma-4-e4b-it-q4-k-m", "gemma", "gemma-polishing-blocks", 40, 4096, null)]
+    [InlineData("bonsai-8b-q1-0", "bonsai", "bonsai-polishing-compact", 8, 1024, 1.15)]
+    [InlineData("llm-jp-4-8b-thinking-q4-k-m", "llm-jp", "llm-jp-polishing-ja", 20, 2048, null)]
+    public void ResolveTaskSettings_ReturnsModelSpecificPolishingPromptAndLimits(
+        string modelId,
+        string family,
+        string promptTemplateId,
+        int chunkSegmentCount,
+        int maxTokens,
+        double? repeatPenalty)
+    {
+        var settings = LlmPresetCatalog.ResolveTaskSettings(modelId, family, LlmTaskKind.Polishing);
+
+        Assert.Equal(promptTemplateId, settings.PromptTemplateId);
+        Assert.Equal(chunkSegmentCount, settings.ChunkSegmentCount);
+        Assert.Equal(maxTokens, settings.MaxTokens);
+        Assert.Equal(repeatPenalty, settings.RepeatPenalty);
+    }
 }

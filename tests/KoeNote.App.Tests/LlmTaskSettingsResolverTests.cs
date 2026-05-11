@@ -45,10 +45,11 @@ public sealed class LlmTaskSettingsResolverTests
         var settings = Resolve("gemma-4-e4b-it-q4-k-m", LlmTaskKind.Polishing);
 
         Assert.Equal(LlmTaskKind.Polishing, settings.TaskKind);
+        Assert.Equal(TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId, settings.PromptTemplateId);
         Assert.Equal(TranscriptPolishingPromptBuilder.PromptVersion, settings.PromptVersion);
         Assert.Equal("gemma-polishing-balanced", settings.GenerationProfile);
         Assert.Equal(4096, settings.MaxTokens);
-        Assert.Equal(80, settings.ChunkSegmentCount);
+        Assert.Equal(40, settings.ChunkSegmentCount);
         Assert.False(settings.UseJsonSchema);
         Assert.False(settings.EnableRepair);
         Assert.Equal("markdown_non_empty", settings.ValidationMode);
@@ -85,9 +86,11 @@ public sealed class LlmTaskSettingsResolverTests
         Assert.Equal("bonsai-compact", summary.PromptTemplateId);
         Assert.Equal(512, summary.MaxTokens);
         Assert.Equal(40, summary.ChunkSegmentCount);
+        Assert.Equal(TranscriptPolishingPromptBuilder.BonsaiCompactPromptTemplateId, polishing.PromptTemplateId);
         Assert.Equal("bonsai-polishing-conservative", polishing.GenerationProfile);
-        Assert.Equal(2048, polishing.MaxTokens);
-        Assert.Equal(40, polishing.ChunkSegmentCount);
+        Assert.Equal(1024, polishing.MaxTokens);
+        Assert.Equal(8, polishing.ChunkSegmentCount);
+        Assert.Equal(1.15, polishing.RepeatPenalty);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Transcript;
 using System.IO.Compression;
 using System.Xml.Linq;
 
@@ -161,6 +162,96 @@ public sealed class TranscriptExportServiceTests
         using var reader = new StreamReader(document.Open());
         var xml = reader.ReadToEnd();
         Assert.Contains("hello docx", xml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportJob_CanWriteReadablePolishedDerivative()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            "job-001",
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            """
+            # After
+
+            。
+
+            [00:00:01 - 00:00:02] Speaker_0: 入力側の混入です。
+            Output:
+            [00:00:01 - 00:00:02] Speaker_0: 読みやすい整文です。
+            [00:00:02 - 00:00:03] Speaker_1: 次の発話です。
+            """,
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "seg-001..seg-002",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Docx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished));
+
+        Assert.Equal(3, result.FilePaths.Count);
+        var text = File.ReadAllText(Path.Combine(output, "meeting.txt"));
+        Assert.Contains("読みやすい整文です。", text, StringComparison.Ordinal);
+        Assert.Contains($"読みやすい整文です。{Environment.NewLine}{Environment.NewLine}[00:00:02", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Output:", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("入力側", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("# After", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[00:00:00.000 - 00:00:00.000]", text, StringComparison.Ordinal);
+
+        var markdown = File.ReadAllText(Path.Combine(output, "meeting.md"));
+        Assert.StartsWith("[00:00:01 - 00:00:02] Speaker_0: 読みやすい整文です。", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("# meeting", markdown, StringComparison.Ordinal);
+        Assert.Contains("Speaker_1: 次の発話です。", markdown, StringComparison.Ordinal);
+
+        var docxXml = ReadDocxDocumentXml(Path.Combine(output, "meeting.docx"));
+        Assert.Contains("読みやすい整文です。", docxXml, StringComparison.Ordinal);
+        Assert.DoesNotContain("meeting", docxXml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportJob_RejectsBrokenReadablePolishedDerivative()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
+        new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
+            "job-001",
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            """
+            破損した読みやすく整文です。
+            �
+            同じ行です。
+            同じ行です。
+            同じ行です。
+            同じ行です。
+            """,
+            TranscriptDerivativeSourceKinds.Raw,
+            "hash",
+            "seg-001..seg-002",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new TranscriptExportService(paths).ExportJob(
+                "job-001",
+                output,
+                [TranscriptExportFormat.Text],
+                new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished)));
+
+        Assert.Contains("not usable", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -411,6 +502,15 @@ public sealed class TranscriptExportServiceTests
             .ToDictionary(
                 cell => cell.Attribute("r")!.Value,
                 cell => string.Concat(cell.Descendants(main + "t").Select(static text => text.Value)));
+    }
+
+    private static string ReadDocxDocumentXml(string path)
+    {
+        using var archive = ZipFile.OpenRead(path);
+        var document = archive.GetEntry("word/document.xml");
+        Assert.NotNull(document);
+        using var reader = new StreamReader(document.Open());
+        return reader.ReadToEnd();
     }
 
     private static void SetFinalText(AppPaths paths, string jobId, string segmentId, string finalText)

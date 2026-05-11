@@ -19,7 +19,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
         var timeout = options.Timeout ?? TimeSpan.FromHours(2);
         Directory.CreateDirectory(options.OutputDirectory);
 
-        var prompt = promptBuilder.Build(chunk);
+        var prompt = promptBuilder.Build(chunk, options.PromptTemplateId);
         var promptPath = Path.Combine(options.OutputDirectory, $"polish.chunk-{chunk.ChunkIndex:D3}.prompt.txt");
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 

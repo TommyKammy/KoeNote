@@ -44,7 +44,7 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         var exportOptions = options ?? new TranscriptExportOptions();
         var snapshot = LoadSnapshot(jobId, exportOptions.Source);
-        if (snapshot.Segments.Count == 0)
+        if (snapshot.Segments.Count == 0 && string.IsNullOrWhiteSpace(snapshot.DocumentContent))
         {
             throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
         }
@@ -107,7 +107,7 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         var exportOptions = options ?? new TranscriptExportOptions();
         var snapshot = LoadSnapshot(jobId, exportOptions.Source);
-        if (snapshot.Segments.Count == 0)
+        if (snapshot.Segments.Count == 0 && string.IsNullOrWhiteSpace(snapshot.DocumentContent))
         {
             throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
         }
@@ -138,6 +138,29 @@ public sealed class TranscriptExportService(AppPaths paths)
         using var connection = SqliteConnectionFactory.Open(paths);
         var title = LoadJobTitle(connection, jobId);
         var pendingDraftCount = LoadPendingDraftCount(connection, jobId);
+        if (source == TranscriptExportSource.ReadablePolished)
+        {
+            var derivative = new TranscriptDerivativeRepository(paths)
+                .ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
+            if (derivative is null || string.IsNullOrWhiteSpace(derivative.Content))
+            {
+                throw new InvalidOperationException($"No readable polished transcript was available for export: {jobId}");
+            }
+
+            var content = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+            if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out var reason))
+            {
+                throw new InvalidOperationException($"Readable polished transcript is not usable and must be regenerated: {reason}");
+            }
+
+            return new ExportSnapshot(
+                jobId,
+                title,
+                pendingDraftCount,
+                [],
+                content);
+        }
+
         var segments = new TranscriptReadRepository(paths)
             .ReadForJob(jobId)
             .Select(segment => new TranscriptExportSegment(
@@ -158,6 +181,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         {
             TranscriptExportSource.Raw => segment.RawText,
             TranscriptExportSource.Polished => segment.Text,
+            TranscriptExportSource.ReadablePolished => segment.Text,
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }
@@ -168,6 +192,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         {
             TranscriptExportSource.Raw => "raw",
             TranscriptExportSource.Polished => "polished",
+            TranscriptExportSource.ReadablePolished => "readable_polished",
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }
@@ -314,6 +339,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static string RenderText(ExportSnapshot snapshot, TranscriptExportOptions options)
     {
+        if (snapshot.DocumentContent is { } documentContent)
+        {
+            return documentContent.TrimEnd() + Environment.NewLine;
+        }
+
         var builder = new StringBuilder();
         for (var i = 0; i < snapshot.Segments.Count; i++)
         {
@@ -337,6 +367,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static string RenderMarkdown(ExportSnapshot snapshot, TranscriptExportOptions options)
     {
+        if (snapshot.DocumentContent is { } documentContent)
+        {
+            return documentContent.TrimEnd() + Environment.NewLine;
+        }
+
         var builder = new StringBuilder()
             .Append("# ")
             .AppendLine(snapshot.Title)
@@ -378,6 +413,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static string RenderJson(ExportSnapshot snapshot)
     {
+        if (snapshot.DocumentContent is not null)
+        {
+            throw new InvalidOperationException("Readable polished transcript export does not support JSON.");
+        }
+
         var payload = new
         {
             snapshot.JobId,
@@ -391,6 +431,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static string RenderSrt(ExportSnapshot snapshot)
     {
+        if (snapshot.DocumentContent is not null)
+        {
+            throw new InvalidOperationException("Readable polished transcript export does not support SRT.");
+        }
+
         var builder = new StringBuilder();
         for (var i = 0; i < snapshot.Segments.Count; i++)
         {
@@ -408,6 +453,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static string RenderVtt(ExportSnapshot snapshot)
     {
+        if (snapshot.DocumentContent is not null)
+        {
+            throw new InvalidOperationException("Readable polished transcript export does not support VTT.");
+        }
+
         var builder = new StringBuilder("WEBVTT").AppendLine().AppendLine();
         foreach (var segment in snapshot.Segments)
         {
@@ -460,6 +510,11 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static void WriteXlsx(string path, ExportSnapshot snapshot)
     {
+        if (snapshot.DocumentContent is not null)
+        {
+            throw new InvalidOperationException("Readable polished transcript export does not support XLSX.");
+        }
+
         if (File.Exists(path))
         {
             File.Delete(path);
@@ -635,8 +690,19 @@ public sealed class TranscriptExportService(AppPaths paths)
         var builder = new StringBuilder()
             .AppendLine("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
             .AppendLine("""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">""")
-            .AppendLine("<w:body>")
-            .Append("<w:p><w:r><w:t>")
+            .AppendLine("<w:body>");
+
+        if (snapshot.DocumentContent is { } documentContent)
+        {
+            AppendDocxTextParagraphs(builder, documentContent);
+            return builder
+                .AppendLine("<w:sectPr/>")
+                .AppendLine("</w:body>")
+                .AppendLine("</w:document>")
+                .ToString();
+        }
+
+        builder.Append("<w:p><w:r><w:t>")
             .Append(SecurityElement.Escape(snapshot.Title))
             .AppendLine("</w:t></w:r></w:p>");
 
@@ -675,6 +741,25 @@ public sealed class TranscriptExportService(AppPaths paths)
             .ToString();
     }
 
+    private static void AppendDocxTextParagraphs(StringBuilder builder, string content)
+    {
+        var normalized = content
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        foreach (var line in normalized.Split('\n'))
+        {
+            builder.Append("<w:p><w:r><w:t");
+            if (RequiresXmlSpacePreserve(line))
+            {
+                builder.Append(" xml:space=\"preserve\"");
+            }
+
+            builder.Append('>')
+                .Append(SecurityElement.Escape(line))
+                .AppendLine("</w:t></w:r></w:p>");
+        }
+    }
+
     private static void AppendDisplayTimestamp(StringBuilder builder, TranscriptExportSegment segment, TranscriptExportOptions options)
     {
         if (!options.IncludeTimestamps)
@@ -700,5 +785,6 @@ public sealed class TranscriptExportService(AppPaths paths)
         string JobId,
         string Title,
         int PendingDraftCount,
-        IReadOnlyList<TranscriptExportSegment> Segments);
+        IReadOnlyList<TranscriptExportSegment> Segments,
+        string? DocumentContent = null);
 }

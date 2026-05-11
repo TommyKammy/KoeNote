@@ -56,6 +56,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptExportService _transcriptExportService;
     private readonly JobLogExportService _jobLogExportService;
     private readonly TranscriptExportDialogService _transcriptExportDialogService;
+    private readonly TranscriptPolishingService _transcriptPolishingService;
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
     private readonly ModelDownloadJobRepository _modelDownloadJobRepository;
@@ -121,6 +122,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _mergeConsecutiveSpeakersOnExport;
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
+    private string _readablePolishedContent = string.Empty;
+    private string _readablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+    private bool _isReadablePolishingInProgress;
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
     private string _modelDownloadProgressStageText = string.Empty;
@@ -202,6 +206,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptExportService = services.TranscriptExportService;
         _jobLogExportService = services.JobLogExportService;
         _transcriptExportDialogService = new TranscriptExportDialogService();
+        _transcriptPolishingService = services.TranscriptPolishingService;
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
         _modelDownloadJobRepository = services.ModelDownloadJobRepository;
@@ -299,6 +304,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
+        RunReadablePolishingCommand = new RelayCommand(RunReadablePolishingAsync, () => CanRunReadablePolishing);
         // Compatibility command for non-header callers; the normal UX separates review and summary.
         RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
@@ -374,6 +380,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportPolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportReadablePolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
+        ExportReadablePolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
+        ExportReadablePolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
         ExportSummaryMarkdownCommand = new RelayCommand(ExportSummaryMarkdownAsync, CanExportSummaryMarkdown);
         ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
@@ -612,6 +621,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool CanRunPostSummary => CanRunPostProcessSelectedJob;
 
+    public bool CanRunReadablePolishing => CanRunPostProcessSelectedJob;
+
     public bool CanRunPostReviewAndSummary => CanRunPostProcessSelectedJob;
 
     private bool CanRunPostProcessSelectedJob => SelectedJob is not null && !IsRunInProgress && !IsPostProcessInProgress && Segments.Count > 0;
@@ -726,6 +737,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunPostReviewCommand { get; }
 
     public ICommand RunPostSummaryCommand { get; }
+
+    public ICommand RunReadablePolishingCommand { get; }
 
     public ICommand RunPostReviewAndSummaryCommand { get; }
 
@@ -875,6 +888,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportPolishedDocxCommand { get; }
 
+    public ICommand ExportReadablePolishedTxtCommand { get; }
+
+    public ICommand ExportReadablePolishedMarkdownCommand { get; }
+
+    public ICommand ExportReadablePolishedDocxCommand { get; }
+
     public ICommand ExportSummaryMarkdownCommand { get; }
 
     public ICommand ExportSummaryTextCommand { get; }
@@ -923,6 +942,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
                 LoadSummaryForSelectedJob();
+                LoadReadablePolishedForSelectedJob();
                 LoadReviewQueue();
                 RefreshLogCommandStates();
                 UpdateExportCommandStates();
@@ -1545,7 +1565,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public int SelectedTranscriptTabIndex
     {
         get => _selectedTranscriptTabIndex;
-        set => SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 2));
+        set => SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3));
     }
 
     public bool IsPolishedTranscriptTabHighlighted
@@ -1719,6 +1739,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateReviewCommandStates();
                 UpdateSegmentEditCommandStates();
                 RefreshPostProcessCommandStates();
+                UpdateExportCommandStates();
             }
         }
     }
@@ -1945,6 +1966,60 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _summaryStatus;
         private set => SetField(ref _summaryStatus, value);
+    }
+
+    public string ReadablePolishedContent
+    {
+        get => _readablePolishedContent;
+        private set
+        {
+            if (SetField(ref _readablePolishedContent, value))
+            {
+                OnPropertyChanged(nameof(HasReadablePolishedContent));
+                OnPropertyChanged(nameof(ReadablePolishedContentDisplay));
+                OnPropertyChanged(nameof(ReadablePolishedActionText));
+                OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                UpdateExportCommandStates();
+            }
+        }
+    }
+
+    public bool HasReadablePolishedContent => !string.IsNullOrWhiteSpace(ReadablePolishedContent);
+
+    public string ReadablePolishedContentDisplay => HasReadablePolishedContent
+        ? ReadablePolishedContent
+        : "読みやすく整文はまだ生成されていません。";
+
+    public string ReadablePolishedActionText => IsReadablePolishingInProgress
+        ? "生成中"
+        : HasReadablePolishedContent
+            ? "再生成"
+            : "読みやすい文書を生成";
+
+    public string ReadablePolishedActionToolTip => IsReadablePolishingInProgress
+        ? "読みやすく整文を生成しています。完了すると結果タブに表示されます。"
+        : HasReadablePolishedContent
+            ? "選択ジョブ全体から読みやすく整文を再生成します。"
+            : "選択ジョブ全体から読みやすく整文を生成します。";
+
+    public bool IsReadablePolishingInProgress
+    {
+        get => _isReadablePolishingInProgress;
+        private set
+        {
+            if (SetField(ref _isReadablePolishingInProgress, value))
+            {
+                OnPropertyChanged(nameof(ReadablePolishedActionText));
+                OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                UpdateExportCommandStates();
+            }
+        }
+    }
+
+    public string ReadablePolishedStatus
+    {
+        get => _readablePolishedStatus;
+        private set => SetField(ref _readablePolishedStatus, value);
     }
 
     public double MainContentZoomScale
