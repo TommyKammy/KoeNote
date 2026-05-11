@@ -1486,6 +1486,7 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("読みやすく整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
         Assert.Equal("再生成", viewModel.ReadablePolishedActionText);
         Assert.Contains("再生成", viewModel.ReadablePolishedActionToolTip, StringComparison.Ordinal);
+        Assert.True(viewModel.CopyReadablePolishedContentCommand.CanExecute(null));
     }
 
     [Fact]
@@ -1523,6 +1524,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.HasReadablePolishedContent);
         Assert.Contains("破損", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.False(viewModel.CopyReadablePolishedContentCommand.CanExecute(null));
         Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
     }
 

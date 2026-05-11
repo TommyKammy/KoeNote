@@ -4,6 +4,22 @@
              xmlns:controls="clr-namespace:KoeNote.App.Controls">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="VisibleWhenReadablePolishedContent" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="VisibleWhenNoReadablePolishedContent" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="TranscriptTabItem" TargetType="TabItem">
             <Setter Property="Foreground" Value="#64748B" />
             <Setter Property="FontSize" Value="12" />
@@ -254,21 +270,67 @@
                                              Visibility="{Binding IsReadablePolishingInProgress, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
                         </Border>
-                        <Border Grid.Row="1"
+                        <Border x:Name="ReadablePolishedContentCard"
+                                Grid.Row="1"
                                 Background="#FFFFFF"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 Padding="16">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
-                                           FontSize="14"
-                                           FontWeight="Normal"
-                                           LineHeight="23"
-                                           Foreground="{StaticResource TextBrush}"
-                                           TextWrapping="Wrap" />
-                            </ScrollViewer>
+                            <Grid>
+                                <TextBox Text="{Binding ReadablePolishedContent, Mode=OneWay}"
+                                         IsReadOnly="True"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Padding="0"
+                                         FontSize="14"
+                                         FontWeight="Normal"
+                                         Foreground="{StaticResource TextBrush}"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         Style="{StaticResource VisibleWhenReadablePolishedContent}" />
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Style="{StaticResource VisibleWhenNoReadablePolishedContent}">
+                                    <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
+                                               FontSize="14"
+                                               FontWeight="Normal"
+                                               LineHeight="23"
+                                               Foreground="{StaticResource TextBrush}"
+                                               TextWrapping="Wrap" />
+                                </ScrollViewer>
+                                <Button HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Command="{Binding CopyReadablePolishedContentCommand}"
+                                        Padding="10,6"
+                                        ToolTip="読みやすく整文をコピー">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=ReadablePolishedContentCard}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <StackPanel Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE8C8;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="12"
+                                                   Margin="0,0,6,0" />
+                                        <TextBlock Text="コピー"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
                         </Border>
                     </Grid>
                 </TabItem>

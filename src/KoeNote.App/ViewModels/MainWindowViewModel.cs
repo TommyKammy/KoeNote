@@ -305,6 +305,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
         RunReadablePolishingCommand = new RelayCommand(RunReadablePolishingAsync, () => CanRunReadablePolishing);
+        CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
         // Compatibility command for non-header callers; the normal UX separates review and summary.
         RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
@@ -739,6 +740,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunPostSummaryCommand { get; }
 
     public ICommand RunReadablePolishingCommand { get; }
+
+    public ICommand CopyReadablePolishedContentCommand { get; }
 
     public ICommand RunPostReviewAndSummaryCommand { get; }
 
@@ -1979,6 +1982,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ReadablePolishedContentDisplay));
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                if (CopyReadablePolishedContentCommand is RelayCommand copyCommand)
+                {
+                    copyCommand.RaiseCanExecuteChanged();
+                }
+
                 UpdateExportCommandStates();
             }
         }

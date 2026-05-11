@@ -64,6 +64,18 @@ public sealed partial class MainWindowViewModel
             : $"読みやすく整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
 
+    private Task CopyReadablePolishedContentAsync()
+    {
+        if (!HasReadablePolishedContent)
+        {
+            return Task.CompletedTask;
+        }
+
+        System.Windows.Clipboard.SetText(ReadablePolishedContent);
+        LatestLog = "読みやすく整文をクリップボードにコピーしました。";
+        return Task.CompletedTask;
+    }
+
     private Task ExportSummaryMarkdownAsync()
     {
         return ExportSummaryAsync("Markdown (*.md)|*.md", "md", "markdown");
