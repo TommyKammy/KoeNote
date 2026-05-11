@@ -170,6 +170,62 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public async Task PolishAsync_RecoversMarkedBlockOutputThatOmitsTimestamp()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 1642, 1644, "Speaker_0", "raw one", "raw one"),
+            new TranscriptSegment("000002", "job-001", 1644, 1668, "Speaker_0", "raw two", "raw two")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => """
+                BEGIN_BLOCK block-001
+                Speaker_0: Polished readable sentence.
+                END_BLOCK block-001
+
+                BEGIN_BLOCK block-002
+                Speaker_0: Polished readable sentence.
+                END_BLOCK block-002
+                """));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal("[27:22 - 27:48] Speaker_0: Polished readable sentence.", result.Content);
+        Assert.DoesNotContain("raw one", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_RecoversJapaneseSpeakerMarkedBlockOutputThatUsesFullWidthColon()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 1642, 1644, "上嶋", "料理辛い風を乗り越える鍵となります", "料理辛い風を乗り越える鍵となります"),
+            new TranscriptSegment("000002", "job-001", 1644, 1668, "上嶋", "ご視聴いただきありがとうございました", "ご視聴いただきありがとうございました")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => """
+                BEGIN_BLOCK block-001
+                上嶋：読みやすく整えた本文です。
+                END_BLOCK block-001
+                """));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal("[27:22 - 27:48] 上嶋: 読みやすく整えた本文です。", result.Content);
+        Assert.DoesNotContain("料理辛い風", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PolishAsync_FallsBackToSourceBlockWhenOutputRepeatsLongLines()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();

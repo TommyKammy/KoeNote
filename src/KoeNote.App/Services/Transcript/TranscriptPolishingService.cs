@@ -33,12 +33,20 @@ public sealed class TranscriptPolishingService(
                 var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
                 if (!IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
                 {
-                    normalizedContent = BuildFallbackChunkContent(chunk);
-                    chunkResult = chunkResult with
+                    if (!TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
+                        !IsChunkOutputUsable(chunk, recoveredContent, out fallbackReason))
                     {
-                        UsedFallback = true,
-                        FallbackReason = fallbackReason
-                    };
+                        normalizedContent = BuildFallbackChunkContent(chunk);
+                        chunkResult = chunkResult with
+                        {
+                            UsedFallback = true,
+                            FallbackReason = fallbackReason
+                        };
+                    }
+                    else
+                    {
+                        normalizedContent = recoveredContent;
+                    }
                 }
 
                 chunkResults.Add(chunkResult with { Content = normalizedContent });
@@ -271,6 +279,75 @@ public sealed class TranscriptPolishingService(
         }
 
         return string.Join(Environment.NewLine + Environment.NewLine, blocks);
+    }
+
+    private static bool TryRecoverMissingTimestampContent(
+        TranscriptPolishingChunk chunk,
+        string content,
+        out string recoveredContent)
+    {
+        recoveredContent = string.Empty;
+        if (string.IsNullOrWhiteSpace(content) || content.Contains('\uFFFD', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var sourceBlocks = BuildSpeakerBlocks(chunk.Segments).ToArray();
+        var lines = content
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(static line => line.Trim())
+            .Where(static line => line.Length > 0)
+            .ToArray();
+        if (sourceBlocks.Length == 0 || lines.Length != sourceBlocks.Length)
+        {
+            return false;
+        }
+
+        var recoveredBlocks = new List<string>(sourceBlocks.Length);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var sourceBlock = sourceBlocks[index];
+            var first = sourceBlock[0];
+            var last = sourceBlock[^1];
+            var text = StripSpeakerPrefix(lines[index], first.Speaker).Trim();
+            if (string.IsNullOrWhiteSpace(text) || LooksLikeGeneratedWrapper(text))
+            {
+                return false;
+            }
+
+            recoveredBlocks.Add($"[{FormatTimestamp(first.StartSeconds)} - {FormatTimestamp(last.EndSeconds)}] {first.Speaker}: {text}");
+        }
+
+        recoveredContent = string.Join(Environment.NewLine + Environment.NewLine, recoveredBlocks);
+        return true;
+    }
+
+    private static string StripSpeakerPrefix(string line, string speaker)
+    {
+        var prefixes = new[]
+        {
+            $"{speaker}:",
+            $"{speaker}："
+        };
+
+        foreach (var prefix in prefixes)
+        {
+            if (line.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return line[prefix.Length..];
+            }
+        }
+
+        return line;
+    }
+
+    private static bool LooksLikeGeneratedWrapper(string text)
+    {
+        return text.StartsWith("BEGIN_BLOCK", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("END_BLOCK", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Output:", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatTimestamp(double seconds)
