@@ -7,5 +7,6 @@ public enum TranscriptExportFormat
     Json,
     Srt,
     Vtt,
-    Docx
+    Docx,
+    Xlsx
 }

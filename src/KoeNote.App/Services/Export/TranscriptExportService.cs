@@ -145,7 +145,9 @@ public sealed class TranscriptExportService(AppPaths paths)
                 segment.StartSeconds,
                 segment.EndSeconds,
                 segment.Speaker,
-                SelectExportText(segment, source)))
+                SelectExportText(segment, source),
+                segment.RawText,
+                string.IsNullOrWhiteSpace(segment.FinalText) ? string.Empty : segment.FinalText))
             .ToArray();
         return new ExportSnapshot(jobId, title, pendingDraftCount, segments);
     }
@@ -209,6 +211,12 @@ public sealed class TranscriptExportService(AppPaths paths)
         if (format == TranscriptExportFormat.Docx)
         {
             WriteDocx(path, snapshot, options);
+            return;
+        }
+
+        if (format == TranscriptExportFormat.Xlsx)
+        {
+            WriteXlsx(path, snapshot);
             return;
         }
 
@@ -344,8 +352,149 @@ public sealed class TranscriptExportService(AppPaths paths)
             TranscriptExportFormat.Srt => "srt",
             TranscriptExportFormat.Vtt => "vtt",
             TranscriptExportFormat.Docx => "docx",
+            TranscriptExportFormat.Xlsx => "xlsx",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
+    }
+
+    private static void WriteXlsx(string path, ExportSnapshot snapshot)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        WriteZipEntry(archive, "[Content_Types].xml", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+              <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+              <Default Extension="xml" ContentType="application/xml"/>
+              <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+              <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+              <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+            </Types>
+            """);
+        WriteZipEntry(archive, "_rels/.rels", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+            </Relationships>
+            """);
+        WriteZipEntry(archive, "xl/_rels/workbook.xml.rels", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+              <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+            </Relationships>
+            """);
+        WriteZipEntry(archive, "xl/workbook.xml", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets>
+                <sheet name="Transcript" sheetId="1" r:id="rId1"/>
+              </sheets>
+            </workbook>
+            """);
+        WriteZipEntry(archive, "xl/styles.xml", """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <fonts count="2">
+                <font><sz val="11"/><name val="Calibri"/></font>
+                <font><b/><sz val="11"/><name val="Calibri"/></font>
+              </fonts>
+              <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+              <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+              <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+              <cellXfs count="3">
+                <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+                <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+                <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>
+              </cellXfs>
+              <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+            </styleSheet>
+            """);
+        WriteZipEntry(archive, "xl/worksheets/sheet1.xml", RenderXlsxWorksheet(snapshot));
+    }
+
+    private static string RenderXlsxWorksheet(ExportSnapshot snapshot)
+    {
+        var builder = new StringBuilder()
+            .AppendLine("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
+            .AppendLine("""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""")
+            .AppendLine("""  <cols><col min="1" max="2" width="14" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="5" width="48" customWidth="1"/></cols>""")
+            .AppendLine("  <sheetData>");
+
+        AppendXlsxRow(builder, 1, ["開始時刻", "終了時刻", "話者", "素起こし", "整文"], styleId: 1);
+
+        for (var i = 0; i < snapshot.Segments.Count; i++)
+        {
+            var segment = snapshot.Segments[i];
+            AppendXlsxRow(
+                builder,
+                i + 2,
+                [
+                    TimestampFormatter.FormatDisplay(segment.StartSeconds),
+                    TimestampFormatter.FormatDisplay(segment.EndSeconds),
+                    segment.Speaker,
+                    segment.RawText,
+                    segment.PolishedText
+                ],
+                styleId: 2);
+        }
+
+        return builder
+            .AppendLine("  </sheetData>")
+            .AppendLine("</worksheet>")
+            .ToString();
+    }
+
+    private static void AppendXlsxRow(StringBuilder builder, int rowIndex, IReadOnlyList<string> values, int styleId)
+    {
+        builder.Append("    <row r=\"").Append(rowIndex).Append("\">");
+        for (var columnIndex = 0; columnIndex < values.Count; columnIndex++)
+        {
+            AppendInlineStringCell(builder, GetCellReference(columnIndex, rowIndex), values[columnIndex], styleId);
+        }
+
+        builder.AppendLine("</row>");
+    }
+
+    private static void AppendInlineStringCell(StringBuilder builder, string cellReference, string value, int styleId)
+    {
+        builder.Append("<c r=\"")
+            .Append(cellReference)
+            .Append("\" t=\"inlineStr\" s=\"")
+            .Append(styleId)
+            .Append("\"><is><t");
+
+        if (RequiresXmlSpacePreserve(value))
+        {
+            builder.Append(" xml:space=\"preserve\"");
+        }
+
+        builder.Append('>')
+            .Append(SecurityElement.Escape(value))
+            .Append("</t></is></c>");
+    }
+
+    private static bool RequiresXmlSpacePreserve(string value)
+    {
+        return value.Length > 0 && (char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]));
+    }
+
+    private static string GetCellReference(int zeroBasedColumnIndex, int rowIndex)
+    {
+        var columnName = new StringBuilder();
+        var index = zeroBasedColumnIndex;
+        do
+        {
+            columnName.Insert(0, (char)('A' + index % 26));
+            index = index / 26 - 1;
+        }
+        while (index >= 0);
+
+        return columnName.Append(rowIndex).ToString();
     }
 
     private static void WriteDocx(string path, ExportSnapshot snapshot, TranscriptExportOptions options)

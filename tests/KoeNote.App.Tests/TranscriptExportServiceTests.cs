@@ -5,6 +5,7 @@ using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
 using System.IO.Compression;
+using System.Xml.Linq;
 
 namespace KoeNote.App.Tests;
 
@@ -163,6 +164,52 @@ public sealed class TranscriptExportServiceTests
     }
 
     [Fact]
+    public void ExportJob_CanWriteXlsxWithRawAndPolishedColumns()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "xlsx-export");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 1.25, 2.5, "spk-1", "raw <one>\nsecond & line"),
+            new TranscriptSegment("seg-002", "job-001", 3, 4.125, "spk-2", "raw two")
+        ]);
+        SetFinalText(paths, "job-001", "seg-001", "polished <one>\nsecond & line");
+        SetSpeakerAlias(paths, "job-001", "spk-1", "Alice");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Xlsx]);
+
+        var file = Assert.Single(result.FilePaths);
+        Assert.Equal(Path.Combine(output, "xlsx-export.xlsx"), file);
+        Assert.True(File.Exists(file));
+
+        using var archive = ZipFile.OpenRead(file);
+        Assert.NotNull(archive.GetEntry("[Content_Types].xml"));
+        Assert.NotNull(archive.GetEntry("xl/styles.xml"));
+
+        var workbook = ReadZipXml(archive, "xl/workbook.xml");
+        XNamespace main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        Assert.Equal("Transcript", workbook.Descendants(main + "sheet").Single().Attribute("name")?.Value);
+
+        var worksheet = ReadZipXml(archive, "xl/worksheets/sheet1.xml");
+        var cells = ReadInlineStringCells(worksheet);
+        Assert.Equal("開始時刻", cells["A1"]);
+        Assert.Equal("終了時刻", cells["B1"]);
+        Assert.Equal("話者", cells["C1"]);
+        Assert.Equal("素起こし", cells["D1"]);
+        Assert.Equal("整文", cells["E1"]);
+        Assert.Equal("00:00:01.250", cells["A2"]);
+        Assert.Equal("00:00:02.500", cells["B2"]);
+        Assert.Equal("Alice", cells["C2"]);
+        Assert.Equal("raw <one>\nsecond & line", cells["D2"]);
+        Assert.Equal("polished <one>\nsecond & line", cells["E2"]);
+        Assert.Equal("00:00:03.000", cells["A3"]);
+        Assert.Equal("00:00:04.125", cells["B3"]);
+        Assert.Equal("spk-2", cells["C3"]);
+        Assert.Equal("raw two", cells["D3"]);
+        Assert.Equal(string.Empty, cells["E3"]);
+    }
+
+    [Fact]
     public void ExportJob_NormalizesBlankLinesInsideSubtitleCues()
     {
         var paths = TestDatabase.CreateReadyPaths();
@@ -181,6 +228,25 @@ public sealed class TranscriptExportServiceTests
         var vtt = File.ReadAllText(Path.Combine(output, "subtitle.vtt"));
         Assert.Contains($"spk-1: first line{Environment.NewLine}second line", vtt, StringComparison.Ordinal);
         Assert.DoesNotContain($"first line{Environment.NewLine}{Environment.NewLine}second line", vtt, StringComparison.Ordinal);
+    }
+
+    private static XDocument ReadZipXml(ZipArchive archive, string entryName)
+    {
+        var entry = archive.GetEntry(entryName);
+        Assert.NotNull(entry);
+        using var stream = entry.Open();
+        return XDocument.Load(stream);
+    }
+
+    private static Dictionary<string, string> ReadInlineStringCells(XDocument worksheet)
+    {
+        XNamespace main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        return worksheet
+            .Descendants(main + "c")
+            .Where(cell => cell.Attribute("r") is not null)
+            .ToDictionary(
+                cell => cell.Attribute("r")!.Value,
+                cell => string.Concat(cell.Descendants(main + "t").Select(static text => text.Value)));
     }
 
     private static void SetFinalText(AppPaths paths, string jobId, string segmentId, string finalText)

@@ -1298,6 +1298,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
         Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
+        Assert.True(viewModel.ExportTranscriptXlsxCommand.CanExecute(null));
     }
 
     [Fact]

@@ -5,4 +5,6 @@ public sealed record TranscriptExportSegment(
     double StartSeconds,
     double EndSeconds,
     string Speaker,
-    string Text);
+    string Text,
+    string RawText,
+    string PolishedText);

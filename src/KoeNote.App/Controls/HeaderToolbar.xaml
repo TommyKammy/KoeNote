@@ -98,6 +98,9 @@
                                 <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
+                            <MenuItem Header="素起こし+整文" Style="{StaticResource HeaderExportMenuItem}">
+                                <MenuItem Header="Excel" Command="{Binding ExportTranscriptXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            </MenuItem>
                             <MenuItem Header="整文" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />

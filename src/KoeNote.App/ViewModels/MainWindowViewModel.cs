@@ -369,6 +369,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportRawSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawVttCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Vtt, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportTranscriptXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Polished), CanExportSelectedJob);
@@ -864,6 +865,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ExportRawVttCommand { get; }
 
     public ICommand ExportRawDocxCommand { get; }
+
+    public ICommand ExportTranscriptXlsxCommand { get; }
 
     public ICommand ExportPolishedTxtCommand { get; }
 

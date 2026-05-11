@@ -70,13 +70,13 @@ public sealed partial class MainWindowViewModel
                 new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
-            LatestLog = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}を出力しました: {string.Join(", ", result.FilePaths)}";
+            LatestLog = $"{TranscriptExportDialogService.GetExportDisplayName(format, source)}を出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
+            ExportWarning = $"{TranscriptExportDialogService.GetExportDisplayName(format, source)}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(
                 SelectedJob.JobId,
@@ -112,13 +112,19 @@ public sealed partial class MainWindowViewModel
                 new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
-            LatestLog = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}を{result.FilePaths.Count}件出力しました: {string.Join(", ", result.FilePaths)}";
+            var exportName = format is { } selectedFormat
+                ? TranscriptExportDialogService.GetExportDisplayName(selectedFormat, source)
+                : TranscriptExportDialogService.GetSourceDisplayName(source);
+            LatestLog = $"{exportName}を{result.FilePaths.Count}件出力しました: {string.Join(", ", result.FilePaths)}";
             RefreshLogs();
             UpdateExportCommandStates();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            ExportWarning = $"{TranscriptExportDialogService.GetSourceDisplayName(source)}の出力に失敗しました: {exception.Message}";
+            var exportName = format is { } selectedFormat
+                ? TranscriptExportDialogService.GetExportDisplayName(selectedFormat, source)
+                : TranscriptExportDialogService.GetSourceDisplayName(source);
+            ExportWarning = $"{exportName}の出力に失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
             _jobLogRepository.AddEvent(
                 SelectedJob.JobId,
@@ -204,6 +210,7 @@ public sealed partial class MainWindowViewModel
         RaiseExportCommandState(ExportRawSrtCommand);
         RaiseExportCommandState(ExportRawVttCommand);
         RaiseExportCommandState(ExportRawDocxCommand);
+        RaiseExportCommandState(ExportTranscriptXlsxCommand);
         RaiseExportCommandState(ExportPolishedTxtCommand);
         RaiseExportCommandState(ExportPolishedMarkdownCommand);
         RaiseExportCommandState(ExportPolishedDocxCommand);

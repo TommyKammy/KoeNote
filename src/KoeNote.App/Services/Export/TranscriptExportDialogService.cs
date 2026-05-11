@@ -14,7 +14,7 @@ public sealed class TranscriptExportDialogService
         var defaultFormat = format ?? TranscriptExportFormat.Text;
         var dialog = new SaveFileDialog
         {
-            Title = $"{GetSourceDisplayName(source)}を出力",
+            Title = $"{GetExportDisplayName(defaultFormat, source)}を出力",
             AddExtension = true,
             OverwritePrompt = true,
             FileName = CreateDefaultFileName(jobFileName, defaultFormat, source),
@@ -46,6 +46,13 @@ public sealed class TranscriptExportDialogService
         };
     }
 
+    public static string GetExportDisplayName(TranscriptExportFormat format, TranscriptExportSource source)
+    {
+        return format == TranscriptExportFormat.Xlsx
+            ? "素起こし+整文"
+            : GetSourceDisplayName(source);
+    }
+
     private static string CreateDefaultFileName(
         string jobFileName,
         TranscriptExportFormat format,
@@ -57,12 +64,14 @@ public sealed class TranscriptExportDialogService
             baseName = "transcript";
         }
 
-        var suffix = source switch
-        {
-            TranscriptExportSource.Raw => ".raw",
-            TranscriptExportSource.Polished => ".polished",
-            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
-        };
+        var suffix = format == TranscriptExportFormat.Xlsx
+            ? ".transcript"
+            : source switch
+            {
+                TranscriptExportSource.Raw => ".raw",
+                TranscriptExportSource.Polished => ".polished",
+                _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+            };
         return $"{baseName}{suffix}.{GetExtension(format)}";
     }
 
@@ -96,6 +105,7 @@ public sealed class TranscriptExportDialogService
             TranscriptExportFormat.Srt => "SRT subtitles",
             TranscriptExportFormat.Vtt => "WebVTT subtitles",
             TranscriptExportFormat.Docx => "Word document",
+            TranscriptExportFormat.Xlsx => "Excel workbook",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
     }
@@ -110,6 +120,7 @@ public sealed class TranscriptExportDialogService
             TranscriptExportFormat.Srt => "srt",
             TranscriptExportFormat.Vtt => "vtt",
             TranscriptExportFormat.Docx => "docx",
+            TranscriptExportFormat.Xlsx => "xlsx",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
         };
     }
