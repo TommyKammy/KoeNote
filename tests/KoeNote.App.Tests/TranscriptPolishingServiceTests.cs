@@ -19,7 +19,10 @@ public sealed class TranscriptPolishingServiceTests
         ]);
         var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
         var runtime = new FakePolishingRuntime(chunk =>
-            $"[00:00 - 00:01] Speaker_0: [{chunk.ChunkIndex}] {string.Join(" / ", chunk.Segments.Select(segment => segment.Text))}");
+            string.Join(Environment.NewLine + Environment.NewLine, chunk.Segments
+                .GroupBy(static segment => segment.Speaker)
+                .Select(group =>
+                    $"[{FormatTestTimestamp(group.First().StartSeconds)} - {FormatTestTimestamp(group.Last().EndSeconds)}] {group.Key}: [{chunk.ChunkIndex}] {string.Join(" / ", group.Select(segment => segment.Text))}")));
         var service = new TranscriptPolishingService(
             new TranscriptReadRepository(fixture.Paths),
             derivativeRepository,
@@ -61,7 +64,8 @@ public sealed class TranscriptPolishingServiceTests
         var service = new TranscriptPolishingService(
             new TranscriptReadRepository(fixture.Paths),
             derivativeRepository,
-            new FakePolishingRuntime(chunk => $"[00:00 - 00:01] Speaker_0: {string.Join(",", chunk.Segments.Select(static segment => segment.SegmentId))}"));
+            new FakePolishingRuntime(chunk =>
+                $"[{FormatTestTimestamp(chunk.Segments[0].StartSeconds)} - {FormatTestTimestamp(chunk.Segments[^1].EndSeconds)}] {chunk.Segments[0].Speaker}: {string.Join(",", chunk.Segments.Select(static segment => segment.SegmentId))}"));
 
         var result = await service.PolishAsync(CreateOptions("job-001", chunkSegmentCount: 3));
 
@@ -145,7 +149,7 @@ public sealed class TranscriptPolishingServiceTests
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
         SaveSegments(fixture.Paths, [
-            new TranscriptSegment("000001", "job-001", 25, 27, "Speaker_0", "raw", "raw")
+            new TranscriptSegment("000001", "job-001", 1557, 1642, "Speaker_0", "raw", "raw")
         ]);
         var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
         var service = new TranscriptPolishingService(
@@ -194,6 +198,39 @@ public sealed class TranscriptPolishingServiceTests
         var result = await service.PolishAsync(CreateOptions("job-001"));
 
         Assert.Equal("[27:22 - 27:48] Speaker_0: Polished readable sentence.", result.Content);
+        Assert.DoesNotContain("raw one", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_RecoversSingleMarkedBlockWithoutTimestampWhenItHasParagraphs()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 4.56, 10, "Speaker_0", "raw one", "raw one"),
+            new TranscriptSegment("000002", "job-001", 10, 185.38, "Speaker_0", "raw two", "raw two")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => """
+                Unrelated preamble from the model.
+
+                BEGIN_BLOCK block-001
+                こんにちは、友育プロジェクト推進委員の上条です。
+
+                本日は、育休中のリスクと対策についてお話しします。
+                END_BLOCK block-001
+                """));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal(
+            $"[00:04 - 03:05] Speaker_0: こんにちは、友育プロジェクト推進委員の上条です。{Environment.NewLine}{Environment.NewLine}本日は、育休中のリスクと対策についてお話しします。",
+            result.Content);
+        Assert.DoesNotContain("Unrelated preamble", result.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("raw one", result.Content, StringComparison.Ordinal);
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
         Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
@@ -280,6 +317,55 @@ public sealed class TranscriptPolishingServiceTests
         Assert.Contains("raw", derivative.Content, StringComparison.Ordinal);
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
         Assert.Contains("fallback=contains replacement characters", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_FallsBackToSourceBlockWhenOutputAddsExtraTimestampedBlocks()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 1661.9, 1664.66, "Speaker_0", "please use the follow-up episode", "please use the follow-up episode"),
+            new TranscriptSegment("000002", "job-001", 1664.66, 1666.9, "Speaker_0", "thank you for watching", "thank you for watching")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => """
+                [27:41 - 27:47] Speaker_0: Please use the follow-up episode. Thank you for watching.
+
+                [27:47 - 27:50] Speaker_0: See you in the next video. Thank you.
+                """));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal(
+            $"[27:41 - 27:46] Speaker_0: please use the follow-up episode{Environment.NewLine}thank you for watching",
+            result.Content);
+        Assert.DoesNotContain("See you in the next video", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=unexpected transcript block count", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_FallsBackToSourceBlockWhenOutputTimestampExceedsSourceBlock()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 1661.9, 1666.9, "Speaker_0", "thank you", "thank you")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => "[27:41 - 28:00] Speaker_0: Thank you. See you in the next video."));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal("[27:41 - 27:46] Speaker_0: thank you", result.Content);
+        Assert.DoesNotContain("next video", result.Content, StringComparison.OrdinalIgnoreCase);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=timestamp outside source block", chunk.GenerationProfile, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -442,6 +528,14 @@ public sealed class TranscriptPolishingServiceTests
     private static void SaveSegments(AppPaths paths, IReadOnlyList<TranscriptSegment> segments)
     {
         new TranscriptSegmentRepository(paths).SaveSegments(segments);
+    }
+
+    private static string FormatTestTimestamp(double seconds)
+    {
+        var time = TimeSpan.FromSeconds(seconds);
+        return time.TotalHours >= 1
+            ? $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}"
+            : $"{time.Minutes:00}:{time.Seconds:00}";
     }
 
     private sealed class FakePolishingRuntime(Func<TranscriptPolishingChunk, string> responseFactory) : ITranscriptPolishingRuntime

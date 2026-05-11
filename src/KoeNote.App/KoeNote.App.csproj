@@ -11,7 +11,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\AppIcon.ico" />
+    <Content Include="Resources\AppIcon.ico"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always" />
     <Resource Include="Resources\KoeNoteBirdMono.png" />
     <Resource Include="Resources\KoeNoteLogoMark.png" />
     <Resource Include="Resources\KoeNoteTitle.png" />

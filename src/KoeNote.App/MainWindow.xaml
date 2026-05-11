@@ -6,7 +6,7 @@
         xmlns:controls="clr-namespace:KoeNote.App.Controls"
         mc:Ignorable="d"
         Title="KoeNote" Height="820" Width="1360" MinHeight="720" MinWidth="1080"
-        Icon="pack://application:,,,/Resources/AppIcon.ico"
+        Icon="pack://siteoforigin:,,,/Resources/AppIcon.ico"
         Background="#F8F9FA"
         FontFamily="Meiryo UI"
         AllowDrop="True"

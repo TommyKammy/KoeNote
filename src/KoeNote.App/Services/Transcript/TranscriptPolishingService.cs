@@ -34,7 +34,8 @@ public sealed class TranscriptPolishingService(
                 var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
                 if (!TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
                 {
-                    if (!TranscriptPolishingFallbackBuilder.TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
+                    if (!string.Equals(fallbackReason, TranscriptPolishingFallbackBuilder.MissingTimestampReason, StringComparison.Ordinal) ||
+                        !TranscriptPolishingFallbackBuilder.TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
                         !TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, recoveredContent, out fallbackReason))
                     {
                         normalizedContent = TranscriptPolishingFallbackBuilder.BuildFallbackChunkContent(chunk);
