@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)][string]$PayloadDir,
     [int]$MaxReviewRuntimeMB = 700,
     [int]$MaxAsrRuntimeMB = 180,
-    [int]$MaxBundledPythonMB = 120
+    [int]$MaxBundledPythonMB = 120,
+    [int]$MaxFfmpegRuntimeMB = 180
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,6 +54,24 @@ $failures = New-Object System.Collections.Generic.List[string]
 $reviewRuntimeDir = Join-Path $payloadRoot "tools\review"
 $asrRuntimeDir = Join-Path $payloadRoot "tools\asr"
 $bundledPythonDir = Join-Path $payloadRoot "tools\python"
+$ffmpegRuntimeDir = Join-Path $payloadRoot "tools"
+
+$ffmpegRequiredPatterns = @(
+    "avcodec-*.dll",
+    "avdevice-*.dll",
+    "avfilter-*.dll",
+    "avformat-*.dll",
+    "avutil-*.dll",
+    "swresample-*.dll",
+    "swscale-*.dll"
+)
+
+foreach ($pattern in $ffmpegRequiredPatterns) {
+    $matches = Get-ChildItem -LiteralPath $ffmpegRuntimeDir -File -Filter $pattern -ErrorAction SilentlyContinue
+    if ($matches.Count -eq 0) {
+        $failures.Add("FFmpeg shared runtime dependency is missing from the MSI payload: tools\$pattern")
+    }
+}
 
 $nvidiaRedistributablePatterns = @(
     "cublas*.dll",
@@ -115,9 +134,19 @@ if (Test-Path -LiteralPath $sitePackagesDir -PathType Container) {
 $reviewRuntimeBytes = Get-DirectorySizeBytes -Path $reviewRuntimeDir
 $asrRuntimeBytes = Get-DirectorySizeBytes -Path $asrRuntimeDir
 $bundledPythonBytes = Get-DirectorySizeBytes -Path $bundledPythonDir
+$ffmpegRuntimeBytes = 0L
+if (Test-Path -LiteralPath $ffmpegRuntimeDir -PathType Container) {
+    $ffmpegRuntimeFiles = Get-ChildItem -LiteralPath $ffmpegRuntimeDir -File |
+        Where-Object { $_.Name -eq "ffmpeg.exe" -or $_.Name -match '^(avcodec|avdevice|avfilter|avformat|avutil|swresample|swscale)-.*\.dll$' }
+    $ffmpegRuntimeSum = ($ffmpegRuntimeFiles | Measure-Object Length -Sum).Sum
+    if ($null -ne $ffmpegRuntimeSum) {
+        $ffmpegRuntimeBytes = [int64]$ffmpegRuntimeSum
+    }
+}
 $maxReviewRuntimeBytes = [int64]$MaxReviewRuntimeMB * 1MB
 $maxAsrRuntimeBytes = [int64]$MaxAsrRuntimeMB * 1MB
 $maxBundledPythonBytes = [int64]$MaxBundledPythonMB * 1MB
+$maxFfmpegRuntimeBytes = [int64]$MaxFfmpegRuntimeMB * 1MB
 
 if ($reviewRuntimeBytes -gt $maxReviewRuntimeBytes) {
     $failures.Add("Review runtime payload is too large for the GPU-ready MSI: $(Format-Size $reviewRuntimeBytes), limit $(Format-Size $maxReviewRuntimeBytes).")
@@ -129,6 +158,10 @@ if ($asrRuntimeBytes -gt $maxAsrRuntimeBytes) {
 
 if ($bundledPythonBytes -gt $maxBundledPythonBytes) {
     $failures.Add("Bundled Python payload is too large for the GPU-ready MSI: $(Format-Size $bundledPythonBytes), limit $(Format-Size $maxBundledPythonBytes).")
+}
+
+if ($ffmpegRuntimeBytes -gt $maxFfmpegRuntimeBytes) {
+    $failures.Add("FFmpeg runtime payload is too large for the GPU-ready MSI: $(Format-Size $ffmpegRuntimeBytes), limit $(Format-Size $maxFfmpegRuntimeBytes).")
 }
 
 if ($failures.Count -gt 0) {
@@ -144,4 +177,6 @@ if ($failures.Count -gt 0) {
     MaxAsrRuntimeMB = $MaxAsrRuntimeMB
     BundledPythonMB = [math]::Round($bundledPythonBytes / 1MB, 2)
     MaxBundledPythonMB = $MaxBundledPythonMB
+    FfmpegRuntimeMB = [math]::Round($ffmpegRuntimeBytes / 1MB, 2)
+    MaxFfmpegRuntimeMB = $MaxFfmpegRuntimeMB
 }

@@ -18,12 +18,12 @@
       "notes": "Verify package license metadata during release packaging."
     },
     {
-      "name": "ffmpeg.exe",
+      "name": "FFmpeg runtime",
       "type": "runtime tool",
       "license": "LGPL/GPL depending on enabled codecs",
       "source": "https://ffmpeg.org/",
-      "expectedPath": "tools/ffmpeg.exe",
-      "notes": "Used for local audio normalization before ASR."
+      "expectedPath": "tools/ffmpeg.exe; tools/avcodec-*.dll; tools/avdevice-*.dll; tools/avfilter-*.dll; tools/avformat-*.dll; tools/avutil-*.dll; tools/swresample-*.dll; tools/swscale-*.dll",
+      "notes": "Used for local audio normalization before ASR. Shared FFmpeg builds require the companion DLLs to be deployed next to ffmpeg.exe."
     },
     {
       "name": "Python 3.12 x64 runtime",

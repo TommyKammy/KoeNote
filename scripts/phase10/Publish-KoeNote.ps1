@@ -113,8 +113,29 @@ New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "samples") | Ou
 
 $toolsSource = Join-Path $repoRoot "tools"
 $ffmpegSource = Join-Path $toolsSource "ffmpeg.exe"
+$ffmpegDestinationDir = Join-Path $publishDir "tools"
+$ffmpegRequiredDllPatterns = @(
+    "avcodec-*.dll",
+    "avdevice-*.dll",
+    "avfilter-*.dll",
+    "avformat-*.dll",
+    "avutil-*.dll",
+    "swresample-*.dll",
+    "swscale-*.dll"
+)
 if (Test-Path -LiteralPath $ffmpegSource) {
-    Copy-Item -LiteralPath $ffmpegSource -Destination (Join-Path $publishDir "tools\ffmpeg.exe") -Force
+    Copy-Item -LiteralPath $ffmpegSource -Destination (Join-Path $ffmpegDestinationDir "ffmpeg.exe") -Force
+
+    foreach ($pattern in $ffmpegRequiredDllPatterns) {
+        $matches = Get-ChildItem -LiteralPath $toolsSource -File -Filter $pattern
+        if ($matches.Count -eq 0) {
+            throw "Missing required FFmpeg shared runtime dependency matching '$pattern' under $toolsSource. Copy the DLLs from the same FFmpeg build as ffmpeg.exe before publishing."
+        }
+
+        foreach ($match in $matches) {
+            Copy-Item -LiteralPath $match.FullName -Destination (Join-Path $ffmpegDestinationDir $match.Name) -Force
+        }
+    }
 }
 else {
     throw "Missing required Phase 10 core runtime: $ffmpegSource. Place ffmpeg.exe there before publishing KoeNote Core."

@@ -35,10 +35,28 @@ $requiredFiles = @(
     "samples\koenote-smoke-1s.wav"
 )
 
+$requiredFilePatterns = @(
+    "tools\avcodec-*.dll",
+    "tools\avdevice-*.dll",
+    "tools\avfilter-*.dll",
+    "tools\avformat-*.dll",
+    "tools\avutil-*.dll",
+    "tools\swresample-*.dll",
+    "tools\swscale-*.dll"
+)
+
 foreach ($relativePath in $requiredFiles) {
     $path = Join-Path $installDirFull $relativePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing installed Core file: $path"
+    }
+}
+
+foreach ($relativePattern in $requiredFilePatterns) {
+    $pattern = Join-Path $installDirFull $relativePattern
+    $matches = Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue
+    if ($matches.Count -eq 0) {
+        throw "Missing installed Core file matching pattern: $pattern"
     }
 }
 

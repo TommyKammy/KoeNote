@@ -9,6 +9,13 @@ KoeNote.App.exe
 README.distribution.md
 licenses/license-manifest.json
 tools/ffmpeg.exe
+tools/avcodec-*.dll
+tools/avdevice-*.dll
+tools/avfilter-*.dll
+tools/avformat-*.dll
+tools/avutil-*.dll
+tools/swresample-*.dll
+tools/swscale-*.dll
 tools/python/python.exe
 tools/review/llama-completion.exe
 tools/review/ggml-cuda.dll
@@ -22,6 +29,8 @@ models/review/README-review-models-not-included.txt
 samples/README-sample-audio.txt
 samples/koenote-smoke-1s.wav
 ```
+
+KoeNote Core includes FFmpeg under `tools/` for local audio normalization. Shared FFmpeg builds require companion DLLs such as `avformat-*.dll`, `avcodec-*.dll`, and `avutil-*.dll`; these DLLs must stay next to `ffmpeg.exe` so KoeNote works on machines that do not have FFmpeg installed globally.
 
 KoeNote Core includes a minimal Python 3.12 x64 runtime under `tools/python/` so ASR and speaker diarization setup do not depend on host Python. It also includes the llama.cpp CPU x64 review runtime under `tools/review/` so Review can run after the selected Review model is installed.
 
