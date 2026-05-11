@@ -3,23 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:KoeNote.App.Controls">
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <Style x:Key="VisibleWhenReadablePolishedContent" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="VisibleWhenNoReadablePolishedContent" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Visible" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
         <Style x:Key="TranscriptTabItem" TargetType="TabItem">
             <Setter Property="Foreground" Value="#64748B" />
             <Setter Property="FontSize" Value="12" />
@@ -215,124 +198,7 @@
                     <controls:TranscriptSegmentList DisplayMode="Diff" />
                 </TabItem>
                 <TabItem Header="読みやすく整文">
-                    <Grid Margin="0,8,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Border Grid.Row="0"
-                                Background="#F8FAFC"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="12,9"
-                                Margin="0,0,0,10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" LastChildFill="True">
-                                <Button DockPanel.Dock="Right"
-                                        Style="{StaticResource OutlineSuccessButton}"
-                                        Command="{Binding RunReadablePolishingCommand}"
-                                        ToolTip="{Binding ReadablePolishedActionToolTip}"
-                                        Padding="14,8"
-                                        Margin="12,0,0,0">
-                                    <StackPanel Orientation="Horizontal"
-                                                VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE70F;"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   FontSize="13"
-                                                   Margin="0,0,7,0"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Text="{Binding ReadablePolishedActionText}"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                                <Ellipse DockPanel.Dock="Left"
-                                         Width="8"
-                                         Height="8"
-                                         Fill="{StaticResource AccentBrush}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,8,0" />
-                                <TextBlock Text="{Binding ReadablePolishedStatus}"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           FontSize="12"
-                                           TextWrapping="Wrap" />
-                            </DockPanel>
-                                <ProgressBar Grid.Row="1"
-                                             Height="4"
-                                             Margin="0,8,0,0"
-                                             IsIndeterminate="True"
-                                             Visibility="{Binding IsReadablePolishingInProgress, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            </Grid>
-                        </Border>
-                        <Border x:Name="ReadablePolishedContentCard"
-                                Grid.Row="1"
-                                Background="#FFFFFF"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="16">
-                            <Grid>
-                                <TextBox Text="{Binding ReadablePolishedContent, Mode=OneWay}"
-                                         IsReadOnly="True"
-                                         BorderThickness="0"
-                                         Background="Transparent"
-                                         Padding="0"
-                                         FontSize="14"
-                                         FontWeight="Normal"
-                                         Foreground="{StaticResource TextBrush}"
-                                         TextWrapping="Wrap"
-                                         AcceptsReturn="True"
-                                         VerticalScrollBarVisibility="Auto"
-                                         HorizontalScrollBarVisibility="Disabled"
-                                         Style="{StaticResource VisibleWhenReadablePolishedContent}" />
-                                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              Style="{StaticResource VisibleWhenNoReadablePolishedContent}">
-                                    <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
-                                               FontSize="14"
-                                               FontWeight="Normal"
-                                               LineHeight="23"
-                                               Foreground="{StaticResource TextBrush}"
-                                               TextWrapping="Wrap" />
-                                </ScrollViewer>
-                                <Button HorizontalAlignment="Right"
-                                        VerticalAlignment="Top"
-                                        Command="{Binding CopyReadablePolishedContentCommand}"
-                                        Padding="10,6"
-                                        ToolTip="読みやすく整文をコピー">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=ReadablePolishedContentCard}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="False">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <StackPanel Orientation="Horizontal"
-                                                VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE8C8;"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   FontSize="12"
-                                                   Margin="0,0,6,0" />
-                                        <TextBlock Text="コピー"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Button>
-                            </Grid>
-                        </Border>
-                    </Grid>
+                    <controls:ReadablePolishedPanel />
                 </TabItem>
             </TabControl>
         </DockPanel>

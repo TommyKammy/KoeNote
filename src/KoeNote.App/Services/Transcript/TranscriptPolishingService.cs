@@ -20,7 +20,8 @@ public sealed class TranscriptPolishingService(
         }
 
         var sourceHash = TranscriptDerivativeRepository.ComputeSourceTranscriptHash(segments);
-        var chunks = BuildChunks(segments, options.ChunkSegmentCount).ToArray();
+        var sourceSegmentRange = TranscriptPolishingChunkBuilder.BuildSegmentRange(segments);
+        var chunks = TranscriptPolishingChunkBuilder.BuildChunks(segments, options.ChunkSegmentCount).ToArray();
         var duration = TimeSpan.Zero;
         var chunkResults = new List<TranscriptPolishingChunkResult>(chunks.Length);
 
@@ -31,12 +32,12 @@ public sealed class TranscriptPolishingService(
                 cancellationToken.ThrowIfCancellationRequested();
                 var chunkResult = await runtime.PolishChunkAsync(options, chunk, cancellationToken);
                 var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
-                if (!IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
+                if (!TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
                 {
-                    if (!TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
-                        !IsChunkOutputUsable(chunk, recoveredContent, out fallbackReason))
+                    if (!TranscriptPolishingFallbackBuilder.TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
+                        !TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, recoveredContent, out fallbackReason))
                     {
-                        normalizedContent = BuildFallbackChunkContent(chunk);
+                        normalizedContent = TranscriptPolishingFallbackBuilder.BuildFallbackChunkContent(chunk);
                         chunkResult = chunkResult with
                         {
                             UsedFallback = true,
@@ -55,18 +56,18 @@ public sealed class TranscriptPolishingService(
         }
         catch (ReviewWorkerException exception)
         {
-            return SaveFailed(options, sourceHash, exception.Message, BuildSegmentRange(segments));
+            return SaveFailed(options, sourceHash, exception.Message, sourceSegmentRange);
         }
         catch (TimeoutException exception)
         {
-            return SaveFailed(options, sourceHash, exception.Message, BuildSegmentRange(segments));
+            return SaveFailed(options, sourceHash, exception.Message, sourceSegmentRange);
         }
 
         var content = string.Join(Environment.NewLine + Environment.NewLine, chunkResults.Select(static result => result.Content.Trim()))
             .Trim();
         if (string.IsNullOrWhiteSpace(content))
         {
-            return SaveFailed(options, sourceHash, "Transcript polishing returned empty output.", BuildSegmentRange(segments));
+            return SaveFailed(options, sourceHash, "Transcript polishing returned empty output.", sourceSegmentRange);
         }
 
         var derivative = derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
@@ -76,7 +77,7 @@ public sealed class TranscriptPolishingService(
             content,
             TranscriptDerivativeSourceKinds.Raw,
             sourceHash,
-            BuildSegmentRange(segments),
+            sourceSegmentRange,
             null,
             options.ModelId,
             options.PromptVersion,
@@ -109,7 +110,7 @@ public sealed class TranscriptPolishingService(
             content,
             TranscriptDerivativeSourceKinds.Raw,
             sourceHash,
-            BuildSegmentRange(segments),
+            sourceSegmentRange,
             string.Join(",", chunkResults.Select(result => BuildChunkId(derivativeId, result.Chunk))),
             options.ModelId,
             options.PromptVersion,
@@ -155,77 +156,6 @@ public sealed class TranscriptPolishingService(
             TimeSpan.Zero);
     }
 
-    private static IEnumerable<TranscriptPolishingChunk> BuildChunks(
-        IReadOnlyList<TranscriptReadModel> segments,
-        int chunkSegmentCount)
-    {
-        var chunkIndex = 1;
-        var currentChunk = new List<TranscriptReadModel>();
-
-        foreach (var speakerBlock in BuildSpeakerBlocks(segments))
-        {
-            if (speakerBlock.Count > chunkSegmentCount)
-            {
-                if (currentChunk.Count > 0)
-                {
-                    yield return new TranscriptPolishingChunk(chunkIndex++, currentChunk.ToArray());
-                    currentChunk.Clear();
-                }
-
-                for (var index = 0; index < speakerBlock.Count; index += chunkSegmentCount)
-                {
-                    yield return new TranscriptPolishingChunk(
-                        chunkIndex++,
-                        speakerBlock.Skip(index).Take(chunkSegmentCount).ToArray());
-                }
-
-                continue;
-            }
-
-            if (currentChunk.Count > 0 && currentChunk.Count + speakerBlock.Count > chunkSegmentCount)
-            {
-                yield return new TranscriptPolishingChunk(chunkIndex++, currentChunk.ToArray());
-                currentChunk.Clear();
-            }
-
-            currentChunk.AddRange(speakerBlock);
-        }
-
-        if (currentChunk.Count > 0)
-        {
-            yield return new TranscriptPolishingChunk(chunkIndex, currentChunk.ToArray());
-        }
-    }
-
-    private static IEnumerable<IReadOnlyList<TranscriptReadModel>> BuildSpeakerBlocks(
-        IReadOnlyList<TranscriptReadModel> segments)
-    {
-        var currentBlock = new List<TranscriptReadModel>();
-        var currentSpeaker = string.Empty;
-
-        foreach (var segment in segments)
-        {
-            if (currentBlock.Count > 0 && !string.Equals(currentSpeaker, segment.Speaker, StringComparison.Ordinal))
-            {
-                yield return currentBlock.ToArray();
-                currentBlock.Clear();
-            }
-
-            currentSpeaker = segment.Speaker;
-            currentBlock.Add(segment);
-        }
-
-        if (currentBlock.Count > 0)
-        {
-            yield return currentBlock.ToArray();
-        }
-    }
-
-    private static string BuildSegmentRange(IReadOnlyList<TranscriptReadModel> segments)
-    {
-        return segments.Count == 0 ? string.Empty : $"{segments[0].SegmentId}..{segments[^1].SegmentId}";
-    }
-
     private static string BuildChunkId(string derivativeId, TranscriptPolishingChunk chunk)
     {
         return $"{derivativeId}-chunk-{chunk.ChunkIndex:D3}";
@@ -238,125 +168,6 @@ public sealed class TranscriptPolishingService(
         return chunkResult.UsedFallback
             ? $"{generationProfile}; fallback={chunkResult.FallbackReason}"
             : generationProfile;
-    }
-
-    private static bool IsChunkOutputUsable(TranscriptPolishingChunk chunk, string content, out string reason)
-    {
-        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out reason))
-        {
-            return false;
-        }
-
-        var sourceLength = chunk.Segments.Sum(static segment => Math.Max(0, segment.Text.Length));
-        if (sourceLength > 0 && content.Length > 2000 && content.Length > sourceLength * 6)
-        {
-            reason = "expanded far beyond the source chunk";
-            return false;
-        }
-
-        reason = string.Empty;
-        return true;
-    }
-
-    private static string BuildFallbackChunkContent(TranscriptPolishingChunk chunk)
-    {
-        var blocks = new List<string>();
-        foreach (var speakerBlock in BuildSpeakerBlocks(chunk.Segments))
-        {
-            var first = speakerBlock[0];
-            var last = speakerBlock[^1];
-            var text = string.Join(
-                Environment.NewLine,
-                speakerBlock
-                    .Select(static segment => segment.Text.Trim())
-                    .Where(static text => text.Length > 0));
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                continue;
-            }
-
-            blocks.Add($"[{FormatTimestamp(first.StartSeconds)} - {FormatTimestamp(last.EndSeconds)}] {first.Speaker}: {text}");
-        }
-
-        return string.Join(Environment.NewLine + Environment.NewLine, blocks);
-    }
-
-    private static bool TryRecoverMissingTimestampContent(
-        TranscriptPolishingChunk chunk,
-        string content,
-        out string recoveredContent)
-    {
-        recoveredContent = string.Empty;
-        if (string.IsNullOrWhiteSpace(content) || content.Contains('\uFFFD', StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var sourceBlocks = BuildSpeakerBlocks(chunk.Segments).ToArray();
-        var lines = content
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n')
-            .Split('\n')
-            .Select(static line => line.Trim())
-            .Where(static line => line.Length > 0)
-            .ToArray();
-        if (sourceBlocks.Length == 0 || lines.Length != sourceBlocks.Length)
-        {
-            return false;
-        }
-
-        var recoveredBlocks = new List<string>(sourceBlocks.Length);
-        for (var index = 0; index < lines.Length; index++)
-        {
-            var sourceBlock = sourceBlocks[index];
-            var first = sourceBlock[0];
-            var last = sourceBlock[^1];
-            var text = StripSpeakerPrefix(lines[index], first.Speaker).Trim();
-            if (string.IsNullOrWhiteSpace(text) || LooksLikeGeneratedWrapper(text))
-            {
-                return false;
-            }
-
-            recoveredBlocks.Add($"[{FormatTimestamp(first.StartSeconds)} - {FormatTimestamp(last.EndSeconds)}] {first.Speaker}: {text}");
-        }
-
-        recoveredContent = string.Join(Environment.NewLine + Environment.NewLine, recoveredBlocks);
-        return true;
-    }
-
-    private static string StripSpeakerPrefix(string line, string speaker)
-    {
-        var prefixes = new[]
-        {
-            $"{speaker}:",
-            $"{speaker}："
-        };
-
-        foreach (var prefix in prefixes)
-        {
-            if (line.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return line[prefix.Length..];
-            }
-        }
-
-        return line;
-    }
-
-    private static bool LooksLikeGeneratedWrapper(string text)
-    {
-        return text.StartsWith("BEGIN_BLOCK", StringComparison.OrdinalIgnoreCase) ||
-            text.StartsWith("END_BLOCK", StringComparison.OrdinalIgnoreCase) ||
-            text.StartsWith("Output:", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string FormatTimestamp(double seconds)
-    {
-        var clamped = Math.Max(0, seconds);
-        var time = TimeSpan.FromSeconds(clamped);
-        return time.TotalHours >= 1
-            ? $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}"
-            : $"{time.Minutes:00}:{time.Seconds:00}";
     }
 
     private static void ValidateOptions(TranscriptPolishingOptions options)
