@@ -118,6 +118,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _exportWarning = string.Empty;
     private string _lastExportFolder = string.Empty;
     private bool _includeExportTimestamps = true;
+    private bool _mergeConsecutiveSpeakersOnExport;
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
     private string _latestLog;
@@ -1884,6 +1885,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _includeExportTimestamps;
         set => SetField(ref _includeExportTimestamps, value);
+    }
+
+    public bool MergeConsecutiveSpeakersOnExport
+    {
+        get => _mergeConsecutiveSpeakersOnExport;
+        set => SetField(ref _mergeConsecutiveSpeakersOnExport, value);
     }
 
     public string SummaryContent

@@ -115,6 +115,10 @@
                                       IsCheckable="True"
                                       IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
                                       Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="同じ話者をまとめる"
+                                      IsCheckable="True"
+                                      IsChecked="{Binding MergeConsecutiveSpeakersOnExport, Mode=TwoWay}"
+                                      Style="{StaticResource HeaderExportMenuItem}" />
                             <Separator Style="{StaticResource HeaderMenuSeparator}" />
                             <MenuItem Header="出力フォルダーを開く"
                                       Command="{Binding OpenExportFolderCommand}"

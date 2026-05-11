@@ -210,6 +210,170 @@ public sealed class TranscriptExportServiceTests
     }
 
     [Fact]
+    public void ExportJob_CanMergeConsecutiveSpeakersForReadableFormats()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "merge-export");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw one"),
+            new TranscriptSegment("seg-002", "job-001", 1.5, 2.5, "spk-1", "raw two"),
+            new TranscriptSegment("seg-003", "job-001", 3, 4, "spk-2", "raw three")
+        ]);
+        SetFinalText(paths, "job-001", "seg-001", "final one");
+        SetFinalText(paths, "job-001", "seg-002", "final two");
+        SetFinalText(paths, "job-001", "seg-003", "final three");
+        SetSpeakerAlias(paths, "job-001", "spk-1", "Alice");
+        SetSpeakerAlias(paths, "job-001", "spk-2", "Bob");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx, TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Docx],
+            new TranscriptExportOptions(IncludeTimestamps: false, MergeConsecutiveSpeakers: true));
+
+        using (var archive = ZipFile.OpenRead(Path.Combine(output, "merge-export.xlsx")))
+        {
+            var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+            Assert.Equal("00:00:00.000", cells["A2"]);
+            Assert.Equal("00:00:02.500", cells["B2"]);
+            Assert.Equal("Alice", cells["C2"]);
+            Assert.Equal("raw one\nraw two", cells["D2"]);
+            Assert.Equal("final one\nfinal two", cells["E2"]);
+            Assert.Equal("Bob", cells["C3"]);
+            Assert.Equal("raw three", cells["D3"]);
+            Assert.Equal("final three", cells["E3"]);
+            Assert.False(cells.ContainsKey("A4"));
+        }
+
+        var text = File.ReadAllText(Path.Combine(output, "merge-export.txt"));
+        Assert.Contains($"Alice: final one{Environment.NewLine}final two", text, StringComparison.Ordinal);
+        Assert.Contains($"final two{Environment.NewLine}{Environment.NewLine}Bob: final three", text, StringComparison.Ordinal);
+        Assert.DoesNotContain($"Alice: final one{Environment.NewLine}Alice: final two", text, StringComparison.Ordinal);
+
+        var markdown = File.ReadAllText(Path.Combine(output, "merge-export.md"));
+        Assert.Contains($"**Alice**: final one{Environment.NewLine}final two", markdown, StringComparison.Ordinal);
+        Assert.Contains($"final two{Environment.NewLine}{Environment.NewLine}- **Bob**: final three", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain($"**Alice**: final one{Environment.NewLine}- **Alice**: final two", markdown, StringComparison.Ordinal);
+
+        using var docx = ZipFile.OpenRead(Path.Combine(output, "merge-export.docx"));
+        var document = docx.GetEntry("word/document.xml");
+        Assert.NotNull(document);
+        using var reader = new StreamReader(document.Open());
+        var xml = reader.ReadToEnd();
+        Assert.Contains("Alice: final one", xml, StringComparison.Ordinal);
+        Assert.Contains("final two", xml, StringComparison.Ordinal);
+        Assert.Contains($"final two</w:t></w:r></w:p>{Environment.NewLine}<w:p><w:r><w:t></w:t></w:r></w:p>{Environment.NewLine}<w:p><w:r><w:t>Bob: final three", xml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Alice: final two", xml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportJob_MergedXlsxLeavesPolishedColumnBlankWhenNoPolishedTextExists()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "blank-polished");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw one"),
+            new TranscriptSegment("seg-002", "job-001", 1.5, 2.5, "spk-1", "raw two")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(MergeConsecutiveSpeakers: true));
+
+        using var archive = ZipFile.OpenRead(Path.Combine(output, "blank-polished.xlsx"));
+        var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+        Assert.Equal("raw one\nraw two", cells["D2"]);
+        Assert.Equal(string.Empty, cells["E2"]);
+        Assert.False(cells.ContainsKey("A3"));
+    }
+
+    [Fact]
+    public void ExportJob_DoesNotMergeWhenOptionDisabled()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "no-merge");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw one"),
+            new TranscriptSegment("seg-002", "job-001", 1.5, 2.5, "spk-1", "raw two")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Xlsx]);
+
+        using var archive = ZipFile.OpenRead(Path.Combine(output, "no-merge.xlsx"));
+        var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+        Assert.Equal("raw one", cells["D2"]);
+        Assert.Equal("raw two", cells["D3"]);
+    }
+
+    [Fact]
+    public void ExportJob_DoesNotInsertSpeakerBlockBlankLinesWhenMergeDisabled()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "no-blank-lines");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw one"),
+            new TranscriptSegment("seg-002", "job-001", 1.5, 2.5, "spk-2", "raw two")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Docx],
+            new TranscriptExportOptions(IncludeTimestamps: false, Source: TranscriptExportSource.Raw));
+
+        var text = File.ReadAllText(Path.Combine(output, "no-blank-lines.txt"));
+        Assert.Contains($"spk-1: raw one{Environment.NewLine}spk-2: raw two", text, StringComparison.Ordinal);
+        Assert.DoesNotContain($"spk-1: raw one{Environment.NewLine}{Environment.NewLine}spk-2: raw two", text, StringComparison.Ordinal);
+
+        var markdown = File.ReadAllText(Path.Combine(output, "no-blank-lines.md"));
+        Assert.Contains($"**spk-1**: raw one{Environment.NewLine}- **spk-2**: raw two", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain($"**spk-1**: raw one{Environment.NewLine}{Environment.NewLine}- **spk-2**: raw two", markdown, StringComparison.Ordinal);
+
+        using var docx = ZipFile.OpenRead(Path.Combine(output, "no-blank-lines.docx"));
+        var document = docx.GetEntry("word/document.xml");
+        Assert.NotNull(document);
+        using var reader = new StreamReader(document.Open());
+        var xml = reader.ReadToEnd();
+        Assert.DoesNotContain("<w:p><w:r><w:t></w:t></w:r></w:p>", xml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExportJob_DoesNotMergeJsonSrtOrVtt()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "non-readable");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw one"),
+            new TranscriptSegment("seg-002", "job-001", 1.5, 2.5, "spk-1", "raw two")
+        ]);
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Json, TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt],
+            new TranscriptExportOptions(MergeConsecutiveSpeakers: true));
+
+        var json = File.ReadAllText(Path.Combine(output, "non-readable.json"));
+        Assert.Contains("\"SegmentId\": \"seg-001\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"SegmentId\": \"seg-002\"", json, StringComparison.Ordinal);
+
+        var srt = File.ReadAllText(Path.Combine(output, "non-readable.srt"));
+        Assert.Contains("00:00:00,000 --> 00:00:01,000", srt, StringComparison.Ordinal);
+        Assert.Contains("00:00:01,500 --> 00:00:02,500", srt, StringComparison.Ordinal);
+
+        var vtt = File.ReadAllText(Path.Combine(output, "non-readable.vtt"));
+        Assert.Contains("00:00:00.000 --> 00:00:01.000", vtt, StringComparison.Ordinal);
+        Assert.Contains("00:00:01.500 --> 00:00:02.500", vtt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ExportJob_NormalizesBlankLinesInsideSubtitleCues()
     {
         var paths = TestDatabase.CreateReadyPaths();

@@ -208,26 +208,121 @@ public sealed class TranscriptExportService(AppPaths paths)
 
     private static void WriteFormat(string path, ExportSnapshot snapshot, TranscriptExportFormat format, TranscriptExportOptions options)
     {
+        var renderSnapshot = ApplyFormatOptions(snapshot, format, options);
         if (format == TranscriptExportFormat.Docx)
         {
-            WriteDocx(path, snapshot, options);
+            WriteDocx(path, renderSnapshot, options);
             return;
         }
 
         if (format == TranscriptExportFormat.Xlsx)
         {
-            WriteXlsx(path, snapshot);
+            WriteXlsx(path, renderSnapshot);
             return;
         }
 
-        File.WriteAllText(path, Render(snapshot, format, options), Encoding.UTF8);
+        File.WriteAllText(path, Render(renderSnapshot, format, options), Encoding.UTF8);
+    }
+
+    private static ExportSnapshot ApplyFormatOptions(
+        ExportSnapshot snapshot,
+        TranscriptExportFormat format,
+        TranscriptExportOptions options)
+    {
+        return options.MergeConsecutiveSpeakers && SupportsSpeakerMerging(format)
+            ? snapshot with { Segments = MergeConsecutiveSpeakerSegments(snapshot.Segments) }
+            : snapshot;
+    }
+
+    private static bool SupportsSpeakerMerging(TranscriptExportFormat format)
+    {
+        return format is TranscriptExportFormat.Text
+            or TranscriptExportFormat.Markdown
+            or TranscriptExportFormat.Docx
+            or TranscriptExportFormat.Xlsx;
+    }
+
+    private static IReadOnlyList<TranscriptExportSegment> MergeConsecutiveSpeakerSegments(
+        IReadOnlyList<TranscriptExportSegment> segments)
+    {
+        if (segments.Count <= 1)
+        {
+            return segments;
+        }
+
+        var merged = new List<TranscriptExportSegment>();
+        TranscriptExportSegment? current = null;
+
+        foreach (var segment in segments)
+        {
+            if (current is not null && CanMergeSpeakerSegments(current, segment))
+            {
+                current = MergeSpeakerSegments(current, segment);
+                continue;
+            }
+
+            if (current is not null)
+            {
+                merged.Add(current);
+            }
+
+            current = segment;
+        }
+
+        if (current is not null)
+        {
+            merged.Add(current);
+        }
+
+        return merged;
+    }
+
+    private static bool CanMergeSpeakerSegments(TranscriptExportSegment left, TranscriptExportSegment right)
+    {
+        return !string.IsNullOrWhiteSpace(left.Speaker)
+            && string.Equals(left.Speaker, right.Speaker, StringComparison.Ordinal);
+    }
+
+    private static TranscriptExportSegment MergeSpeakerSegments(
+        TranscriptExportSegment left,
+        TranscriptExportSegment right)
+    {
+        return left with
+        {
+            SegmentId = $"{left.SegmentId}+{right.SegmentId}",
+            EndSeconds = right.EndSeconds,
+            Text = JoinExportText(left.Text, right.Text),
+            RawText = JoinExportText(left.RawText, right.RawText),
+            PolishedText = JoinExportText(left.PolishedText, right.PolishedText)
+        };
+    }
+
+    private static string JoinExportText(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left))
+        {
+            return string.IsNullOrWhiteSpace(right) ? string.Empty : right;
+        }
+
+        if (string.IsNullOrWhiteSpace(right))
+        {
+            return left;
+        }
+
+        return string.Concat(left, Environment.NewLine, right);
     }
 
     private static string RenderText(ExportSnapshot snapshot, TranscriptExportOptions options)
     {
         var builder = new StringBuilder();
-        foreach (var segment in snapshot.Segments)
+        for (var i = 0; i < snapshot.Segments.Count; i++)
         {
+            if (options.MergeConsecutiveSpeakers && i > 0)
+            {
+                builder.AppendLine();
+            }
+
+            var segment = snapshot.Segments[i];
             AppendDisplayTimestamp(builder, segment, options);
             if (!string.IsNullOrWhiteSpace(segment.Speaker))
             {
@@ -254,8 +349,14 @@ public sealed class TranscriptExportService(AppPaths paths)
                 .AppendLine();
         }
 
-        foreach (var segment in snapshot.Segments)
+        for (var i = 0; i < snapshot.Segments.Count; i++)
         {
+            if (options.MergeConsecutiveSpeakers && i > 0)
+            {
+                builder.AppendLine();
+            }
+
+            var segment = snapshot.Segments[i];
             builder.Append("- ");
             if (options.IncludeTimestamps)
             {
@@ -546,8 +647,14 @@ public sealed class TranscriptExportService(AppPaths paths)
                 .AppendLine("</w:t></w:r></w:p>");
         }
 
-        foreach (var segment in snapshot.Segments)
+        for (var i = 0; i < snapshot.Segments.Count; i++)
         {
+            if (options.MergeConsecutiveSpeakers && i > 0)
+            {
+                builder.AppendLine("<w:p><w:r><w:t></w:t></w:r></w:p>");
+            }
+
+            var segment = snapshot.Segments[i];
             var prefix = options.IncludeTimestamps
                 ? $"[{TimestampFormatter.FormatDisplay(segment.StartSeconds)} - {TimestampFormatter.FormatDisplay(segment.EndSeconds)}] "
                 : string.Empty;

@@ -67,7 +67,10 @@ public sealed partial class MainWindowViewModel
                 SelectedJob.JobId,
                 outputPath,
                 format,
-                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
+                new TranscriptExportOptions(
+                    IncludeTimestamps: IncludeExportTimestamps,
+                    Source: source,
+                    MergeConsecutiveSpeakers: MergeConsecutiveSpeakersOnExport));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
             LatestLog = $"{TranscriptExportDialogService.GetExportDisplayName(format, source)}を出力しました: {string.Join(", ", result.FilePaths)}";
@@ -109,7 +112,10 @@ public sealed partial class MainWindowViewModel
                 SelectedJob.JobId,
                 outputDirectory,
                 formats,
-                new TranscriptExportOptions(IncludeTimestamps: IncludeExportTimestamps, Source: source));
+                new TranscriptExportOptions(
+                    IncludeTimestamps: IncludeExportTimestamps,
+                    Source: source,
+                    MergeConsecutiveSpeakers: MergeConsecutiveSpeakersOnExport));
             LastExportFolder = result.OutputDirectory;
             ExportWarning = CreateExportWarning(result);
             var exportName = format is { } selectedFormat

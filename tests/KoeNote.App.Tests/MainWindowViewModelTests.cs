@@ -1,10 +1,13 @@
 using System.Collections;
+using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Input;
+using System.Xml.Linq;
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
+using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
@@ -1528,6 +1531,45 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void MergeConsecutiveSpeakersOnExport_CanBeToggled()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.MergeConsecutiveSpeakersOnExport = true;
+
+        Assert.True(viewModel.MergeConsecutiveSpeakersOnExport);
+    }
+
+    [Fact]
+    public void ExportSelectedJobToFolder_UsesMergeConsecutiveSpeakersOption()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw one"),
+            new TranscriptSegment("segment-002", job.JobId, 1.5, 2.5, "Speaker_0", "raw two")
+        ]);
+        var output = Path.Combine(root, "exports");
+        var viewModel = new MainWindowViewModel(paths)
+        {
+            MergeConsecutiveSpeakersOnExport = true
+        };
+
+        viewModel.ExportSelectedJobToFolder(output, TranscriptExportFormat.Xlsx, TranscriptExportSource.Raw);
+
+        using var archive = ZipFile.OpenRead(Path.Combine(output, "meeting.xlsx"));
+        var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+        Assert.Equal("00:00:00.000", cells["A2"]);
+        Assert.Equal("00:00:02.500", cells["B2"]);
+        Assert.Equal("Speaker_0", cells["C2"]);
+        Assert.Equal("raw one\nraw two", cells["D2"]);
+        Assert.False(cells.ContainsKey("A3"));
+    }
+
+    [Fact]
     public void FirstRunSummary_ReportsMissingRuntimeAssets()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -2867,6 +2909,25 @@ public sealed class MainWindowViewModelTests
             BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException($"Method not found: {methodName}");
         return (T)method.Invoke(null, arguments)!;
+    }
+
+    private static XDocument ReadZipXml(ZipArchive archive, string entryName)
+    {
+        var entry = archive.GetEntry(entryName);
+        Assert.NotNull(entry);
+        using var stream = entry.Open();
+        return XDocument.Load(stream);
+    }
+
+    private static Dictionary<string, string> ReadInlineStringCells(XDocument worksheet)
+    {
+        XNamespace main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        return worksheet
+            .Descendants(main + "c")
+            .Where(cell => cell.Attribute("r") is not null)
+            .ToDictionary(
+                cell => cell.Attribute("r")!.Value,
+                cell => string.Concat(cell.Descendants(main + "t").Select(static text => text.Value)));
     }
 
     private static void Touch(string path)
