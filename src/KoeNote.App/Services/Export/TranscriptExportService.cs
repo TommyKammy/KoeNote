@@ -242,7 +242,7 @@ public sealed class TranscriptExportService(AppPaths paths)
 
         if (format == TranscriptExportFormat.Xlsx)
         {
-            WriteXlsx(path, renderSnapshot);
+            WriteXlsx(path, renderSnapshot, options);
             return;
         }
 
@@ -508,13 +508,8 @@ public sealed class TranscriptExportService(AppPaths paths)
         };
     }
 
-    private static void WriteXlsx(string path, ExportSnapshot snapshot)
+    private static void WriteXlsx(string path, ExportSnapshot snapshot, TranscriptExportOptions options)
     {
-        if (snapshot.DocumentContent is not null)
-        {
-            throw new InvalidOperationException("Readable polished transcript export does not support XLSX.");
-        }
-
         if (File.Exists(path))
         {
             File.Delete(path);
@@ -570,18 +565,28 @@ public sealed class TranscriptExportService(AppPaths paths)
               <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
             </styleSheet>
             """);
-        WriteZipEntry(archive, "xl/worksheets/sheet1.xml", RenderXlsxWorksheet(snapshot));
+        WriteZipEntry(archive, "xl/worksheets/sheet1.xml", RenderXlsxWorksheet(snapshot, options.Source));
     }
 
-    private static string RenderXlsxWorksheet(ExportSnapshot snapshot)
+    private static string RenderXlsxWorksheet(ExportSnapshot snapshot, TranscriptExportSource source)
     {
         var builder = new StringBuilder()
             .AppendLine("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
             .AppendLine("""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""")
-            .AppendLine("""  <cols><col min="1" max="2" width="14" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="5" width="48" customWidth="1"/></cols>""")
+            .AppendLine(GetXlsxColumns(source))
             .AppendLine("  <sheetData>");
 
-        AppendXlsxRow(builder, 1, ["開始時刻", "終了時刻", "話者", "素起こし", "整文"], styleId: 1);
+        if (source == TranscriptExportSource.ReadablePolished)
+        {
+            AppendXlsxRow(builder, 1, ["読みやすく整文"], styleId: 1);
+            AppendXlsxRow(builder, 2, [snapshot.DocumentContent ?? string.Empty], styleId: 2);
+            return builder
+                .AppendLine("  </sheetData>")
+                .AppendLine("</worksheet>")
+                .ToString();
+        }
+
+        AppendXlsxRow(builder, 1, GetXlsxHeaders(source), styleId: 1);
 
         for (var i = 0; i < snapshot.Segments.Count; i++)
         {
@@ -589,13 +594,7 @@ public sealed class TranscriptExportService(AppPaths paths)
             AppendXlsxRow(
                 builder,
                 i + 2,
-                [
-                    TimestampFormatter.FormatDisplay(segment.StartSeconds),
-                    TimestampFormatter.FormatDisplay(segment.EndSeconds),
-                    segment.Speaker,
-                    segment.RawText,
-                    segment.PolishedText
-                ],
+                GetXlsxSegmentValues(segment, source),
                 styleId: 2);
         }
 
@@ -603,6 +602,46 @@ public sealed class TranscriptExportService(AppPaths paths)
             .AppendLine("  </sheetData>")
             .AppendLine("</worksheet>")
             .ToString();
+    }
+
+    private static string GetXlsxColumns(TranscriptExportSource source)
+    {
+        return source == TranscriptExportSource.ReadablePolished
+            ? """  <cols><col min="1" max="1" width="120" customWidth="1"/></cols>"""
+            : """  <cols><col min="1" max="2" width="14" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="64" customWidth="1"/></cols>""";
+    }
+
+    private static string[] GetXlsxHeaders(TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.Raw => ["開始時刻", "終了時刻", "話者", "素起こし"],
+            TranscriptExportSource.Polished => ["開始時刻", "終了時刻", "話者", "整文"],
+            TranscriptExportSource.ReadablePolished => ["読みやすく整文"],
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
+    }
+
+    private static string[] GetXlsxSegmentValues(TranscriptExportSegment segment, TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.Raw =>
+            [
+                TimestampFormatter.FormatDisplay(segment.StartSeconds),
+                TimestampFormatter.FormatDisplay(segment.EndSeconds),
+                segment.Speaker,
+                segment.Text
+            ],
+            TranscriptExportSource.Polished =>
+            [
+                TimestampFormatter.FormatDisplay(segment.StartSeconds),
+                TimestampFormatter.FormatDisplay(segment.EndSeconds),
+                segment.Speaker,
+                segment.Text
+            ],
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
     }
 
     private static void AppendXlsxRow(StringBuilder builder, int rowIndex, IReadOnlyList<string> values, int styleId)

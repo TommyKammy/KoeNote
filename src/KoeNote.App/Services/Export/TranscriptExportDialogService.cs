@@ -50,7 +50,7 @@ public sealed class TranscriptExportDialogService
     public static string GetExportDisplayName(TranscriptExportFormat format, TranscriptExportSource source)
     {
         return format == TranscriptExportFormat.Xlsx
-            ? "素起こし+整文"
+            ? $"{GetSourceDisplayName(source)} Excel"
             : GetSourceDisplayName(source);
     }
 
@@ -65,15 +65,13 @@ public sealed class TranscriptExportDialogService
             baseName = "transcript";
         }
 
-        var suffix = format == TranscriptExportFormat.Xlsx
-            ? ".transcript"
-            : source switch
-            {
-                TranscriptExportSource.Raw => ".raw",
-                TranscriptExportSource.Polished => ".polished",
-                TranscriptExportSource.ReadablePolished => ".readable-polished",
-                _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
-            };
+        var suffix = source switch
+        {
+            TranscriptExportSource.Raw => ".raw",
+            TranscriptExportSource.Polished => ".polished",
+            TranscriptExportSource.ReadablePolished => ".readable-polished",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
         return $"{baseName}{suffix}.{GetExtension(format)}";
     }
 

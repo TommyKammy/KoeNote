@@ -227,16 +227,18 @@ public sealed partial class MainWindowViewModel
 
         RaiseExportCommandState(ExportRawTxtCommand);
         RaiseExportCommandState(ExportRawMarkdownCommand);
+        RaiseExportCommandState(ExportRawXlsxCommand);
         RaiseExportCommandState(ExportRawJsonCommand);
         RaiseExportCommandState(ExportRawSrtCommand);
         RaiseExportCommandState(ExportRawVttCommand);
         RaiseExportCommandState(ExportRawDocxCommand);
-        RaiseExportCommandState(ExportTranscriptXlsxCommand);
         RaiseExportCommandState(ExportPolishedTxtCommand);
         RaiseExportCommandState(ExportPolishedMarkdownCommand);
+        RaiseExportCommandState(ExportPolishedXlsxCommand);
         RaiseExportCommandState(ExportPolishedDocxCommand);
         RaiseExportCommandState(ExportReadablePolishedTxtCommand);
         RaiseExportCommandState(ExportReadablePolishedMarkdownCommand);
+        RaiseExportCommandState(ExportReadablePolishedXlsxCommand);
         RaiseExportCommandState(ExportReadablePolishedDocxCommand);
 
         if (ExportSummaryMarkdownCommand is RelayCommand summaryCommand)

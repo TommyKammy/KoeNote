@@ -97,22 +97,22 @@
                             <MenuItem Header="素起こし" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="TXT" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Excel" Command="{Binding ExportRawXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="JSON" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="SRT" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
-                            <MenuItem Header="素起こし+整文" Style="{StaticResource HeaderExportMenuItem}">
-                                <MenuItem Header="Excel" Command="{Binding ExportTranscriptXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                            </MenuItem>
                             <MenuItem Header="整文" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Excel" Command="{Binding ExportPolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
                             <MenuItem Header="読みやすく整文" Style="{StaticResource HeaderExportMenuItem}">
                                 <MenuItem Header="TXT" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="Markdown" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                                <MenuItem Header="Excel" Command="{Binding ExportReadablePolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
                             <MenuItem Header="要約" Style="{StaticResource HeaderExportMenuItem}">

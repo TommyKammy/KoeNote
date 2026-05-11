@@ -1301,7 +1301,8 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
         Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
-        Assert.True(viewModel.ExportTranscriptXlsxCommand.CanExecute(null));
+        Assert.True(viewModel.ExportRawXlsxCommand.CanExecute(null));
+        Assert.True(viewModel.ExportPolishedXlsxCommand.CanExecute(null));
         Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
 
         var derivativeRepository = new TranscriptDerivativeRepository(paths);
@@ -1321,6 +1322,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedMarkdownCommand.CanExecute(null));
+        Assert.True(viewModel.ExportReadablePolishedXlsxCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedDocxCommand.CanExecute(null));
     }
 

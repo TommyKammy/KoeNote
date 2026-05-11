@@ -373,16 +373,18 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
         ExportRawTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Raw), CanExportSelectedJob);
+        ExportRawXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawVttCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Vtt, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportTranscriptXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportPolishedXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportPolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportReadablePolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
         ExportReadablePolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
+        ExportReadablePolishedXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
         ExportReadablePolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
         ExportSummaryMarkdownCommand = new RelayCommand(ExportSummaryMarkdownAsync, CanExportSummaryMarkdown);
         ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
@@ -875,6 +877,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportRawMarkdownCommand { get; }
 
+    public ICommand ExportRawXlsxCommand { get; }
+
     public ICommand ExportRawJsonCommand { get; }
 
     public ICommand ExportRawSrtCommand { get; }
@@ -883,17 +887,19 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportRawDocxCommand { get; }
 
-    public ICommand ExportTranscriptXlsxCommand { get; }
-
     public ICommand ExportPolishedTxtCommand { get; }
 
     public ICommand ExportPolishedMarkdownCommand { get; }
+
+    public ICommand ExportPolishedXlsxCommand { get; }
 
     public ICommand ExportPolishedDocxCommand { get; }
 
     public ICommand ExportReadablePolishedTxtCommand { get; }
 
     public ICommand ExportReadablePolishedMarkdownCommand { get; }
+
+    public ICommand ExportReadablePolishedXlsxCommand { get; }
 
     public ICommand ExportReadablePolishedDocxCommand { get; }
 

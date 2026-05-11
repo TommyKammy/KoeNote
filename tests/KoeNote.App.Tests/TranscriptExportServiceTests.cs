@@ -255,7 +255,7 @@ public sealed class TranscriptExportServiceTests
     }
 
     [Fact]
-    public void ExportJob_CanWriteXlsxWithRawAndPolishedColumns()
+    public void ExportJob_CanWriteRawXlsx()
     {
         var paths = TestDatabase.CreateReadyPaths();
         TestDatabase.InsertReviewReadyJob(paths, "job-001", "xlsx-export");
@@ -263,11 +263,14 @@ public sealed class TranscriptExportServiceTests
             new TranscriptSegment("seg-001", "job-001", 1.25, 2.5, "spk-1", "raw <one>\nsecond & line"),
             new TranscriptSegment("seg-002", "job-001", 3, 4.125, "spk-2", "raw two")
         ]);
-        SetFinalText(paths, "job-001", "seg-001", "polished <one>\nsecond & line");
         SetSpeakerAlias(paths, "job-001", "spk-1", "Alice");
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        var result = new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Xlsx]);
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Raw));
 
         var file = Assert.Single(result.FilePaths);
         Assert.Equal(Path.Combine(output, "xlsx-export.xlsx"), file);
@@ -287,17 +290,88 @@ public sealed class TranscriptExportServiceTests
         Assert.Equal("終了時刻", cells["B1"]);
         Assert.Equal("話者", cells["C1"]);
         Assert.Equal("素起こし", cells["D1"]);
-        Assert.Equal("整文", cells["E1"]);
         Assert.Equal("00:00:01.250", cells["A2"]);
         Assert.Equal("00:00:02.500", cells["B2"]);
         Assert.Equal("Alice", cells["C2"]);
         Assert.Equal("raw <one>\nsecond & line", cells["D2"]);
-        Assert.Equal("polished <one>\nsecond & line", cells["E2"]);
         Assert.Equal("00:00:03.000", cells["A3"]);
         Assert.Equal("00:00:04.125", cells["B3"]);
         Assert.Equal("spk-2", cells["C3"]);
         Assert.Equal("raw two", cells["D3"]);
-        Assert.Equal(string.Empty, cells["E3"]);
+        Assert.False(cells.ContainsKey("E1"));
+    }
+
+    [Fact]
+    public void ExportJob_CanWritePolishedXlsx()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "polished-xlsx");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 1.25, 2.5, "spk-1", "raw <one>\nsecond & line")
+        ]);
+        SetFinalText(paths, "job-001", "seg-001", "polished <one>\nsecond & line");
+        SetSpeakerAlias(paths, "job-001", "spk-1", "Alice");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished));
+
+        var file = Assert.Single(result.FilePaths);
+        Assert.Equal(Path.Combine(output, "polished-xlsx.xlsx"), file);
+        using var archive = ZipFile.OpenRead(file);
+        var worksheet = ReadZipXml(archive, "xl/worksheets/sheet1.xml");
+        var cells = ReadInlineStringCells(worksheet);
+        Assert.Equal("開始時刻", cells["A1"]);
+        Assert.Equal("終了時刻", cells["B1"]);
+        Assert.Equal("話者", cells["C1"]);
+        Assert.Equal("整文", cells["D1"]);
+        Assert.Equal("00:00:01.250", cells["A2"]);
+        Assert.Equal("00:00:02.500", cells["B2"]);
+        Assert.Equal("Alice", cells["C2"]);
+        Assert.Equal("polished <one>\nsecond & line", cells["D2"]);
+        Assert.False(cells.ContainsKey("E1"));
+    }
+
+    [Fact]
+    public void ExportJob_CanWriteReadablePolishedXlsx()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "readable-xlsx");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            "job-001",
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Alice: 読みやすい本文です。",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash("job-001"),
+            "seg-001..seg-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished));
+
+        var file = Assert.Single(result.FilePaths);
+        Assert.Equal(Path.Combine(output, "readable-xlsx.xlsx"), file);
+        using var archive = ZipFile.OpenRead(file);
+        var worksheet = ReadZipXml(archive, "xl/worksheets/sheet1.xml");
+        var cells = ReadInlineStringCells(worksheet);
+        Assert.Equal("読みやすく整文", cells["A1"]);
+        Assert.Equal("[00:00 - 00:01] Alice: 読みやすい本文です。", cells["A2"]);
+        Assert.False(cells.ContainsKey("B1"));
     }
 
     [Fact]
@@ -329,11 +403,9 @@ public sealed class TranscriptExportServiceTests
             Assert.Equal("00:00:00.000", cells["A2"]);
             Assert.Equal("00:00:02.500", cells["B2"]);
             Assert.Equal("Alice", cells["C2"]);
-            Assert.Equal("raw one\nraw two", cells["D2"]);
-            Assert.Equal("final one\nfinal two", cells["E2"]);
+            Assert.Equal("final one\nfinal two", cells["D2"]);
             Assert.Equal("Bob", cells["C3"]);
-            Assert.Equal("raw three", cells["D3"]);
-            Assert.Equal("final three", cells["E3"]);
+            Assert.Equal("final three", cells["D3"]);
             Assert.False(cells.ContainsKey("A4"));
         }
 
@@ -359,7 +431,7 @@ public sealed class TranscriptExportServiceTests
     }
 
     [Fact]
-    public void ExportJob_MergedXlsxLeavesPolishedColumnBlankWhenNoPolishedTextExists()
+    public void ExportJob_MergedPolishedXlsxUsesRawTextWhenNoPolishedTextExists()
     {
         var paths = TestDatabase.CreateReadyPaths();
         TestDatabase.InsertReviewReadyJob(paths, "job-001", "blank-polished");
@@ -373,12 +445,11 @@ public sealed class TranscriptExportServiceTests
             "job-001",
             output,
             [TranscriptExportFormat.Xlsx],
-            new TranscriptExportOptions(MergeConsecutiveSpeakers: true));
+            new TranscriptExportOptions(MergeConsecutiveSpeakers: true, Source: TranscriptExportSource.Polished));
 
         using var archive = ZipFile.OpenRead(Path.Combine(output, "blank-polished.xlsx"));
         var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
         Assert.Equal("raw one\nraw two", cells["D2"]);
-        Assert.Equal(string.Empty, cells["E2"]);
         Assert.False(cells.ContainsKey("A3"));
     }
 
