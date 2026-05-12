@@ -340,6 +340,60 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SelectedSetupConfigurationReady_DoesNotRequireAsrCudaRuntimeWithDetectedGpu()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBaseDirectory, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBaseDirectory, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+        CreateFasterWhisperRuntime(paths);
+        Touch(paths.LlamaCompletionPath);
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(paths.CudaReviewRuntimeMarkerPath);
+        CreateDiarizationRuntime(paths);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "high_accuracy",
+            SelectedModelPresetId = "high_accuracy",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var gpuRecommendation = new SetupPresetRecommendation(
+            "high_accuracy",
+            "High accuracy",
+            "GPU",
+            new SetupHostResources(null, 12, NvidiaGpuDetected: true, LogicalProcessorCount: null, "GPU"));
+        SetPrivateField(viewModel, "_setupPresetRecommendation", gpuRecommendation);
+
+        Assert.True(viewModel.SetupAsrCudaRuntimeRecommended);
+        Assert.False(viewModel.SetupAsrCudaRuntimeReady);
+        Assert.True(viewModel.SelectedSetupConfigurationReady);
+        Assert.True(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void SelectedSetupConfigurationReady_RequiresCudaReviewRuntimeWithDetectedGpu()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

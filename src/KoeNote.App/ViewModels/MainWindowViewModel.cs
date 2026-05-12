@@ -1147,7 +1147,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupTernaryReviewRuntimeReady;
 
     public bool SetupConditionalRuntimeReady =>
-        (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady);
 
     public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&

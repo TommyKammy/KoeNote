@@ -37,7 +37,7 @@
       "quality_label": "高精度",
       "display_name": "高精度",
       "description": "日本語精度と専門語を重視する構成です。処理時間とメモリ使用量は大きめです。",
-      "asr_model_id": "kotoba-whisper-v2.2-faster",
+      "asr_model_id": "faster-whisper-large-v3",
       "review_model_id": "gemma-4-e4b-it-q4-k-m",
       "badges": ["高精度"],
       "recommended_for": ["high_accuracy_japanese", "domain_terms"]

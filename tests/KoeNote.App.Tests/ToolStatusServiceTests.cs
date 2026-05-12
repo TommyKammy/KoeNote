@@ -61,6 +61,7 @@ public sealed class ToolStatusServiceTests
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));
         paths.EnsureCreated();
         Directory.CreateDirectory(Path.Combine(paths.PythonPackages, "diarize"));
+        Touch(Path.Combine(paths.PythonPackages, "silero_vad", "data", "silero_vad.jit"));
 
         var items = new ToolStatusService(paths).GetStatusItems();
 

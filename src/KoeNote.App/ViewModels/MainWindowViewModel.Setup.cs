@@ -327,16 +327,17 @@ public sealed partial class MainWindowViewModel
                 if (!runtimeResult.IsSucceeded)
                 {
                     var message = BuildAsrCudaRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
-                    SetSetupInstallStatus("ASR GPU runtime", "失敗", message);
-                    SetupAsrCudaRuntimeSummary = message;
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
+                    var fallbackMessage = $"{message} ASR GPU acceleration was not installed, but CPU ASR remains available. You can retry ASR GPU runtime installation later from Setup.";
+                    SetSetupInstallStatus("ASR GPU runtime", "未導入", fallbackMessage);
+                    SetupAsrCudaRuntimeSummary = fallbackMessage;
+                    LatestLog = fallbackMessage;
                 }
-
-                SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {runtimeResult.InstallPath}";
-                SetSetupInstallStatus("ASR GPU runtime", "完了", runtimeResult.InstallPath);
-                LatestLog = runtimeResult.Message;
+                else
+                {
+                    SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {runtimeResult.InstallPath}";
+                    SetSetupInstallStatus("ASR GPU runtime", "完了", runtimeResult.InstallPath);
+                    LatestLog = runtimeResult.Message;
+                }
             }
             else if (SetupAsrCudaRuntimeRecommended)
             {
@@ -1196,7 +1197,7 @@ public sealed partial class MainWindowViewModel
             items.Add(new(
                 "ASR GPU runtime",
                 "NVIDIA GPU向けのASR CUDA runtime",
-                SetupAsrCudaRuntimeReady ? "導入済み" : "導入します"));
+                SetupAsrCudaRuntimeReady ? "導入済み" : "任意"));
         }
 
         if (SetupCudaReviewRuntimeRecommended)

@@ -60,7 +60,7 @@ public sealed class ModelCatalogServiceTests
 
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
         Assert.Equal("高精度", highAccuracy.QualityLabel);
-        Assert.Equal("kotoba-whisper-v2.2-faster", highAccuracy.AsrModelId);
+        Assert.Equal("faster-whisper-large-v3", highAccuracy.AsrModelId);
         Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
