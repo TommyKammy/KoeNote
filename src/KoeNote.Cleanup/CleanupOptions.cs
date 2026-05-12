@@ -7,6 +7,7 @@ public sealed record CleanupOptions(
     bool ListUpdateBackups,
     string? RestoreUpdateBackup,
     bool HasExplicitTargets,
+    bool RemoveAllData,
     bool RemoveLogs,
     bool RemoveDownloads,
     bool RemoveUserModels,
@@ -15,16 +16,17 @@ public sealed record CleanupOptions(
 {
     public static string HelpText => """
         KoeNoteCleanup は KoeNote の任意データを削除する補助ツールです。
-
         Usage:
+          KoeNoteCleanup.exe [--quiet] [--dry-run] [--all]
           KoeNoteCleanup.exe [--quiet] [--dry-run] [--logs] [--downloads] [--models] [--machine-models] [--user-data]
           KoeNoteCleanup.exe --list-update-backups
           KoeNoteCleanup.exe --restore-update-backup <backup-name-or-path> [--dry-run]
 
         既定値:
           通常起動では確認ウィンドウを表示します。
-          quiet mode は、追加指定がない限りログと一時モデルダウンロードのみ削除します。
-          モデル、ジョブ、文字起こし、セットアップ状態、設定は明示的に選択しない限り保持します。
+          quiet mode は追加指定がない限り、KoeNote データを削除しません。
+          --all は KoeNote の AppData / LocalAppData / ProgramData 配下を削除します。
+          %USERPROFILE%\Documents\KoeNote\Exports は削除対象外です。
         """;
 
     public static CleanupOptions Parse(string[] args)
@@ -36,7 +38,9 @@ public sealed record CleanupOptions(
 
         var quiet = set.Contains("--quiet") || set.Contains("/quiet") || set.Contains("/qn");
         var restoreUpdateBackup = ReadOptionValue(args, "--restore-update-backup");
-        var explicitTarget = set.Contains("--logs") ||
+        var removeAllData = set.Contains("--all");
+        var explicitTarget = removeAllData ||
+            set.Contains("--logs") ||
             set.Contains("--downloads") ||
             set.Contains("--models") ||
             set.Contains("--machine-models") ||
@@ -49,8 +53,9 @@ public sealed record CleanupOptions(
             ListUpdateBackups: set.Contains("--list-update-backups"),
             RestoreUpdateBackup: restoreUpdateBackup,
             HasExplicitTargets: explicitTarget,
-            RemoveLogs: set.Contains("--logs") || (quiet && !explicitTarget),
-            RemoveDownloads: set.Contains("--downloads") || (quiet && !explicitTarget),
+            RemoveAllData: removeAllData,
+            RemoveLogs: set.Contains("--logs"),
+            RemoveDownloads: set.Contains("--downloads"),
             RemoveUserModels: set.Contains("--models"),
             RemoveMachineModels: set.Contains("--machine-models"),
             RemoveUserData: set.Contains("--user-data"));
@@ -79,6 +84,11 @@ public sealed record CleanupOptions(
 
     public CleanupPlan ToPlan()
     {
+        if (RemoveAllData)
+        {
+            return CleanupPlan.AllData;
+        }
+
         return new CleanupPlan(
             RemoveLogs,
             RemoveDownloads,

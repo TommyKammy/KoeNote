@@ -9,6 +9,10 @@ public sealed record CleanupPaths(
 {
     public string UserRoot => Path.Combine(AppDataRoot, "KoeNote");
 
+    public string LocalRoot => Path.Combine(LocalAppDataRoot, "KoeNote");
+
+    public string MachineRoot => Path.Combine(ProgramDataRoot, "KoeNote");
+
     public string Jobs => Path.Combine(UserRoot, "jobs");
 
     public string DatabasePath => Path.Combine(UserRoot, "jobs.sqlite");
@@ -19,17 +23,21 @@ public sealed record CleanupPaths(
 
     public string SetupReportPath => Path.Combine(UserRoot, "setup_report.json");
 
-    public string Logs => Path.Combine(LocalAppDataRoot, "KoeNote", "logs");
+    public string Logs => Path.Combine(LocalRoot, "logs");
 
-    public string ModelDownloads => Path.Combine(LocalAppDataRoot, "KoeNote", "model-downloads");
+    public string ModelDownloads => Path.Combine(LocalRoot, "model-downloads");
 
-    public string PythonPackages => Path.Combine(LocalAppDataRoot, "KoeNote", "python-packages");
+    public string PythonPackages => Path.Combine(LocalRoot, "python-packages");
 
-    public string UpdateBackups => Path.Combine(LocalAppDataRoot, "KoeNote", "backups", "updates");
+    public string PythonEnvironments => Path.Combine(LocalRoot, "python-envs");
 
-    public string UserModels => Path.Combine(LocalAppDataRoot, "KoeNote", "models");
+    public string UpdateDownloads => Path.Combine(LocalRoot, "updates");
 
-    public string MachineModels => Path.Combine(ProgramDataRoot, "KoeNote", "models");
+    public string UpdateBackups => Path.Combine(LocalRoot, "backups", "updates");
+
+    public string UserModels => Path.Combine(LocalRoot, "models");
+
+    public string MachineModels => Path.Combine(MachineRoot, "models");
 
     public static CleanupPaths FromEnvironment()
     {

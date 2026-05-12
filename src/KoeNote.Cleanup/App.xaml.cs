@@ -55,11 +55,7 @@ public partial class App : Application
 
         var initialPlan = options.HasExplicitTargets
             ? options.ToPlan()
-            : options.ToPlan() with
-            {
-                RemoveLogs = true,
-                RemoveDownloads = true
-            };
+            : CleanupPlan.AppOnly;
         var window = new CleanupWindow(service, initialPlan, options.DryRun);
         MainWindow = window;
         window.Show();

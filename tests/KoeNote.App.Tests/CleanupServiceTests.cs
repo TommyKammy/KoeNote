@@ -11,6 +11,7 @@ public sealed class CleanupServiceTests
 
         Assert.False(options.Quiet);
         Assert.False(options.HasExplicitTargets);
+        Assert.False(options.RemoveAllData);
         Assert.False(options.RemoveLogs);
         Assert.False(options.RemoveDownloads);
         Assert.False(options.RemoveUserModels);
@@ -19,14 +20,15 @@ public sealed class CleanupServiceTests
     }
 
     [Fact]
-    public void CleanupOptions_QuietWithoutExplicitTargets_RemovesOnlyEphemeralData()
+    public void CleanupOptions_QuietWithoutExplicitTargets_DefaultsToAppOnly()
     {
         var options = CleanupOptions.Parse(["--quiet"]);
 
         Assert.True(options.Quiet);
         Assert.False(options.HasExplicitTargets);
-        Assert.True(options.RemoveLogs);
-        Assert.True(options.RemoveDownloads);
+        Assert.False(options.RemoveAllData);
+        Assert.False(options.RemoveLogs);
+        Assert.False(options.RemoveDownloads);
         Assert.False(options.RemoveUserModels);
         Assert.False(options.RemoveMachineModels);
         Assert.False(options.RemoveUserData);
@@ -39,11 +41,28 @@ public sealed class CleanupServiceTests
 
         Assert.True(options.Quiet);
         Assert.True(options.HasExplicitTargets);
+        Assert.False(options.RemoveAllData);
         Assert.False(options.RemoveLogs);
         Assert.False(options.RemoveDownloads);
         Assert.True(options.RemoveUserModels);
         Assert.False(options.RemoveMachineModels);
         Assert.False(options.RemoveUserData);
+    }
+
+    [Fact]
+    public void CleanupOptions_ParseAllData()
+    {
+        var options = CleanupOptions.Parse(["--quiet", "--all"]);
+
+        Assert.True(options.Quiet);
+        Assert.True(options.HasExplicitTargets);
+        Assert.True(options.RemoveAllData);
+        Assert.False(options.RemoveLogs);
+        Assert.False(options.RemoveDownloads);
+        Assert.False(options.RemoveUserModels);
+        Assert.False(options.RemoveMachineModels);
+        Assert.False(options.RemoveUserData);
+        Assert.True(options.ToPlan().RemoveAllData);
     }
 
     [Fact]
@@ -64,7 +83,60 @@ public sealed class CleanupServiceTests
     }
 
     [Fact]
-    public void Execute_DefaultQuietPolicy_RemovesLogsAndDownloadsButKeepsModelsAndUserData()
+    public void Execute_AllDataPolicy_RemovesOnlyKoeNoteDataRootsAndKeepsDocumentExports()
+    {
+        var root = CreateTempRoot();
+        var documentsRoot = Path.Combine(root, "documents");
+        var exports = Path.Combine(documentsRoot, "KoeNote", "Exports", "transcript.md");
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        CreateFile(paths.DatabasePath);
+        CreateFile(Path.Combine(paths.Jobs, "job-1", "result.json"));
+        CreateFile(Path.Combine(paths.Logs, "app.log"));
+        CreateFile(Path.Combine(paths.ModelDownloads, "download.tmp"));
+        CreateFile(Path.Combine(paths.UpdateDownloads, "KoeNote.msi"));
+        CreateFile(Path.Combine(paths.UpdateBackups, "schema-backup", "jobs.sqlite"));
+        CreateFile(Path.Combine(paths.PythonPackages, "package.txt"));
+        CreateFile(Path.Combine(paths.PythonEnvironments, "asr", "pyvenv.cfg"));
+        CreateFile(Path.Combine(paths.UserModels, "asr", "model.bin"));
+        CreateFile(Path.Combine(paths.MachineModels, "review", "model.gguf"));
+        CreateFile(exports, "exported transcript");
+
+        var service = new CleanupService(paths);
+        var result = service.Execute(CleanupPlan.AllData, dryRun: false);
+
+        Assert.True(result.Succeeded);
+        Assert.False(Directory.Exists(paths.UserRoot));
+        Assert.False(Directory.Exists(paths.LocalRoot));
+        Assert.False(Directory.Exists(paths.MachineRoot));
+        Assert.True(File.Exists(exports));
+    }
+
+    [Fact]
+    public void Execute_AllDataDryRun_DoesNotRemoveKoeNoteDataRoots()
+    {
+        var root = CreateTempRoot();
+        var paths = new CleanupPaths(
+            Path.Combine(root, "roaming"),
+            Path.Combine(root, "local"),
+            Path.Combine(root, "program-data"));
+        CreateFile(paths.DatabasePath);
+        CreateFile(Path.Combine(paths.UserModels, "asr", "model.bin"));
+        CreateFile(Path.Combine(paths.MachineModels, "review", "model.gguf"));
+
+        var service = new CleanupService(paths);
+        var result = service.Execute(CleanupPlan.AllData, dryRun: true);
+
+        Assert.True(result.Succeeded);
+        Assert.True(Directory.Exists(paths.UserRoot));
+        Assert.True(Directory.Exists(paths.LocalRoot));
+        Assert.True(Directory.Exists(paths.MachineRoot));
+    }
+
+    [Fact]
+    public void Execute_EphemeralPolicy_RemovesLogsAndDownloadsButKeepsModelsAndUserData()
     {
         var root = CreateTempRoot();
         var paths = new CleanupPaths(

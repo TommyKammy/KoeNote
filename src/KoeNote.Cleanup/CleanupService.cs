@@ -6,6 +6,16 @@ public sealed class CleanupService(CleanupPaths paths)
 {
     public IReadOnlyList<CleanupTarget> BuildTargets(CleanupPlan plan)
     {
+        if (plan.RemoveAllData)
+        {
+            return
+            [
+                new("KoeNote roaming data", paths.UserRoot, true, true),
+                new("KoeNote local data", paths.LocalRoot, true, true),
+                new("KoeNote machine data", paths.MachineRoot, true, true)
+            ];
+        }
+
         return
         [
             new("一時ファイルとログ", paths.Logs, true, plan.RemoveLogs),

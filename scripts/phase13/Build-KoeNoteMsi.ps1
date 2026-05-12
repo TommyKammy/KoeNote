@@ -14,6 +14,7 @@ param(
     [string]$ComponentGuidSalt = "KoeNote",
     [string]$CleanupUiCommand = "",
     [string]$CleanupQuietCommand = "--quiet",
+    [string]$CleanupQuietAllCommand = "--quiet --all",
     [switch]$RequireCodeSigning
 )
 
@@ -248,6 +249,7 @@ dotnet build $installerProject `
     -p:ProductRegistryKey="$ProductRegistryKey" `
     -p:CleanupUiCommand="$CleanupUiCommand" `
     -p:CleanupQuietCommand="$CleanupQuietCommand" `
+    -p:CleanupQuietAllCommand="$CleanupQuietAllCommand" `
     -p:PayloadDir="$publishDir\" `
     -p:OutputPath="$installerOut\"
 if ($LASTEXITCODE -ne 0) {

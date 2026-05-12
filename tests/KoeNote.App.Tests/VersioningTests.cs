@@ -251,6 +251,23 @@ public sealed class VersioningTests
         Assert.Contains("PromptToContinue=\"no\"", productWxs);
     }
 
+    [Fact]
+    public void Installer_RequiresExplicitPropertyForQuietAllDataCleanup()
+    {
+        var repoRoot = FindRepoRoot();
+        var productWxs = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.Installer", "Product.wxs"));
+        var wixProject = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.Installer", "KoeNote.Installer.wixproj"));
+        var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
+
+        Assert.Contains("RunKoeNoteCleanupQuietAll", productWxs);
+        Assert.Contains("KOENOTE_CLEANUP_ALL_DATA=&quot;1&quot;", productWxs);
+        Assert.Contains("KOENOTE_CLEANUP_ALL_DATA &lt;&gt; &quot;1&quot;", productWxs);
+        Assert.Contains("CleanupQuietAllCommand", wixProject);
+        Assert.Contains("--quiet --all", wixProject);
+        Assert.Contains("[string]$CleanupQuietAllCommand = \"--quiet --all\"", buildScript);
+        Assert.Contains("-p:CleanupQuietAllCommand=\"$CleanupQuietAllCommand\"", buildScript);
+    }
+
     private static string FindRepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

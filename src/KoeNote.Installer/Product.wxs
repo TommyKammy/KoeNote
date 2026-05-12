@@ -91,6 +91,11 @@
                   ExeCommand="$(var.CleanupQuietCommand)"
                   Execute="immediate"
                   Return="ignore" />
+    <CustomAction Id="RunKoeNoteCleanupQuietAll"
+                  FileRef="KoeNoteCleanupExe"
+                  ExeCommand="$(var.CleanupQuietAllCommand)"
+                  Execute="immediate"
+                  Return="ignore" />
     <CustomAction Id="SetArpMetadata"
                   FileRef="KoeNoteCleanupExe"
                   ExeCommand="--set-arp-metadata &quot;[ProductCode]&quot; &quot;[INSTALLFOLDER]&quot; &quot;[INSTALLFOLDER]KoeNote.App.exe&quot;"
@@ -100,7 +105,8 @@
     <InstallExecuteSequence>
       <Custom Action="SetArpMetadata" After="InstallFinalize" Condition="NOT REMOVE" />
       <Custom Action="RunKoeNoteCleanupUi" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &gt; 3" />
-      <Custom Action="RunKoeNoteCleanupQuiet" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3" />
+      <Custom Action="RunKoeNoteCleanupQuiet" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3 AND KOENOTE_CLEANUP_ALL_DATA &lt;&gt; &quot;1&quot;" />
+      <Custom Action="RunKoeNoteCleanupQuietAll" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3 AND KOENOTE_CLEANUP_ALL_DATA=&quot;1&quot;" />
     </InstallExecuteSequence>
 
     <Feature Id="MainFeature" Title="KoeNote" Level="1">

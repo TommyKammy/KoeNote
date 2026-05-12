@@ -5,7 +5,18 @@ public sealed record CleanupPlan(
     bool RemoveDownloads,
     bool RemoveUserModels,
     bool RemoveMachineModels,
-    bool RemoveUserData);
+    bool RemoveUserData,
+    bool RemoveAllData = false)
+{
+    public static CleanupPlan AppOnly { get; } = new(
+        RemoveLogs: false,
+        RemoveDownloads: false,
+        RemoveUserModels: false,
+        RemoveMachineModels: false,
+        RemoveUserData: false);
+
+    public static CleanupPlan AllData { get; } = AppOnly with { RemoveAllData = true };
+}
 
 public sealed record CleanupTarget(string Label, string Path, bool IsDirectory, bool Remove);
 
@@ -16,7 +27,7 @@ public sealed record CleanupResult(IReadOnlyList<CleanupActionResult> Actions)
     public bool Succeeded => Actions.All(static action =>
         action.Removed ||
         (!action.Message.StartsWith("Failed:", StringComparison.Ordinal) &&
-            !action.Message.Contains("失敗:", StringComparison.Ordinal)));
+            !action.Message.Contains("失敗", StringComparison.Ordinal)));
 
     public string ToConsoleText()
     {

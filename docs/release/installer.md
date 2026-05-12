@@ -86,7 +86,16 @@ Removed by MSI:
 - `%LOCALAPPDATA%\Programs\KoeNote`
 - KoeNote Start Menu shortcuts
 
-Kept by default:
+The cleanup UI offers two choices:
+
+- `アプリのみ削除`: remove only the installed application payload. KoeNote data remains.
+- `KoeNote 関連データをすべて削除`: remove KoeNote data under AppData, LocalAppData, and ProgramData.
+
+Always kept:
+
+- `%USERPROFILE%\Documents\KoeNote\Exports`
+
+Kept by app-only uninstall:
 
 - `%APPDATA%\KoeNote\jobs.sqlite`
 - `%APPDATA%\KoeNote\jobs`
@@ -96,15 +105,17 @@ Kept by default:
 - `%LOCALAPPDATA%\KoeNote\models`
 - `%ProgramData%\KoeNote\models`
 
-Removed by default in quiet cleanup:
+Quiet uninstall is also app-only by default. To remove all KoeNote data during a quiet uninstall, pass the MSI property:
 
-- `%LOCALAPPDATA%\KoeNote\logs`
-- `%LOCALAPPDATA%\KoeNote\model-downloads`
-- `%LOCALAPPDATA%\KoeNote\python-packages`
+```powershell
+msiexec /x KoeNote-v<version>-win-x64.msi /qn KOENOTE_CLEANUP_ALL_DATA=1
+```
 
 Explicit cleanup options:
 
 ```powershell
+KoeNoteCleanup.exe --all
+KoeNoteCleanup.exe --quiet --all
 KoeNoteCleanup.exe --models
 KoeNoteCleanup.exe --machine-models
 KoeNoteCleanup.exe --user-data

@@ -8,11 +8,8 @@ public sealed class CleanupWindow : Window
 {
     private readonly CleanupService _service;
     private readonly bool _dryRun;
-    private readonly CheckBox _logs;
-    private readonly CheckBox _downloads;
-    private readonly CheckBox _models;
-    private readonly CheckBox _machineModels;
-    private readonly CheckBox _userData;
+    private readonly RadioButton _appOnly;
+    private readonly RadioButton _allData;
     private readonly TextBox _output;
 
     public CleanupWindow(CleanupService service, CleanupPlan initialPlan, bool dryRun)
@@ -20,11 +17,11 @@ public sealed class CleanupWindow : Window
         _service = service;
         _dryRun = dryRun;
 
-        Title = "KoeNote クリーンアップ";
-        Width = 560;
-        Height = 480;
-        MinWidth = 480;
-        MinHeight = 420;
+        Title = "KoeNote アンインストール";
+        Width = 660;
+        Height = 520;
+        MinWidth = 560;
+        MinHeight = 460;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         var root = new Grid
@@ -36,36 +33,56 @@ public sealed class CleanupWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+        var header = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+
         var title = new TextBlock
         {
-            Text = "KoeNote データのクリーンアップ",
+            Text = "KoeNote のアンインストール方法を選択",
             FontSize = 22,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 8)
         };
-        root.Children.Add(title);
+        header.Children.Add(title);
+
+        var lead = new TextBlock
+        {
+            Text = "アプリ本体はアンインストーラーによって削除されます。必要に応じて、KoeNote が保存したデータも一緒に削除できます。",
+            Foreground = Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 0)
+        };
+        header.Children.Add(lead);
+        root.Children.Add(header);
 
         var options = new StackPanel
         {
             Margin = new Thickness(0, 8, 0, 12)
         };
         Grid.SetRow(options, 1);
-        _logs = NewCheckBox("一時ファイルとログ", initialPlan.RemoveLogs);
-        _downloads = NewCheckBox("一時モデルダウンロードと任意の Python パッケージ", initialPlan.RemoveDownloads);
-        _models = NewCheckBox("ダウンロード済みユーザーモデル", initialPlan.RemoveUserModels);
-        _machineModels = NewCheckBox("共有マシンモデル", initialPlan.RemoveMachineModels);
-        _userData = NewCheckBox("ジョブ、文字起こし、セットアップ状態、設定", initialPlan.RemoveUserData);
-        options.Children.Add(_logs);
-        options.Children.Add(_downloads);
-        options.Children.Add(_models);
-        options.Children.Add(_machineModels);
-        options.Children.Add(_userData);
+
+        _appOnly = NewRadioButton("アプリのみ削除", !initialPlan.RemoveAllData);
+        _allData = NewRadioButton("アプリと KoeNote 関連データをすべて削除", initialPlan.RemoveAllData);
+        _appOnly.Checked += (_, _) => Run(dryRun: true);
+        _allData.Checked += (_, _) => Run(dryRun: true);
+
+        options.Children.Add(_appOnly);
         options.Children.Add(new TextBlock
         {
-            Text = "モデルとジョブデータは、ここで選択しない限り保持されます。再インストール後も再利用できます。",
+            Text = "アプリ本体だけを削除します。ジョブ履歴、設定、モデル、ログ、更新ファイル、エクスポート済みファイルは残ります。",
             Foreground = Brushes.DimGray,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 8, 0, 0)
+            Margin = new Thickness(24, 0, 0, 10)
+        });
+        options.Children.Add(_allData);
+        options.Children.Add(new TextBlock
+        {
+            Text = "AppData、LocalAppData、ProgramData 配下の KoeNote データを削除します。Documents\\KoeNote\\Exports は削除しません。",
+            Foreground = Brushes.DimGray,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(24, 0, 0, 0)
         });
         root.Children.Add(options);
 
@@ -89,8 +106,8 @@ public sealed class CleanupWindow : Window
         Grid.SetRow(buttons, 3);
         var preview = new Button { Content = "プレビュー", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
         preview.Click += (_, _) => Run(dryRun: true);
-        var cleanup = new Button { Content = "削除する", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
-        cleanup.Click += (_, _) => Run(_dryRun);
+        var cleanup = new Button { Content = "選択して続行", MinWidth = 112, Margin = new Thickness(0, 0, 8, 0) };
+        cleanup.Click += (_, _) => Run(dryRun: _dryRun);
         var close = new Button { Content = "閉じる", MinWidth = 96 };
         close.Click += (_, _) => Close();
         buttons.Children.Add(preview);
@@ -102,70 +119,61 @@ public sealed class CleanupWindow : Window
         Run(dryRun: true);
     }
 
-    private static CheckBox NewCheckBox(string text, bool isChecked)
+    private static RadioButton NewRadioButton(string text, bool isChecked)
     {
-        return new CheckBox
+        return new RadioButton
         {
             Content = text,
             IsChecked = isChecked,
+            GroupName = "CleanupMode",
+            FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 4, 0, 4)
         };
     }
 
     private CleanupPlan BuildPlan()
     {
-        return new CleanupPlan(
-            _logs.IsChecked == true,
-            _downloads.IsChecked == true,
-            _models.IsChecked == true,
-            _machineModels.IsChecked == true,
-            _userData.IsChecked == true);
+        return _allData.IsChecked == true
+            ? CleanupPlan.AllData
+            : CleanupPlan.AppOnly;
     }
 
     private void Run(bool dryRun)
     {
         var plan = BuildPlan();
-        if (!dryRun && RequiresDestructiveConfirmation(plan) && !ConfirmDestructiveCleanup(plan))
+        if (!dryRun && plan.RemoveAllData && !ConfirmDeleteAllData())
         {
             _output.Text = "削除をキャンセルしました。";
             return;
         }
 
         var result = _service.Execute(plan, dryRun);
-        _output.Text = result.ToConsoleText();
+        if (plan.RemoveAllData || result.Actions.Any(static action => action.Removed))
+        {
+            _output.Text = result.ToConsoleText();
+            return;
+        }
+
+        _output.Text = dryRun
+            ? "アプリ本体のみ削除します。KoeNote のジョブ、設定、モデル、ログ、更新ファイルは保持されます。アプリ本体は、この画面を閉じた後にアンインストーラーによって削除されます。"
+            : "選択を確定しました。この画面を閉じると、アンインストーラーがアプリ本体の削除を続行します。KoeNote のジョブ、設定、モデル、ログ、更新ファイルは保持されます。";
     }
 
-    private static bool RequiresDestructiveConfirmation(CleanupPlan plan)
+    private bool ConfirmDeleteAllData()
     {
-        return plan.RemoveUserModels || plan.RemoveMachineModels || plan.RemoveUserData;
-    }
+        const string message =
+            "アプリ本体に加えて、KoeNote 関連データを削除します。\n\n" +
+            "削除対象:\n" +
+            "- %APPDATA%\\KoeNote\n" +
+            "- %LOCALAPPDATA%\\KoeNote\n" +
+            "- %ProgramData%\\KoeNote\n\n" +
+            "Documents\\KoeNote\\Exports は削除しません。\n" +
+            "この操作は元に戻せません。KoeNote を開いている場合は先に終了してください。";
 
-    private bool ConfirmDestructiveCleanup(CleanupPlan plan)
-    {
-        var targets = new List<string>();
-        if (plan.RemoveUserModels)
-        {
-            targets.Add("ダウンロード済みユーザーモデル");
-        }
-
-        if (plan.RemoveMachineModels)
-        {
-            targets.Add("共有マシンモデル");
-        }
-
-        if (plan.RemoveUserData)
-        {
-            targets.Add("ジョブ、文字起こし、セットアップ状態、設定");
-        }
-
-        var message = string.Join(Environment.NewLine, targets.Select(static target => $"・{target}")) +
-            Environment.NewLine +
-            Environment.NewLine +
-            "選択したデータを削除します。この操作は元に戻せません。KoeNote 本体を開いている場合は、先に終了してください。";
         return MessageBox.Show(
             this,
             message,
-            "クリーンアップの確認",
+            "KoeNote 関連データの全削除",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No) == MessageBoxResult.Yes;
