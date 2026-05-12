@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 
@@ -80,7 +81,7 @@ internal sealed class SetupReadinessService(
         var succeeded = checks.All(static check => check.IsOk);
         var updated = stateService.Save(state with
         {
-            CurrentStep = SetupStep.SmokeTest,
+            CurrentStep = state.IsCompleted && succeeded ? SetupStep.Complete : SetupStep.SmokeTest,
             LastSmokeSucceeded = succeeded,
             IsCompleted = state.IsCompleted && succeeded
         });
@@ -150,6 +151,7 @@ internal sealed class SetupReadinessService(
             CheckSelectedModel("ASR model", state.SelectedAsrModelId),
             CheckSelectedModel("Review LLM model", state.SelectedReviewModelId),
             CheckSelectedReviewRuntime(state.SelectedReviewModelId),
+            CheckDiarizationRuntime(),
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
@@ -160,9 +162,28 @@ internal sealed class SetupReadinessService(
                 "ASR CUDA runtime",
                 AsrCudaRuntimeLayout.HasPackage(paths),
                 AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrRuntimeDirectory : $"Not installed: {paths.AsrRuntimeDirectory}"));
+            checks.Add(CheckCudaReviewRuntime());
         }
 
         return checks;
+    }
+
+    private SetupSmokeCheck CheckDiarizationRuntime()
+    {
+        var exists = DiarizationRuntimeLayout.HasPackage(paths);
+        return new SetupSmokeCheck(
+            "speaker diarization runtime",
+            exists,
+            exists ? paths.DiarizationPythonEnvironment : $"Not installed: {paths.DiarizationPythonEnvironment}");
+    }
+
+    private SetupSmokeCheck CheckCudaReviewRuntime()
+    {
+        var exists = CudaReviewRuntimeLayout.HasPackage(paths);
+        return new SetupSmokeCheck(
+            "Review CUDA runtime",
+            exists,
+            exists ? paths.ReviewRuntimeDirectory : $"Not installed: {paths.ReviewRuntimeDirectory}");
     }
 
     private SetupSmokeCheck CheckSelectedReviewRuntime(string? modelId)

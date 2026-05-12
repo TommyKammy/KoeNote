@@ -304,7 +304,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SelectedSetupConfigurationReady_DoesNotRequireCudaReviewRuntimeWithDetectedGpu()
+    public void SelectedSetupConfigurationReady_RequiresCudaReviewRuntimeWithDetectedGpu()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var appBaseDirectory = Path.Combine(root, "app");
@@ -357,8 +357,8 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.SetupCudaReviewRuntimeRecommended);
         Assert.False(viewModel.SetupCudaReviewRuntimeReady);
-        Assert.True(viewModel.SelectedSetupConfigurationReady);
-        Assert.DoesNotContain("Review GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+        Assert.False(viewModel.SelectedSetupConfigurationReady);
+        Assert.Contains("Review GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
         Assert.True(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
     }
 
@@ -377,6 +377,106 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsModelDownloadInProgress);
         Assert.True(viewModel.SetupCancelInstallCommand.CanExecute(null));
         viewModel.SetupCancelInstallCommand.Execute(null);
+    }
+
+    [Fact]
+    public async Task SetupInstallSelectedPresetCommand_StopsWhenDiarizationRuntimeInstallFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBaseDirectory, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBaseDirectory, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        CreateFasterWhisperRuntime(paths);
+        Touch(paths.LlamaCompletionPath);
+
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var installedModels = new InstalledModelRepository(paths);
+        var now = DateTimeOffset.Now;
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3-turbo");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        Touch(Path.Combine(asrPath, "model.bin"));
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            asrItem.ModelId,
+            asrItem.Role,
+            asrItem.EngineId,
+            asrItem.DisplayName,
+            asrItem.Family,
+            null,
+            asrPath,
+            null,
+            null,
+            null,
+            true,
+            asrItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            reviewItem.ModelId,
+            reviewItem.Role,
+            reviewItem.EngineId,
+            reviewItem.DisplayName,
+            reviewItem.Family,
+            null,
+            reviewPath,
+            null,
+            null,
+            null,
+            true,
+            reviewItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "recommended",
+            SelectedModelPresetId = "recommended",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId,
+            StorageRoot = paths.UserModels
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        SetPrivateField(viewModel, "_setupPresetRecommendation", new SetupPresetRecommendation(
+            "recommended",
+            "Recommended",
+            "No GPU",
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, LogicalProcessorCount: null, "No GPU")));
+
+        var originalPipNoIndex = Environment.GetEnvironmentVariable("PIP_NO_INDEX");
+        Environment.SetEnvironmentVariable("PIP_NO_INDEX", "1");
+        try
+        {
+            viewModel.SetupInstallSelectedPresetCommand.Execute(null);
+            for (var i = 0; i < 400 && viewModel.IsModelDownloadInProgress; i++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50));
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIP_NO_INDEX", originalPipNoIndex);
+        }
+
+        Assert.False(viewModel.IsModelDownloadInProgress);
+        Assert.False(viewModel.IsSetupComplete);
+        Assert.Equal(nameof(SetupStep.Install), viewModel.SetupCurrentStep);
+        Assert.Contains("Failure category:", viewModel.ModelDownloadProgressSummary, StringComparison.Ordinal);
+        Assert.Contains("diarize", viewModel.SetupDiarizationRuntimeSummary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -418,6 +518,94 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SetupNextAction_UsesStartWhenCompletedStateIsLeftOnSmokeStep()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        Directory.CreateDirectory(Path.Combine(appBaseDirectory, "catalog"));
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "catalog", "model-catalog.json"),
+            Path.Combine(appBaseDirectory, "catalog", "model-catalog.json"));
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var installedModels = new InstalledModelRepository(paths);
+        var now = DateTimeOffset.Now;
+        var asrItem = catalog.Models.First(model => model.ModelId == "whisper-small");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        Touch(Path.Combine(asrPath, "model.bin"));
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            asrItem.ModelId,
+            asrItem.Role,
+            asrItem.EngineId,
+            asrItem.DisplayName,
+            asrItem.Family,
+            null,
+            asrPath,
+            null,
+            null,
+            null,
+            true,
+            asrItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        var reviewItem = catalog.Models.First(model => model.ModelId == "bonsai-8b-q1-0");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Touch(reviewPath);
+        installedModels.UpsertInstalledModel(new InstalledModel(
+            reviewItem.ModelId,
+            reviewItem.Role,
+            reviewItem.EngineId,
+            reviewItem.DisplayName,
+            reviewItem.Family,
+            null,
+            reviewPath,
+            null,
+            null,
+            null,
+            true,
+            reviewItem.License.Name,
+            "download",
+            now,
+            now,
+            "installed"));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            CurrentStep = SetupStep.SmokeTest,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SetupMode = "lightweight",
+            SelectedModelPresetId = "lightweight",
+            SelectedAsrModelId = asrItem.ModelId,
+            SelectedReviewModelId = reviewItem.ModelId,
+            StorageRoot = paths.UserModels
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        SetPrivateField(viewModel, "_setupPresetRecommendation", new SetupPresetRecommendation(
+            "lightweight",
+            "Lightweight",
+            "No GPU",
+            new SetupHostResources(null, null, NvidiaGpuDetected: false, LogicalProcessorCount: null, "No GPU")));
+
+        Assert.True(viewModel.IsSetupComplete);
+        Assert.Equal(nameof(SetupStep.SmokeTest), viewModel.SetupCurrentStep);
+        Assert.True(viewModel.SelectedSetupConfigurationReady);
+        Assert.Equal("KoeNoteを開始", viewModel.SetupNextActionText);
+        Assert.True(viewModel.SetupNextCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void SetupWizardModalText_UsesShortPresetFirstFlowCopy()
     {
         var viewModel = CreateViewModel();
@@ -450,24 +638,24 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsSetupComplete);
         Assert.Equal(nameof(SetupStep.Complete), viewModel.SetupCurrentStep);
         Assert.Equal("ダウンロードとインストール", viewModel.SetupNextActionText);
+        Assert.True(viewModel.SetupNextCommand.CanExecute(null));
     }
 
     [Fact]
-    public void SetupFailureMessages_ExplainOptionalRuntimeFallbacks()
+    public void SetupFailureMessages_ExplainRequiredRuntimeFailures()
     {
         var diarizationMessage = InvokePrivateStatic<string>(
-            "BuildOptionalDiarizationRuntimeFailureMessage",
+            "BuildDiarizationRuntimeSetupFailureMessage",
             "network unavailable",
             DiarizationRuntimeService.FailureCategoryNetworkUnavailable);
         var cudaMessage = InvokePrivateStatic<string>(
-            "BuildOptionalCudaReviewRuntimeFailureMessage",
+            "BuildCudaReviewRuntimeSetupFailureMessage",
             "network unavailable",
             CudaReviewRuntimeService.FailureCategoryNetworkUnavailable);
 
-        Assert.Contains("KoeNote本体は利用できます", diarizationMessage, StringComparison.Ordinal);
-        Assert.Contains("後から追加導入できます", diarizationMessage, StringComparison.Ordinal);
-        Assert.Contains("CPU版で続行できます", cudaMessage, StringComparison.Ordinal);
-        Assert.Contains("GPU高速化は後から追加導入できます", cudaMessage, StringComparison.Ordinal);
+        Assert.Contains("diarize could not be downloaded", diarizationMessage, StringComparison.Ordinal);
+        Assert.Contains("CUDA review runtime could not download", cudaMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("CPU review runtime remains available", cudaMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1949,6 +2137,7 @@ public sealed class MainWindowViewModelTests
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));

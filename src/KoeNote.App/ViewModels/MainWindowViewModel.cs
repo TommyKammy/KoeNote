@@ -130,9 +130,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _modelDownloadProgressStageText = string.Empty;
     private string _modelDownloadNotification = string.Empty;
     private bool _isModelDownloadNotificationError;
-    private string _setupDiarizationRuntimeSummary = "話者識別runtimeは未導入です。必要になったらここから追加導入できます。";
-    private string _setupCudaReviewRuntimeSummary = "CUDA review runtime is optional. KoeNote will use CPU review runtime unless CUDA files are installed.";
-    private string _setupAsrCudaRuntimeSummary = "CUDA ASR runtime is optional. GPU ASR models will prompt for CUDA when an NVIDIA GPU is detected.";
+    private string _setupDiarizationRuntimeSummary = "Speaker diarization runtime is required and not installed yet.";
+    private string _setupCudaReviewRuntimeSummary = "CUDA review runtime is required when an NVIDIA GPU is detected.";
+    private string _setupAsrCudaRuntimeSummary = "CUDA ASR runtime is required when an NVIDIA GPU is detected.";
     private string _databaseMaintenanceSummary = string.Empty;
     private string _updateNotificationTitle = string.Empty;
     private string _updateNotificationMessage = string.Empty;
@@ -1115,7 +1115,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupAsrCudaRuntimeActionText => SetupAsrCudaRuntimeReady
         ? "導入済み"
-        : "追加導入";
+        : "導入";
 
     public bool SetupCudaReviewRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 
@@ -1123,17 +1123,24 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SetupCudaReviewRuntimeActionText => SetupCudaReviewRuntimeReady
         ? "導入済み"
-        : "追加導入";
+        : "導入";
 
     public bool SetupTernaryReviewRuntimeReady => !SelectedSetupReviewModelRequiresTernaryRuntime() ||
         File.Exists(Paths.TernaryLlamaCompletionPath);
 
-    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
+    public bool SetupRequiredRuntimeReady =>
         SetupFasterWhisperRuntimeReady &&
         SetupReviewRuntimeReady &&
-        (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         SetupDiarizationRuntimeReady &&
         SetupTernaryReviewRuntimeReady;
+
+    public bool SetupConditionalRuntimeReady =>
+        (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
+        (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady);
+
+    public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
+        SetupRequiredRuntimeReady &&
+        SetupConditionalRuntimeReady;
 
     public string SetupPrimaryInstallActionText => IsModelDownloadInProgress
         ? "導入中..."
@@ -1143,27 +1150,29 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             ? "構成は導入済み"
             : "おすすめ構成を導入";
 
-    public string SetupNextActionText => _setupState.CurrentStep switch
-    {
-        SetupStep.License => "同意して次へ",
-        SetupStep.InstallPlan when SelectedSetupConfigurationReady => "最終確認へ",
-        SetupStep.InstallPlan => "ダウンロードとインストール",
-        SetupStep.Install when SelectedSetupConfigurationReady => "最終確認へ",
-        SetupStep.Install => "ダウンロードとインストール",
-        SetupStep.SmokeTest when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
-        SetupStep.SmokeTest => "最終確認を実行",
-        SetupStep.Complete when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
-        SetupStep.Complete when _setupState.IsCompleted => "KoeNoteを開始",
-        SetupStep.Complete => "最終確認を実行",
-        SetupStep.SetupMode => "導入内容へ",
-        _ => "次へ"
-    };
+    public string SetupNextActionText => _setupState.IsCompleted && SelectedSetupConfigurationReady
+        ? "KoeNoteを開始"
+        : _setupState.CurrentStep switch
+        {
+            SetupStep.License => "同意して次へ",
+            SetupStep.InstallPlan when SelectedSetupConfigurationReady => "最終確認へ",
+            SetupStep.InstallPlan => "ダウンロードとインストール",
+            SetupStep.Install when SelectedSetupConfigurationReady => "最終確認へ",
+            SetupStep.Install => "ダウンロードとインストール",
+            SetupStep.SmokeTest when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
+            SetupStep.SmokeTest => "最終確認を実行",
+            SetupStep.Complete when !SelectedSetupConfigurationReady => "ダウンロードとインストール",
+            SetupStep.Complete => "最終確認を実行",
+            SetupStep.SetupMode => "導入内容へ",
+            _ => "次へ"
+        };
 
     public bool ShowSetupInlineInstallAction => !IsSetupWizardModalOpen && _setupState.CurrentStep != SetupStep.InstallPlan;
 
     public bool ShowSetupLicenseNotice => _setupState.CurrentStep == SetupStep.License;
 
     public bool ShowSetupSmokeAction => !IsSetupWizardModalOpen &&
+        !_setupState.IsCompleted &&
         (_setupState.CurrentStep is SetupStep.SmokeTest or SetupStep.Complete);
 
     public bool ShowSetupCompleteAction => false;
@@ -1215,6 +1224,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
             {
                 missing.Add("ASR GPU runtime");
+            }
+
+            if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
+            {
+                missing.Add("Review GPU runtime");
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -1382,6 +1396,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
                 OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
+                OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
+                OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
                 OnPropertyChanged(nameof(SetupPrimaryInstallSummary));

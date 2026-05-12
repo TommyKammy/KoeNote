@@ -591,7 +591,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_CompleteIfReady_RequiresAsrGpuRuntimeWhenNvidiaGpuIsDetected()
+    public void SetupWizard_CompleteIfReady_RequiresGpuRuntimesWhenNvidiaGpuIsDetected()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
@@ -619,16 +619,18 @@ public sealed class SetupWizardServiceTests
         Assert.False(completed.IsCompleted);
         Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
         Assert.Contains(smoke.Checks, check => check.Name == "ASR CUDA runtime" && !check.IsOk);
-        Assert.DoesNotContain(smoke.Checks, check => check.Name == "Review CUDA runtime");
+        Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && !check.IsOk);
+        Assert.Contains(smoke.Checks, check => check.Name == "speaker diarization runtime" && !check.IsOk);
     }
 
     [Fact]
-    public void SetupWizard_CompletesAfterVerifiedModelsSmokeAndAsrGpuRuntimePass()
+    public void SetupWizard_CompletesAfterVerifiedModelsSmokeAndGpuRuntimesPass()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
@@ -640,6 +642,7 @@ public sealed class SetupWizardServiceTests
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
         Touch(paths.AsrCudaRuntimeMarkerPath);
+        CreateCudaReviewRuntime(paths);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var installedModels = new InstalledModelRepository(paths);
@@ -657,9 +660,16 @@ public sealed class SetupWizardServiceTests
         var completed = wizard.CompleteIfReady();
 
         Assert.True(smoke.IsSucceeded);
-        Assert.DoesNotContain(smoke.Checks, check => check.Name == "Review CUDA runtime");
+        Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && check.IsOk);
         Assert.True(completed.IsCompleted);
         Assert.Equal(SetupStep.Complete, completed.CurrentStep);
+
+        var rerunSmoke = wizard.RunSmokeCheck();
+        var rerunState = wizard.LoadState();
+
+        Assert.True(rerunSmoke.IsSucceeded);
+        Assert.True(rerunState.IsCompleted);
+        Assert.Equal(SetupStep.Complete, rerunState.CurrentStep);
     }
 
     [Fact]
@@ -669,6 +679,7 @@ public sealed class SetupWizardServiceTests
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         var ternaryModelPath = Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0", "Ternary-Bonsai-8B-Q2_0.gguf");
         Touch(ternaryModelPath);
@@ -704,6 +715,7 @@ public sealed class SetupWizardServiceTests
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
@@ -1017,6 +1029,20 @@ public sealed class SetupWizardServiceTests
         var entry = archive.CreateEntry(path);
         using var writer = new StreamWriter(entry.Open());
         writer.Write(content);
+    }
+
+    private static void CreateDiarizationRuntime(AppPaths paths)
+    {
+        Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+    }
+
+    private static void CreateCudaReviewRuntime(AppPaths paths)
+    {
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(paths.CudaReviewRuntimeMarkerPath);
     }
 
     private sealed class FailingHandler : HttpMessageHandler
