@@ -81,6 +81,7 @@ public sealed class JobLogExportServiceTests
         var service = new JobLogExportService(paths, new JobLogRepository(paths));
         var job = CreateJob();
         var jobLogPath = Path.Combine(paths.Jobs, job.JobId, "logs", "preprocess.log");
+        var asrWorkerLogPath = Path.Combine(paths.Jobs, job.JobId, "logs", "asr-20260512145447000-abcdef.log");
         var excludedFiles = new[]
         {
             Path.Combine(paths.Jobs, job.JobId, "asr", "asr.raw.json"),
@@ -90,6 +91,7 @@ public sealed class JobLogExportServiceTests
         };
         Directory.CreateDirectory(Path.GetDirectoryName(jobLogPath)!);
         File.WriteAllText(jobLogPath, "ffmpeg log");
+        File.WriteAllText(asrWorkerLogPath, "asr worker diagnostics");
         foreach (var file in excludedFiles)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
@@ -107,6 +109,7 @@ public sealed class JobLogExportServiceTests
         var entries = archive.Entries.Select(static entry => entry.FullName).ToArray();
         Assert.Contains("diagnostic-report.txt", entries);
         Assert.Contains("job-logs/preprocess.log", entries);
+        Assert.Contains("job-logs/asr-20260512145447000-abcdef.log", entries);
         Assert.Contains("crash-logs/crash-20260508-120000-000.log", entries);
         Assert.DoesNotContain(entries, entry => entry.Contains("asr.raw.json", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(entries, entry => entry.Contains("diarize.raw.json", StringComparison.OrdinalIgnoreCase));

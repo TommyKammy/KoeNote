@@ -13,7 +13,8 @@ internal sealed class SetupReadinessService(
     ToolStatusService toolStatusService,
     ModelCatalogService modelCatalogService,
     InstalledModelRepository installedModelRepository,
-    ISetupHostResourceProbe hostResourceProbe)
+    ISetupHostResourceProbe hostResourceProbe,
+    ISetupRuntimeSmokeService? runtimeSmokeService = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -165,12 +166,35 @@ internal sealed class SetupReadinessService(
             checks.Add(CheckCudaReviewRuntime());
         }
 
+        checks.AddRange((runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository)).Run(state));
+
         return checks;
     }
 
     private SetupSmokeCheck CheckDiarizationRuntime()
     {
         var exists = DiarizationRuntimeLayout.HasPackage(paths);
+        if (!exists)
+        {
+            var missingData = DiarizationRuntimeLayout.GetMissingManagedRuntimeData(paths);
+            if (DiarizationRuntimeLayout.HasManagedPackageMetadata(paths) && missingData.Count > 0)
+            {
+                return new SetupSmokeCheck(
+                    "speaker diarization runtime",
+                    false,
+                    $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missingData)}");
+            }
+
+            var missingLegacyData = DiarizationRuntimeLayout.GetMissingLegacyRuntimeData(paths);
+            if (DiarizationRuntimeLayout.HasLegacyPackageMetadata(paths) && missingLegacyData.Count > 0)
+            {
+                return new SetupSmokeCheck(
+                    "speaker diarization runtime",
+                    false,
+                    $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missingLegacyData)}");
+            }
+        }
+
         return new SetupSmokeCheck(
             "speaker diarization runtime",
             exists,

@@ -146,6 +146,41 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SettingsAsrEngine_ReflectsInstalledModelAfterSetupWizardRefresh()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        CreateFasterWhisperRuntime(paths);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            SelectedModelPresetId = "high_accuracy",
+            SelectedAsrModelId = "faster-whisper-large-v3-turbo",
+            StorageRoot = paths.UserModels
+        });
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "faster-whisper-large-v3-turbo"));
+        var viewModel = new MainWindowViewModel(paths);
+        Assert.False(viewModel.AvailableAsrEngines.Single(engine => engine.EngineId == "faster-whisper-large-v3-turbo").IsInstalled);
+
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var asrItem = catalog.Models.First(model => model.ModelId == "faster-whisper-large-v3-turbo");
+        var asrPath = installService.GetDefaultInstallPath(asrItem);
+        Directory.CreateDirectory(asrPath);
+        File.WriteAllText(Path.Combine(asrPath, "model.bin"), "asr");
+        installService.RegisterLocalModel(asrItem, asrPath, "download");
+
+        InvokePrivate(viewModel, "RefreshSetupWizard", true);
+
+        var option = viewModel.AvailableAsrEngines.Single(engine => engine.EngineId == "faster-whisper-large-v3-turbo");
+        Assert.True(option.IsInstalled);
+        Assert.True(viewModel.RequiredRuntimeAssetsReady);
+    }
+
+    [Fact]
     public void HeaderModels_RegistersDownloadedSetupAsrFolderWhenInstallRecordIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -652,8 +687,13 @@ public sealed class MainWindowViewModelTests
             "BuildCudaReviewRuntimeSetupFailureMessage",
             "network unavailable",
             CudaReviewRuntimeService.FailureCategoryNetworkUnavailable);
+        var packageDataMessage = InvokePrivateStatic<string>(
+            "BuildDiarizationRuntimeSetupFailureMessage",
+            "missing silero_vad.jit",
+            DiarizationRuntimeService.FailureCategoryPackageDataMissing);
 
         Assert.Contains("diarize could not be downloaded", diarizationMessage, StringComparison.Ordinal);
+        Assert.Contains("required runtime data is missing", packageDataMessage, StringComparison.Ordinal);
         Assert.Contains("CUDA review runtime could not download", cudaMessage, StringComparison.Ordinal);
         Assert.DoesNotContain("CPU review runtime remains available", cudaMessage, StringComparison.Ordinal);
     }
@@ -2528,6 +2568,26 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void AsrNativeCrashRunUpdate_ShowsActionableLatestLog()
+    {
+        var viewModel = CreateViewModel();
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Asr,
+                JobRunStageState.Failed,
+                100,
+                ErrorCategory: AsrFailureCategory.NativeCrash.ToString())
+        ]);
+
+        Assert.Contains("ASR native runtime crashed", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains("diagnostic package", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SelectingSegment_SeeksPlaybackPositionToSegmentStart()
     {
         var viewModel = CreateViewModel();
@@ -3326,12 +3386,15 @@ public sealed class MainWindowViewModelTests
 
     private static void CreateFasterWhisperRuntime(AppPaths paths)
     {
+        Touch(paths.AsrPythonPath);
+        Touch(paths.FasterWhisperScriptPath);
         Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper-1.2.1.dist-info"));
     }
 
     private static void CreateDiarizationRuntime(AppPaths paths)
     {
         Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+        Touch(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "silero_vad", "data", "silero_vad.jit"));
     }
 
     private sealed class RecordingUpdateInstallerLauncher : IUpdateInstallerLauncher

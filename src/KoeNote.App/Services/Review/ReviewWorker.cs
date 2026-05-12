@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Services.Review;
@@ -119,8 +120,23 @@ public sealed class ReviewWorker(
         CancellationToken cancellationToken)
     {
         var schemaPath = options.UseJsonSchema ? jsonSchemaFilePath : null;
-        var arguments = commandBuilder.BuildArgumentList(options, promptFilePath, schemaPath);
-        var processResult = await processRunner.RunAsync(options.LlamaCompletionPath, arguments, timeout, cancellationToken);
+        ProcessRunResult processResult;
+        try
+        {
+            using var pathBridge = LlamaRuntimePathBridge.Create(options.ModelPath);
+            var safeOptions = options with { ModelPath = pathBridge.ModelPath };
+            var safePromptPath = pathBridge.AddInputFile(promptFilePath);
+            var safeSchemaPath = schemaPath is null ? null : pathBridge.AddInputFile(schemaPath);
+            var arguments = commandBuilder.BuildArgumentList(safeOptions, safePromptPath, safeSchemaPath);
+            processResult = await processRunner.RunAsync(options.LlamaCompletionPath, arguments, timeout, cancellationToken);
+        }
+        catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"Could not prepare ASCII-safe Review runtime paths: {exception.Message}",
+                exception);
+        }
 
         if (processResult.ExitCode != 0)
         {

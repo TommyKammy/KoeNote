@@ -869,6 +869,7 @@ public sealed partial class MainWindowViewModel
             SetupReviewModelChoices.FirstOrDefault();
         _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
             preset.PresetId.Equals(displayState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
+        RefreshAvailableAsrEngines();
 
         if (refreshSmokeChecks)
         {
@@ -929,6 +930,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsSetupComplete));
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
+        OnPropertyChanged(nameof(SummaryStageAssetsReady));
         OnPropertyChanged(nameof(CanRunSelectedJob));
         OnPropertyChanged(nameof(RunPreflightSummary));
         OnPropertyChanged(nameof(RunPreflightDetail));
@@ -1261,6 +1263,8 @@ public sealed partial class MainWindowViewModel
                 $"KoeNote found Python, but pip could not install diarize. Details: {message}",
             DiarizationRuntimeService.FailureCategoryPackageCheckFailed =>
                 $"diarize was installed, but KoeNote could not verify the required version. Details: {message}",
+            DiarizationRuntimeService.FailureCategoryPackageDataMissing =>
+                $"diarize was installed, but required runtime data is missing. Reinstall speaker diarization runtime. Details: {message}",
             _ => message
         };
     }

@@ -99,11 +99,25 @@ public sealed class LlamaTranscriptSummaryRuntime(
         string promptPath,
         CancellationToken cancellationToken)
     {
-        var result = await processRunner.RunAsync(
-            options.LlamaCompletionPath,
-            BuildArguments(options, promptPath),
-            options.Timeout ?? TimeSpan.FromHours(2),
-            cancellationToken);
+        ProcessRunResult result;
+        try
+        {
+            using var pathBridge = LlamaRuntimePathBridge.Create(options.ModelPath);
+            var safePromptPath = pathBridge.AddInputFile(promptPath);
+            var safeOptions = options with { ModelPath = pathBridge.ModelPath };
+            result = await processRunner.RunAsync(
+                options.LlamaCompletionPath,
+                BuildArguments(safeOptions, safePromptPath),
+                options.Timeout ?? TimeSpan.FromHours(2),
+                cancellationToken);
+        }
+        catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"Could not prepare ASCII-safe transcript summary runtime paths: {exception.Message}",
+                exception);
+        }
 
         if (result.ExitCode != 0)
         {

@@ -16,6 +16,7 @@ public sealed class DiarizationRuntimeService(
     public const string FailureCategoryNetworkUnavailable = "network-unavailable";
     public const string FailureCategoryTorchWheelUnavailable = "torch-wheel-unavailable";
     public const string FailureCategoryPackageCheckFailed = "package-check-failed";
+    public const string FailureCategoryPackageDataMissing = "package-data-missing";
     private readonly PythonRuntimeResolver _pythonRuntimeResolver = pythonRuntimeResolver ?? new PythonRuntimeResolver(paths, processRunner);
 
     public async Task<DiarizationRuntimeStatus> CheckAsync(CancellationToken cancellationToken = default)
@@ -43,7 +44,7 @@ public sealed class DiarizationRuntimeService(
             }
 
             return string.Equals(detail, RequiredPackageVersion, StringComparison.OrdinalIgnoreCase)
-                ? new DiarizationRuntimeStatus(true, detail, runtime.Command.InstallPath)
+                ? CheckRuntimeData(runtime.Command.InstallPath)
                 : new DiarizationRuntimeStatus(
                     false,
                     $"diarize {detail} is installed, but {RequiredPackageVersion} is required.",
@@ -97,7 +98,9 @@ public sealed class DiarizationRuntimeService(
                 : DiarizationRuntimeInstallResult.Failed(
                     $"diarize installed but package check failed: {status.Detail}",
                     paths.DiarizationPythonEnvironment,
-                    FailureCategoryPackageCheckFailed);
+                    string.IsNullOrWhiteSpace(status.FailureCategory)
+                        ? FailureCategoryPackageCheckFailed
+                        : status.FailureCategory);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -218,9 +221,30 @@ public sealed class DiarizationRuntimeService(
 
         return FailureCategoryPipInstallFailed;
     }
+
+    private DiarizationRuntimeStatus CheckRuntimeData(string installPath)
+    {
+        var missing = string.Equals(installPath, paths.PythonPackages, StringComparison.OrdinalIgnoreCase)
+            ? DiarizationRuntimeLayout.GetMissingLegacyRuntimeData(paths)
+            : DiarizationRuntimeLayout.GetMissingManagedRuntimeData(paths);
+        if (missing.Count == 0)
+        {
+            return new DiarizationRuntimeStatus(true, RequiredPackageVersion, installPath, string.Empty);
+        }
+
+        return new DiarizationRuntimeStatus(
+            false,
+            $"diarize {RequiredPackageVersion} is installed, but required runtime data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missing)}",
+            installPath,
+            FailureCategoryPackageDataMissing);
+    }
 }
 
-public sealed record DiarizationRuntimeStatus(bool IsAvailable, string Detail, string InstallPath);
+public sealed record DiarizationRuntimeStatus(
+    bool IsAvailable,
+    string Detail,
+    string InstallPath,
+    string FailureCategory = "");
 
 public sealed record DiarizationRuntimePreflightStatus(
     bool IsReady,

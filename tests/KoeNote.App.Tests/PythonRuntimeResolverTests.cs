@@ -64,6 +64,37 @@ public sealed class PythonRuntimeResolverTests
     }
 
     [Fact]
+    public async Task DiarizationRuntimeService_CheckAsync_RejectsMissingSileroVadData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.DiarizationPythonPath)!);
+        File.WriteAllText(paths.DiarizationPythonPath, string.Empty);
+        var runner = new FakePythonProcessRunner(new Dictionary<string, ProcessRunResult>(StringComparer.OrdinalIgnoreCase)
+        {
+            [paths.DiarizationPythonPath] = new(
+                0,
+                TimeSpan.FromMilliseconds(1),
+                $"3.12.4|{paths.DiarizationPythonPath}",
+                string.Empty)
+        })
+        {
+            VersionCheckResult = new ProcessRunResult(
+                0,
+                TimeSpan.FromMilliseconds(1),
+                "0.1.2",
+                string.Empty)
+        };
+        var service = new DiarizationRuntimeService(paths, runner);
+
+        var result = await service.CheckAsync();
+
+        Assert.False(result.IsAvailable);
+        Assert.Equal(DiarizationRuntimeService.FailureCategoryPackageDataMissing, result.FailureCategory);
+        Assert.Contains("silero_vad.jit", result.Detail);
+    }
+
+    [Fact]
     public async Task DiarizationRuntimeService_CheckInstallPreflightAsync_UsesBundledPythonAndPip()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -294,6 +325,7 @@ public sealed class PythonRuntimeResolverTests
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize"));
+        CreateDiarizationRuntimeData(paths);
 
         Assert.True(DiarizationRuntimeLayout.HasManagedPackage(paths));
         Assert.True(DiarizationRuntimeLayout.HasPackage(paths));
@@ -305,8 +337,47 @@ public sealed class PythonRuntimeResolverTests
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+        CreateDiarizationRuntimeData(paths);
 
         Assert.True(DiarizationRuntimeLayout.HasManagedPackage(paths));
+        Assert.True(DiarizationRuntimeLayout.HasPackage(paths));
+    }
+
+    [Fact]
+    public void DiarizationRuntimeLayout_RejectsManagedVenvPackageWhenSileroVadDataIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+
+        Assert.False(DiarizationRuntimeLayout.HasManagedPackage(paths));
+        Assert.False(DiarizationRuntimeLayout.HasPackage(paths));
+        Assert.Contains(DiarizationRuntimeLayout.GetMissingManagedRuntimeData(paths), path => path.EndsWith("silero_vad.jit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DiarizationRuntimeLayout_RejectsLegacyPackageWhenSileroVadDataIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(Path.Combine(paths.PythonPackages, "diarize"));
+
+        Assert.False(DiarizationRuntimeLayout.HasLegacyPackage(paths));
+        Assert.False(DiarizationRuntimeLayout.HasPackage(paths));
+        Assert.Contains(DiarizationRuntimeLayout.GetMissingLegacyRuntimeData(paths), path => path.EndsWith("silero_vad.jit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DiarizationRuntimeLayout_DetectsLegacyPackageWithSileroVadData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(Path.Combine(paths.PythonPackages, "diarize"));
+        var dataPath = Path.Combine(paths.PythonPackages, "silero_vad", "data", "silero_vad.jit");
+        Directory.CreateDirectory(Path.GetDirectoryName(dataPath)!);
+        File.WriteAllText(dataPath, "jit");
+
+        Assert.True(DiarizationRuntimeLayout.HasLegacyPackage(paths));
         Assert.True(DiarizationRuntimeLayout.HasPackage(paths));
     }
 
@@ -391,5 +462,12 @@ public sealed class PythonRuntimeResolverTests
                     string.Empty,
                     $"{fileName} not found"));
         }
+    }
+
+    private static void CreateDiarizationRuntimeData(AppPaths paths)
+    {
+        var dataPath = Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "silero_vad", "data", "silero_vad.jit");
+        Directory.CreateDirectory(Path.GetDirectoryName(dataPath)!);
+        File.WriteAllText(dataPath, "jit");
     }
 }

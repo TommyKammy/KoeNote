@@ -24,11 +24,25 @@ public sealed class LlamaTranscriptPolishingRuntime(
         await File.WriteAllTextAsync(promptPath, prompt, Encoding.UTF8, cancellationToken);
 
         var start = DateTimeOffset.UtcNow;
-        var result = await processRunner.RunAsync(
-            options.LlamaCompletionPath,
-            BuildArguments(options, promptPath),
-            timeout,
-            cancellationToken);
+        ProcessRunResult result;
+        try
+        {
+            using var pathBridge = LlamaRuntimePathBridge.Create(options.ModelPath);
+            var safePromptPath = pathBridge.AddInputFile(promptPath);
+            var safeOptions = options with { ModelPath = pathBridge.ModelPath };
+            result = await processRunner.RunAsync(
+                options.LlamaCompletionPath,
+                BuildArguments(safeOptions, safePromptPath),
+                timeout,
+                cancellationToken);
+        }
+        catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"Could not prepare ASCII-safe transcript polishing runtime paths: {exception.Message}",
+                exception);
+        }
 
         if (result.ExitCode != 0)
         {

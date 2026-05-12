@@ -278,7 +278,8 @@ internal static class MainWindowAsrEngineComposition
             asrJsonNormalizer,
             asrResultStore,
             transcriptSegmentRepository,
-            new AsrRunRepository(paths));
+            new AsrRunRepository(paths),
+            new JobLogRepository(paths));
     }
 }
 

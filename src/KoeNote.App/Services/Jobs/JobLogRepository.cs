@@ -6,23 +6,39 @@ namespace KoeNote.App.Services.Jobs;
 
 public sealed class JobLogRepository(AppPaths paths)
 {
-    public string SaveWorkerLog(string jobId, string stage, string standardOutput, string standardError)
+    public string SaveWorkerLog(
+        string jobId,
+        string stage,
+        string standardOutput,
+        string standardError,
+        IReadOnlyDictionary<string, string>? metadata = null,
+        string? fileName = null)
     {
         var logDirectory = Path.Combine(paths.Jobs, jobId, "logs");
         Directory.CreateDirectory(logDirectory);
 
-        var logPath = Path.Combine(logDirectory, $"{stage}.log");
-        var content = $"""
-            # {stage}
+        var logPath = Path.Combine(logDirectory, fileName ?? $"{stage}.log");
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {stage}");
+        builder.AppendLine();
+        if (metadata is not null && metadata.Count > 0)
+        {
+            builder.AppendLine("## metadata");
+            foreach (var item in metadata)
+            {
+                builder.AppendLine($"{item.Key}: {item.Value}");
+            }
 
-            ## stdout
-            {standardOutput}
+            builder.AppendLine();
+        }
 
-            ## stderr
-            {standardError}
-            """;
+        builder.AppendLine("## stdout");
+        builder.AppendLine(standardOutput);
+        builder.AppendLine();
+        builder.AppendLine("## stderr");
+        builder.AppendLine(standardError);
 
-        File.WriteAllText(logPath, content, Encoding.UTF8);
+        File.WriteAllText(logPath, builder.ToString(), Encoding.UTF8);
 
         AddEvent(jobId, stage, "info", $"Saved {stage} worker log: {logPath}");
         return logPath;

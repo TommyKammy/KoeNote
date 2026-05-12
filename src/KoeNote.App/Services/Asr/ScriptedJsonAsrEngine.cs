@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.Services.Asr;
 
@@ -10,7 +11,8 @@ public sealed class ScriptedJsonAsrEngine(
     AsrJsonNormalizer normalizer,
     AsrResultStore resultStore,
     TranscriptSegmentRepository transcriptSegmentRepository,
-    AsrRunRepository asrRunRepository) : IAsrEngine
+    AsrRunRepository asrRunRepository,
+    JobLogRepository jobLogRepository) : IAsrEngine
 {
     public string EngineId => engineId;
 
@@ -54,12 +56,21 @@ public sealed class ScriptedJsonAsrEngine(
             ValidateInputs(input, config);
             Directory.CreateDirectory(config.OutputDirectory);
             var arguments = BuildArguments(input, config, options, scriptJsonPath);
+            var processEnvironment = BuildProcessEnvironment(config);
             var processResult = await processRunner.RunAsync(
                 config.RuntimePath,
                 arguments,
                 timeout,
                 cancellationToken,
-                BuildProcessEnvironment(config));
+                processEnvironment.Environment);
+            var workerLogPath = SaveAsrWorkerLog(
+                input,
+                config,
+                asrRunId,
+                arguments,
+                scriptJsonPath,
+                processResult,
+                processEnvironment);
             if (processResult.ExitCode != 0)
             {
                 if (!File.Exists(scriptJsonPath))
@@ -67,12 +78,12 @@ public sealed class ScriptedJsonAsrEngine(
                     var workerOutput = string.IsNullOrWhiteSpace(processResult.StandardError)
                         ? processResult.StandardOutput
                         : processResult.StandardError;
-                    var category = IsCudaRuntimeFailure(workerOutput)
-                        ? AsrFailureCategory.CudaRuntimeMissing
-                        : AsrFailureCategory.ProcessFailed;
+                    var category = ClassifyProcessFailure(processResult.ExitCode, workerOutput);
+                    var exitSummary = DescribeExitCode(processResult.ExitCode);
                     throw new AsrWorkerException(
                         category,
-                        $"{DisplayName} exited with code {processResult.ExitCode}: {processResult.StandardError}");
+                        $"{DisplayName} exited with code {processResult.ExitCode} ({exitSummary}): {processResult.StandardError} Worker log: {workerLogPath}",
+                        workerLogPath: workerLogPath);
                 }
             }
 
@@ -184,7 +195,106 @@ public sealed class ScriptedJsonAsrEngine(
             value.Contains("specified module could not be found", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IReadOnlyDictionary<string, string> BuildProcessEnvironment(AsrEngineConfig config)
+    private static AsrFailureCategory ClassifyProcessFailure(int exitCode, string workerOutput)
+    {
+        if (IsCudaRuntimeFailure(workerOutput))
+        {
+            return AsrFailureCategory.CudaRuntimeMissing;
+        }
+
+        return IsNativeCrashExitCode(exitCode)
+            ? AsrFailureCategory.NativeCrash
+            : AsrFailureCategory.ProcessFailed;
+    }
+
+    private string SaveAsrWorkerLog(
+        AsrInput input,
+        AsrEngineConfig config,
+        string asrRunId,
+        IReadOnlyList<string> arguments,
+        string outputJsonPath,
+        ProcessRunResult processResult,
+        AsrProcessEnvironment processEnvironment)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["engine_id"] = EngineId,
+            ["display_name"] = DisplayName,
+            ["runtime_path"] = config.RuntimePath,
+            ["worker_script_path"] = config.WorkerPath ?? "(unset)",
+            ["argument_summary"] = BuildArgumentSummary(arguments),
+            ["model_id"] = config.ModelId,
+            ["model_version"] = config.ModelVersion ?? "(unset)",
+            ["model_path"] = config.ModelPath,
+            ["normalized_audio_path"] = input.NormalizedAudioPath,
+            ["output_json_path"] = outputJsonPath,
+            ["exit_code"] = processResult.ExitCode.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["exit_summary"] = DescribeExitCode(processResult.ExitCode),
+            ["duration"] = processResult.Duration.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
+            ["asr_path_entries"] = processEnvironment.AddedPathEntries.Count == 0
+                ? "(none)"
+                : string.Join(";", processEnvironment.AddedPathEntries),
+            ["koenote_asr_tools_dir"] = processEnvironment.Environment.TryGetValue("KOENOTE_ASR_TOOLS_DIR", out var asrToolsDir)
+                ? asrToolsDir
+                : "(unset)"
+        };
+
+        return jobLogRepository.SaveWorkerLog(
+            input.JobId,
+            "asr",
+            processResult.StandardOutput,
+            processResult.StandardError,
+            metadata,
+            $"asr-{asrRunId}.log");
+    }
+
+    private static string BuildArgumentSummary(IReadOnlyList<string> arguments)
+    {
+        var sanitized = new List<string>();
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            sanitized.Add(arguments[index]);
+            if (arguments[index].Equals("--context", StringComparison.OrdinalIgnoreCase) ||
+                arguments[index].Equals("--hotword", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 < arguments.Count)
+                {
+                    sanitized.Add("(redacted)");
+                    index++;
+                }
+            }
+        }
+
+        return string.Join(" ", sanitized.Select(QuoteArgument));
+    }
+
+    private static string QuoteArgument(string value)
+    {
+        return value.Any(char.IsWhiteSpace)
+            ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+
+    private static string DescribeExitCode(int exitCode)
+    {
+        return exitCode switch
+        {
+            0 => "success",
+            -1073740791 => "0xC0000409 STATUS_STACK_BUFFER_OVERRUN/native fail-fast",
+            -1073741819 => "0xC0000005 access violation/native crash",
+            -1073741571 => "0xC00000FD stack overflow/native crash",
+            -1073741515 => "0xC0000135 missing native dependency",
+            _ when exitCode < 0 => $"0x{unchecked((uint)exitCode):X8} native process failure",
+            _ => "process failed"
+        };
+    }
+
+    private static bool IsNativeCrashExitCode(int exitCode)
+    {
+        return exitCode < 0;
+    }
+
+    private static AsrProcessEnvironment BuildProcessEnvironment(AsrEngineConfig config)
     {
         var pathEntries = new List<string>();
         var appAsrTools = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
@@ -205,15 +315,16 @@ public sealed class ScriptedJsonAsrEngine(
 
         if (pathEntries.Count == 0)
         {
-            return new Dictionary<string, string>();
+            return new AsrProcessEnvironment(new Dictionary<string, string>(), []);
         }
 
         var existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         var environment = new Dictionary<string, string>();
+        var addedPathEntries = pathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         pathEntries.Add(existingPath);
         environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
-        environment["KOENOTE_ASR_TOOLS_DIR"] = pathEntries[0];
-        return environment;
+        environment["KOENOTE_ASR_TOOLS_DIR"] = addedPathEntries[0];
+        return new AsrProcessEnvironment(environment, addedPathEntries);
     }
 
     private static void ValidateInputs(AsrInput input, AsrEngineConfig config)
@@ -238,4 +349,8 @@ public sealed class ScriptedJsonAsrEngine(
             throw new AsrWorkerException(AsrFailureCategory.MissingAudio, $"Normalized audio not found: {input.NormalizedAudioPath}");
         }
     }
+
+    private sealed record AsrProcessEnvironment(
+        IReadOnlyDictionary<string, string> Environment,
+        IReadOnlyList<string> AddedPathEntries);
 }

@@ -1,5 +1,6 @@
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Jobs;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
@@ -15,6 +16,20 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.DoesNotContain("retrying on CPU", script, StringComparison.Ordinal);
         Assert.DoesNotContain("device=\"cpu\"", script, StringComparison.Ordinal);
         Assert.DoesNotContain("compute_type=\"int8\"", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FasterWhisperWorker_EmitsRuntimeDiagnostics()
+    {
+        var scriptPath = FindRepositoryFasterWhisperScriptPath();
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("koenote_asr_diagnostic", script);
+        Assert.Contains("faster_whisper_version", script);
+        Assert.Contains("ctranslate2_version", script);
+        Assert.Contains("ctranslate2_cuda_device_count", script);
+        Assert.Contains("supported_compute_types_cuda", script);
+        Assert.Contains("KOENOTE_ASR_TOOLS_DIR", script);
     }
 
     [Fact]
@@ -53,6 +68,21 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Equal(
             Path.Combine(AppContext.BaseDirectory, "tools", "asr"),
             runner.Environment["KOENOTE_ASR_TOOLS_DIR"]);
+
+        var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("engine_id: scripted-test", log);
+        Assert.Contains("display_name: Scripted test", log);
+        Assert.Contains("runtime_path: python", log);
+        Assert.Contains($"worker_script_path: {scriptPath}", log);
+        Assert.Contains($"model_path: {modelPath}", log);
+        Assert.Contains($"normalized_audio_path: {audioPath}", log);
+        Assert.Contains("output_json_path:", log);
+        Assert.Contains("exit_code: 0", log);
+        Assert.Contains("exit_summary: success", log);
+        Assert.Contains("koenote_asr_tools_dir:", log);
+        Assert.Contains("## stdout", log);
+        Assert.Contains("ok", log);
     }
 
     [Fact]
@@ -106,7 +136,43 @@ public sealed class ScriptedJsonAsrEngineTests
             new AsrOptions()));
 
         Assert.Equal(AsrFailureCategory.CudaRuntimeMissing, exception.Category);
+        Assert.NotNull(exception.WorkerLogPath);
+        Assert.True(File.Exists(exception.WorkerLogPath));
+        Assert.Contains("Worker log:", exception.Message);
         Assert.Equal("failed", ReadSingleRunStatus(paths));
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_DescribesNativeCrashExitCodeInFailureAndWorkerLog()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('should fail')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var engine = CreateEngine(paths, new ExitCodeAsrProcessRunner(-1073740791));
+
+        var exception = await Assert.ThrowsAsync<AsrWorkerException>(() => engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "model",
+                scriptPath),
+            new AsrOptions()));
+
+        Assert.Equal(AsrFailureCategory.NativeCrash, exception.Category);
+        Assert.Contains("0xC0000409 STATUS_STACK_BUFFER_OVERRUN/native fail-fast", exception.Message);
+        Assert.NotNull(exception.WorkerLogPath);
+        var log = File.ReadAllText(exception.WorkerLogPath);
+        Assert.Contains("exit_code: -1073740791", log);
+        Assert.Contains("exit_summary: 0xC0000409 STATUS_STACK_BUFFER_OVERRUN/native fail-fast", log);
+        Assert.Equal("NativeCrash", ReadSingleRunErrorCategory(paths));
     }
 
     [Theory]
@@ -149,7 +215,8 @@ public sealed class ScriptedJsonAsrEngineTests
             new AsrJsonNormalizer(),
             new AsrResultStore(),
             new TranscriptSegmentRepository(paths),
-            new AsrRunRepository(paths));
+            new AsrRunRepository(paths),
+            new JobLogRepository(paths));
     }
 
     private static AppPaths CreatePaths()
@@ -168,6 +235,18 @@ public sealed class ScriptedJsonAsrEngineTests
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT status FROM asr_runs;";
+        return Convert.ToString(command.ExecuteScalar()) ?? "";
+    }
+
+    private static string ReadSingleRunErrorCategory(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT error_category FROM asr_runs;";
         return Convert.ToString(command.ExecuteScalar()) ?? "";
     }
 
@@ -227,6 +306,19 @@ public sealed class ScriptedJsonAsrEngineTests
             IReadOnlyDictionary<string, string>? environment = null)
         {
             return Task.FromResult(new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, standardError));
+        }
+    }
+
+    private sealed class ExitCodeAsrProcessRunner(int exitCode) : ExternalProcessRunner
+    {
+        public override Task<ProcessRunResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            return Task.FromResult(new ProcessRunResult(exitCode, TimeSpan.FromSeconds(1), string.Empty, string.Empty));
         }
     }
 }

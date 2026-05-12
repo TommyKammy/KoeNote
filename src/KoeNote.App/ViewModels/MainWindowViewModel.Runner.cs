@@ -131,6 +131,13 @@ public sealed partial class MainWindowViewModel
             LatestLog = "ASR GPU実行に必要なCUDA runtimeが不足しています。セットアップからASR GPU runtimeを導入してください。";
             RefreshSetupWizard();
         }
+
+        if (update.Stage == JobRunStage.Asr &&
+            update.StageState == JobRunStageState.Failed &&
+            string.Equals(update.ErrorCategory, AsrFailureCategory.NativeCrash.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            LatestLog = "ASR native runtime crashed. Check the ASR worker log in the diagnostic package, then retry with a lighter ASR model or reinstall the ASR GPU runtime.";
+        }
     }
 
     private StageStatus GetStageStatus(JobRunStage stage)

@@ -596,7 +596,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         paths.EnsureCreated();
@@ -629,7 +629,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateFasterWhisperRuntime(paths);
         CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
@@ -661,6 +661,9 @@ public sealed class SetupWizardServiceTests
 
         Assert.True(smoke.IsSucceeded);
         Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && check.IsOk);
+        Assert.Contains(smoke.Checks, check => check.Name == "ASR runtime smoke" && check.IsOk);
+        Assert.Contains(smoke.Checks, check => check.Name == "Review runtime smoke" && check.IsOk);
+        Assert.Contains(smoke.Checks, check => check.Name == "speaker diarization smoke" && check.IsOk);
         Assert.True(completed.IsCompleted);
         Assert.Equal(SetupStep.Complete, completed.CurrentStep);
 
@@ -673,12 +676,73 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_CompleteIfReady_RejectsDiarizationRuntimeWhenPackageDataIsMissing()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var wizard = CreateWizard(paths);
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = wizard.RunSmokeCheck();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        var check = Assert.Single(smoke.Checks, check => check.Name == "speaker diarization runtime");
+        Assert.False(check.IsOk);
+        Assert.Contains("silero_vad.jit", check.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetupWizard_CompleteIfReady_RejectsMissingAsrWorkerScriptInRuntimeSmoke()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.AsrPythonPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var wizard = CreateWizard(paths);
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = wizard.RunSmokeCheck();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        var check = Assert.Single(smoke.Checks, check => check.Name == "ASR runtime smoke");
+        Assert.False(check.IsOk);
+        Assert.Contains("ASR worker script is missing", check.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SetupWizard_CompleteIfReady_RequiresTernaryRuntimeForTernaryReviewModel()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateFasterWhisperRuntime(paths);
         CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         var ternaryModelPath = Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0", "Ternary-Bonsai-8B-Q2_0.gguf");
@@ -714,7 +778,7 @@ public sealed class SetupWizardServiceTests
         var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
+        CreateFasterWhisperRuntime(paths);
         CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
@@ -1034,6 +1098,14 @@ public sealed class SetupWizardServiceTests
     private static void CreateDiarizationRuntime(AppPaths paths)
     {
         Directory.CreateDirectory(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "diarize-0.1.2.dist-info"));
+        Touch(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "silero_vad", "data", "silero_vad.jit"));
+    }
+
+    private static void CreateFasterWhisperRuntime(AppPaths paths)
+    {
+        Touch(paths.AsrPythonPath);
+        Touch(paths.FasterWhisperScriptPath);
+        Directory.CreateDirectory(Path.Combine(paths.AsrPythonEnvironment, "Lib", "site-packages", "faster_whisper"));
     }
 
     private static void CreateCudaReviewRuntime(AppPaths paths)

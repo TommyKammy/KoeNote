@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import gc
+import importlib.metadata as metadata
 import json
 import os
 import sys
+from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -36,6 +38,94 @@ def add_windows_dll_directories() -> None:
             os.add_dll_directory(candidate)
         except OSError:
             continue
+
+
+def write_diagnostic(event: str, **values: object) -> None:
+    payload = {"event": event, **values}
+    print("koenote_asr_diagnostic " + json.dumps(payload, ensure_ascii=True, sort_keys=True), file=sys.stderr, flush=True)
+
+
+def package_version(package_name: str) -> str | None:
+    try:
+        return metadata.version(package_name)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def collect_asr_tools_files() -> list[str]:
+    tools_dir = os.environ.get("KOENOTE_ASR_TOOLS_DIR")
+    if not tools_dir:
+        return []
+
+    root = Path(tools_dir)
+    if not root.is_dir():
+        return []
+
+    names = [
+        "crispasr.exe",
+        "crispasr.dll",
+        "whisper.dll",
+        "ggml-cuda.dll",
+        "cublas64_12.dll",
+        "cublasLt64_12.dll",
+        "cudart64_12.dll",
+        "cudnn64_9.dll",
+        "zlibwapi.dll",
+    ]
+    present = []
+    for name in names:
+        candidate = root / name
+        if candidate.exists():
+            present.append(name)
+    return present
+
+
+def write_startup_diagnostics(args: argparse.Namespace) -> None:
+    write_diagnostic(
+        "startup",
+        requested_device=args.device,
+        requested_compute_type=args.compute_type,
+        model_path=args.model,
+        audio_path=args.audio,
+        output_json_path=args.output_json,
+        koenote_asr_tools_dir=os.environ.get("KOENOTE_ASR_TOOLS_DIR"),
+        path_head=os.environ.get("PATH", "").split(os.pathsep)[:5],
+        asr_tools_files=collect_asr_tools_files(),
+    )
+
+    try:
+        import ctranslate2
+
+        cuda_device_count = None
+        cuda_available = None
+        try:
+            cuda_device_count = ctranslate2.get_cuda_device_count()
+            cuda_available = cuda_device_count > 0
+        except Exception as exc:
+            cuda_available = False
+            cuda_device_count = f"error: {type(exc).__name__}: {exc}"
+
+        write_diagnostic(
+            "runtime",
+            faster_whisper_version=package_version("faster-whisper"),
+            ctranslate2_version=package_version("ctranslate2"),
+            ctranslate2_cuda_available=cuda_available,
+            ctranslate2_cuda_device_count=cuda_device_count,
+            supported_compute_types_auto=safe_supported_compute_types("auto"),
+            supported_compute_types_cpu=safe_supported_compute_types("cpu"),
+            supported_compute_types_cuda=safe_supported_compute_types("cuda"),
+        )
+    except Exception as exc:
+        write_diagnostic("runtime_probe_failed", error=f"{type(exc).__name__}: {exc}")
+
+
+def safe_supported_compute_types(device: str) -> object:
+    try:
+        import ctranslate2
+
+        return ctranslate2.get_supported_compute_types(device)
+    except Exception as exc:
+        return f"error: {type(exc).__name__}: {exc}"
 
 
 def parse_args() -> argparse.Namespace:
@@ -124,6 +214,7 @@ def main() -> int:
     args = parse_args()
 
     add_windows_dll_directories()
+    write_startup_diagnostics(args)
 
     try:
         from faster_whisper import WhisperModel
@@ -147,11 +238,23 @@ def main() -> int:
     if args.chunk_length is not None and args.chunk_length > 0:
         transcribe_options["chunk_length"] = args.chunk_length
 
+    write_diagnostic(
+        "model_load_start",
+        requested_device=args.device,
+        requested_compute_type=args.compute_type,
+        local_files_only=args.local_files_only,
+    )
+
     model = WhisperModel(
         args.model,
         device=args.device,
         compute_type=args.compute_type,
         local_files_only=args.local_files_only)
+    write_diagnostic(
+        "model_loaded",
+        model_device=str(getattr(model, "device", "unknown")),
+        model_compute_type=str(getattr(model, "compute_type", "unknown")),
+    )
     segments, info = model.transcribe(args.audio, **transcribe_options)
 
     segment_items = [
