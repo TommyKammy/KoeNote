@@ -473,6 +473,104 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public void PromptBuilder_IncludesAdditionalInstructionFromPromptSettings()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Gemma) with
+            {
+                PresetId = ReadablePolishingPromptPresets.StrongPunctuation,
+                AdditionalInstruction = "短い行の連続は自然な文に結合してください。\n文末に句読点を補ってください。"
+            });
+
+        Assert.Contains("Additional user instructions:", prompt, StringComparison.Ordinal);
+        Assert.Contains("- 短い行の連続は自然な文に結合してください。", prompt, StringComparison.Ordinal);
+        Assert.Contains("- 文末に句読点を補ってください。", prompt, StringComparison.Ordinal);
+        Assert.True(
+            prompt.IndexOf("短い行の連続", StringComparison.Ordinal) <
+            prompt.IndexOf("Speaker blocks:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PromptBuilder_IncludesPresetInstructionFromPromptSettings()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Gemma) with
+            {
+                PresetId = ReadablePolishingPromptPresets.StrongPunctuation
+            });
+
+        Assert.Contains("Additional user instructions:", prompt, StringComparison.Ordinal);
+        Assert.Contains("Add Japanese punctuation more actively than the standard setting.", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not preserve source line breaks when they are only ASR segmentation artifacts.", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_CombinesPresetAndUserInstructions()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Gemma) with
+            {
+                PresetId = ReadablePolishingPromptPresets.Faithful,
+                AdditionalInstruction = "専門用語はできるだけ残してください。"
+            });
+
+        Assert.Contains("Stay very close to the input wording and order.", prompt, StringComparison.Ordinal);
+        Assert.Contains("専門用語はできるだけ残してください。", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_UsesModelSpecificPresetInstruction()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.LlmJp) with
+            {
+                PresetId = ReadablePolishingPromptPresets.LectureSeminar
+            });
+
+        Assert.Contains("講義やセミナーの書き起こしとして読みやすく整えてください。", prompt, StringComparison.Ordinal);
+        Assert.Contains("Speaker blocks:", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_CustomPromptKeepsMandatoryOutputContract()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Gemma) with
+            {
+                UseCustomPrompt = true,
+                CustomPrompt = "講演録として読みやすい文章にしてください。"
+            });
+
+        Assert.Contains("講演録として読みやすい文章にしてください。", prompt, StringComparison.Ordinal);
+        Assert.Contains("Mandatory output contract:", prompt, StringComparison.Ordinal);
+        Assert.Contains("Output exactly one result block for each input speaker_block_id.", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not add facts that are not present in the transcript.", prompt, StringComparison.Ordinal);
+        Assert.Contains("BEGIN_BLOCK block-001", prompt, StringComparison.Ordinal);
+        Assert.Contains("speaker_block_id: block-001", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PromptBuilder_UsesPromptTemplateIdFromPromptSettings()
+    {
+        var prompt = new TranscriptPolishingPromptBuilder().Build(
+            CreatePromptChunk(),
+            TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Bonsai));
+
+        Assert.Contains("short Japanese ASR transcript chunk", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PromptBuilder_UsesJapanesePromptForLlmJp()
     {
         var prompt = new TranscriptPolishingPromptBuilder().Build(new TranscriptPolishingChunk(
@@ -510,6 +608,15 @@ public sealed class TranscriptPolishingServiceTests
         Assert.DoesNotContain("source_segment_ids: 000001,000002,000004", prompt, StringComparison.Ordinal);
         Assert.Contains("Treat each speaker block as one continuous utterance", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not keep source segment line breaks", prompt, StringComparison.Ordinal);
+    }
+
+    private static TranscriptPolishingChunk CreatePromptChunk()
+    {
+        return new TranscriptPolishingChunk(
+            1,
+            [
+                new TranscriptReadModel("000001", 0, 1, "Speaker_0", "今日はテストです", "none", "Speaker_0", "今日はテストです", null, null)
+            ]);
     }
 
     private static TranscriptPolishingOptions CreateOptions(string jobId, int chunkSegmentCount = 80)

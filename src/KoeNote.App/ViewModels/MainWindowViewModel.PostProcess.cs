@@ -156,9 +156,15 @@ public sealed partial class MainWindowViewModel
             var modelId = ResolveEffectiveReviewModelId(catalog);
             var profile = new LlmProfileResolver(Paths, _installedModelRepository).Resolve(catalog, modelId);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Polishing);
+            var promptSettings = LoadReadablePolishingPromptSettings(profile);
             var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "polishing");
 
             _jobLogRepository.AddEvent(job.JobId, "polishing", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
+            _jobLogRepository.AddEvent(
+                job.JobId,
+                "polishing",
+                "info",
+                $"Readable polishing prompt settings: family={promptSettings.ModelFamily}, preset={promptSettings.PresetId}, custom={promptSettings.UseCustomPrompt}");
             LatestLog = "読みやすく整文を実行しています。";
             RefreshLogs();
 
@@ -171,7 +177,7 @@ public sealed partial class MainWindowViewModel
                     profile.ModelId,
                     taskSettings.PromptTemplateId,
                     taskSettings.GenerationProfile,
-                    taskSettings.PromptVersion,
+                    promptSettings.PromptVersion,
                     ChunkSegmentCount: taskSettings.ChunkSegmentCount,
                     Timeout: profile.Timeout,
                     OutputSanitizerProfile: profile.OutputSanitizerProfile,
@@ -184,7 +190,8 @@ public sealed partial class MainWindowViewModel
                     RepeatPenalty: taskSettings.RepeatPenalty,
                     NoConversation: profile.NoConversation,
                     Threads: profile.Threads,
-                    ThreadsBatch: profile.ThreadsBatch),
+                    ThreadsBatch: profile.ThreadsBatch,
+                    PromptSettings: promptSettings),
                 cancellation.Token);
 
             if (string.IsNullOrWhiteSpace(result.Content))
@@ -253,6 +260,18 @@ public sealed partial class MainWindowViewModel
         stage.Status = "進行中";
         stage.ProgressPercent = 10;
         stage.DurationText = "00:00:00";
+    }
+
+    private ReadablePolishingPromptSettings LoadReadablePolishingPromptSettings(LlmRuntimeProfile profile)
+    {
+        var modelFamily = ReadablePolishingPromptModelFamilies.ResolveForModel(profile.ModelId, profile.ModelFamily);
+        var settings = _readablePolishingPromptSettingsRepository.Load(modelFamily).Settings.Normalize();
+        return settings with
+        {
+            PromptTemplateId = string.IsNullOrWhiteSpace(settings.PromptTemplateId)
+                ? ReadablePolishingPromptSettings.ResolveDefaultPromptTemplateId(modelFamily)
+                : settings.PromptTemplateId
+        };
     }
 
     private void MarkReadablePolishingStageSucceeded(DateTimeOffset startedAt)

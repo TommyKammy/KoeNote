@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.Sqlite;
+using Microsoft.Data.Sqlite;
 using KoeNote.App.Services;
 
 namespace KoeNote.App.Tests;
@@ -49,8 +49,9 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("transcript_derivative_chunks", tables);
         Assert.Contains("llm_profiles", tables);
         Assert.Contains("llm_task_settings", tables);
+        Assert.Contains("readable_polishing_prompt_settings", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("is_deleted", ReadColumnNames(connection, "jobs"));
         Assert.Contains("deleted_at", ReadColumnNames(connection, "jobs"));
@@ -73,6 +74,12 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("idx_llm_profiles_model", ReadIndexNames(connection));
         Assert.Contains("idx_llm_profiles_active", ReadIndexNames(connection));
         Assert.Contains("idx_llm_task_settings_profile", ReadIndexNames(connection));
+        Assert.Contains("preset_id", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
+        Assert.Contains("additional_instruction", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
+        Assert.Contains("use_custom_prompt", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
+        Assert.Contains("custom_prompt", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
+        Assert.Contains("prompt_template_id", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
+        Assert.Contains("prompt_version", ReadColumnNames(connection, "readable_polishing_prompt_settings"));
         Assert.Contains("deactivated_at", ReadColumnNames(connection, "domain_preset_imports"));
         Assert.Contains("previous_display_name", ReadColumnNames(connection, "domain_preset_speaker_alias_imports"));
         Assert.Contains("applied_display_name", ReadColumnNames(connection, "domain_preset_speaker_alias_imports"));
@@ -95,7 +102,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
@@ -119,6 +126,7 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("transcript_derivative_chunks", ReadTableNames(connection));
         Assert.Contains("llm_profiles", ReadTableNames(connection));
         Assert.Contains("llm_task_settings", ReadTableNames(connection));
+        Assert.Contains("readable_polishing_prompt_settings", ReadTableNames(connection));
         Assert.Contains("previous_display_name", ReadColumnNames(connection, "domain_preset_speaker_alias_imports"));
         Assert.Contains("applied_display_name", ReadColumnNames(connection, "domain_preset_speaker_alias_imports"));
     }
@@ -212,7 +220,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
     }
 
     [Fact]
@@ -232,7 +240,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
     }

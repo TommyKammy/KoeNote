@@ -75,6 +75,129 @@
 
                 <Border Style="{StaticResource SettingsSection}">
                     <StackPanel>
+                        <TextBlock Text="読みやすく整文プロンプト" Style="{StaticResource SettingsSectionTitle}" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="対象モデル" Style="{StaticResource SettingsFieldLabel}" />
+                                <ComboBox ItemsSource="{Binding ReadablePolishingPromptModelFamilyOptions}"
+                                          SelectedItem="{Binding SelectedReadablePolishingPromptModelFamily, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName"
+                                          MinHeight="32" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="プリセット" Style="{StaticResource SettingsFieldLabel}" />
+                                <ComboBox ItemsSource="{Binding ReadablePolishingPromptPresetOptions}"
+                                          SelectedItem="{Binding SelectedReadablePolishingPromptPreset, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName"
+                                          IsEnabled="{Binding IsReadablePolishingPromptPresetEnabled}"
+                                          MinHeight="32" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="{Binding ReadablePolishingPromptPresetDescription}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="{Binding ReadablePolishingPromptActiveModelFamilySummary}"
+                                       Style="{StaticResource MutedText}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                            <Button Command="{Binding SelectActiveReadablePolishingPromptModelFamilyCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    MinHeight="30"
+                                    Padding="10,4"
+                                    Margin="8,0,0,0"
+                                    ToolTip="現在の整文モデルに対応するプロンプト設定を表示します。">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8AB;"
+                                               Style="{StaticResource IconText}"
+                                               Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="表示"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <TextBox Text="{Binding ReadablePolishingPromptPreviewText, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="120"
+                                 MaxHeight="220"
+                                 Margin="0,0,0,10"
+                                 ToolTip="表示ボタンで、現在選択されている読みやすく整文プロンプトの内容を確認できます。" />
+
+                        <TextBlock Text="追加指示" Style="{StaticResource SettingsFieldLabel}" />
+                        <TextBox Text="{Binding ReadablePolishingPromptAdditionalInstruction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="70"
+                                 Margin="0,0,0,10"
+                                 ToolTip="選択したプリセットに追加で反映したい指示を入力します。" />
+
+                        <CheckBox Content="カスタムプロンプトを使う"
+                                  IsChecked="{Binding ReadablePolishingPromptUseCustomPrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  Margin="0,0,0,8" />
+
+                        <TextBox Text="{Binding ReadablePolishingPromptCustomPrompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="96"
+                                 Margin="0,0,0,10"
+                                 ToolTip="オンにすると、プリセットの代わりにこの本文を使います。出力形式などの必須ルールは自動で追加されます。" />
+
+                        <StackPanel Orientation="Horizontal">
+                            <Button Command="{Binding SaveReadablePolishingPromptSettingsCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    MinHeight="34"
+                                    Padding="14,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE74E;"
+                                               Style="{StaticResource IconText}"
+                                               Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="保存"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Command="{Binding ResetReadablePolishingPromptSettingsCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    MinHeight="34"
+                                    Padding="14,6"
+                                    Margin="8,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE777;"
+                                               Style="{StaticResource IconText}"
+                                               Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="標準に戻す"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding ReadablePolishingPromptSettingsStatus}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SettingsSection}">
+                    <StackPanel>
                         <TextBlock Text="ASR補助情報" Style="{StaticResource SettingsSectionTitle}" />
 
                         <TextBlock Text="コンテキスト" Style="{StaticResource SettingsFieldLabel}" />

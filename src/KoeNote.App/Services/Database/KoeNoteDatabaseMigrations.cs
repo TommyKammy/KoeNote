@@ -20,7 +20,8 @@ internal static class KoeNoteDatabaseMigrations
         new(14, "domain preset speaker alias restore", ApplyDomainPresetSpeakerAliasRestoreSchema),
         new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema),
         new(16, "summary stage toggle", ApplySummaryStageToggle),
-        new(17, "LLM profile task settings", ApplyLlmProfileTaskSettingsSchema)
+        new(17, "LLM profile task settings", ApplyLlmProfileTaskSettingsSchema),
+        new(18, "readable polishing prompt settings", ApplyReadablePolishingPromptSettingsSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -611,6 +612,23 @@ internal static class KoeNoteDatabaseMigrations
         migration.Execute("""
             CREATE INDEX IF NOT EXISTS idx_llm_task_settings_profile
             ON llm_task_settings(profile_id);
+            """);
+    }
+
+    private static void ApplyReadablePolishingPromptSettingsSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS readable_polishing_prompt_settings (
+                model_family TEXT NOT NULL PRIMARY KEY,
+                preset_id TEXT NOT NULL,
+                additional_instruction TEXT NOT NULL DEFAULT '',
+                use_custom_prompt INTEGER NOT NULL DEFAULT 0,
+                custom_prompt TEXT NOT NULL DEFAULT '',
+                prompt_template_id TEXT NOT NULL,
+                prompt_version TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """);
     }
 

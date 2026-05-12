@@ -50,7 +50,8 @@ public sealed record MainWindowServices(
     IUpdateHistoryService UpdateHistoryService,
     DomainPresetImportService DomainPresetImportService,
     LlmSettingsSeedService LlmSettingsSeedService,
-    LlmSettingsDisplayService LlmSettingsDisplayService)
+    LlmSettingsDisplayService LlmSettingsDisplayService,
+    ReadablePolishingPromptSettingsRepository ReadablePolishingPromptSettingsRepository)
 {
     public static MainWindowServices Create(AppPaths paths)
     {
@@ -124,6 +125,7 @@ public sealed record MainWindowServices(
             runtime.UpdateHistoryService,
             new DomainPresetImportService(paths, repositories.AsrSettingsRepository),
             llmSettingsSeedService,
-            new LlmSettingsDisplayService(llmSettingsRepository));
+            new LlmSettingsDisplayService(llmSettingsRepository),
+            new ReadablePolishingPromptSettingsRepository(paths));
     }
 }

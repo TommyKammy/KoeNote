@@ -21,7 +21,8 @@ public sealed record TranscriptPolishingOptions(
     double? RepeatPenalty = null,
     bool NoConversation = true,
     int? Threads = null,
-    int? ThreadsBatch = null);
+    int? ThreadsBatch = null,
+    ReadablePolishingPromptSettings? PromptSettings = null);
 
 public sealed record TranscriptPolishingChunk(
     int ChunkIndex,

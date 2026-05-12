@@ -9,6 +9,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
@@ -3293,6 +3294,123 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
         Assert.Contains("Installer started", viewModel.UpdateDownloadProgressText, StringComparison.Ordinal);
         Assert.True(shutdownRequested);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_LoadDefaultSettings()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Gemma, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
+        Assert.Contains("Gemma 4", viewModel.ReadablePolishingPromptActiveModelFamilySummary, StringComparison.Ordinal);
+        Assert.Equal(ReadablePolishingPromptPresets.Standard, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
+        Assert.False(viewModel.ReadablePolishingPromptUseCustomPrompt);
+        Assert.True(viewModel.IsReadablePolishingPromptPresetEnabled);
+        Assert.Empty(viewModel.ReadablePolishingPromptAdditionalInstruction);
+        Assert.Empty(viewModel.ReadablePolishingPromptCustomPrompt);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_SaveAndReloadPerModelFamily()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        var first = new MainWindowViewModel(paths);
+
+        first.SelectedReadablePolishingPromptModelFamily = first.ReadablePolishingPromptModelFamilyOptions
+            .Single(option => option.ModelFamily == ReadablePolishingPromptModelFamilies.Bonsai);
+        first.SelectedReadablePolishingPromptPreset = first.ReadablePolishingPromptPresetOptions
+            .Single(option => option.PresetId == ReadablePolishingPromptPresets.Faithful);
+        first.ReadablePolishingPromptAdditionalInstruction = "専門用語を残してください。";
+        first.ReadablePolishingPromptUseCustomPrompt = true;
+        first.ReadablePolishingPromptCustomPrompt = "読みやすい講演録にしてください。";
+        first.SaveReadablePolishingPromptSettingsCommand.Execute(null);
+
+        var second = new MainWindowViewModel(paths);
+        second.SelectedReadablePolishingPromptModelFamily = second.ReadablePolishingPromptModelFamilyOptions
+            .Single(option => option.ModelFamily == ReadablePolishingPromptModelFamilies.Bonsai);
+
+        Assert.Equal(ReadablePolishingPromptPresets.Standard, second.SelectedReadablePolishingPromptPreset?.PresetId);
+        Assert.Equal("専門用語を残してください。", second.ReadablePolishingPromptAdditionalInstruction);
+        Assert.True(second.ReadablePolishingPromptUseCustomPrompt);
+        Assert.False(second.IsReadablePolishingPromptPresetEnabled);
+        Assert.Equal("読みやすい講演録にしてください。", second.ReadablePolishingPromptCustomPrompt);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_LoadsSettingsForRuntimeModelFamily()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var repository = new ReadablePolishingPromptSettingsRepository(paths);
+        repository.Save(ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Bonsai) with
+        {
+            PresetId = ReadablePolishingPromptPresets.StrongPunctuation,
+            AdditionalInstruction = "短い行を自然につないでください。"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+
+        var settings = InvokePrivate<ReadablePolishingPromptSettings>(
+            viewModel,
+            "LoadReadablePolishingPromptSettings",
+            new LlmRuntimeProfile(
+                "test",
+                "bonsai-8b-q4-k-m",
+                "bonsai",
+                "Bonsai 8B",
+                "llama-cpp",
+                "runtime-llama-cpp",
+                "model.gguf",
+                "llama-cli.exe",
+                8192,
+                0,
+                null,
+                null,
+                true,
+                "strict",
+                TimeSpan.FromMinutes(10)));
+
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Bonsai, settings.ModelFamily);
+        Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, settings.PresetId);
+        Assert.Equal("短い行を自然につないでください。", settings.AdditionalInstruction);
+        Assert.Equal(TranscriptPolishingPromptBuilder.BonsaiCompactPromptTemplateId, settings.PromptTemplateId);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_SelectActiveModelFamilyCommandSelectsCurrentReviewModelFamily()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.SelectActiveReadablePolishingPromptModelFamilyCommand.Execute(null);
+
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Bonsai, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
+        Assert.Contains("Bonsai 8B", viewModel.ReadablePolishingPromptActiveModelFamilySummary, StringComparison.Ordinal);
+        Assert.Contains("Bonsai 8B", viewModel.ReadablePolishingPromptSettingsStatus, StringComparison.Ordinal);
+        Assert.Contains("対象モデル: Bonsai 8B", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
+        Assert.Contains("テンプレート: bonsai-polishing-compact", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_SelectActiveModelFamilyCommandUpdatesStatusWhenSelectionDoesNotChange()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectActiveReadablePolishingPromptModelFamilyCommand.Execute(null);
+
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Gemma, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
+        Assert.Contains("Gemma 4", viewModel.ReadablePolishingPromptSettingsStatus, StringComparison.Ordinal);
+        Assert.Contains("対象モデル: Gemma 4", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
+        Assert.Contains("標準プリセット", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
     }
 
     private static MainWindowViewModel CreateViewModel()

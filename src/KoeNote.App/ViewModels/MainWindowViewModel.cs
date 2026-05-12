@@ -75,6 +75,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateHistoryService _updateHistoryService;
     private readonly LlmSettingsSeedService _llmSettingsSeedService;
     private readonly LlmSettingsDisplayService _llmSettingsDisplayService;
+    private readonly ReadablePolishingPromptSettingsRepository _readablePolishingPromptSettingsRepository;
     private readonly MainContentZoomState _mainContentZoomState;
     private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
@@ -233,6 +234,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateHistoryService = services.UpdateHistoryService;
         _llmSettingsSeedService = services.LlmSettingsSeedService;
         _llmSettingsDisplayService = services.LlmSettingsDisplayService;
+        _readablePolishingPromptSettingsRepository = services.ReadablePolishingPromptSettingsRepository;
         _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
         _mainContentZoomState = new MainContentZoomState(paths);
         var currentApplication = System.Windows.Application.Current;
@@ -398,7 +400,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         InstallVerifiedUpdateCommand = new RelayCommand(InstallVerifiedUpdateAsync, CanInstallVerifiedUpdate);
         DismissUpdateNotificationCommand = new RelayCommand(DismissUpdateNotificationAsync);
         OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
+        SaveReadablePolishingPromptSettingsCommand = new RelayCommand(SaveReadablePolishingPromptSettings);
+        ResetReadablePolishingPromptSettingsCommand = new RelayCommand(ResetReadablePolishingPromptSettings);
+        SelectActiveReadablePolishingPromptModelFamilyCommand = new RelayCommand(SelectActiveReadablePolishingPromptModelFamily);
 
+        InitializeReadablePolishingPromptSettings();
         MarkInterruptedModelDownloads();
         RegisterDiscoveredManagedModels();
         RefreshModelCatalog();
@@ -926,6 +932,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand DismissUpdateNotificationCommand { get; }
 
     public ICommand OpenUpdateReleaseNotesCommand { get; }
+
+    public ICommand SaveReadablePolishingPromptSettingsCommand { get; }
+
+    public ICommand ResetReadablePolishingPromptSettingsCommand { get; }
+
+    public ICommand SelectActiveReadablePolishingPromptModelFamilyCommand { get; }
 
     public JobSummary? SelectedJob
     {
@@ -2376,6 +2388,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(LlmReviewTaskSummary));
         OnPropertyChanged(nameof(LlmSummaryTaskSummary));
         OnPropertyChanged(nameof(LlmPolishingTaskSummary));
+        OnPropertyChanged(nameof(ReadablePolishingPromptActiveModelFamilySummary));
     }
 
 }
