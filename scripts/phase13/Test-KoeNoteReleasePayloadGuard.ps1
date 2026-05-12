@@ -3,7 +3,7 @@ param(
     [int]$MaxReviewRuntimeMB = 700,
     [int]$MaxAsrRuntimeMB = 180,
     [int]$MaxBundledPythonMB = 120,
-    [int]$MaxFfmpegRuntimeMB = 180
+    [int]$MaxFfmpegRuntimeMB = 280
 )
 
 $ErrorActionPreference = "Stop"
