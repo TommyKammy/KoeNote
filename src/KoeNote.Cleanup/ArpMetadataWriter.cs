@@ -19,6 +19,7 @@ internal static class ArpMetadataWriter
         var productCode = args[1].Trim();
         var installLocation = args[2].Trim();
         var displayIcon = args[3].Trim();
+        var interactiveUninstall = $"MsiExec.exe /I{productCode}";
         var quietUninstall = $"MsiExec.exe /X{productCode} /qn";
 
         foreach (var key in OpenExistingUninstallKeys(productCode))
@@ -27,6 +28,7 @@ internal static class ArpMetadataWriter
             {
                 key.SetValue("InstallLocation", installLocation, RegistryValueKind.String);
                 key.SetValue("DisplayIcon", displayIcon, RegistryValueKind.String);
+                key.SetValue("UninstallString", interactiveUninstall, RegistryValueKind.String);
                 key.SetValue("QuietUninstallString", quietUninstall, RegistryValueKind.String);
             }
         }

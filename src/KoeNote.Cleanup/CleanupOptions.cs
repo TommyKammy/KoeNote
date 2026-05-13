@@ -12,7 +12,10 @@ public sealed record CleanupOptions(
     bool RemoveDownloads,
     bool RemoveUserModels,
     bool RemoveMachineModels,
-    bool RemoveUserData)
+    bool RemoveUserData,
+    string? AppDataRoot,
+    string? LocalAppDataRoot,
+    string? ProgramDataRoot)
 {
     public static string HelpText => """
         KoeNoteCleanup は KoeNote の任意データを削除する補助ツールです。
@@ -38,6 +41,9 @@ public sealed record CleanupOptions(
 
         var quiet = set.Contains("--quiet") || set.Contains("/quiet") || set.Contains("/qn");
         var restoreUpdateBackup = ReadOptionValue(args, "--restore-update-backup");
+        var appDataRoot = ReadOptionValue(args, "--appdata-root");
+        var localAppDataRoot = ReadOptionValue(args, "--localappdata-root");
+        var programDataRoot = ReadOptionValue(args, "--programdata-root");
         var removeAllData = set.Contains("--all");
         var explicitTarget = removeAllData ||
             set.Contains("--logs") ||
@@ -58,7 +64,10 @@ public sealed record CleanupOptions(
             RemoveDownloads: set.Contains("--downloads"),
             RemoveUserModels: set.Contains("--models"),
             RemoveMachineModels: set.Contains("--machine-models"),
-            RemoveUserData: set.Contains("--user-data"));
+            RemoveUserData: set.Contains("--user-data"),
+            AppDataRoot: string.IsNullOrWhiteSpace(appDataRoot) ? null : appDataRoot,
+            LocalAppDataRoot: string.IsNullOrWhiteSpace(localAppDataRoot) ? null : localAppDataRoot,
+            ProgramDataRoot: string.IsNullOrWhiteSpace(programDataRoot) ? null : programDataRoot);
     }
 
     private static string? ReadOptionValue(string[] args, string optionName)
@@ -95,5 +104,10 @@ public sealed record CleanupOptions(
             RemoveUserModels,
             RemoveMachineModels,
             RemoveUserData);
+    }
+
+    public CleanupPaths ToPaths()
+    {
+        return CleanupPaths.FromEnvironment(AppDataRoot, LocalAppDataRoot, ProgramDataRoot);
     }
 }

@@ -107,7 +107,7 @@ public sealed class CleanupWindow : Window
         var preview = new Button { Content = "プレビュー", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0) };
         preview.Click += (_, _) => Run(dryRun: true);
         var cleanup = new Button { Content = "選択して続行", MinWidth = 112, Margin = new Thickness(0, 0, 8, 0) };
-        cleanup.Click += (_, _) => Run(dryRun: _dryRun);
+        cleanup.Click += (_, _) => ContinueUninstall();
         var close = new Button { Content = "閉じる", MinWidth = 96 };
         close.Click += (_, _) => Close();
         buttons.Children.Add(preview);
@@ -157,6 +157,25 @@ public sealed class CleanupWindow : Window
         _output.Text = dryRun
             ? "アプリ本体のみ削除します。KoeNote のジョブ、設定、モデル、ログ、更新ファイルは保持されます。アプリ本体は、この画面を閉じた後にアンインストーラーによって削除されます。"
             : "選択を確定しました。この画面を閉じると、アンインストーラーがアプリ本体の削除を続行します。KoeNote のジョブ、設定、モデル、ログ、更新ファイルは保持されます。";
+    }
+
+    private void ContinueUninstall()
+    {
+        var plan = BuildPlan();
+        if (!_dryRun && plan.RemoveAllData && !ConfirmDeleteAllData())
+        {
+            _output.Text = "削除をキャンセルしました。";
+            return;
+        }
+
+        var result = _service.Execute(plan, _dryRun);
+        if (_dryRun || !result.Succeeded)
+        {
+            _output.Text = result.ToConsoleText();
+            return;
+        }
+
+        Close();
     }
 
     private bool ConfirmDeleteAllData()

@@ -15,7 +15,7 @@ public partial class App : Application
         }
 
         var options = CleanupOptions.Parse(e.Args);
-        var paths = CleanupPaths.FromEnvironment();
+        var paths = options.ToPaths();
         var service = new CleanupService(paths);
         var updateBackupRestoreService = new UpdateBackupRestoreService(paths);
 

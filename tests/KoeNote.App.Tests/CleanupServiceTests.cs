@@ -66,6 +66,28 @@ public sealed class CleanupServiceTests
     }
 
     [Fact]
+    public void CleanupOptions_ParseRootOverrides()
+    {
+        var options = CleanupOptions.Parse(
+            [
+                "--quiet",
+                "--all",
+                "--appdata-root",
+                @"C:\smoke\roaming",
+                "--localappdata-root",
+                @"C:\smoke\local",
+                "--programdata-root",
+                @"C:\smoke\programdata"
+            ]);
+
+        var paths = options.ToPaths();
+
+        Assert.Equal(@"C:\smoke\roaming", paths.AppDataRoot);
+        Assert.Equal(@"C:\smoke\local", paths.LocalAppDataRoot);
+        Assert.Equal(@"C:\smoke\programdata", paths.ProgramDataRoot);
+    }
+
+    [Fact]
     public void CleanupOptions_ParseRestoreUpdateBackup()
     {
         var options = CleanupOptions.Parse(["--restore-update-backup", "latest", "--dry-run"]);

@@ -3,6 +3,7 @@ param(
     [string]$UpgradeFromMsiPath,
     [string]$DisplayName = "KoeNote",
     [switch]$AllowExistingUserData,
+    [switch]$TestAllDataCleanup,
     [switch]$SkipInstall
 )
 
@@ -79,6 +80,44 @@ function Test-KoeNoteUpgradeSmokeData {
     }
 }
 
+function New-KoeNoteIsolatedCleanupSmokeData {
+    $root = Join-Path ([IO.Path]::GetTempPath()) "KoeNote-MsiAllDataSmoke-$([Guid]::NewGuid().ToString('N'))"
+    $appDataRoot = Join-Path $root "roaming"
+    $localAppDataRoot = Join-Path $root "local"
+    $programDataRoot = Join-Path $root "programdata"
+
+    foreach ($dataRoot in @($appDataRoot, $localAppDataRoot, $programDataRoot)) {
+        $koeNoteRoot = Join-Path $dataRoot "KoeNote"
+        New-Item -ItemType Directory -Force -Path $koeNoteRoot | Out-Null
+        Set-Content -LiteralPath (Join-Path $koeNoteRoot "marker.txt") -Encoding UTF8 -Value "delete me"
+    }
+
+    [pscustomobject]@{
+        Root = $root
+        AppDataRoot = $appDataRoot
+        LocalAppDataRoot = $localAppDataRoot
+        ProgramDataRoot = $programDataRoot
+    }
+}
+
+function Test-KoeNoteIsolatedCleanupSmokeDataRemoved {
+    param(
+        [Parameter(Mandatory = $true)]$Seed
+    )
+
+    $remaining = @(
+        (Join-Path $Seed.AppDataRoot "KoeNote"),
+        (Join-Path $Seed.LocalAppDataRoot "KoeNote"),
+        (Join-Path $Seed.ProgramDataRoot "KoeNote")
+    ) | Where-Object {
+        Test-Path -LiteralPath $_
+    }
+
+    if ($remaining) {
+        throw "All-data cleanup did not remove expected isolated KoeNote roots: $($remaining -join ', ')"
+    }
+}
+
 if (-not $SkipInstall) {
     if ($upgradeFromMsi) {
         Test-KoeNoteSmokeDataRootAvailable
@@ -123,7 +162,13 @@ if (-not $apps) {
     throw "$DisplayName was not found in Windows Apps management uninstall registry entries."
 }
 
-$app = $apps | Select-Object -First 1
+$app = $apps | Where-Object {
+    $_.SystemComponent -ne 1
+} | Select-Object -First 1
+if (-not $app) {
+    throw "$DisplayName was found only as hidden Windows Installer ARP entries."
+}
+
 $productCode = Split-Path -Path $app.PSPath -Leaf
 $metadataEntry = $registryEntries | Where-Object {
     (Split-Path -Path $_.PSPath -Leaf) -eq $productCode -and
@@ -132,6 +177,10 @@ $metadataEntry = $registryEntries | Where-Object {
 
 if (-not $app.UninstallString -or $app.UninstallString -notmatch "msiexec") {
     throw "$DisplayName uninstall entry is missing a standard msiexec UninstallString."
+}
+
+if ($app.UninstallString -notmatch "(?i)/I") {
+    throw "$DisplayName uninstall entry must open MSI maintenance UI with /I. Actual: $($app.UninstallString)"
 }
 
 $quietUninstallString = if ($app.QuietUninstallString) { $app.QuietUninstallString } else { $metadataEntry.QuietUninstallString }
@@ -152,9 +201,22 @@ Write-Host "Found $DisplayName app registration:"
 
 if (-not $SkipInstall) {
     $uninstallLog = Join-Path $logRoot "uninstall.log"
-    $uninstallArgs = "/x `"$msi`" /qn /norestart /L*v `"$uninstallLog`""
+    $cleanupSeed = $null
+    if ($TestAllDataCleanup) {
+        $cleanupSeed = New-KoeNoteIsolatedCleanupSmokeData
+        $uninstallArgs = "/x $productCode /qn /norestart KOENOTE_CLEANUP_ALL_DATA=1 KOENOTE_CLEANUP_APPDATA_ROOT=`"$($cleanupSeed.AppDataRoot)`" KOENOTE_CLEANUP_LOCALAPPDATA_ROOT=`"$($cleanupSeed.LocalAppDataRoot)`" KOENOTE_CLEANUP_PROGRAMDATA_ROOT=`"$($cleanupSeed.ProgramDataRoot)`" /L*v `"$uninstallLog`""
+    }
+    else {
+        $uninstallArgs = "/x `"$msi`" /qn /norestart /L*v `"$uninstallLog`""
+    }
+
     $uninstall = Start-Process -FilePath "msiexec.exe" -ArgumentList $uninstallArgs -Wait -PassThru
     if ($uninstall.ExitCode -ne 0) {
         throw "MSI uninstall failed with exit code $($uninstall.ExitCode). Log: $uninstallLog"
+    }
+
+    if ($cleanupSeed) {
+        Test-KoeNoteIsolatedCleanupSmokeDataRemoved -Seed $cleanupSeed
+        Remove-Item -LiteralPath $cleanupSeed.Root -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

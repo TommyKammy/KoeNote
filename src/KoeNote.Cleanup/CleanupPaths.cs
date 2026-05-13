@@ -39,14 +39,20 @@ public sealed record CleanupPaths(
 
     public string MachineModels => Path.Combine(MachineRoot, "models");
 
-    public static CleanupPaths FromEnvironment()
+    public static CleanupPaths FromEnvironment(
+        string? appDataRootOverride = null,
+        string? localAppDataRootOverride = null,
+        string? programDataRootOverride = null)
     {
         return new CleanupPaths(
-            Environment.GetEnvironmentVariable("KOENOTE_APPDATA_ROOT") ??
+            appDataRootOverride ??
+                Environment.GetEnvironmentVariable("KOENOTE_APPDATA_ROOT") ??
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            Environment.GetEnvironmentVariable("KOENOTE_LOCALAPPDATA_ROOT") ??
+            localAppDataRootOverride ??
+                Environment.GetEnvironmentVariable("KOENOTE_LOCALAPPDATA_ROOT") ??
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            Environment.GetEnvironmentVariable("KOENOTE_PROGRAMDATA_ROOT") ??
+            programDataRootOverride ??
+                Environment.GetEnvironmentVariable("KOENOTE_PROGRAMDATA_ROOT") ??
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
     }
 }

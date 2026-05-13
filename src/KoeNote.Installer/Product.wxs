@@ -8,7 +8,8 @@
       Version="$(var.ProductVersion)"
       UpgradeCode="$(var.UpgradeCode)"
       Scope="perUser"
-      Language="1041">
+      Language="1041"
+      Codepage="932">
 
     <SummaryInformation Description="$(var.ProductName) lightweight MSI installer" Manufacturer="$(var.Publisher)" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." Schedule="afterInstallInitialize" />
@@ -22,9 +23,39 @@
 
     <Property Id="ARPPRODUCTICON" Value="KoeNoteIcon" />
     <Property Id="ARPHELPLINK" Value="https://github.com/" />
+    <Property Id="ARPSYSTEMCOMPONENT" Value="1" />
+    <Property Id="KOENOTE_UNINSTALL_MODE" Value="APPONLY" />
     <Icon Id="KoeNoteIcon" SourceFile="$(var.PayloadDir)\KoeNote.App.exe" />
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <UI>
+      <Dialog Id="KoeNoteCleanupChoiceDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}アンインストール方法の選択" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="20" Transparent="yes" NoPrefix="yes" Text="KoeNote 関連データを削除するか選択してください。" />
+        <Control Id="Instruction" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Text="エクスポート済みファイル Documents\KoeNote\Exports は、どちらを選んでも削除されません。" />
+        <Control Id="ModeGroup" Type="RadioButtonGroup" X="25" Y="100" Width="320" Height="70" Property="KOENOTE_UNINSTALL_MODE" />
+        <Control Id="AppOnlyText" Type="Text" X="45" Y="122" Width="295" Height="24" NoPrefix="yes" Text="アプリ本体だけを削除します。ジョブ、設定、モデル、ログは残ります。" />
+        <Control Id="AllDataText" Type="Text" X="45" Y="162" Width="295" Height="24" NoPrefix="yes" Text="AppData、LocalAppData、ProgramData 配下の KoeNote データも削除します。" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="戻る" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="次へ" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="キャンセル" />
+      </Dialog>
+
+      <RadioButtonGroup Property="KOENOTE_UNINSTALL_MODE">
+        <RadioButton Value="APPONLY" X="0" Y="0" Width="310" Height="17" Text="アプリのみ削除" />
+        <RadioButton Value="ALL" X="0" Y="40" Width="310" Height="17" Text="アプリと KoeNote 関連データをすべて削除" />
+      </RadioButtonGroup>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="KoeNoteCleanupChoiceDlg" Order="2" />
+      <Publish Dialog="KoeNoteCleanupChoiceDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="KoeNoteCleanupChoiceDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="KoeNoteCleanupChoiceDlg" Control="Cancel" Event="SpawnDialog" Value="CancelDlg" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="KoeNoteCleanupChoiceDlg" Condition="WixUI_InstallMode=&quot;Remove&quot;" Order="1" />
+    </UI>
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="LocalProgramsFolder" Name="Programs">
@@ -62,17 +93,42 @@
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="ArpMetadataComponent" Guid="$(var.ArpMetadataComponentGuid)">
-        <RegistryValue Root="HKMU"
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="DisplayName"
+                       Type="string"
+                       Value="$(var.ProductName)" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="DisplayVersion"
+                       Type="string"
+                       Value="$(var.ProductVersion)" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="Publisher"
+                       Type="string"
+                       Value="$(var.Publisher)" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="HelpLink"
+                       Type="string"
+                       Value="https://github.com/" />
+        <RegistryValue Root="HKCU"
                        Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
                        Name="InstallLocation"
                        Type="string"
                        Value="[INSTALLFOLDER]" />
-        <RegistryValue Root="HKMU"
+        <RegistryValue Root="HKCU"
                        Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
                        Name="DisplayIcon"
                        Type="string"
                        Value="[INSTALLFOLDER]KoeNote.App.exe" />
-        <RegistryValue Root="HKMU"
+        <RegistryValue Root="HKCU"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="UninstallString"
+                       Type="string"
+                       Value="MsiExec.exe /I[ProductCode]" />
+        <RegistryValue Root="HKCU"
                        Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
                        Name="QuietUninstallString"
                        Type="string"
@@ -81,19 +137,9 @@
       </Component>
     </DirectoryRef>
 
-    <CustomAction Id="RunKoeNoteCleanupUi"
-                  FileRef="KoeNoteCleanupExe"
-                  ExeCommand="$(var.CleanupUiCommand)"
-                  Execute="immediate"
-                  Return="ignore" />
-    <CustomAction Id="RunKoeNoteCleanupQuiet"
-                  FileRef="KoeNoteCleanupExe"
-                  ExeCommand="$(var.CleanupQuietCommand)"
-                  Execute="immediate"
-                  Return="ignore" />
     <CustomAction Id="RunKoeNoteCleanupQuietAll"
                   FileRef="KoeNoteCleanupExe"
-                  ExeCommand="$(var.CleanupQuietAllCommand)"
+                  ExeCommand="$(var.CleanupQuietAllCommand) --appdata-root &quot;[KOENOTE_CLEANUP_APPDATA_ROOT]&quot; --localappdata-root &quot;[KOENOTE_CLEANUP_LOCALAPPDATA_ROOT]&quot; --programdata-root &quot;[KOENOTE_CLEANUP_PROGRAMDATA_ROOT]&quot;"
                   Execute="immediate"
                   Return="ignore" />
     <CustomAction Id="SetArpMetadata"
@@ -104,9 +150,7 @@
 
     <InstallExecuteSequence>
       <Custom Action="SetArpMetadata" After="InstallFinalize" Condition="NOT REMOVE" />
-      <Custom Action="RunKoeNoteCleanupUi" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &gt; 3" />
-      <Custom Action="RunKoeNoteCleanupQuiet" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3 AND KOENOTE_CLEANUP_ALL_DATA &lt;&gt; &quot;1&quot;" />
-      <Custom Action="RunKoeNoteCleanupQuietAll" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND UILevel &lt;= 3 AND KOENOTE_CLEANUP_ALL_DATA=&quot;1&quot;" />
+      <Custom Action="RunKoeNoteCleanupQuietAll" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND (KOENOTE_UNINSTALL_MODE=&quot;ALL&quot; OR KOENOTE_CLEANUP_ALL_DATA=&quot;1&quot;)" />
     </InstallExecuteSequence>
 
     <Feature Id="MainFeature" Title="KoeNote" Level="1">

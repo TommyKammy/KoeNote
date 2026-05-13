@@ -86,10 +86,12 @@ Removed by MSI:
 - `%LOCALAPPDATA%\Programs\KoeNote`
 - KoeNote Start Menu shortcuts
 
-The cleanup UI offers two choices:
+The standalone `KoeNote Cleanup` shortcut offers two choices:
 
-- `アプリのみ削除`: remove only the installed application payload. KoeNote data remains.
-- `KoeNote 関連データをすべて削除`: remove KoeNote data under AppData, LocalAppData, and ProgramData.
+- `アプリのみ削除`: keep KoeNote data. When launched from the standalone shortcut, this is informational because the MSI owns app payload removal.
+- `アプリと KoeNote 関連データをすべて削除`: remove KoeNote data under AppData, LocalAppData, and ProgramData.
+
+The MSI uninstall flow does not launch the standalone cleanup window as a separate process. Interactive uninstall opens the MSI maintenance UI and shows the data removal choice inside that flow.
 
 Always kept:
 
@@ -142,6 +144,8 @@ Run on a clean Windows 11 VM when possible:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNoteMsiSmoke.ps1 `
   -MsiPath artifacts\msi\KoeNote-v0.15.0-win-x64.msi
 ```
+
+To also verify the all-data uninstall path without touching real KoeNote data, add `-TestAllDataCleanup`. The smoke script creates temporary AppData / LocalAppData / ProgramData roots and passes them to the MSI cleanup action.
 
 To test an MSI-to-MSI upgrade:
 

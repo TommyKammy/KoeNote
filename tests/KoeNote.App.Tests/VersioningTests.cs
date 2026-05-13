@@ -258,12 +258,32 @@ public sealed class VersioningTests
         var productWxs = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.Installer", "Product.wxs"));
         var wixProject = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.Installer", "KoeNote.Installer.wixproj"));
         var buildScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Build-KoeNoteMsi.ps1"));
+        var smokeScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "phase13", "Test-KoeNoteMsiSmoke.ps1"));
 
+        Assert.DoesNotContain("RunKoeNoteCleanupUi", productWxs);
+        Assert.DoesNotContain("RunKoeNoteCleanupQuiet\"", productWxs);
+        Assert.DoesNotContain("CleanupUiCommand", wixProject);
+        Assert.DoesNotContain("CleanupUiCommand", buildScript);
+        Assert.DoesNotContain("CleanupQuietCommand", wixProject);
+        Assert.DoesNotContain("CleanupQuietCommand", buildScript);
         Assert.Contains("RunKoeNoteCleanupQuietAll", productWxs);
         Assert.Contains("KOENOTE_CLEANUP_ALL_DATA=&quot;1&quot;", productWxs);
-        Assert.Contains("KOENOTE_CLEANUP_ALL_DATA &lt;&gt; &quot;1&quot;", productWxs);
+        Assert.Contains("KOENOTE_UNINSTALL_MODE=&quot;ALL&quot;", productWxs);
+        Assert.Contains("KOENOTE_CLEANUP_APPDATA_ROOT", productWxs);
+        Assert.Contains("--appdata-root", productWxs);
+        Assert.DoesNotContain("KOENOTE_CLEANUP_ALL_DATA &lt;&gt; &quot;1&quot;", productWxs);
+        Assert.DoesNotContain("UILevel &lt; 3 AND KOENOTE_CLEANUP_ALL_DATA", productWxs);
+        Assert.Contains("KoeNoteCleanupChoiceDlg", productWxs);
+        Assert.Contains("KOENOTE_UNINSTALL_MODE", productWxs);
+        Assert.Contains("ARPSYSTEMCOMPONENT", productWxs);
+        Assert.Contains("Name=\"DisplayName\"", productWxs);
+        Assert.Contains("MsiExec.exe /I[ProductCode]", productWxs);
+        Assert.Contains("MsiExec.exe /I", File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.Cleanup", "ArpMetadataWriter.cs")));
         Assert.Contains("CleanupQuietAllCommand", wixProject);
         Assert.Contains("--quiet --all", wixProject);
+        Assert.Contains("[switch]$TestAllDataCleanup", smokeScript);
+        Assert.Contains("KOENOTE_CLEANUP_APPDATA_ROOT", smokeScript);
+        Assert.Contains("must open MSI maintenance UI with /I", smokeScript);
         Assert.Contains("[string]$CleanupQuietAllCommand = \"--quiet --all\"", buildScript);
         Assert.Contains("-p:CleanupQuietAllCommand=\"$CleanupQuietAllCommand\"", buildScript);
     }

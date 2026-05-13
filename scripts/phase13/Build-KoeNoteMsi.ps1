@@ -12,8 +12,6 @@ param(
     [string]$ArpMetadataComponentGuid = "{39818D14-4A4F-4B12-A29D-67E13FC97FD3}",
     [string]$ProductRegistryKey = "Software\KoeNote\KoeNote",
     [string]$ComponentGuidSalt = "KoeNote",
-    [string]$CleanupUiCommand = "",
-    [string]$CleanupQuietCommand = "--quiet",
     [string]$CleanupQuietAllCommand = "--quiet --all",
     [switch]$RequireCodeSigning
 )
@@ -247,8 +245,6 @@ dotnet build $installerProject `
     -p:ShortcutComponentGuid="$ShortcutComponentGuid" `
     -p:ArpMetadataComponentGuid="$ArpMetadataComponentGuid" `
     -p:ProductRegistryKey="$ProductRegistryKey" `
-    -p:CleanupUiCommand="$CleanupUiCommand" `
-    -p:CleanupQuietCommand="$CleanupQuietCommand" `
     -p:CleanupQuietAllCommand="$CleanupQuietAllCommand" `
     -p:PayloadDir="$publishDir\" `
     -p:OutputPath="$installerOut\"
