@@ -3357,7 +3357,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(ReadablePolishingPromptModelFamilies.Gemma, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
         Assert.Contains("Gemma 4", viewModel.ReadablePolishingPromptActiveModelFamilySummary, StringComparison.Ordinal);
-        Assert.Equal(ReadablePolishingPromptPresets.Standard, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
+        Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
         Assert.False(viewModel.ReadablePolishingPromptUseCustomPrompt);
         Assert.True(viewModel.IsReadablePolishingPromptPresetEnabled);
         Assert.Empty(viewModel.ReadablePolishingPromptAdditionalInstruction);
@@ -3464,7 +3464,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(ReadablePolishingPromptModelFamilies.Gemma, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
         Assert.Contains("Gemma 4", viewModel.ReadablePolishingPromptSettingsStatus, StringComparison.Ordinal);
         Assert.Contains("対象モデル: Gemma 4", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
-        Assert.Contains("標準プリセット", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
+        Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
     }
 
     private static MainWindowViewModel CreateViewModel()

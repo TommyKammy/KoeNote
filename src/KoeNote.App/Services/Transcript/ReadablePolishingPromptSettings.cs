@@ -49,6 +49,7 @@ public static class ReadablePolishingPromptPresets
     public const string MeetingMinutes = "meeting-minutes";
     public const string LectureSeminar = "lecture-seminar";
     public const string Custom = "custom";
+    public const string Default = StrongPunctuation;
 
     public static IReadOnlyList<string> Supported { get; } =
     [
@@ -81,7 +82,7 @@ public sealed record ReadablePolishingPromptSettings(
         var normalizedFamily = ReadablePolishingPromptModelFamilies.Normalize(modelFamily);
         return new ReadablePolishingPromptSettings(
             normalizedFamily,
-            ReadablePolishingPromptPresets.Standard,
+            ReadablePolishingPromptPresets.Default,
             string.Empty,
             UseCustomPrompt: false,
             string.Empty,

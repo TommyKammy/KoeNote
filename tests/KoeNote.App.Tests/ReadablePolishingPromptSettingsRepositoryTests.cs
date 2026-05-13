@@ -15,7 +15,7 @@ public sealed class ReadablePolishingPromptSettingsRepositoryTests
         var persisted = repository.Load(modelFamily);
 
         Assert.Equal(modelFamily, persisted.Settings.ModelFamily);
-        Assert.Equal(ReadablePolishingPromptPresets.Standard, persisted.Settings.PresetId);
+        Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, persisted.Settings.PresetId);
         Assert.Equal(promptTemplateId, persisted.Settings.PromptTemplateId);
         Assert.Equal(TranscriptPolishingPromptBuilder.PromptVersion, persisted.Settings.PromptVersion);
         Assert.False(persisted.Settings.UseCustomPrompt);
@@ -107,7 +107,7 @@ public sealed class ReadablePolishingPromptSettingsRepositoryTests
             item.Settings.PresetId == ReadablePolishingPromptPresets.LectureSeminar);
         Assert.Contains(settings, item =>
             item.Settings.ModelFamily == ReadablePolishingPromptModelFamilies.Gemma &&
-            item.Settings.PresetId == ReadablePolishingPromptPresets.Standard);
+            item.Settings.PresetId == ReadablePolishingPromptPresets.StrongPunctuation);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class ReadablePolishingPromptSettingsRepositoryTests
 
         repository.Reset(ReadablePolishingPromptModelFamilies.Gemma);
 
-        Assert.Equal(ReadablePolishingPromptPresets.Standard, repository.Load(ReadablePolishingPromptModelFamilies.Gemma).Settings.PresetId);
+        Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, repository.Load(ReadablePolishingPromptModelFamilies.Gemma).Settings.PresetId);
     }
 
     [Theory]
