@@ -1729,7 +1729,7 @@ public sealed class MainWindowViewModelTests
         var viewModelWithoutSummary = new MainWindowViewModel(paths);
 
         Assert.False(viewModelWithoutSummary.HasSummaryContent);
-        Assert.Equal("要約を生成", viewModelWithoutSummary.SummaryActionText);
+        Assert.Equal("生成", viewModelWithoutSummary.SummaryActionText);
 
         new TranscriptDerivativeRepository(paths).Save(new TranscriptDerivativeSaveRequest(
             job.JobId,
@@ -1746,7 +1746,7 @@ public sealed class MainWindowViewModelTests
         var viewModelWithSummary = new MainWindowViewModel(paths);
 
         Assert.True(viewModelWithSummary.HasSummaryContent);
-        Assert.Equal("要約を再生成", viewModelWithSummary.SummaryActionText);
+        Assert.Equal("再生成", viewModelWithSummary.SummaryActionText);
     }
 
     [Fact]

@@ -30,6 +30,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("<TabControl Style=\"{StaticResource CardTabControl}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("SelectedIndex=\"{Binding SelectedDetailPanelTabIndex, Mode=TwoWay}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource CardTabControl}\" SelectedIndex=\"{Binding SelectedLogPanelTabIndex, Mode=TwoWay}\"", logPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("設定 / 辞書プリセット / モデル / セットアップ / ログ", logPanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ログ / 設定 / セットアップ / モデル", logPanelXaml, StringComparison.Ordinal);
         Assert.True(
             mainWindowXaml.IndexOf("Header=\"設定\"", StringComparison.Ordinal) <
             mainWindowXaml.IndexOf("Header=\"辞書プリセット\"", StringComparison.Ordinal));
