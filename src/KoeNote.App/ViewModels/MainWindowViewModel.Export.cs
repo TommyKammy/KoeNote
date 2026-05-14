@@ -194,7 +194,7 @@ public sealed partial class MainWindowViewModel
     private static string CreateExportWarning(TranscriptExportResult result)
     {
         return result.HasUnresolvedDrafts
-            ? $"未処理の整文候補が{result.PendingDraftCount}件残っています。確認用として出力しました。"
+            ? $"未処理のレビュー候補が{result.PendingDraftCount}件残っています。確認用として出力しました。"
             : string.Empty;
     }
 

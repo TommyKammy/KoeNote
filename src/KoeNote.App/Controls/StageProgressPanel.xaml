@@ -45,6 +45,43 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="StageBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="Text" Value="未開始" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDone}" Value="True">
+                    <Setter Property="Text" Value="完了" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsDoing}" Value="True">
+                    <Setter Property="Text" Value="処理中" />
+                    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSkipped}" Value="True">
+                    <Setter Property="Text" Value="スキップ" />
+                    <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="StageDurationTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="LineHeight" Value="14" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DurationText}" Value="00:00:00">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}" Padding="14,12">
@@ -78,6 +115,7 @@
                                 <RowDefinition Height="38" />
                                 <RowDefinition Height="22" />
                                 <RowDefinition Height="18" />
+                                <RowDefinition Height="16" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -153,16 +191,15 @@
                                        LineHeight="16"
                                        TextTrimming="CharacterEllipsis"
                                        Margin="0,4,0,0" />
-                            <Grid Grid.Row="2"
+                            <TextBlock Grid.Row="2"
+                                       Grid.ColumnSpan="3"
+                                       Style="{StaticResource StageBadgeTextStyle}" />
+
+                            <Grid Grid.Row="3"
                                   Grid.ColumnSpan="3"
                                   Margin="0,0,0,0">
                                 <TextBlock Text="{Binding DurationText}"
-                                           FontSize="11"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           TextAlignment="Center"
-                                           VerticalAlignment="Top"
-                                           LineHeight="14"
-                                           TextTrimming="CharacterEllipsis" />
+                                           Style="{StaticResource StageDurationTextStyle}" />
                             </Grid>
                         </Grid>
                     </DataTemplate>

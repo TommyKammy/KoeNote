@@ -118,7 +118,7 @@ public sealed partial class MainWindowViewModel
 
         if (!ReviewStageAssetsReady)
         {
-            LatestLog = "読みやすく整文するためのランタイムまたは整文モデルが不足しています。";
+            LatestLog = "整文を生成するためのランタイムまたは整文モデルが不足しています。";
             IsSetupWizardModalOpen = true;
             return;
         }
@@ -127,17 +127,17 @@ public sealed partial class MainWindowViewModel
         var segments = _transcriptSegmentRepository.ReadSegments(job.JobId);
         if (segments.Count == 0)
         {
-            LatestLog = "素起こし結果がないため、読みやすく整文を実行できません。";
+            LatestLog = "素起こし結果がないため、整文を生成できません。";
             RefreshPostProcessCommandStates();
             return;
         }
 
         if (HasExistingReadablePolishingOutput(job.JobId) &&
             !ConfirmAction(
-                "読みやすく整文を再生成",
-                "既存の読みやすく整文結果があります。新しい結果を生成して最新として扱います。続行しますか？"))
+                "整文を再生成",
+                "既存の整文結果があります。新しい結果を生成して最新として扱います。続行しますか？"))
         {
-            LatestLog = "読みやすく整文をキャンセルしました。";
+            LatestLog = "整文をキャンセルしました。";
             return;
         }
 
@@ -145,8 +145,23 @@ public sealed partial class MainWindowViewModel
         _runCancellation = cancellation;
         IsPostProcessInProgress = true;
         IsRunInProgress = true;
+
+        try
+        {
+            await RunReadablePolishingForJobAsync(job, cancellation.Token);
+        }
+        finally
+        {
+            _runCancellation = null;
+            IsRunInProgress = false;
+            IsPostProcessInProgress = false;
+        }
+    }
+
+    private async Task<bool> RunReadablePolishingForJobAsync(JobSummary job, CancellationToken cancellationToken)
+    {
         IsReadablePolishingInProgress = true;
-        ReadablePolishedStatus = "読みやすく整文を生成中です。完了すると結果タブに表示されます。";
+        ReadablePolishedStatus = "整文を生成中です。完了すると先頭の整文タブに表示されます。";
         var startedAt = DateTimeOffset.Now;
         MarkReadablePolishingStageRunning();
 
@@ -165,7 +180,7 @@ public sealed partial class MainWindowViewModel
                 "polishing",
                 "info",
                 $"Readable polishing prompt settings: family={promptSettings.ModelFamily}, preset={promptSettings.PresetId}, custom={promptSettings.UseCustomPrompt}");
-            LatestLog = "読みやすく整文を実行しています。";
+            LatestLog = "整文を生成しています。";
             RefreshLogs();
 
             var result = await _transcriptPolishingService.PolishAsync(
@@ -192,33 +207,39 @@ public sealed partial class MainWindowViewModel
                     Threads: profile.Threads,
                     ThreadsBatch: profile.ThreadsBatch,
                     PromptSettings: promptSettings),
-                cancellation.Token);
+                cancellationToken);
 
             if (string.IsNullOrWhiteSpace(result.Content))
             {
                 _jobLogRepository.AddEvent(job.JobId, "polishing", "error", $"Readable polishing failed derivative: {result.DerivativeId}");
-                LatestLog = "読みやすく整文に失敗しました。";
+                LatestLog = "整文を作成できませんでした。素起こしを確認してから再生成してください。";
+                ReadablePolishedStatus = LatestLog;
                 MarkReadablePolishingStageFailed(startedAt);
+                RefreshJobViews();
+                RefreshLogs();
+                UpdateExportCommandStates();
+                return false;
             }
-            else
-            {
-                _jobLogRepository.AddEvent(job.JobId, "polishing", "info", $"Generated readable polished derivative: {result.DerivativeId}");
-                LatestLog = "読みやすく整文が完了しました。";
-                MarkReadablePolishingStageSucceeded(startedAt);
-                LoadReadablePolishedForSelectedJob();
-                SelectedTranscriptTabIndex = 3;
-            }
+
+            _jobLogRepository.AddEvent(job.JobId, "polishing", "info", $"Generated readable polished derivative: {result.DerivativeId}");
+            LatestLog = "整文が完了しました。";
+            MarkReadablePolishingStageSucceeded(startedAt);
+            LoadReadablePolishedForSelectedJob();
+            SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
 
             RefreshJobViews();
             RefreshLogs();
             UpdateExportCommandStates();
+            return true;
         }
         catch (OperationCanceledException)
         {
             _jobLogRepository.AddEvent(job.JobId, "polishing", "info", "Readable polishing was cancelled.");
-            LatestLog = "読みやすく整文を中止しました。";
+            LatestLog = "整文を中止しました。";
+            ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageCancelled(startedAt);
             RefreshLogs();
+            return false;
         }
         catch (ReviewWorkerException exception)
         {
@@ -228,9 +249,11 @@ public sealed partial class MainWindowViewModel
                 "polishing",
                 "error",
                 JobLogDiagnostics.FormatException(exception.Category.ToString(), exception, outputDirectory));
-            LatestLog = $"読みやすく整文に失敗しました ({exception.Category}): {exception.Message}";
+            LatestLog = $"整文を作成できませんでした ({exception.Category}): {exception.Message}";
+            ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageFailed(startedAt);
             RefreshLogs();
+            return false;
         }
         catch (Exception exception)
         {
@@ -240,16 +263,15 @@ public sealed partial class MainWindowViewModel
                 "polishing",
                 "error",
                 JobLogDiagnostics.FormatException(ReviewFailureCategory.Unknown.ToString(), exception, outputDirectory));
-            LatestLog = $"読みやすく整文に失敗しました: {exception.Message}";
+            LatestLog = $"整文を作成できませんでした: {exception.Message}";
+            ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageFailed(startedAt);
             RefreshLogs();
+            return false;
         }
         finally
         {
-            _runCancellation = null;
             IsReadablePolishingInProgress = false;
-            IsRunInProgress = false;
-            IsPostProcessInProgress = false;
         }
     }
 
@@ -257,8 +279,8 @@ public sealed partial class MainWindowViewModel
     {
         var stage = GetStageStatus(JobRunStage.Review);
         stage.IsRunning = true;
-        stage.Status = "進行中";
-        stage.ProgressPercent = 10;
+        stage.Status = "完成文書作成中";
+        stage.ProgressPercent = 92;
         stage.DurationText = "00:00:00";
     }
 
@@ -311,8 +333,8 @@ public sealed partial class MainWindowViewModel
 
         var existingOutputText = (hasReviewOutput, hasSummaryOutput) switch
         {
-            (true, true) => "既存の整文候補または適用済み整文と、既存の要約",
-            (true, false) => "既存の整文候補または適用済み整文",
+            (true, true) => "既存のレビュー候補または適用済みレビュー結果と、既存の要約",
+            (true, false) => "既存のレビュー候補または適用済みレビュー結果",
             (false, true) => "既存の要約",
             _ => string.Empty
         };
@@ -359,9 +381,9 @@ public sealed partial class MainWindowViewModel
     {
         return mode switch
         {
-            PostProcessMode.ReviewOnly => "整文",
+            PostProcessMode.ReviewOnly => "レビュー候補",
             PostProcessMode.SummaryOnly => "要約",
-            PostProcessMode.ReviewAndSummary => "整文・要約",
+            PostProcessMode.ReviewAndSummary => "レビュー候補・要約",
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
     }

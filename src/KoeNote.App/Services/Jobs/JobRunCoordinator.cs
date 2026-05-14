@@ -9,7 +9,7 @@ public sealed class JobRunCoordinator(
     IReviewStageRunner reviewStageRunner,
     ISummaryStageRunner summaryStageRunner)
 {
-    public async Task RunAsync(
+    public async Task<bool> RunAsync(
         JobSummary job,
         AsrSettings asrSettings,
         Action<JobRunUpdate> report,
@@ -18,13 +18,13 @@ public sealed class JobRunCoordinator(
         var normalizedAudioPath = await preprocessStageRunner.RunAsync(job, report, cancellationToken);
         if (normalizedAudioPath is null)
         {
-            return;
+            return false;
         }
 
         var segments = await asrStageRunner.RunAsync(job, normalizedAudioPath, asrSettings, report, cancellationToken);
         if (segments is null)
         {
-            return;
+            return false;
         }
 
         if (asrSettings.EnableReviewStage)
@@ -32,7 +32,7 @@ public sealed class JobRunCoordinator(
             var reviewSucceeded = await reviewStageRunner.RunAsync(job, segments, report, cancellationToken);
             if (!reviewSucceeded)
             {
-                return;
+                return false;
             }
 
         }
@@ -40,6 +40,8 @@ public sealed class JobRunCoordinator(
         {
             reviewStageRunner.Skip(job, report);
         }
+
+        return true;
     }
 
     public Task<bool> RunReviewOnlyAsync(

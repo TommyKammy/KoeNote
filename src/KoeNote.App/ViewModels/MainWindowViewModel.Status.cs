@@ -19,6 +19,7 @@ public sealed partial class MainWindowViewModel
             OnPropertyChanged(nameof(MemorySummary));
             OnPropertyChanged(nameof(CpuSummary));
             OnPropertyChanged(nameof(GpuUsageSummary));
+            OnPropertyChanged(nameof(IsGpuUsageUnknown));
         }
         finally
         {

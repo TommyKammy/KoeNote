@@ -43,24 +43,19 @@
                     <Border x:Name="RowChrome"
                             Background="{TemplateBinding Background}"
                             BorderBrush="Transparent"
-                            BorderThickness="4,0,0,0"
-                            CornerRadius="6"
-                            Margin="0,0,0,4">
+                            BorderThickness="0"
+                            CornerRadius="0"
+                            Margin="0">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="RowChrome" Property="Background" Value="#FAFBFC" />
+                            <Setter TargetName="RowChrome" Property="Background" Value="#F8FAFC" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="RowChrome" Property="Background" Value="{StaticResource BlueLightBrush}" />
+                            <Setter TargetName="RowChrome" Property="Background" Value="#ECFDF3" />
                             <Setter TargetName="RowChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                            <Setter TargetName="RowChrome" Property="BorderThickness" Value="5,1,1,1" />
-                            <Setter TargetName="RowChrome" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="#2F8F5B" BlurRadius="16" ShadowDepth="0" Opacity="0.18" />
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="RowChrome" Property="BorderThickness" Value="3,0,0,0" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

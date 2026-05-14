@@ -30,11 +30,62 @@
         </DockPanel.Resources>
 
         <Border DockPanel.Dock="Top"
+                Background="#F7FCF9"
+                BorderBrush="#B7D8C4"
+                BorderThickness="1"
+                CornerRadius="0"
+                Padding="12"
+                Margin="0,0,0,10"
+                Style="{StaticResource VisibleWhenRawTranscriptMode}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="原文確認・修正"
+                               Foreground="{StaticResource TextBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="話者名や本文に違和感がある場合だけ、ここで原文を修正します。修正後はジョブ全体から再整文できます。"
+                               Style="{StaticResource MutedText}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+                <WrapPanel Grid.Column="1"
+                           VerticalAlignment="Center"
+                           Margin="14,0,0,0">
+                    <Button Command="{Binding RunPostReviewCommand}"
+                            Content="レビュー候補を再生成"
+                            Padding="12,6"
+                            MinWidth="0"
+                            Margin="0,0,8,0"
+                            ToolTip="修正済み原文からレビュー候補を再生成します" />
+                    <Button Command="{Binding RunReadablePolishingCommand}"
+                            Padding="12,6"
+                            MinWidth="0"
+                            Style="{StaticResource OutlineSuccessButton}"
+                            ToolTip="修正済み原文から整文を再生成します">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE70F;"
+                                       Style="{StaticResource IconText}"
+                                       Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="この原文から再整文"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Top"
                 Background="#FAFBFC"
                 BorderBrush="#E2E8F0"
                 BorderThickness="0,0,0,1"
-                Padding="12,8"
-                Margin="0,0,0,2">
+                Padding="16,8"
+                Margin="0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="92" />
@@ -45,7 +96,7 @@
                 <TextBlock Text="時間" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="1" Text="話者" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Grid.Column="2" Text="素起こし" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenRawTranscriptMode}" />
-                <TextBlock Grid.Column="2" Text="整文" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenPolishedTranscriptMode}" />
+                <TextBlock Grid.Column="2" Text="レビュー候補" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenPolishedTranscriptMode}" />
                 <TextBlock Grid.Column="2" Text="差分" Foreground="#64748B" FontSize="12" FontWeight="SemiBold" Style="{StaticResource VisibleWhenDiffTranscriptMode}" />
             </Grid>
         </Border>
@@ -61,12 +112,12 @@
                         <Style x:Key="InlineDisplayTextStyle" TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished">
+                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -79,7 +130,7 @@
                             <Style.Triggers>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSegmentInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -89,10 +140,16 @@
                         </Style>
                         <Style x:Key="SpeakerDisplayStyle" TargetType="Border">
                             <Setter Property="Visibility" Value="Visible" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                            <Setter Property="ToolTip" Value="{x:Null}" />
                             <Style.Triggers>
+                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw">
+                                    <Setter Property="Cursor" Value="IBeam" />
+                                    <Setter Property="ToolTip" Value="クリックして話者名を編集" />
+                                </DataTrigger>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -105,7 +162,7 @@
                             <Style.Triggers>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished" />
+                                        <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw" />
                                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True" />
                                         <Condition Binding="{Binding DataContext.IsSpeakerInlineEditActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True" />
                                     </MultiDataTrigger.Conditions>
@@ -115,7 +172,7 @@
                         </Style>
                     </DataTemplate.Resources>
 
-                    <Border Padding="12,14"
+                    <Border Padding="16,13"
                             Background="Transparent"
                             BorderBrush="#EEF1F3"
                             BorderThickness="0,0,0,1">
@@ -137,9 +194,7 @@
                                     Padding="9,4"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
-                                    Cursor="IBeam"
                                     MouseLeftButtonDown="OnSpeakerMouseLeftButtonDown"
-                                    ToolTip="クリックして話者名を編集"
                                     Style="{StaticResource SpeakerDisplayStyle}">
                                 <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
                             </Border>
@@ -165,14 +220,6 @@
                                        LineHeight="22"
                                        Style="{StaticResource InlineDisplayTextStyle}"
                                        MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
-                            <TextBlock Grid.Column="2"
-                                       Text="{Binding RawTranscriptText}"
-                                       TextWrapping="Wrap"
-                                       TextTrimming="None"
-                                       FontSize="14"
-                                       FontWeight="Normal"
-                                       LineHeight="22"
-                                       Style="{StaticResource VisibleWhenRawTranscriptMode}" />
                             <Grid Grid.Column="2"
                                   Style="{StaticResource VisibleWhenDiffTranscriptMode}">
                                 <Grid.RowDefinitions>
@@ -215,7 +262,7 @@
                                         CornerRadius="6"
                                         Padding="10,8">
                                     <StackPanel>
-                                        <TextBlock Text="整文"
+                                        <TextBlock Text="レビュー候補"
                                                    Foreground="{StaticResource MutedBrush}"
                                                    FontSize="11"
                                                    FontWeight="SemiBold"
@@ -243,7 +290,7 @@
                                         Orientation="Horizontal"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
-                                        Style="{StaticResource VisibleWhenPolishedTranscriptMode}">
+                                        Style="{StaticResource VisibleWhenRawTranscriptMode}">
                                 <Button Width="24"
                                         Height="24"
                                         Padding="0"

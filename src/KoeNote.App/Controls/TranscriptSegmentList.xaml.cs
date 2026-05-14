@@ -100,7 +100,7 @@ public partial class TranscriptSegmentList : UserControl
 
     private void OnSegmentTextMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount < 2 || !string.Equals(DisplayMode, "Polished", StringComparison.Ordinal))
+        if (e.ClickCount < 2 || !string.Equals(DisplayMode, "Raw", StringComparison.Ordinal))
         {
             return;
         }
@@ -120,7 +120,7 @@ public partial class TranscriptSegmentList : UserControl
 
     private void OnSpeakerMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!string.Equals(DisplayMode, "Polished", StringComparison.Ordinal))
+        if (!string.Equals(DisplayMode, "Raw", StringComparison.Ordinal))
         {
             return;
         }

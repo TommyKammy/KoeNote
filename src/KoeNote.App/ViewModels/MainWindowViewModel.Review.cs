@@ -288,7 +288,7 @@ public sealed partial class MainWindowViewModel
             Segments[i] = Segments[i] with
             {
                 Text = nextText,
-                ReviewState = hasPendingDraft ? "整文候補あり" : "整文済み"
+                ReviewState = hasPendingDraft ? "レビュー候補あり" : "レビュー済み"
             };
             break;
         }

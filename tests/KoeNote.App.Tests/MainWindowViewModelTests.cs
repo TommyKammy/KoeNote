@@ -13,6 +13,7 @@ using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.SystemStatus;
 using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 using KoeNote.App.ViewModels;
@@ -1502,7 +1503,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("候補なし", viewModel.ReviewIssueType);
         Assert.Empty(viewModel.OriginalText);
         Assert.Empty(viewModel.SuggestedText);
-        Assert.Equal("整文候補はありません。", viewModel.ReviewReason);
+        Assert.Equal("レビュー候補はありません。", viewModel.ReviewReason);
         Assert.Equal(0, viewModel.Confidence);
         Assert.Equal("0 / 0", viewModel.DraftPositionText);
     }
@@ -1562,8 +1563,8 @@ public sealed class MainWindowViewModelTests
 
         viewModel.ExportSelectedJobToFolder(string.Empty);
 
-        Assert.StartsWith("整文の出力に失敗しました:", viewModel.ExportWarning, StringComparison.Ordinal);
-        Assert.StartsWith("整文の出力に失敗しました:", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.StartsWith("レビュー候補の出力に失敗しました:", viewModel.ExportWarning, StringComparison.Ordinal);
+        Assert.StartsWith("レビュー候補の出力に失敗しました:", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.Contains(viewModel.Logs, entry => entry.Stage == "export" && entry.Level == "error");
     }
 
@@ -1769,7 +1770,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.HasReadablePolishedContent);
         Assert.Equal("[00:00 - 00:01] Speaker_0: 読みやすい本文です。", viewModel.ReadablePolishedContent);
-        Assert.Contains("読みやすく整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.Contains("整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
         Assert.Equal("再生成", viewModel.ReadablePolishedActionText);
         Assert.Contains("再生成", viewModel.ReadablePolishedActionToolTip, StringComparison.Ordinal);
         Assert.True(viewModel.CopyReadablePolishedContentCommand.CanExecute(null));
@@ -1893,7 +1894,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.IsSummaryStale);
         Assert.Contains("要約済み", viewModel.SummaryStatus, StringComparison.Ordinal);
-        Assert.Contains("読みやすく整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.Contains("整文済み", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
 
         viewModel.BeginSegmentInlineEditCommand.Execute(segment);
         viewModel.SelectedSegmentEditText = "edited raw";
@@ -1902,7 +1903,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsSummaryStale);
         Assert.Contains("古い要約", viewModel.SummaryStatus, StringComparison.Ordinal);
         Assert.Contains("本文が更新", viewModel.SummaryActionToolTip, StringComparison.Ordinal);
-        Assert.Contains("古い読みやすく整文", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+        Assert.Contains("古い整文", viewModel.ReadablePolishedStatus, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -1947,7 +1948,7 @@ public sealed class MainWindowViewModelTests
         var promptSeen = false;
         viewModel.ConfirmAction = (_, message) =>
         {
-            promptSeen = message.Contains("整文", StringComparison.Ordinal);
+            promptSeen = message.Contains("レビュー候補", StringComparison.Ordinal);
             return false;
         };
 
@@ -2497,10 +2498,10 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ReviewSucceededRunUpdate_SelectsAndHighlightsPolishedTranscriptTab()
+    public void ReviewSucceededRunUpdate_SelectsReadableTranscriptTabAndHighlightsReviewCandidateTab()
     {
         var viewModel = CreateViewModel();
-        viewModel.SelectedTranscriptTabIndex = 0;
+        viewModel.SelectedTranscriptTabIndex = 2;
         var method = typeof(MainWindowViewModel).GetMethod(
             "ApplyRunUpdate",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
@@ -2512,7 +2513,7 @@ public sealed class MainWindowViewModelTests
                 100)
         ]);
 
-        Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
         Assert.True(viewModel.IsPolishedTranscriptTabHighlighted);
         Assert.Equal("Highlighted", viewModel.PolishedTranscriptTabHighlightTag);
     }
@@ -2555,6 +2556,40 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedTranscriptTabIndex = value;
 
         Assert.Equal(expected, viewModel.SelectedTranscriptTabIndex);
+    }
+
+    [Fact]
+    public void ReadableTranscriptTabNavigationCommands_SelectSupplementalTabs()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedTranscriptTabIndex = 3;
+        viewModel.ShowReadableTranscriptTabCommand.Execute(null);
+        Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
+
+        viewModel.ShowRawTranscriptTabCommand.Execute(null);
+        Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
+
+        viewModel.ShowDiffTranscriptTabCommand.Execute(null);
+        Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
+
+        viewModel.ShowReviewCandidateTranscriptTabCommand.Execute(null);
+        Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
+    }
+
+    [Theory]
+    [InlineData("GPU Unknown", true)]
+    [InlineData("GPU 未検出", true)]
+    [InlineData("GPU 12% / 4096 MB", false)]
+    public void IsGpuUsageUnknown_ReflectsStatusBarGpuSummary(string summary, bool expected)
+    {
+        var viewModel = CreateViewModel();
+        SetPrivateField(
+            viewModel,
+            "_statusBarInfo",
+            new StatusBarInfo("空き容量 100 GB", "MEM 100 MB", "CPU 0%", summary));
+
+        Assert.Equal(expected, viewModel.IsGpuUsageUnknown);
     }
 
     [Fact]
@@ -3077,6 +3112,79 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task RunSelectedJobAsync_GeneratesReadableDocumentByDefault()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: 読める本文です。"));
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.True(fixture.ViewModel.HasReadablePolishedContent);
+        Assert.Contains("読める本文です。", fixture.ViewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        Assert.Equal(0, fixture.ViewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("整文が完了しました。", fixture.ViewModel.LatestLog);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_SkipsReadableDocumentWhenReviewStageIsDisabled()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: false,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: 読める本文です。"));
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.False(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.True(fixture.ReviewStageRunner.SkipWasCalled);
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.False(fixture.ViewModel.HasReadablePolishedContent);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_KeepsReadableFailureVisibleWhenDocumentGenerationFails()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime(
+                "[00:00 - 00:01] Speaker_0: 読める本文です。",
+                new ReviewWorkerException(ReviewFailureCategory.ProcessFailed, "runtime failed")));
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.False(fixture.ViewModel.HasReadablePolishedContent);
+        Assert.Contains("整文を作成できませんでした", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains("整文を作成できませんでした", fixture.ViewModel.ReadablePolishedStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunReadablePolishingAsync_UsesEditedRawTranscriptText()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: 読める本文です。"));
+        Assert.NotNull(fixture.ViewModel.SelectedJob);
+        var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+        ]);
+        InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
+        var segment = Assert.Single(fixture.ViewModel.Segments);
+
+        fixture.ViewModel.BeginSegmentInlineEditCommand.Execute(segment);
+        fixture.ViewModel.SelectedSegmentEditText = "edited source text";
+        fixture.ViewModel.SaveSegmentInlineEditCommand.Execute(null);
+
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+
+        Assert.Contains("edited source text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
+    }
+
+    [Fact]
     public void RunSelectedJobCommand_RequiresReviewAssetsWhenReviewStageIsEnabled()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -3493,6 +3601,170 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("Gemma 4", viewModel.ReadablePolishingPromptSettingsStatus, StringComparison.Ordinal);
         Assert.Contains("対象モデル: Gemma 4", viewModel.ReadablePolishingPromptPreviewText, StringComparison.Ordinal);
         Assert.Equal(ReadablePolishingPromptPresets.StrongPunctuation, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
+    }
+
+    private static RunReadyViewModelFixture CreateRunReadyViewModel(
+        bool enableReviewStage,
+        FakeTranscriptPolishingRuntime polishingRuntime)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "kotoba-whisper-v2.2-faster",
+            enableReviewStage));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+
+        var job = new JobRepository(paths).CreateFromAudio(audioPath);
+        var segments = new[]
+        {
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw text")
+        };
+        var asrStageRunner = new SavingAsrStageRunnerStub(paths, segments);
+        var reviewStageRunner = new ReviewStageRunnerStub();
+        var viewModel = new MainWindowViewModel(paths);
+        SetPrivateField(
+            viewModel,
+            "_jobRunCoordinator",
+            new JobRunCoordinator(
+                new PreprocessStageRunnerStub("normalized.wav"),
+                asrStageRunner,
+                reviewStageRunner,
+                new SummaryStageRunnerStub()));
+        SetPrivateField(
+            viewModel,
+            "_transcriptPolishingService",
+            new TranscriptPolishingService(
+                new TranscriptReadRepository(paths),
+                new TranscriptDerivativeRepository(paths),
+                polishingRuntime));
+        viewModel.SelectedJob = viewModel.Jobs.Single(item => item.JobId == job.JobId);
+        return new RunReadyViewModelFixture(viewModel, polishingRuntime, reviewStageRunner);
+    }
+
+    private sealed record RunReadyViewModelFixture(
+        MainWindowViewModel ViewModel,
+        FakeTranscriptPolishingRuntime PolishingRuntime,
+        ReviewStageRunnerStub ReviewStageRunner);
+
+    private sealed class PreprocessStageRunnerStub(string normalizedAudioPath) : IPreprocessStageRunner
+    {
+        public Task<string?> RunAsync(
+            JobSummary job,
+            Action<JobRunUpdate> report,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<string?>(normalizedAudioPath);
+        }
+    }
+
+    private sealed class SavingAsrStageRunnerStub(AppPaths paths, IReadOnlyList<TranscriptSegment> segments) : IAsrStageRunner
+    {
+        public Task<IReadOnlyList<TranscriptSegment>?> RunAsync(
+            JobSummary job,
+            string normalizedAudioPath,
+            AsrSettings asrSettings,
+            Action<JobRunUpdate> report,
+            CancellationToken cancellationToken)
+        {
+            new TranscriptSegmentRepository(paths).SaveSegments(segments);
+            report(new JobRunUpdate(
+                JobRunStage.Asr,
+                JobRunStageState.Succeeded,
+                100,
+                Segments: segments,
+                RefreshJobViews: true));
+            return Task.FromResult<IReadOnlyList<TranscriptSegment>?>(segments);
+        }
+    }
+
+    private sealed class ReviewStageRunnerStub : IReviewStageRunner
+    {
+        public bool RunWasCalled { get; private set; }
+
+        public bool SkipWasCalled { get; private set; }
+
+        public Task<bool> RunAsync(
+            JobSummary job,
+            IReadOnlyList<TranscriptSegment> segments,
+            Action<JobRunUpdate> report,
+            CancellationToken cancellationToken)
+        {
+            RunWasCalled = true;
+            report(new JobRunUpdate(
+                JobRunStage.Review,
+                JobRunStageState.Succeeded,
+                100,
+                Drafts: [],
+                RefreshJobViews: true));
+            return Task.FromResult(true);
+        }
+
+        public void Skip(JobSummary job, Action<JobRunUpdate> report)
+        {
+            SkipWasCalled = true;
+            report(new JobRunUpdate(
+                JobRunStage.Review,
+                JobRunStageState.Skipped,
+                100,
+                ClearReviewPreview: true));
+        }
+    }
+
+    private sealed class SummaryStageRunnerStub : ISummaryStageRunner
+    {
+        public Task RunAsync(
+            JobSummary job,
+            Action<JobRunUpdate> report,
+            CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Skip(JobSummary job, Action<JobRunUpdate> report, string reason)
+        {
+        }
+    }
+
+    private sealed class FakeTranscriptPolishingRuntime(string content, Exception? exception = null) : ITranscriptPolishingRuntime
+    {
+        public bool WasCalled { get; private set; }
+
+        public List<string> SeenSegmentTexts { get; } = [];
+
+        public Task<TranscriptPolishingChunkResult> PolishChunkAsync(
+            TranscriptPolishingOptions options,
+            TranscriptPolishingChunk chunk,
+            CancellationToken cancellationToken = default)
+        {
+            WasCalled = true;
+            SeenSegmentTexts.AddRange(chunk.Segments.Select(static segment => segment.Text));
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return Task.FromResult(new TranscriptPolishingChunkResult(chunk, content, TimeSpan.FromSeconds(1)));
+        }
     }
 
     private static MainWindowViewModel CreateViewModel()

@@ -29,7 +29,7 @@
         <ScrollViewer x:Name="MainContentScrollViewer"
                       Grid.Row="1"
                       Grid.RowSpan="2"
-                      Margin="10,10,10,10"
+                      Margin="0"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
             <Grid Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
@@ -40,9 +40,9 @@
                 </Grid.LayoutTransform>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4*" MinWidth="176" />
-                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="1" />
                     <ColumnDefinition Width="15*" MinWidth="540" />
-                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="1" />
                     <ColumnDefinition Width="6*" MinWidth="300" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -54,11 +54,11 @@
                 <GridSplitter Grid.RowSpan="2"
                               Grid.Column="1"
                               Style="{StaticResource ModernVerticalGridSplitter}" />
-                <controls:TranscriptPanel Grid.Column="2" Grid.Row="0" Margin="0,0,0,8" />
+                <controls:TranscriptPanel Grid.Column="2" Grid.Row="0" Margin="0" />
                 <GridSplitter Grid.RowSpan="2"
                               Grid.Column="3"
                               Style="{StaticResource ModernVerticalGridSplitter}" />
-                <controls:ReviewPanel Grid.Column="4" Grid.Row="0" Margin="0,0,0,8" />
+                <controls:ReviewPanel Grid.Column="4" Grid.Row="0" Margin="0" />
                 <controls:TranscriptAudioPlayer Grid.Column="2" Grid.Row="1" />
                 <controls:StageProgressPanel Grid.Column="4" Grid.Row="1" />
             </Grid>

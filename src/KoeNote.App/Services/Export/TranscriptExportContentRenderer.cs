@@ -72,7 +72,7 @@ internal static class TranscriptExportContentRenderer
         {
             builder.Append("> Warning: ")
                 .Append(snapshot.PendingDraftCount)
-                .AppendLine("件の未処理の整文候補が残っています。")
+                .AppendLine("件の未処理のレビュー候補が残っています。")
                 .AppendLine();
         }
 

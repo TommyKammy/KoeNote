@@ -104,7 +104,7 @@ internal static class TranscriptExportOpenXmlWriter
 
         if (source == TranscriptExportSource.ReadablePolished)
         {
-            AppendXlsxRow(builder, 1, ["読みやすく整文"], styleId: 1);
+            AppendXlsxRow(builder, 1, ["整文"], styleId: 1);
             AppendXlsxRow(builder, 2, [snapshot.DocumentContent ?? string.Empty], styleId: 2);
             return builder
                 .AppendLine("  </sheetData>")
@@ -141,8 +141,8 @@ internal static class TranscriptExportOpenXmlWriter
         return source switch
         {
             TranscriptExportSource.Raw => ["開始時刻", "終了時刻", "話者", "素起こし"],
-            TranscriptExportSource.Polished => ["開始時刻", "終了時刻", "話者", "整文"],
-            TranscriptExportSource.ReadablePolished => ["読みやすく整文"],
+            TranscriptExportSource.Polished => ["開始時刻", "終了時刻", "話者", "レビュー候補"],
+            TranscriptExportSource.ReadablePolished => ["整文"],
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }
@@ -232,7 +232,7 @@ internal static class TranscriptExportOpenXmlWriter
         if (snapshot.PendingDraftCount > 0)
         {
             builder.Append("<w:p><w:r><w:t>")
-                .Append(SecurityElement.Escape($"{snapshot.PendingDraftCount}件の未処理の整文候補が残っています。"))
+                .Append(SecurityElement.Escape($"{snapshot.PendingDraftCount}件の未処理のレビュー候補が残っています。"))
                 .AppendLine("</w:t></w:r></w:p>");
         }
 

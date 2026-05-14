@@ -37,7 +37,7 @@ public sealed partial class MainWindowViewModel
         if (SelectedJob is null)
         {
             ReadablePolishedContent = string.Empty;
-            ReadablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+            ReadablePolishedStatus = "整文はまだ生成されていません。";
             return;
         }
 
@@ -47,21 +47,21 @@ public sealed partial class MainWindowViewModel
         if (derivative is null)
         {
             ReadablePolishedContent = string.Empty;
-            ReadablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+            ReadablePolishedStatus = "整文はまだ生成されていません。";
             return;
         }
 
         if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out var reason))
         {
             ReadablePolishedContent = string.Empty;
-            ReadablePolishedStatus = $"読みやすく整文の最新結果は破損しているため表示できません。再生成してください。({reason})";
+            ReadablePolishedStatus = $"整文の最新結果は破損しているため表示できません。再生成してください。({reason})";
             return;
         }
 
         ReadablePolishedContent = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
         ReadablePolishedStatus = _transcriptDerivativeRepository.IsStale(derivative)
-            ? "古い読みやすく整文があります。再生成すると更新できます。"
-            : $"読みやすく整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+            ? "古い整文があります。再生成すると更新できます。"
+            : $"整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
 
     private Task CopyReadablePolishedContentAsync()
@@ -72,7 +72,7 @@ public sealed partial class MainWindowViewModel
         }
 
         System.Windows.Clipboard.SetText(ReadablePolishedContent);
-        LatestLog = "読みやすく整文をクリップボードにコピーしました。";
+        LatestLog = "整文をクリップボードにコピーしました。";
         return Task.CompletedTask;
     }
 

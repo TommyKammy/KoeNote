@@ -41,8 +41,8 @@ public sealed class TranscriptExportDialogService
         return source switch
         {
             TranscriptExportSource.Raw => "素起こし",
-            TranscriptExportSource.Polished => "整文",
-            TranscriptExportSource.ReadablePolished => "読みやすく整文",
+            TranscriptExportSource.Polished => "レビュー候補",
+            TranscriptExportSource.ReadablePolished => "整文",
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }

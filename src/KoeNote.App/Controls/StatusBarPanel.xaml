@@ -13,7 +13,18 @@
                     <TextBlock Text="{Binding DiskFreeSummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
                     <TextBlock Text="{Binding MemorySummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
                     <TextBlock Text="{Binding CpuSummary}" Style="{StaticResource MutedText}" Margin="0,0,16,0" />
-                    <TextBlock Text="{Binding GpuUsageSummary}" Style="{StaticResource MutedText}" />
+                    <TextBlock Text="{Binding GpuUsageSummary}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGpuUsageUnknown}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
             </Grid>
         </Border>

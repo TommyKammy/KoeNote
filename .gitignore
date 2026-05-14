@@ -89,6 +89,13 @@ data/private/
 # Generated WiX payload manifest
 src/KoeNote.Installer/PayloadFiles.wxs
 
+# UI mockup artifacts
+mockup.html
+index.html
+
+# Claude Code local config
+.claude/
+
 # OS files
 Thumbs.db
 ehthumbs.db

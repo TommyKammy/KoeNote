@@ -22,7 +22,7 @@
     <Border Background="#FFFFFF"
             BorderBrush="{StaticResource BorderBrushSoft}"
             BorderThickness="1"
-            CornerRadius="8"
+            CornerRadius="0"
             MinHeight="116"
             Padding="14,12">
         <Grid>

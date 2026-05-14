@@ -41,6 +41,10 @@ public sealed record DiagnosticLogScopeOption(DiagnosticLogScope Scope, string D
 public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private const string DefaultSelectableAsrEngineId = "faster-whisper-large-v3-turbo";
+    private const int ReadableTranscriptTabIndex = 0;
+    private const int RawTranscriptTabIndex = 1;
+    private const int DiffTranscriptTabIndex = 2;
+    private const int ReviewCandidateTranscriptTabIndex = 3;
 
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
@@ -124,7 +128,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
     private string _readablePolishedContent = string.Empty;
-    private string _readablePolishedStatus = "読みやすく整文はまだ生成されていません。";
+    private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
     private string _latestLog;
     private string _modelDownloadProgressSummary = "No active model download.";
@@ -178,7 +182,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _reviewIssueType = "候補なし";
     private string _originalText = string.Empty;
     private string _suggestedText = string.Empty;
-    private string _reviewReason = "整文候補はありません。";
+    private string _reviewReason = "レビュー候補はありません。";
     private double _confidence;
     private int _reviewSegmentFocusRequestId;
     private int _transcriptAutoScrollRequestId;
@@ -308,6 +312,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
         RunReadablePolishingCommand = new RelayCommand(RunReadablePolishingAsync, () => CanRunReadablePolishing);
         CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
+        ShowReadableTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReadableTranscriptTabIndex));
+        ShowRawTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(RawTranscriptTabIndex));
+        ShowDiffTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(DiffTranscriptTabIndex));
+        ShowReviewCandidateTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReviewCandidateTranscriptTabIndex));
         // Compatibility command for non-header callers; the normal UX separates review and summary.
         RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
@@ -459,6 +467,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string CpuSummary => _statusBarInfo.CpuSummary;
 
     public string GpuUsageSummary => _statusBarInfo.GpuUsageSummary;
+
+    public bool IsGpuUsageUnknown =>
+        GpuUsageSummary.Contains("Unknown", StringComparison.OrdinalIgnoreCase) ||
+        GpuUsageSummary.Contains("未検出", StringComparison.OrdinalIgnoreCase);
 
     public string FirstRunSummary
     {
@@ -750,6 +762,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunReadablePolishingCommand { get; }
 
     public ICommand CopyReadablePolishedContentCommand { get; }
+
+    public ICommand ShowReadableTranscriptTabCommand { get; }
+
+    public ICommand ShowRawTranscriptTabCommand { get; }
+
+    public ICommand ShowDiffTranscriptTabCommand { get; }
+
+    public ICommand ShowReviewCandidateTranscriptTabCommand { get; }
 
     public ICommand RunPostReviewAndSummaryCommand { get; }
 
@@ -2029,7 +2049,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string ReadablePolishedContentDisplay => HasReadablePolishedContent
         ? ReadablePolishedContent
-        : "読みやすく整文はまだ生成されていません。";
+        : "整文はまだ生成されていません。素起こしを確認するか、このジョブ全体から整文を生成してください。";
 
     public string ReadablePolishedActionText => IsReadablePolishingInProgress
         ? "生成中"
@@ -2038,10 +2058,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             : "読みやすい文書を生成";
 
     public string ReadablePolishedActionToolTip => IsReadablePolishingInProgress
-        ? "読みやすく整文を生成しています。完了すると結果タブに表示されます。"
+        ? "整文を生成しています。完了すると先頭の整文タブに表示されます。"
         : HasReadablePolishedContent
-            ? "選択ジョブ全体から読みやすく整文を再生成します。"
-            : "選択ジョブ全体から読みやすく整文を生成します。";
+            ? "選択ジョブ全体から整文を再生成します。"
+            : "選択ジョブ全体から整文を生成します。";
 
     public bool IsReadablePolishingInProgress
     {

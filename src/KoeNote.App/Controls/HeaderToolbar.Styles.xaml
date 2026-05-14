@@ -66,9 +66,9 @@
 </Style>
 
 <Style x:Key="HeaderReviewToggle" TargetType="ToggleButton">
-    <Setter Property="Foreground" Value="{StaticResource HeaderInfoValueBrush}" />
-    <Setter Property="Background" Value="#FFFFFF" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+    <Setter Property="Foreground" Value="#64748B" />
+    <Setter Property="Background" Value="#F8FAFC" />
+    <Setter Property="BorderBrush" Value="#E2E8F0" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Height" Value="34" />
     <Setter Property="MinWidth" Value="104" />
@@ -112,6 +112,44 @@
     <Style.Triggers>
         <DataTrigger Binding="{Binding IsRunInProgress}" Value="True">
             <Setter Property="IsEnabled" Value="False" />
+        </DataTrigger>
+    </Style.Triggers>
+</Style>
+
+<Style x:Key="HeaderModelBadgeButton" TargetType="Button" BasedOn="{StaticResource HeaderButtonBase}">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="MinWidth" Value="156" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
+    <Setter Property="BorderBrush" Value="#B7D8C4" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+</Style>
+
+<Style x:Key="HeaderToggleTrack" TargetType="Border">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="17" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Background" Value="#CBD5E1" />
+    <Setter Property="Margin" Value="8,0,0,0" />
+    <Style.Triggers>
+        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        </DataTrigger>
+    </Style.Triggers>
+</Style>
+
+<Style x:Key="HeaderToggleThumb" TargetType="Ellipse">
+    <Setter Property="Width" Value="13" />
+    <Setter Property="Height" Value="13" />
+    <Setter Property="Fill" Value="#FFFFFF" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="2,0,0,0" />
+    <Style.Triggers>
+        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,0,2,0" />
         </DataTrigger>
     </Style.Triggers>
 </Style>

@@ -6,6 +6,12 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private Task SelectTranscriptTabAsync(int tabIndex)
+    {
+        SelectedTranscriptTabIndex = tabIndex;
+        return Task.CompletedTask;
+    }
+
     private static string FormatTimestamp(double seconds)
     {
         return TimestampFormatter.FormatDisplay(seconds);
@@ -19,7 +25,7 @@ public sealed partial class MainWindowViewModel
             var preview = Segments[i];
             if (draftSegmentIds.Contains(preview.SegmentId))
             {
-                Segments[i] = preview with { ReviewState = "整文候補あり" };
+                Segments[i] = preview with { ReviewState = "レビュー候補あり" };
             }
         }
     }
@@ -29,7 +35,7 @@ public sealed partial class MainWindowViewModel
         ReviewIssueType = "候補なし";
         OriginalText = string.Empty;
         SuggestedText = string.Empty;
-        ReviewReason = "整文候補はありません。";
+        ReviewReason = "レビュー候補はありません。";
         Confidence = 0;
         DiffTokens.Clear();
         OnPropertyChanged(nameof(SelectedCorrectionDraftId));

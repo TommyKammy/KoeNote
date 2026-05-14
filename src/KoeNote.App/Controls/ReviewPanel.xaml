@@ -90,7 +90,7 @@
                                 <Path Style="{StaticResource LucidePathIcon}"
                                       Data="M21.64 3.64l-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72M14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9" />
                             </Border>
-                            <TextBlock Text="整文"
+                            <TextBlock Text="レビュー候補"
                                        Style="{StaticResource SectionTitle}"
                                        Margin="0"
                                        VerticalAlignment="Center" />
@@ -209,7 +209,7 @@
                             <Border Background="#FAFBFC"
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="1"
-                                    CornerRadius="8"
+                                    CornerRadius="0"
                                     Padding="12"
                                     Style="{StaticResource VisibleWhenNoSummaryStyle}">
                                 <StackPanel>
@@ -255,15 +255,32 @@
                                         Background="#FAFBFC"
                                         BorderBrush="{StaticResource BorderBrushSoft}"
                                         BorderThickness="1"
-                                        CornerRadius="8"
+                                        CornerRadius="0"
                                         Padding="16">
                                     <StackPanel>
-                                        <TextBlock Text="整文候補はありません"
+                                        <TextBlock Text="レビュー候補はありません"
                                                    FontWeight="SemiBold"
                                                    Margin="0,0,0,6" />
                                         <TextBlock Text="整文が生成済みの場合は中央の整文タブで確認できます。必要な確認候補がある場合だけ、ここに候補が表示されます。"
                                                    Style="{StaticResource MutedText}"
-                                                   TextWrapping="Wrap" />
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,12" />
+                                        <Button Command="{Binding ShowReadableTranscriptTabCommand}"
+                                                Padding="12,6"
+                                                MinWidth="0"
+                                                HorizontalAlignment="Left"
+                                                Style="{StaticResource OutlineSuccessButton}"
+                                                ToolTip="中央の整文タブを開きます">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE8A7;"
+                                                           Style="{StaticResource IconText}"
+                                                           Foreground="{StaticResource AccentBrush}" />
+                                                <TextBlock Text="整文タブを開く"
+                                                           Foreground="{StaticResource AccentBrush}"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </Border>
 
@@ -274,7 +291,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="整文候補"
+                            <TextBlock Text="レビュー候補"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                             <WrapPanel Grid.Column="1" VerticalAlignment="Center">
@@ -307,7 +324,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="整文案" Style="{StaticResource ReviewSubheading}" />
+                            <TextBlock Text="レビュー候補案" Style="{StaticResource ReviewSubheading}" />
                             <TextBlock Grid.Column="1"
                                        Text="ここで編集してから手修正できます"
                                        Foreground="{StaticResource MutedBrush}"
@@ -325,7 +342,7 @@
                         <Border Background="#FAFBFC"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1"
-                                CornerRadius="8"
+                                CornerRadius="0"
                                 Padding="10"
                                 Margin="0,5,0,14"
                                 PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick">
@@ -432,7 +449,7 @@
 
                                     <Button Style="{StaticResource ReviewApplyButton}"
                                             Command="{Binding AcceptDraftCommand}"
-                                            ToolTip="整文候補を整文へ反映して、次の候補へ進みます">
+                                            ToolTip="レビュー候補を反映して、次の候補へ進みます">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
                                             <TextBlock Text="適用"

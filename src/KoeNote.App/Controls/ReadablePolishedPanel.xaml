@@ -21,8 +21,9 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="0,8,0,0">
+    <Grid Margin="0">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -30,10 +31,10 @@
         <Border Grid.Row="0"
                 Background="#F8FAFC"
                 BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12,9"
-                Margin="0,0,0,10">
+                BorderThickness="0,0,0,1"
+                CornerRadius="0"
+                Padding="16,9"
+                Margin="0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -78,13 +79,72 @@
             </Grid>
         </Border>
 
-        <Border x:Name="ReadablePolishedContentCard"
-                Grid.Row="1"
+        <Border Grid.Row="1"
+                HorizontalAlignment="Right"
                 Background="#FFFFFF"
                 BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="16">
+                BorderThickness="0,0,0,1"
+                CornerRadius="0"
+                Padding="16,8"
+                Margin="0">
+            <WrapPanel>
+                <Button Command="{Binding ShowRawTranscriptTabCommand}"
+                        Padding="10,6"
+                        MinWidth="0"
+                        Margin="0,0,6,0"
+                        ToolTip="ASR原文を確認・修正します"
+                        Style="{StaticResource ToolbarButton}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8A5;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   Margin="0,0,6,0" />
+                        <TextBlock Text="原文を確認"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ShowDiffTranscriptTabCommand}"
+                        Padding="10,6"
+                        MinWidth="0"
+                        Margin="0,0,6,0"
+                        ToolTip="素起こしとレビュー候補の差分を確認します"
+                        Style="{StaticResource ToolbarButton}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8AB;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   Margin="0,0,6,0" />
+                        <TextBlock Text="差分を見る"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ShowReviewCandidateTranscriptTabCommand}"
+                        Padding="10,6"
+                        MinWidth="0"
+                        ToolTip="最終整文前のレビュー候補を確認します"
+                        Style="{StaticResource ToolbarButton}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE70F;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   Margin="0,0,6,0" />
+                        <TextBlock Text="レビュー候補"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </Border>
+
+        <Border x:Name="ReadablePolishedContentCard"
+                Grid.Row="2"
+                Background="#FFFFFF"
+                BorderBrush="{StaticResource BorderBrushSoft}"
+                BorderThickness="0"
+                CornerRadius="0"
+                Padding="18">
             <Grid>
                 <TextBox Text="{Binding ReadablePolishedContent, Mode=OneWay}"
                          IsReadOnly="True"
@@ -113,7 +173,7 @@
                         VerticalAlignment="Top"
                         Command="{Binding CopyReadablePolishedContentCommand}"
                         Padding="10,6"
-                        ToolTip="読みやすく整文をコピー">
+                        ToolTip="整文をコピー">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
                             <Setter Property="Visibility" Value="Collapsed" />

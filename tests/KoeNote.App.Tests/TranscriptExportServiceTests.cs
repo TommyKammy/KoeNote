@@ -43,7 +43,7 @@ public sealed class TranscriptExportServiceTests
         Assert.Contains("\"Text\": \"final one\"", json, StringComparison.Ordinal);
 
         var markdown = File.ReadAllText(Path.Combine(output, "meeting.md"));
-        Assert.Contains("1件の未処理の整文候補が残っています。", markdown, StringComparison.Ordinal);
+        Assert.Contains("1件の未処理のレビュー候補が残っています。", markdown, StringComparison.Ordinal);
 
         var srt = File.ReadAllText(Path.Combine(output, "meeting.srt"));
         Assert.Contains("00:00:01,000 --> 00:00:02,500", srt, StringComparison.Ordinal);
@@ -327,7 +327,7 @@ public sealed class TranscriptExportServiceTests
         Assert.Equal("開始時刻", cells["A1"]);
         Assert.Equal("終了時刻", cells["B1"]);
         Assert.Equal("話者", cells["C1"]);
-        Assert.Equal("整文", cells["D1"]);
+        Assert.Equal("レビュー候補", cells["D1"]);
         Assert.Equal("00:00:01.250", cells["A2"]);
         Assert.Equal("00:00:02.500", cells["B2"]);
         Assert.Equal("Alice", cells["C2"]);
@@ -369,7 +369,7 @@ public sealed class TranscriptExportServiceTests
         using var archive = ZipFile.OpenRead(file);
         var worksheet = ReadZipXml(archive, "xl/worksheets/sheet1.xml");
         var cells = ReadInlineStringCells(worksheet);
-        Assert.Equal("読みやすく整文", cells["A1"]);
+        Assert.Equal("整文", cells["A1"]);
         Assert.Equal("[00:00 - 00:01] Alice: 読みやすい本文です。", cells["A2"]);
         Assert.False(cells.ContainsKey("B1"));
     }

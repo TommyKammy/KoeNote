@@ -3,6 +3,54 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:KoeNote.App.Controls">
     <UserControl.Resources>
+        <Style x:Key="TranscriptToggleTrack" TargetType="Border">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="17" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Background" Value="#CBD5E1" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TranscriptToggleThumb" TargetType="Ellipse">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Fill" Value="#FFFFFF" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                    <Setter Property="HorizontalAlignment" Value="Right" />
+                    <Setter Property="Margin" Value="0,0,2,0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TranscriptInlineToggle" TargetType="ToggleButton">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="TranscriptTabItem" TargetType="TabItem">
             <Setter Property="Foreground" Value="#64748B" />
             <Setter Property="FontSize" Value="12" />
@@ -53,92 +101,146 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="TranscriptCardTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <DockPanel KeyboardNavigation.TabNavigation="Local">
+                            <Border DockPanel.Dock="Top"
+                                    Background="#FFFFFF"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid Height="47" Margin="16,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="文字起こし"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,24,0" />
+                                    <TabPanel Grid.Column="1"
+                                              x:Name="HeaderPanel"
+                                              IsItemsHost="True"
+                                              KeyboardNavigation.TabIndex="1"
+                                              VerticalAlignment="Stretch"
+                                              Background="Transparent" />
+                                </Grid>
+                            </Border>
+                            <Border DockPanel.Dock="Top"
+                                    Background="#FAFBFC"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="16,8">
+                                <Grid MinHeight="32">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="話者:"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0" />
+                                    <ComboBox Grid.Column="1"
+                                              Style="{StaticResource ToolbarComboBox}"
+                                              ItemsSource="{Binding SpeakerFilters}"
+                                              SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}"
+                                              Width="132"
+                                              Height="32"
+                                              Margin="0,0,10,0"
+                                              HorizontalAlignment="Left"
+                                              HorizontalContentAlignment="Left" />
+                                    <Grid Grid.Column="2"
+                                          Width="220"
+                                          Height="32"
+                                          HorizontalAlignment="Left">
+                                        <TextBox x:Name="SegmentSearchTextBox"
+                                                 Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="32"
+                                                 Padding="32,0,34,0"
+                                                 VerticalContentAlignment="Center"
+                                                 ToolTip="発話内容を検索" />
+                                        <TextBlock Text="&#xE721;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="13"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Left"
+                                                   Margin="12,0,0,0"
+                                                   IsHitTestVisible="False" />
+                                        <TextBlock Text="テキストを検索"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Left"
+                                                   Margin="32,0,0,0"
+                                                   IsHitTestVisible="False">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="" />
+                                                                <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=SegmentSearchTextBox}" Value="False" />
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Button Content="x"
+                                                Command="{Binding ClearSegmentSearchCommand}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SearchClearButton}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+                                    <ToggleButton Grid.Column="3"
+                                                  Style="{StaticResource TranscriptInlineToggle}"
+                                                  IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"
+                                                  ToolTip="再生位置に合わせてセグメントへ自動スクロール">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="自動スクロール"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center" />
+                                            <Grid>
+                                                <Border Style="{StaticResource TranscriptToggleTrack}" />
+                                                <Ellipse Style="{StaticResource TranscriptToggleThumb}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent"
+                                              KeyboardNavigation.TabIndex="2"
+                                              KeyboardNavigation.TabNavigation="Local" />
+                        </DockPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
-    <Border Style="{StaticResource PanelBorder}" Padding="18">
+    <Border Style="{StaticResource PanelBorder}" Padding="0">
         <DockPanel>
-            <Grid DockPanel.Dock="Top" MinHeight="38" Margin="0,0,0,14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Style="{StaticResource LucideCardIconBadge}">
-                        <Path Style="{StaticResource LucidePathIcon}"
-                              Data="M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2M7 15h4M15 15h2M7 11h2M13 11h4" />
-                    </Border>
-                    <TextBlock Text="文字起こし"
-                               Style="{StaticResource SectionTitle}"
-                               Margin="0"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-                <CheckBox Grid.Column="1"
-                          Content="自動スクロール"
-                          IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"
-                          HorizontalAlignment="Right"
-                          VerticalAlignment="Center"
-                          Margin="0,0,14,0"
-                          Foreground="{StaticResource MutedBrush}" />
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <Grid Width="220"
-                          Height="38"
-                          Margin="0,0,8,0">
-                        <TextBox x:Name="SegmentSearchTextBox"
-                                 Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Height="38"
-                                 Padding="10,0,34,0"
-                                 VerticalContentAlignment="Center"
-                                 ToolTip="発話内容を検索" />
-                        <TextBlock Text="&#xE721;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   FontSize="13"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Left"
-                                   Margin="12,0,0,0"
-                                   IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="" />
-                                                <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=SegmentSearchTextBox}" Value="False" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </MultiDataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <Button Content="x"
-                                Command="{Binding ClearSegmentSearchCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SearchClearButton}">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Text, ElementName=SegmentSearchTextBox}" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                    </Grid>
-                    <ComboBox Style="{StaticResource ToolbarComboBox}"
-                              ItemsSource="{Binding SpeakerFilters}"
-                              SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}"
-                              Width="150"
-                              Height="38"
-                              HorizontalAlignment="Right"
-                              HorizontalContentAlignment="Left" />
-                </StackPanel>
-            </Grid>
 
             <TextBlock DockPanel.Dock="Bottom"
                        Text="{Binding ExportWarning}"
@@ -146,17 +248,23 @@
                        FontSize="12"
                        FontWeight="SemiBold"
                        TextWrapping="Wrap"
-                       Margin="0,8,0,0" />
+                       Margin="16,8,16,0" />
 
-            <TabControl Style="{StaticResource CardTabControl}"
+            <TabControl Style="{StaticResource TranscriptCardTabControl}"
                         ItemContainerStyle="{StaticResource TranscriptTabItem}"
                         SelectedIndex="{Binding SelectedTranscriptTabIndex, Mode=TwoWay}">
+                <TabItem Header="整文">
+                    <controls:ReadablePolishedPanel />
+                </TabItem>
                 <TabItem Header="素起こし">
                     <controls:TranscriptSegmentList DisplayMode="Raw" />
                 </TabItem>
+                <TabItem Header="差分">
+                    <controls:TranscriptSegmentList DisplayMode="Diff" />
+                </TabItem>
                 <TabItem>
                     <TabItem.Header>
-                        <Grid MinWidth="72">
+                        <Grid MinWidth="92">
                             <Border x:Name="PolishedTabPulse"
                                     Background="#FEF3C7"
                                     BorderBrush="#FBBF24"
@@ -186,19 +294,13 @@
                                     </Style>
                                 </Border.Style>
                             </Border>
-                            <TextBlock Text="整文"
+                            <TextBlock Text="レビュー候補"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        TextTrimming="None" />
                         </Grid>
                     </TabItem.Header>
                     <controls:TranscriptSegmentList DisplayMode="Polished" />
-                </TabItem>
-                <TabItem Header="差分">
-                    <controls:TranscriptSegmentList DisplayMode="Diff" />
-                </TabItem>
-                <TabItem Header="読みやすく整文">
-                    <controls:ReadablePolishedPanel />
                 </TabItem>
             </TabControl>
         </DockPanel>

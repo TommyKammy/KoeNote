@@ -39,9 +39,20 @@ public sealed partial class MainWindowViewModel
             }
 
             var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, EnableSummaryStage: false);
-            await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
+            var runSucceeded = await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
+            var readablePolishingAttempted = false;
+            var readablePolishingSucceeded = false;
+            if (runSucceeded && enableReviewForRun && !cancellation.IsCancellationRequested)
+            {
+                readablePolishingAttempted = true;
+                readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
+            }
+
             LoadSummaryForSelectedJob();
-            LoadReadablePolishedForSelectedJob();
+            if (!readablePolishingAttempted || readablePolishingSucceeded)
+            {
+                LoadReadablePolishedForSelectedJob();
+            }
         }
         finally
         {
@@ -84,7 +95,7 @@ public sealed partial class MainWindowViewModel
 
                 if (stage == JobRunStage.Review && state == JobRunStageState.Succeeded)
                 {
-                    SelectedTranscriptTabIndex = 1;
+                    SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
                     StartPolishedTranscriptTabHighlight();
                 }
             }

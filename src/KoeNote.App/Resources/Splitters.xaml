@@ -5,8 +5,8 @@
     </ResourceDictionary.MergedDictionaries>
 
     <Style x:Key="ModernVerticalGridSplitter" TargetType="GridSplitter">
-        <Setter Property="Width" Value="10" />
-        <Setter Property="MinWidth" Value="10" />
+        <Setter Property="Width" Value="1" />
+        <Setter Property="MinWidth" Value="1" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="Background" Value="Transparent" />
@@ -19,12 +19,11 @@
                 <ControlTemplate TargetType="GridSplitter">
                     <Grid Background="Transparent">
                         <Border x:Name="Line"
-                                Width="2"
+                                Width="1"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
-                                Background="Transparent"
-                                CornerRadius="1"
-                                Margin="0,8" />
+                                Background="#E5E7EB"
+                                Margin="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
