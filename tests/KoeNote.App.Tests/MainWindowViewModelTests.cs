@@ -898,6 +898,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("custom", state.SetupMode);
         Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSettingsReviewModel?.ModelId);
         Assert.Equal("bonsai-8b-q1-0", viewModel.SelectedSetupReviewModel?.ModelId);
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Bonsai, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
     }
 
     [Fact]
@@ -3362,6 +3363,33 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsReadablePolishingPromptPresetEnabled);
         Assert.Empty(viewModel.ReadablePolishingPromptAdditionalInstruction);
         Assert.Empty(viewModel.ReadablePolishingPromptCustomPrompt);
+    }
+
+    [Fact]
+    public void ReadablePolishingPromptSettings_InitialSelectionUsesCurrentReviewModelFamily()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        new ReadablePolishingPromptSettingsRepository(paths).Save(
+            ReadablePolishingPromptSettings.CreateDefault(ReadablePolishingPromptModelFamilies.Bonsai) with
+            {
+                PresetId = ReadablePolishingPromptPresets.Faithful,
+                AdditionalInstruction = "Keep product names unchanged."
+            });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal(ReadablePolishingPromptModelFamilies.Bonsai, viewModel.SelectedReadablePolishingPromptModelFamily?.ModelFamily);
+        Assert.Contains("Bonsai 8B", viewModel.ReadablePolishingPromptActiveModelFamilySummary, StringComparison.Ordinal);
+        Assert.Equal(ReadablePolishingPromptPresets.Faithful, viewModel.SelectedReadablePolishingPromptPreset?.PresetId);
+        Assert.Equal("Keep product names unchanged.", viewModel.ReadablePolishingPromptAdditionalInstruction);
+        Assert.Equal(TranscriptPolishingPromptBuilder.BonsaiCompactPromptTemplateId, ReadablePolishingPromptSettings.ResolveDefaultPromptTemplateId(viewModel.SelectedReadablePolishingPromptModelFamily!.ModelFamily));
     }
 
     [Fact]

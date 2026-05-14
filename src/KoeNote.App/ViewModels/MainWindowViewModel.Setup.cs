@@ -821,6 +821,7 @@ public sealed partial class MainWindowViewModel
             _setupState = _setupWizardService.SelectModel("review", modelId);
             RefreshSetupWizard();
             RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
+            _ = SelectActiveReadablePolishingPromptModelFamily();
             LatestLog = $"Settings review model selected: {modelId}";
         }
         catch (InvalidOperationException ex)

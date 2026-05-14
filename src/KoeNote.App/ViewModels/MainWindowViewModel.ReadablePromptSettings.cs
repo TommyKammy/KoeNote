@@ -119,8 +119,8 @@ public sealed partial class MainWindowViewModel
         _isLoadingReadablePolishingPromptSettings = true;
         try
         {
-            SelectedReadablePolishingPromptModelFamily = ReadablePolishingPromptModelFamilyOptions
-                .First(option => option.ModelFamily == ReadablePolishingPromptModelFamilies.Gemma);
+            SelectedReadablePolishingPromptModelFamily = FindReadablePolishingPromptModelFamilyOption(
+                ResolveActiveReadablePolishingPromptModelFamily());
         }
         finally
         {
