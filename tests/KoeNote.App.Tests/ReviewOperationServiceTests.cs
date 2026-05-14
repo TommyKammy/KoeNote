@@ -1,6 +1,7 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
 using Microsoft.Data.Sqlite;
 
@@ -93,6 +94,56 @@ public sealed class ReviewOperationServiceTests
         Assert.Null(result.FinalText);
         AssertDraftDecision(paths, "draft-001", "rejected", "rejected", expectedFinalText: null, expectedNote: null);
         AssertSegment(paths, finalText: null, reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
+    public void RejectDraft_AfterReadablePolishingKeepsCompletedJobProgress()
+    {
+        var paths = CreatePaths();
+        ArrangeDraft(paths, "draft-001", originalText: "original", suggestedText: "suggested");
+        SetJobState(
+            paths,
+            "job-001",
+            "整文完了",
+            "readable_polishing_completed",
+            JobRunProgressPlan.Completed,
+            unreviewedDraftCount: 1);
+
+        new ReviewOperationService(paths).RejectDraft("draft-001");
+
+        AssertSegment(paths, finalText: null, reviewState: "reviewed", pendingDraftCount: 0, assertCompletedWhenNoPending: false);
+        AssertJob(
+            paths,
+            "job-001",
+            "整文完了",
+            "readable_polishing_completed",
+            JobRunProgressPlan.Completed,
+            unreviewedDraftCount: 0);
+    }
+
+    [Fact]
+    public void AcceptDraft_AfterReadablePolishingRequestsReadableRefresh()
+    {
+        var paths = CreatePaths();
+        ArrangeDraft(paths, "draft-001", originalText: "original", suggestedText: "suggested");
+        SetJobState(
+            paths,
+            "job-001",
+            "整文完了",
+            "readable_polishing_completed",
+            JobRunProgressPlan.Completed,
+            unreviewedDraftCount: 1);
+
+        new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        AssertSegment(paths, finalText: "suggested", reviewState: "reviewed", pendingDraftCount: 0);
+        AssertJob(
+            paths,
+            "job-001",
+            "完成文書作成待ち",
+            "review_completed",
+            JobRunProgressPlan.ReviewSucceeded,
+            unreviewedDraftCount: 0);
     }
 
     [Fact]
@@ -208,12 +259,17 @@ public sealed class ReviewOperationServiceTests
         }
     }
 
-    private static void AssertSegment(AppPaths paths, string? finalText, string reviewState, int pendingDraftCount)
+    private static void AssertSegment(
+        AppPaths paths,
+        string? finalText,
+        string reviewState,
+        int pendingDraftCount,
+        bool assertCompletedWhenNoPending = true)
     {
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.final_text, s.review_state, j.unreviewed_draft_count
+            SELECT s.final_text, s.review_state, j.unreviewed_draft_count, j.status, j.progress_percent
             FROM transcript_segments s
             JOIN jobs j ON j.job_id = s.job_id
             WHERE s.job_id = 'job-001' AND s.segment_id = 'segment-001';
@@ -231,6 +287,62 @@ public sealed class ReviewOperationServiceTests
         }
         Assert.Equal(reviewState, reader.GetString(1));
         Assert.Equal(pendingDraftCount, reader.GetInt32(2));
+        if (pendingDraftCount == 0 && assertCompletedWhenNoPending)
+        {
+            Assert.Equal("完成文書作成待ち", reader.GetString(3));
+            Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(4));
+        }
+    }
+
+    private static void AssertJob(
+        AppPaths paths,
+        string jobId,
+        string expectedStatus,
+        string expectedStage,
+        int expectedProgress,
+        int unreviewedDraftCount)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT status, current_stage, progress_percent, unreviewed_draft_count
+            FROM jobs
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(expectedStatus, reader.GetString(0));
+        Assert.Equal(expectedStage, reader.GetString(1));
+        Assert.Equal(expectedProgress, reader.GetInt32(2));
+        Assert.Equal(unreviewedDraftCount, reader.GetInt32(3));
+    }
+
+    private static void SetJobState(
+        AppPaths paths,
+        string jobId,
+        string status,
+        string currentStage,
+        int progressPercent,
+        int unreviewedDraftCount)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET status = $status,
+                current_stage = $current_stage,
+                progress_percent = $progress_percent,
+                unreviewed_draft_count = $unreviewed_draft_count
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$current_stage", currentStage);
+        command.Parameters.AddWithValue("$progress_percent", progressPercent);
+        command.Parameters.AddWithValue("$unreviewed_draft_count", unreviewedDraftCount);
+        command.ExecuteNonQuery();
     }
 
     private static AppPaths CreatePaths()

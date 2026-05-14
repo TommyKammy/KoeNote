@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.ViewModels;
@@ -36,7 +37,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (SelectedJob.ProgressPercent >= 100 && IsReviewCompletedDisplayStatus(SelectedJob.Status))
+        if (IsReviewCompletedDisplayStatus(SelectedJob.Status))
         {
             MarkManualReviewStageCompleted();
             return;
@@ -48,6 +49,7 @@ public sealed partial class MainWindowViewModel
     private static bool IsReviewCompletedDisplayStatus(string status)
     {
         return string.Equals(status, "整文完了", StringComparison.Ordinal) ||
+            string.Equals(status, "完成文書作成待ち", StringComparison.Ordinal) ||
             string.Equals(status, "レビュー完了", StringComparison.Ordinal);
     }
 
@@ -219,11 +221,20 @@ public sealed partial class MainWindowViewModel
         UpdateSegmentAfterDecision(result);
         if (SelectedJob is not null && SelectedJob.JobId == result.JobId)
         {
+            var preserveCompletedReadableDocument =
+                result.PendingDraftCount == 0 &&
+                string.Equals(result.Action, "rejected", StringComparison.Ordinal) &&
+                string.Equals(SelectedJob.Status, "整文完了", StringComparison.Ordinal) &&
+                SelectedJob.ProgressPercent >= JobRunProgressPlan.Completed;
             SelectedJob.UnreviewedDrafts = result.PendingDraftCount;
             if (result.PendingDraftCount == 0)
             {
-                SelectedJob.Status = "整文完了";
-                SelectedJob.ProgressPercent = 100;
+                if (!preserveCompletedReadableDocument)
+                {
+                    SelectedJob.Status = "完成文書作成待ち";
+                    SelectedJob.ProgressPercent = JobRunProgressPlan.ReviewSucceeded;
+                }
+
                 MarkManualReviewStageCompleted();
             }
             else

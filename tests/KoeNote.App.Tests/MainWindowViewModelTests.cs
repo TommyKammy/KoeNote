@@ -1499,10 +1499,42 @@ public sealed class MainWindowViewModelTests
 
         Assert.Empty(viewModel.SelectedCorrectionDraftId);
         Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
-        Assert.Equal("整文完了", viewModel.SelectedJob?.Status);
-        Assert.Equal(100, viewModel.SelectedJob?.ProgressPercent);
+        Assert.Equal("完成文書作成待ち", viewModel.SelectedJob?.Status);
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, viewModel.SelectedJob?.ProgressPercent);
         Assert.Equal(3, viewModel.StageStatuses.Count);
         Assert.True(viewModel.StageStatuses.Last().IsToggleable);
+    }
+
+    [Fact]
+    public async Task RejectDraft_AfterReadablePolishingKeepsSelectedJobCompleted()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var jobRepository = new JobRepository(paths);
+        var job = jobRepository.CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "original")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "original", "suggested", "suggestion", 0.8)
+        ]);
+        jobRepository.MarkReadablePolishingSucceeded(job);
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("draft-001", viewModel.SelectedCorrectionDraftId);
+
+        viewModel.RejectDraftCommand.Execute(null);
+        for (var i = 0; i < 20 && viewModel.SelectedCorrectionDraftId == "draft-001"; i++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        Assert.Empty(viewModel.SelectedCorrectionDraftId);
+        Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
+        Assert.Equal("整文完了", viewModel.SelectedJob?.Status);
+        Assert.Equal(JobRunProgressPlan.Completed, viewModel.SelectedJob?.ProgressPercent);
     }
 
     [Fact]

@@ -88,7 +88,7 @@ public sealed class JobRepository(AppPaths paths)
             UPDATE jobs
             SET status = '整文完了',
                 current_stage = 'review_completed',
-                progress_percent = 100,
+                progress_percent = $progress_percent,
                 unreviewed_draft_count = 0,
                 updated_at = $updated_at
             WHERE COALESCE((SELECT value FROM pending WHERE pending.job_id = jobs.job_id), 0) = 0
@@ -101,6 +101,7 @@ public sealed class JobRepository(AppPaths paths)
                 );
             """;
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.Completed);
         command.ExecuteNonQuery();
     }
 
@@ -228,54 +229,69 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkPreprocessRunning(JobSummary job)
     {
-        UpdatePreprocessResult(job, "音声変換中", "preprocessing", 10, null);
+        UpdatePreprocessResult(job, "音声変換中", "preprocessing", JobRunProgressPlan.PreprocessRunning, null);
     }
 
     public void MarkPreprocessSucceeded(JobSummary job, string normalizedAudioPath)
     {
-        UpdatePreprocessResult(job, "音声変換完了", "preprocessed", 100, normalizedAudioPath);
+        UpdatePreprocessResult(job, "音声変換完了", "preprocessed", JobRunProgressPlan.PreprocessSucceeded, normalizedAudioPath);
     }
 
     public void MarkPreprocessFailed(JobSummary job, string errorCategory)
     {
-        UpdatePreprocessResult(job, "音声変換失敗", "preprocessing_failed", 100, null, errorCategory);
+        UpdatePreprocessResult(job, "音声変換失敗", "preprocessing_failed", JobRunProgressPlan.PreprocessSucceeded, null, errorCategory);
     }
 
     public void MarkAsrRunning(JobSummary job)
     {
-        UpdatePreprocessResult(job, "文字起こし中", "asr", 45, job.NormalizedAudioPath);
+        UpdatePreprocessResult(job, "文字起こし中", "asr", JobRunProgressPlan.AsrRunning, job.NormalizedAudioPath);
     }
 
     public void MarkAsrSucceeded(JobSummary job)
     {
-        UpdatePreprocessResult(job, "文字起こし完了", "asr_completed", 70, job.NormalizedAudioPath);
+        UpdatePreprocessResult(job, "文字起こし完了", "asr_completed", JobRunProgressPlan.AsrSucceeded, job.NormalizedAudioPath);
+    }
+
+    public void MarkDiarizationRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "話者識別中", "diarization", JobRunProgressPlan.DiarizationRunning, job.NormalizedAudioPath);
+    }
+
+    public void MarkDiarizationSucceeded(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "話者識別完了", "diarization_completed", JobRunProgressPlan.DiarizationSucceeded, job.NormalizedAudioPath);
+    }
+
+    public void MarkDiarizationFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, $"話者識別失敗: {errorCategory}", "diarization_failed", JobRunProgressPlan.DiarizationSucceeded, job.NormalizedAudioPath, errorCategory);
     }
 
     public void MarkAsrFailed(JobSummary job, string errorCategory)
     {
-        UpdatePreprocessResult(job, $"ASR失敗: {errorCategory}", "asr_failed", 70, job.NormalizedAudioPath, errorCategory);
+        UpdatePreprocessResult(job, $"ASR失敗: {errorCategory}", "asr_failed", JobRunProgressPlan.AsrSucceeded, job.NormalizedAudioPath, errorCategory);
     }
 
     public void MarkReviewRunning(JobSummary job)
     {
-        UpdatePreprocessResult(job, "整文中", "reviewing", 82, job.NormalizedAudioPath);
+        UpdatePreprocessResult(job, "整文候補生成中", "reviewing", JobRunProgressPlan.ReviewRunning, job.NormalizedAudioPath);
     }
 
     public void MarkReviewSucceeded(JobSummary job, int draftCount)
     {
         UpdatePreprocessResult(
             job,
-            draftCount > 0 ? "整文待ち" : "整文完了",
+            draftCount > 0 ? "整文待ち" : "完成文書作成待ち",
             draftCount > 0 ? "review_ready" : "review_completed",
-            draftCount > 0 ? 90 : 100,
+            JobRunProgressPlan.ReviewSucceeded,
             job.NormalizedAudioPath,
             unreviewedDraftCount: draftCount);
     }
 
     public void MarkReviewSkippedAndClearDrafts(JobSummary job)
     {
-        job.Status = "整文完了";
-        job.ProgressPercent = 100;
+        job.Status = "素起こし完了";
+        job.ProgressPercent = JobRunProgressPlan.Completed;
         job.UnreviewedDrafts = 0;
         job.UpdatedAt = DateTimeOffset.Now;
 
@@ -289,7 +305,7 @@ public sealed class JobRepository(AppPaths paths)
                 UPDATE jobs
                 SET status = $status,
                     current_stage = 'review_skipped',
-                    progress_percent = 100,
+                    progress_percent = $progress_percent,
                     normalized_audio_path = $normalized_audio_path,
                     unreviewed_draft_count = 0,
                     updated_at = $updated_at,
@@ -297,6 +313,7 @@ public sealed class JobRepository(AppPaths paths)
                 WHERE job_id = $job_id;
                 """;
             jobCommand.Parameters.AddWithValue("$status", job.Status);
+            jobCommand.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.Completed);
             jobCommand.Parameters.AddWithValue("$normalized_audio_path", (object?)job.NormalizedAudioPath ?? DBNull.Value);
             jobCommand.Parameters.AddWithValue("$updated_at", job.UpdatedAt.ToString("o"));
             jobCommand.Parameters.AddWithValue("$job_id", job.JobId);
@@ -332,12 +349,32 @@ public sealed class JobRepository(AppPaths paths)
 
     public void MarkReviewFailed(JobSummary job, string errorCategory)
     {
-        UpdatePreprocessResult(job, $"整文失敗: {errorCategory}", "review_failed", 90, job.NormalizedAudioPath, errorCategory);
+        UpdatePreprocessResult(job, $"整文失敗: {errorCategory}", "review_failed", JobRunProgressPlan.ReviewSucceeded, job.NormalizedAudioPath, errorCategory);
+    }
+
+    public void MarkReadablePolishingRunning(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "完成文書作成中", "readable_polishing", JobRunProgressPlan.ReadablePolishingRunning, job.NormalizedAudioPath);
+    }
+
+    public void MarkReadablePolishingSucceeded(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "整文完了", "readable_polishing_completed", JobRunProgressPlan.Completed, job.NormalizedAudioPath);
+    }
+
+    public void MarkReadablePolishingFailed(JobSummary job, string errorCategory)
+    {
+        UpdatePreprocessResult(job, $"整文失敗: {errorCategory}", "readable_polishing_failed", JobRunProgressPlan.ReadablePolishingFailed, job.NormalizedAudioPath, errorCategory);
+    }
+
+    public void MarkReadablePolishingCancelled(JobSummary job)
+    {
+        UpdatePreprocessResult(job, "キャンセル済み", "readable_polishing_cancelled", job.ProgressPercent, job.NormalizedAudioPath, "cancelled");
     }
 
     public void MarkSummaryRunning(JobSummary job)
     {
-        UpdatePreprocessResult(job, "要約中", "summarizing", 94, job.NormalizedAudioPath);
+        UpdatePreprocessResult(job, "要約中", "summarizing", JobRunProgressPlan.ReadablePolishingRunning, job.NormalizedAudioPath);
     }
 
     public void MarkSummarySucceeded(JobSummary job)

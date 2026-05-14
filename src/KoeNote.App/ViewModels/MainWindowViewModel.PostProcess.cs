@@ -164,6 +164,8 @@ public sealed partial class MainWindowViewModel
         ReadablePolishedStatus = "整文を生成中です。完了すると先頭の整文タブに表示されます。";
         var startedAt = DateTimeOffset.Now;
         MarkReadablePolishingStageRunning();
+        _jobRepository.MarkReadablePolishingRunning(job);
+        RefreshJobViews();
 
         try
         {
@@ -215,6 +217,7 @@ public sealed partial class MainWindowViewModel
                 LatestLog = "整文を作成できませんでした。素起こしを確認してから再生成してください。";
                 ReadablePolishedStatus = LatestLog;
                 MarkReadablePolishingStageFailed(startedAt);
+                _jobRepository.MarkReadablePolishingFailed(job, "empty_output");
                 RefreshJobViews();
                 RefreshLogs();
                 UpdateExportCommandStates();
@@ -224,6 +227,7 @@ public sealed partial class MainWindowViewModel
             _jobLogRepository.AddEvent(job.JobId, "polishing", "info", $"Generated readable polished derivative: {result.DerivativeId}");
             LatestLog = "整文が完了しました。";
             MarkReadablePolishingStageSucceeded(startedAt);
+            _jobRepository.MarkReadablePolishingSucceeded(job);
             LoadReadablePolishedForSelectedJob();
             SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
 
@@ -238,6 +242,8 @@ public sealed partial class MainWindowViewModel
             LatestLog = "整文を中止しました。";
             ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageCancelled(startedAt);
+            _jobRepository.MarkReadablePolishingCancelled(job);
+            RefreshJobViews();
             RefreshLogs();
             return false;
         }
@@ -252,6 +258,8 @@ public sealed partial class MainWindowViewModel
             LatestLog = $"整文を作成できませんでした ({exception.Category}): {exception.Message}";
             ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageFailed(startedAt);
+            _jobRepository.MarkReadablePolishingFailed(job, exception.Category.ToString());
+            RefreshJobViews();
             RefreshLogs();
             return false;
         }
@@ -266,6 +274,8 @@ public sealed partial class MainWindowViewModel
             LatestLog = $"整文を作成できませんでした: {exception.Message}";
             ReadablePolishedStatus = LatestLog;
             MarkReadablePolishingStageFailed(startedAt);
+            _jobRepository.MarkReadablePolishingFailed(job, ReviewFailureCategory.Unknown.ToString());
+            RefreshJobViews();
             RefreshLogs();
             return false;
         }
@@ -280,7 +290,7 @@ public sealed partial class MainWindowViewModel
         var stage = GetStageStatus(JobRunStage.Review);
         stage.IsRunning = true;
         stage.Status = "完成文書作成中";
-        stage.ProgressPercent = 92;
+        stage.ProgressPercent = JobRunProgressPlan.ReadablePolishingRunning;
         stage.DurationText = "00:00:00";
     }
 
@@ -316,7 +326,9 @@ public sealed partial class MainWindowViewModel
         var stage = GetStageStatus(JobRunStage.Review);
         stage.IsRunning = false;
         stage.Status = status;
-        stage.ProgressPercent = 100;
+        stage.ProgressPercent = string.Equals(status, "失敗", StringComparison.Ordinal)
+            ? JobRunProgressPlan.ReadablePolishingFailed
+            : JobRunProgressPlan.Completed;
         stage.DurationText = FormatStageDuration(DateTimeOffset.Now - startedAt);
     }
 

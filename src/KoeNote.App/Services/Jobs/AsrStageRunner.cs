@@ -26,10 +26,11 @@ public sealed class AsrStageRunner(
     {
         var startedAt = DateTimeOffset.Now;
         var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "asr");
-        report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Running, 10));
+        var activeStage = "asr";
+        report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Running, JobRunProgressPlan.AsrRunning));
         jobRepository.MarkAsrRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true));
-        stageProgressRepository.Upsert(job.JobId, "asr", "running", 10, startedAt: startedAt);
+        stageProgressRepository.Upsert(job.JobId, "asr", "running", JobRunProgressPlan.AsrRunning, startedAt: startedAt);
         report(new JobRunUpdate(LatestLog: $"Running ASR for {job.FileName}"));
 
         try
@@ -48,7 +49,12 @@ public sealed class AsrStageRunner(
                     TimeSpan.FromHours(2)),
                 cancellationToken);
 
+            jobRepository.MarkAsrSucceeded(job);
+            report(new JobRunUpdate(RefreshJobViews: true));
             report(new JobRunUpdate(LatestLog: "Running speaker diarization..."));
+            activeStage = "diarization";
+            jobRepository.MarkDiarizationRunning(job);
+            report(new JobRunUpdate(RefreshJobViews: true));
             var diarizationResult = await diarizationService.RunAsync(
                 job.JobId,
                 normalizedAudioPath,
@@ -57,25 +63,25 @@ public sealed class AsrStageRunner(
             var segments = diarizationResult.Segments;
 
             LogDiarizationResult(job, diarizationResult);
+            jobRepository.MarkDiarizationSucceeded(job);
+            report(new JobRunUpdate(RefreshJobViews: true));
 
             var finishedAt = DateTimeOffset.Now;
             report(new JobRunUpdate(
                 JobRunStage.Asr,
                 JobRunStageState.Succeeded,
-                100,
+                JobRunProgressPlan.Completed,
                 result.Duration,
                 Segments: segments));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
                 "succeeded",
-                100,
+                JobRunProgressPlan.Completed,
                 startedAt,
                 finishedAt,
                 result.Duration.TotalSeconds,
                 logPath: result.RawOutputPath);
-            jobRepository.MarkAsrSucceeded(job);
-            report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "asr", "info", $"Generated {segments.Count} ASR segments: {result.NormalizedSegmentsPath}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR completed: {segments.Count} segments"));
             return segments;
@@ -83,17 +89,17 @@ public sealed class AsrStageRunner(
         catch (OperationCanceledException)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Cancelled, 100, finishedAt - startedAt));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Cancelled, JobRunProgressPlan.Completed, finishedAt - startedAt));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
                 "cancelled",
-                100,
+                JobRunProgressPlan.Completed,
                 startedAt,
                 finishedAt,
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: "cancelled");
-            jobRepository.MarkCancelled(job, "asr");
+            jobRepository.MarkCancelled(job, activeStage);
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "asr", "info", "Run was cancelled.");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: "ASRをキャンセルしました。"));
@@ -102,12 +108,12 @@ public sealed class AsrStageRunner(
         catch (AsrWorkerException exception)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, finishedAt - startedAt, exception.Category.ToString()));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, JobRunProgressPlan.Completed, finishedAt - startedAt, exception.Category.ToString()));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
                 "failed",
-                100,
+                JobRunProgressPlan.Completed,
                 startedAt,
                 finishedAt,
                 (finishedAt - startedAt).TotalSeconds,
@@ -125,24 +131,35 @@ public sealed class AsrStageRunner(
         catch (Exception exception)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, 100, finishedAt - startedAt, AsrFailureCategory.Unknown.ToString()));
+            report(new JobRunUpdate(JobRunStage.Asr, JobRunStageState.Failed, JobRunProgressPlan.Completed, finishedAt - startedAt, AsrFailureCategory.Unknown.ToString()));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "asr",
                 "failed",
-                100,
+                JobRunProgressPlan.Completed,
                 startedAt,
                 finishedAt,
                 (finishedAt - startedAt).TotalSeconds,
                 errorCategory: AsrFailureCategory.Unknown.ToString());
-            jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
+            if (string.Equals(activeStage, "diarization", StringComparison.Ordinal))
+            {
+                jobRepository.MarkDiarizationFailed(job, AsrFailureCategory.Unknown.ToString());
+            }
+            else
+            {
+                jobRepository.MarkAsrFailed(job, AsrFailureCategory.Unknown.ToString());
+            }
+
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(
                 job.JobId,
                 "asr",
                 "error",
                 JobLogDiagnostics.FormatException(AsrFailureCategory.Unknown.ToString(), exception, outputDirectory));
-            report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}"));
+            var latestLog = string.Equals(activeStage, "diarization", StringComparison.Ordinal)
+                ? $"Speaker diarization failed ({AsrFailureCategory.Unknown}): {exception.Message}"
+                : $"ASR failed ({AsrFailureCategory.Unknown}): {exception.Message}";
+            report(new JobRunUpdate(RefreshLogs: true, LatestLog: latestLog));
             return null;
         }
     }

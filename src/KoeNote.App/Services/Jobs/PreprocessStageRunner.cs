@@ -15,21 +15,21 @@ public sealed class PreprocessStageRunner(
         Action<JobRunUpdate> report,
         CancellationToken cancellationToken)
     {
-        report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Running, 10));
+        report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Running, JobRunProgressPlan.PreprocessRunning));
         jobRepository.MarkPreprocessRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true, LatestLog: $"Running ffmpeg for {job.FileName}"));
 
         try
         {
             var result = await audioPreprocessWorker.NormalizeAsync(job, paths.FfmpegPath, paths, cancellationToken);
-            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Succeeded, 100, result.Duration));
+            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Succeeded, JobRunProgressPlan.Completed, result.Duration));
             jobRepository.MarkPreprocessSucceeded(job, result.NormalizedAudioPath);
             report(new JobRunUpdate(RefreshJobViews: true, LatestLog: $"Generated normalized WAV: {result.NormalizedAudioPath}"));
             return result.NormalizedAudioPath;
         }
         catch (OperationCanceledException)
         {
-            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Cancelled, 100));
+            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Cancelled, JobRunProgressPlan.Completed));
             jobRepository.MarkCancelled(job, "preprocess");
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "preprocess", "info", "Run was cancelled.");
@@ -38,7 +38,7 @@ public sealed class PreprocessStageRunner(
         }
         catch (Exception exception)
         {
-            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Failed, 100));
+            report(new JobRunUpdate(JobRunStage.Preprocess, JobRunStageState.Failed, JobRunProgressPlan.Completed));
             jobRepository.MarkPreprocessFailed(job, "ffmpeg_failed");
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(

@@ -1,3 +1,4 @@
+using KoeNote.App.Services.Jobs;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Services.Review;
@@ -6,12 +7,12 @@ public sealed class ReviewOperationService(AppPaths paths)
 {
     public ReviewOperationResult AcceptDraft(string draftId)
     {
-        return Decide(draftId, "accepted", "accepted", static draft => draft.SuggestedText, null);
+        return Decide(draftId, "accepted", "accepted", static draft => draft.SuggestedText, null, requiresReadableRefresh: true);
     }
 
     public ReviewOperationResult RejectDraft(string draftId)
     {
-        return Decide(draftId, "rejected", "rejected", static _ => null, null);
+        return Decide(draftId, "rejected", "rejected", static _ => null, null, requiresReadableRefresh: false);
     }
 
     public ReviewOperationResult ApplyManualEdit(string draftId, string finalText, string? manualNote = null)
@@ -21,7 +22,7 @@ public sealed class ReviewOperationService(AppPaths paths)
             throw new ArgumentException("Final text is required.", nameof(finalText));
         }
 
-        return Decide(draftId, "edited", "manual_edit", _ => finalText, manualNote);
+        return Decide(draftId, "edited", "manual_edit", _ => finalText, manualNote, requiresReadableRefresh: true);
     }
 
     private ReviewOperationResult Decide(
@@ -29,7 +30,8 @@ public sealed class ReviewOperationService(AppPaths paths)
         string draftStatus,
         string action,
         Func<DraftSnapshot, string?> finalTextSelector,
-        string? manualNote)
+        string? manualNote,
+        bool requiresReadableRefresh)
     {
         if (string.IsNullOrWhiteSpace(draftId))
         {
@@ -53,7 +55,7 @@ public sealed class ReviewOperationService(AppPaths paths)
         UpdateDraftStatus(connection, transaction, draftId, draftStatus);
         var decisionId = UpsertDecision(connection, transaction, draftId, action, finalText, manualNote);
         UpdateSegment(connection, transaction, draft.JobId, draft.SegmentId, finalText);
-        RefreshJobPendingCount(connection, transaction, draft.JobId);
+        RefreshJobPendingCount(connection, transaction, draft.JobId, requiresReadableRefresh);
         var afterSnapshot = LoadHistorySnapshot(connection, transaction, draft)
             ?? throw new InvalidOperationException($"Transcript segment was not found after review operation: {draft.JobId}/{draft.SegmentId}");
         var after = afterSnapshot with { DecisionId = decisionId };
@@ -246,7 +248,11 @@ public sealed class ReviewOperationService(AppPaths paths)
         }
     }
 
-    private static void RefreshJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId)
+    private static void RefreshJobPendingCount(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        bool requiresReadableRefresh)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -259,15 +265,21 @@ public sealed class ReviewOperationService(AppPaths paths)
             UPDATE jobs
             SET unreviewed_draft_count = (SELECT value FROM pending),
                 status = CASE
-                    WHEN (SELECT value FROM pending) = 0 THEN '整文完了'
+                    WHEN (SELECT value FROM pending) = 0
+                        AND ($requires_readable_refresh = 1 OR COALESCE(current_stage, '') <> 'readable_polishing_completed')
+                        THEN '完成文書作成待ち'
                     ELSE status
                 END,
                 current_stage = CASE
-                    WHEN (SELECT value FROM pending) = 0 THEN 'review_completed'
+                    WHEN (SELECT value FROM pending) = 0
+                        AND ($requires_readable_refresh = 1 OR COALESCE(current_stage, '') <> 'readable_polishing_completed')
+                        THEN 'review_completed'
                     ELSE current_stage
                 END,
                 progress_percent = CASE
-                    WHEN (SELECT value FROM pending) = 0 THEN 100
+                    WHEN (SELECT value FROM pending) = 0
+                        AND ($requires_readable_refresh = 1 OR COALESCE(current_stage, '') <> 'readable_polishing_completed')
+                        THEN $progress_percent
                     ELSE progress_percent
                 END,
                 updated_at = $updated_at
@@ -275,6 +287,8 @@ public sealed class ReviewOperationService(AppPaths paths)
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded);
+        command.Parameters.AddWithValue("$requires_readable_refresh", requiresReadableRefresh ? 1 : 0);
         var updated = command.ExecuteNonQuery();
         if (updated != 1)
         {

@@ -54,7 +54,7 @@ public sealed class JobRepositoryTests
         Assert.True(reader.Read());
         Assert.Equal("音声変換完了", reader.GetString(0));
         Assert.Equal("preprocessed", reader.GetString(1));
-        Assert.Equal(100, reader.GetInt32(2));
+        Assert.Equal(JobRunProgressPlan.PreprocessSucceeded, reader.GetInt32(2));
         Assert.Equal(@"C:\normalized\audio.wav", reader.GetString(3));
     }
 
@@ -96,6 +96,31 @@ public sealed class JobRepositoryTests
     }
 
     [Fact]
+    public void MarkDiarizationFailed_PersistsVisibleFailureCategory()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        var paths = fixture.Paths;
+
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        repository.MarkDiarizationFailed(job, "Unknown");
+
+        using var connection = fixture.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status, current_stage, progress_percent, last_error_category FROM jobs WHERE job_id = $job_id;";
+        command.Parameters.AddWithValue("$job_id", job.JobId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("話者識別失敗: Unknown", reader.GetString(0));
+        Assert.Equal("diarization_failed", reader.GetString(1));
+        Assert.Equal(JobRunProgressPlan.DiarizationSucceeded, reader.GetInt32(2));
+        Assert.Equal("Unknown", reader.GetString(3));
+        Assert.Equal("話者識別失敗: Unknown", job.Status);
+    }
+
+    [Fact]
     public void LoadRecent_RestoresPersistedJobs()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
@@ -109,12 +134,12 @@ public sealed class JobRepositoryTests
         Assert.Equal(created.JobId, restored.JobId);
         Assert.Equal("整文待ち", restored.Status);
         Assert.Equal(@"C:\audio\meeting.wav", restored.SourceAudioPath);
-        Assert.Equal(90, restored.ProgressPercent);
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, restored.ProgressPercent);
         Assert.Equal(2, restored.UnreviewedDrafts);
     }
 
     [Fact]
-    public void MarkReviewSucceeded_WithNoDrafts_CompletesJob()
+    public void MarkReviewSucceeded_WithNoDrafts_WaitsForReadablePolishing()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
@@ -124,9 +149,46 @@ public sealed class JobRepositoryTests
 
         var restored = Assert.Single(repository.LoadRecent());
 
-        Assert.Equal("整文完了", restored.Status);
-        Assert.Equal(100, restored.ProgressPercent);
+        Assert.Equal("完成文書作成待ち", restored.Status);
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, restored.ProgressPercent);
         Assert.Equal(0, restored.UnreviewedDrafts);
+    }
+
+    [Fact]
+    public void ReadablePolishingMarkers_PersistFinalJobProgress()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkReviewSucceeded(created, draftCount: 0);
+
+        repository.MarkReadablePolishingRunning(created);
+        var running = Assert.Single(repository.LoadRecent());
+        Assert.Equal("完成文書作成中", running.Status);
+        Assert.Equal(JobRunProgressPlan.ReadablePolishingRunning, running.ProgressPercent);
+
+        repository.MarkReadablePolishingSucceeded(created);
+        var restored = Assert.Single(repository.LoadRecent());
+        Assert.Equal("整文完了", restored.Status);
+        Assert.Equal(JobRunProgressPlan.Completed, restored.ProgressPercent);
+    }
+
+    [Fact]
+    public void MarkReadablePolishingSucceeded_PreservesPendingReviewDraftCount()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+        repository.MarkReviewSucceeded(created, draftCount: 2);
+
+        repository.MarkReadablePolishingSucceeded(created);
+
+        var restored = Assert.Single(repository.LoadRecent());
+        Assert.Equal("整文完了", restored.Status);
+        Assert.Equal(JobRunProgressPlan.Completed, restored.ProgressPercent);
+        Assert.Equal(2, restored.UnreviewedDrafts);
     }
 
     [Fact]
@@ -238,9 +300,9 @@ public sealed class JobRepositoryTests
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal("整文完了", reader.GetString(0));
+        Assert.Equal("素起こし完了", reader.GetString(0));
         Assert.Equal("review_skipped", reader.GetString(1));
-        Assert.Equal(100, reader.GetInt32(2));
+        Assert.Equal(JobRunProgressPlan.Completed, reader.GetInt32(2));
         Assert.Equal(0, reader.GetInt32(3));
         Assert.Equal("skipped", reader.GetString(4));
         Assert.Equal("none", reader.GetString(5));
