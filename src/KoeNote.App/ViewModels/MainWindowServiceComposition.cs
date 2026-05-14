@@ -335,3 +335,24 @@ internal static class MainWindowJobRunComposition
                 review.TranscriptSummaryService));
     }
 }
+
+internal static class MainWindowReadablePolishingComposition
+{
+    public static IReadablePolishingStageRunner Create(
+        AppPaths paths,
+        MainWindowRepositoryServices repositories,
+        MainWindowModelServices model,
+        MainWindowReviewServices review,
+        ReadablePolishingPromptSettingsRepository promptSettingsRepository)
+    {
+        return new ReadablePolishingStageRunner(
+            paths,
+            repositories.JobRepository,
+            repositories.StageProgressRepository,
+            repositories.JobLogRepository,
+            model.InstalledModelRepository,
+            new SetupStateService(paths),
+            review.TranscriptPolishingService,
+            promptSettingsRepository);
+    }
+}

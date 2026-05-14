@@ -2692,6 +2692,54 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void JobRunUpdate_SeparatesJobProgressFromStageProgress()
+    {
+        var viewModel = CreateViewModel();
+        var job = viewModel.RegisterAudioFile(@"C:\audio\meeting.wav");
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Asr,
+                JobRunStageState.Running,
+                StageProgressPercent: 35)
+        ]);
+
+        Assert.Equal(0, job.ProgressPercent);
+        Assert.Equal(35, viewModel.StageStatuses.Single(stage => stage.Name == "ASR").ProgressPercent);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(JobProgressPercent: 55)
+        ]);
+
+        Assert.Equal(55, job.ProgressPercent);
+        Assert.Equal(35, viewModel.StageStatuses.Single(stage => stage.Name == "ASR").ProgressPercent);
+    }
+
+    [Fact]
+    public void StageRunUpdate_UsesCustomStageStatusText()
+    {
+        var viewModel = CreateViewModel();
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Review,
+                JobRunStageState.Running,
+                45,
+                StageStatusText: "custom polishing status")
+        ]);
+
+        var reviewStage = viewModel.StageStatuses.Last();
+        Assert.Equal("custom polishing status", reviewStage.Status);
+        Assert.Equal(45, reviewStage.ProgressPercent);
+    }
+
+    [Fact]
     public void StageRunUpdate_DoesNotMarkSkippedReviewStageDone()
     {
         var viewModel = CreateViewModel();
@@ -3706,11 +3754,19 @@ public sealed class MainWindowViewModelTests
                 new SummaryStageRunnerStub()));
         SetPrivateField(
             viewModel,
-            "_transcriptPolishingService",
-            new TranscriptPolishingService(
-                new TranscriptReadRepository(paths),
-                new TranscriptDerivativeRepository(paths),
-                polishingRuntime));
+            "_readablePolishingStageRunner",
+            new ReadablePolishingStageRunner(
+                paths,
+                new JobRepository(paths),
+                new StageProgressRepository(paths),
+                new JobLogRepository(paths),
+                new InstalledModelRepository(paths),
+                new SetupStateService(paths),
+                new TranscriptPolishingService(
+                    new TranscriptReadRepository(paths),
+                    new TranscriptDerivativeRepository(paths),
+                    polishingRuntime),
+                new ReadablePolishingPromptSettingsRepository(paths)));
         viewModel.SelectedJob = viewModel.Jobs.Single(item => item.JobId == job.JobId);
         return new RunReadyViewModelFixture(viewModel, polishingRuntime, reviewStageRunner);
     }

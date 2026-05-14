@@ -30,7 +30,7 @@ public sealed record MainWindowServices(
     TranscriptExportService TranscriptExportService,
     JobLogExportService JobLogExportService,
     TranscriptSummaryService TranscriptSummaryService,
-    TranscriptPolishingService TranscriptPolishingService,
+    IReadablePolishingStageRunner ReadablePolishingStageRunner,
     ModelCatalogService ModelCatalogService,
     InstalledModelRepository InstalledModelRepository,
     ModelDownloadJobRepository ModelDownloadJobRepository,
@@ -71,6 +71,7 @@ public sealed record MainWindowServices(
         llmSettingsSeedService.EnsureActiveProfileFromSetup();
         var review = MainWindowReviewComposition.Create(paths);
         var setupWizardService = MainWindowSetupComposition.Create(paths, runtime, model);
+        var readablePolishingPromptSettingsRepository = new ReadablePolishingPromptSettingsRepository(paths);
         var workers = MainWindowWorkerComposition.Create(
             paths,
             runtime.ProcessRunner,
@@ -105,7 +106,12 @@ public sealed record MainWindowServices(
             review.TranscriptExportService,
             new JobLogExportService(paths, repositories.JobLogRepository),
             review.TranscriptSummaryService,
-            review.TranscriptPolishingService,
+            MainWindowReadablePolishingComposition.Create(
+                paths,
+                repositories,
+                model,
+                review,
+                readablePolishingPromptSettingsRepository),
             model.ModelCatalogService,
             model.InstalledModelRepository,
             model.ModelDownloadJobRepository,
@@ -126,6 +132,6 @@ public sealed record MainWindowServices(
             new DomainPresetImportService(paths, repositories.AsrSettingsRepository),
             llmSettingsSeedService,
             new LlmSettingsDisplayService(llmSettingsRepository),
-            new ReadablePolishingPromptSettingsRepository(paths));
+            readablePolishingPromptSettingsRepository);
     }
 }

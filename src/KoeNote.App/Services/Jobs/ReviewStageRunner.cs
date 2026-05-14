@@ -75,8 +75,7 @@ public sealed class ReviewStageRunner(
                 finishedAt,
                 result.Duration.TotalSeconds,
                 logPath: result.RawOutputPath);
-            jobRepository.MarkReviewSucceeded(job, result.Drafts.Count);
-            job.UnreviewedDrafts = result.Drafts.Count;
+            jobRepository.MarkReviewCandidatesProcessed(job, result.Drafts.Count);
             report(new JobRunUpdate(RefreshJobViews: true));
             jobLogRepository.AddEvent(job.JobId, "review", "info", $"Generated {result.Drafts.Count} correction drafts: {result.NormalizedDraftsPath}");
             report(new JobRunUpdate(RefreshLogs: true, LatestLog: $"Review completed: {result.Drafts.Count} drafts"));

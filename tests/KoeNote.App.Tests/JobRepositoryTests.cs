@@ -127,7 +127,7 @@ public sealed class JobRepositoryTests
 
         var repository = new JobRepository(paths);
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
-        repository.MarkReviewSucceeded(created, draftCount: 2);
+        repository.MarkReviewCandidatesProcessed(created, pendingDraftCount: 2);
 
         var restored = Assert.Single(repository.LoadRecent());
 
@@ -139,13 +139,13 @@ public sealed class JobRepositoryTests
     }
 
     [Fact]
-    public void MarkReviewSucceeded_WithNoDrafts_WaitsForReadablePolishing()
+    public void MarkReviewCandidatesProcessed_WithNoDrafts_WaitsForReadablePolishing()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
         var repository = new JobRepository(paths);
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
-        repository.MarkReviewSucceeded(created, draftCount: 0);
+        repository.MarkReviewCandidatesProcessed(created, pendingDraftCount: 0);
 
         var restored = Assert.Single(repository.LoadRecent());
 
@@ -155,13 +155,25 @@ public sealed class JobRepositoryTests
     }
 
     [Fact]
+    public void MarkReviewCandidatesProcessed_RejectsNegativeDraftCount()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            repository.MarkReviewCandidatesProcessed(created, pendingDraftCount: -1));
+    }
+
+    [Fact]
     public void ReadablePolishingMarkers_PersistFinalJobProgress()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
 
         var repository = new JobRepository(paths);
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
-        repository.MarkReviewSucceeded(created, draftCount: 0);
+        repository.MarkReviewCandidatesProcessed(created, pendingDraftCount: 0);
 
         repository.MarkReadablePolishingRunning(created);
         var running = Assert.Single(repository.LoadRecent());
@@ -181,7 +193,7 @@ public sealed class JobRepositoryTests
 
         var repository = new JobRepository(paths);
         var created = repository.CreateFromAudio(@"C:\audio\meeting.wav");
-        repository.MarkReviewSucceeded(created, draftCount: 2);
+        repository.MarkReviewCandidatesProcessed(created, pendingDraftCount: 2);
 
         repository.MarkReadablePolishingSucceeded(created);
 
@@ -263,6 +275,24 @@ public sealed class JobRepositoryTests
         Assert.Equal("キャンセル済み", reader.GetString(0));
         Assert.Equal("asr_cancelled", reader.GetString(1));
         Assert.Equal("cancelled", reader.GetString(2));
+    }
+
+    [Fact]
+    public void SummaryMarkers_UseSummaryProgressPlan()
+    {
+        var paths = TestDatabase.CreateRepositoryFixture().Paths;
+
+        var repository = new JobRepository(paths);
+        var job = repository.CreateFromAudio(@"C:\audio\meeting.wav");
+
+        repository.MarkSummaryRunning(job);
+        Assert.Equal(JobRunProgressPlan.SummaryRunning, job.ProgressPercent);
+
+        repository.MarkSummaryFailed(job, "summary_failed");
+        Assert.Equal(JobRunProgressPlan.SummaryFailed, job.ProgressPercent);
+
+        repository.MarkSummarySucceeded(job);
+        Assert.Equal(JobRunProgressPlan.Completed, job.ProgressPercent);
     }
 
     [Fact]

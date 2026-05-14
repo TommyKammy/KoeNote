@@ -12,5 +12,8 @@ public static class JobRunProgressPlan
     public const int ReviewSucceeded = 82;
     public const int ReadablePolishingRunning = 92;
     public const int ReadablePolishingFailed = 95;
+    // Summary is a separate post-process stage. Keep semantic names even when values match nearby stages.
+    public const int SummaryRunning = 92;
+    public const int SummaryFailed = 96;
     public const int Completed = 100;
 }

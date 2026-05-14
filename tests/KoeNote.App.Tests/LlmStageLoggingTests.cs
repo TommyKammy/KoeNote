@@ -65,7 +65,8 @@ public sealed class LlmStageLoggingTests
             new SetupStateService(paths),
             summaryService);
 
-        await runner.RunAsync(job, _ => { }, CancellationToken.None);
+        var updates = new List<JobRunUpdate>();
+        await runner.RunAsync(job, updates.Add, CancellationToken.None);
 
         var logs = new JobLogRepository(paths).ReadLatest(job.JobId);
         Assert.Contains(logs, entry =>
@@ -76,6 +77,20 @@ public sealed class LlmStageLoggingTests
             entry.Message.Contains("generation=gemma-summary-balanced", StringComparison.Ordinal) &&
             entry.Message.Contains("max_tokens=1024", StringComparison.Ordinal) &&
             entry.Message.Contains("validation=markdown_summary_sections", StringComparison.Ordinal));
+        Assert.Contains(updates, update =>
+            update.Stage == JobRunStage.Summary &&
+            update.StageState == JobRunStageState.Running &&
+            update.StageProgressPercent == JobRunProgressPlan.SummaryRunning);
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status, progress_percent FROM stage_progress WHERE stage_id = $stage_id;";
+        command.Parameters.AddWithValue("$stage_id", $"{job.JobId}-summary");
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("succeeded", reader.GetString(0));
+        Assert.Equal(JobRunProgressPlan.Completed, reader.GetInt32(1));
     }
 
     private static JobSummary CreateJob(AppPaths paths, string jobId)

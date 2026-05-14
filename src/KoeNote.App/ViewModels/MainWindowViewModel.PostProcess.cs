@@ -1,8 +1,6 @@
-using System.IO;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Llm;
-using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
@@ -162,122 +160,22 @@ public sealed partial class MainWindowViewModel
     {
         IsReadablePolishingInProgress = true;
         ReadablePolishedStatus = "整文を生成中です。完了すると先頭の整文タブに表示されます。";
-        var startedAt = DateTimeOffset.Now;
-        MarkReadablePolishingStageRunning();
-        _jobRepository.MarkReadablePolishingRunning(job);
-        RefreshJobViews();
 
         try
         {
-            var catalog = _modelCatalogService.LoadBuiltInCatalog();
-            var modelId = ResolveEffectiveReviewModelId(catalog);
-            var profile = new LlmProfileResolver(Paths, _installedModelRepository).Resolve(catalog, modelId);
-            var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Polishing);
-            var promptSettings = LoadReadablePolishingPromptSettings(profile);
-            var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "polishing");
-
-            _jobLogRepository.AddEvent(job.JobId, "polishing", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
-            _jobLogRepository.AddEvent(
-                job.JobId,
-                "polishing",
-                "info",
-                $"Readable polishing prompt settings: family={promptSettings.ModelFamily}, preset={promptSettings.PresetId}, custom={promptSettings.UseCustomPrompt}");
-            LatestLog = "整文を生成しています。";
-            RefreshLogs();
-
-            var result = await _transcriptPolishingService.PolishAsync(
-                new TranscriptPolishingOptions(
-                    job.JobId,
-                    profile.LlamaCompletionPath,
-                    profile.ModelPath,
-                    outputDirectory,
-                    profile.ModelId,
-                    taskSettings.PromptTemplateId,
-                    taskSettings.GenerationProfile,
-                    promptSettings.PromptVersion,
-                    ChunkSegmentCount: taskSettings.ChunkSegmentCount,
-                    Timeout: profile.Timeout,
-                    OutputSanitizerProfile: profile.OutputSanitizerProfile,
-                    ContextSize: profile.ContextSize,
-                    GpuLayers: profile.GpuLayers,
-                    MaxTokens: taskSettings.MaxTokens,
-                    Temperature: taskSettings.Temperature,
-                    TopP: taskSettings.TopP,
-                    TopK: taskSettings.TopK,
-                    RepeatPenalty: taskSettings.RepeatPenalty,
-                    NoConversation: profile.NoConversation,
-                    Threads: profile.Threads,
-                    ThreadsBatch: profile.ThreadsBatch,
-                    PromptSettings: promptSettings),
-                cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(result.Content))
+            var result = await _readablePolishingStageRunner.RunAsync(job, ApplyRunUpdate, cancellationToken);
+            if (result.Succeeded)
             {
-                _jobLogRepository.AddEvent(job.JobId, "polishing", "error", $"Readable polishing failed derivative: {result.DerivativeId}");
-                LatestLog = "整文を作成できませんでした。素起こしを確認してから再生成してください。";
-                ReadablePolishedStatus = LatestLog;
-                MarkReadablePolishingStageFailed(startedAt);
-                _jobRepository.MarkReadablePolishingFailed(job, "empty_output");
-                RefreshJobViews();
-                RefreshLogs();
-                UpdateExportCommandStates();
-                return false;
+                LoadReadablePolishedForSelectedJob();
+                SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
+            }
+            else
+            {
+                ReadablePolishedStatus = result.Message;
             }
 
-            _jobLogRepository.AddEvent(job.JobId, "polishing", "info", $"Generated readable polished derivative: {result.DerivativeId}");
-            LatestLog = "整文が完了しました。";
-            MarkReadablePolishingStageSucceeded(startedAt);
-            _jobRepository.MarkReadablePolishingSucceeded(job);
-            LoadReadablePolishedForSelectedJob();
-            SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
-
-            RefreshJobViews();
-            RefreshLogs();
             UpdateExportCommandStates();
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            _jobLogRepository.AddEvent(job.JobId, "polishing", "info", "Readable polishing was cancelled.");
-            LatestLog = "整文を中止しました。";
-            ReadablePolishedStatus = LatestLog;
-            MarkReadablePolishingStageCancelled(startedAt);
-            _jobRepository.MarkReadablePolishingCancelled(job);
-            RefreshJobViews();
-            RefreshLogs();
-            return false;
-        }
-        catch (ReviewWorkerException exception)
-        {
-            var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "polishing");
-            _jobLogRepository.AddEvent(
-                job.JobId,
-                "polishing",
-                "error",
-                JobLogDiagnostics.FormatException(exception.Category.ToString(), exception, outputDirectory));
-            LatestLog = $"整文を作成できませんでした ({exception.Category}): {exception.Message}";
-            ReadablePolishedStatus = LatestLog;
-            MarkReadablePolishingStageFailed(startedAt);
-            _jobRepository.MarkReadablePolishingFailed(job, exception.Category.ToString());
-            RefreshJobViews();
-            RefreshLogs();
-            return false;
-        }
-        catch (Exception exception)
-        {
-            var outputDirectory = Path.Combine(Paths.Jobs, job.JobId, "polishing");
-            _jobLogRepository.AddEvent(
-                job.JobId,
-                "polishing",
-                "error",
-                JobLogDiagnostics.FormatException(ReviewFailureCategory.Unknown.ToString(), exception, outputDirectory));
-            LatestLog = $"整文を作成できませんでした: {exception.Message}";
-            ReadablePolishedStatus = LatestLog;
-            MarkReadablePolishingStageFailed(startedAt);
-            _jobRepository.MarkReadablePolishingFailed(job, ReviewFailureCategory.Unknown.ToString());
-            RefreshJobViews();
-            RefreshLogs();
-            return false;
+            return result.Succeeded;
         }
         finally
         {
@@ -285,51 +183,9 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private void MarkReadablePolishingStageRunning()
-    {
-        var stage = GetStageStatus(JobRunStage.Review);
-        stage.IsRunning = true;
-        stage.Status = "完成文書作成中";
-        stage.ProgressPercent = JobRunProgressPlan.ReadablePolishingRunning;
-        stage.DurationText = "00:00:00";
-    }
-
     private ReadablePolishingPromptSettings LoadReadablePolishingPromptSettings(LlmRuntimeProfile profile)
     {
-        var modelFamily = ReadablePolishingPromptModelFamilies.ResolveForModel(profile.ModelId, profile.ModelFamily);
-        var settings = _readablePolishingPromptSettingsRepository.Load(modelFamily).Settings.Normalize();
-        return settings with
-        {
-            PromptTemplateId = string.IsNullOrWhiteSpace(settings.PromptTemplateId)
-                ? ReadablePolishingPromptSettings.ResolveDefaultPromptTemplateId(modelFamily)
-                : settings.PromptTemplateId
-        };
-    }
-
-    private void MarkReadablePolishingStageSucceeded(DateTimeOffset startedAt)
-    {
-        MarkReadablePolishingStageFinished(startedAt, "完了");
-    }
-
-    private void MarkReadablePolishingStageFailed(DateTimeOffset startedAt)
-    {
-        MarkReadablePolishingStageFinished(startedAt, "失敗");
-    }
-
-    private void MarkReadablePolishingStageCancelled(DateTimeOffset startedAt)
-    {
-        MarkReadablePolishingStageFinished(startedAt, "中止");
-    }
-
-    private void MarkReadablePolishingStageFinished(DateTimeOffset startedAt, string status)
-    {
-        var stage = GetStageStatus(JobRunStage.Review);
-        stage.IsRunning = false;
-        stage.Status = status;
-        stage.ProgressPercent = string.Equals(status, "失敗", StringComparison.Ordinal)
-            ? JobRunProgressPlan.ReadablePolishingFailed
-            : JobRunProgressPlan.Completed;
-        stage.DurationText = FormatStageDuration(DateTimeOffset.Now - startedAt);
+        return ReadablePolishingPromptSettingsResolver.Resolve(profile, _readablePolishingPromptSettingsRepository);
     }
 
     private bool ConfirmOverwriteExistingPostProcessOutputs(PostProcessMode mode, string jobId)

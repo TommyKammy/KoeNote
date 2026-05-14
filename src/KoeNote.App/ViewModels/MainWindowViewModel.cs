@@ -64,7 +64,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly TranscriptExportService _transcriptExportService;
     private readonly JobLogExportService _jobLogExportService;
     private readonly TranscriptExportDialogService _transcriptExportDialogService;
-    private readonly TranscriptPolishingService _transcriptPolishingService;
+    private readonly IReadablePolishingStageRunner _readablePolishingStageRunner;
     private readonly ModelCatalogService _modelCatalogService;
     private readonly InstalledModelRepository _installedModelRepository;
     private readonly ModelDownloadJobRepository _modelDownloadJobRepository;
@@ -215,7 +215,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _transcriptExportService = services.TranscriptExportService;
         _jobLogExportService = services.JobLogExportService;
         _transcriptExportDialogService = new TranscriptExportDialogService();
-        _transcriptPolishingService = services.TranscriptPolishingService;
+        _readablePolishingStageRunner = services.ReadablePolishingStageRunner;
         _modelCatalogService = services.ModelCatalogService;
         _installedModelRepository = services.InstalledModelRepository;
         _modelDownloadJobRepository = services.ModelDownloadJobRepository;
@@ -303,118 +303,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         DiagnosticLogScopes.Add(new DiagnosticLogScopeOption(DiagnosticLogScope.RecentAllJobs, "全体ログ"));
         SelectedDiagnosticLogScope = DiagnosticLogScopes[0];
 
-        AddAudioCommand = new RelayCommand(AddAudioAsync);
-        DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
-        ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
-        ClearJobSearchCommand = new RelayCommand(ClearJobSearchAsync, () => !string.IsNullOrEmpty(JobSearchText));
-        ClearSegmentSearchCommand = new RelayCommand(ClearSegmentSearchAsync, () => !string.IsNullOrEmpty(SegmentSearchText));
-        RestoreJobCommand = new RelayCommand<JobSummary>(RestoreJobAsync, job => job is not null && !IsRunInProgress);
-        PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);
-        PermanentlyDeleteAllDeletedJobsCommand = new RelayCommand(PermanentlyDeleteAllDeletedJobsAsync, () => DeletedJobs.Count > 0 && !IsRunInProgress);
-        RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
-        RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
-        RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
-        RunReadablePolishingCommand = new RelayCommand(RunReadablePolishingAsync, () => CanRunReadablePolishing);
-        CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
-        ShowReadableTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReadableTranscriptTabIndex));
-        ShowRawTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(RawTranscriptTabIndex));
-        ShowDiffTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(DiffTranscriptTabIndex));
-        ShowReviewCandidateTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReviewCandidateTranscriptTabIndex));
-        // Compatibility command for non-header callers; the normal UX separates review and summary.
-        RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
-        CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
-        PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
-        SkipToPreviousSegmentCommand = new RelayCommand(SkipToPreviousSegmentAsync, CanSkipPlaybackSegment);
-        SkipToNextSegmentCommand = new RelayCommand(SkipToNextSegmentAsync, CanSkipPlaybackSegment);
-        OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
-        OpenLogsCommand = new RelayCommand(OpenLogsAsync);
-        ExportLogsCommand = new RelayCommand(ExportLogsAsync, CanExportLogs);
-        OpenLogFolderCommand = new RelayCommand(OpenLogFolderAsync);
-        OpenCleanupToolCommand = new RelayCommand(OpenCleanupToolAsync, CanOpenCleanupTool);
-        ImportDomainPresetCommand = new RelayCommand(ImportDomainPresetAsync, () => !IsRunInProgress);
-        ApplyLoadedDomainPresetCommand = new RelayCommand(ApplyLoadedDomainPresetAsync, () => !IsRunInProgress && HasLoadedDomainPreset);
-        ClearDomainPresetCommand = new RelayCommand(ClearSelectedDomainPresetAsync, () => SelectedDomainPresetImport?.DeactivatedAt is null && !IsRunInProgress);
-        OpenSetupCommand = new RelayCommand(OpenSetupAsync);
-        CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync, CanCloseSetupWizardModal);
-        OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
-        CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
-        SetupBackCommand = new RelayCommand(SetupBackAsync, CanUseSetupBackAction);
-        SetupNextCommand = new RelayCommand(SetupNextAsync, CanUseSetupNextAction);
-        SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
-        SetupAcceptLicensesCommand = new RelayCommand(SetupAcceptLicensesAsync);
-        SetupInstallSelectedPresetCommand = new RelayCommand(SetupInstallSelectedPresetAsync, CanInstallSelectedPreset);
-        SetupCancelInstallCommand = new RelayCommand(SetupCancelInstallAsync, CanCancelSetupInstall);
-        SetupDownloadAsrCommand = new RelayCommand(SetupDownloadAsrAsync, CanDownloadSetupAsr);
-        SetupDownloadReviewCommand = new RelayCommand(SetupDownloadReviewAsync, CanDownloadSetupReview);
-        SetupInstallDiarizationRuntimeCommand = new RelayCommand(SetupInstallDiarizationRuntimeAsync, CanInstallDiarizationRuntime);
-        SetupInstallAsrCudaRuntimeCommand = new RelayCommand(SetupInstallAsrCudaRuntimeAsync, CanInstallAsrCudaRuntime);
-        SetupInstallCudaReviewRuntimeCommand = new RelayCommand(SetupInstallCudaReviewRuntimeAsync, CanInstallCudaReviewRuntime);
-        SetupRegisterLocalAsrCommand = new RelayCommand(SetupRegisterLocalAsrAsync, CanUseSetupInstallActions);
-        SetupRegisterLocalReviewCommand = new RelayCommand(SetupRegisterLocalReviewAsync, CanUseSetupInstallActions);
-        SetupImportOfflinePackCommand = new RelayCommand(SetupImportOfflinePackAsync, CanUseSetupInstallActions);
-        SetupChooseStorageRootCommand = new RelayCommand(SetupChooseStorageRootAsync);
-        SetupRunSmokeCommand = new RelayCommand(SetupRunSmokeAsync);
-        SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
-        ShowModelCatalogCommand = new RelayCommand(ShowModelCatalogAsync);
-        RegisterPreinstalledModelsCommand = new RelayCommand(RegisterPreinstalledModelsAsync);
-        DownloadSelectedModelCommand = new RelayCommand(DownloadSelectedModelAsync, CanDownloadSelectedModel);
-        PauseSelectedModelDownloadCommand = new RelayCommand(PauseSelectedModelDownloadAsync, CanPauseSelectedModelDownload);
-        ResumeSelectedModelDownloadCommand = new RelayCommand(ResumeSelectedModelDownloadAsync, CanResumeSelectedModelDownload);
-        CancelSelectedModelDownloadCommand = new RelayCommand(CancelSelectedModelDownloadAsync, CanCancelSelectedModelDownload);
-        RetrySelectedModelDownloadCommand = new RelayCommand(RetrySelectedModelDownloadAsync, CanRetrySelectedModelDownload);
-        UseSelectedModelCommand = new RelayCommand(UseSelectedModelAsync, () => SelectedModelCatalogEntry is not null);
-        ShowSelectedModelLicenseCommand = new RelayCommand(ShowSelectedModelLicenseAsync, () => SelectedModelCatalogEntry is not null);
-        DeleteSelectedModelFilesCommand = new RelayCommand(DeleteSelectedModelFilesAsync, CanDeleteSelectedModelFiles);
-        AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
-        RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
-        ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
-        SelectPreviousDraftCommand = new RelayCommand(SelectPreviousDraftAsync, CanSelectPreviousDraft);
-        SelectNextDraftCommand = new RelayCommand(SelectNextDraftAsync, CanSelectNextDraft);
-        FocusSelectedDraftSegmentCommand = new RelayCommand(FocusSelectedDraftSegmentAsync, () => SelectedCorrectionDraft is not null);
-        SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
-        BeginSegmentInlineEditCommand = new RelayCommand<TranscriptSegmentPreview>(BeginSegmentInlineEditAsync, CanBeginSegmentInlineEdit);
-        SaveSegmentInlineEditCommand = new RelayCommand(SaveSegmentInlineEditAsync, CanEditSelectedSegment);
-        CancelSegmentInlineEditCommand = new RelayCommand(CancelSegmentInlineEditAsync, () => IsSegmentInlineEditActive);
-        RevertSegmentEditCommand = new RelayCommand<TranscriptSegmentPreview>(RevertSegmentEditAsync, CanRevertSegmentEdit);
-        BeginSpeakerInlineEditCommand = new RelayCommand<TranscriptSegmentPreview>(BeginSpeakerInlineEditAsync, CanBeginSpeakerInlineEdit);
-        SaveSpeakerInlineEditCommand = new RelayCommand(SaveSpeakerInlineEditAsync, CanEditSelectedSpeaker);
-        SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
-        UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
-        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportReadablePolishing);
-        ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportReadablePolishing);
-        ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportReadablePolishing);
-        ExportRawTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawVttCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Vtt, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportRawDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Raw), CanExportSelectedJob);
-        ExportPolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportPolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportPolishedXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportPolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.Polished), CanExportSelectedJob);
-        ExportReadablePolishedTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
-        ExportReadablePolishedMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
-        ExportReadablePolishedXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
-        ExportReadablePolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
-        ExportSummaryMarkdownCommand = new RelayCommand(ExportSummaryMarkdownAsync, CanExportSummaryMarkdown);
-        ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
-        OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
-        ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
-        ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);
-        ResetZoomCommand = new RelayCommand(ResetZoomAsync, () => _mainContentZoomState.CanReset);
-        RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
-        CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
-        DownloadUpdateCommand = new RelayCommand(DownloadUpdateAsync, CanDownloadUpdate);
-        InstallVerifiedUpdateCommand = new RelayCommand(InstallVerifiedUpdateAsync, CanInstallVerifiedUpdate);
-        DismissUpdateNotificationCommand = new RelayCommand(DismissUpdateNotificationAsync);
-        OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
-        SaveReadablePolishingPromptSettingsCommand = new RelayCommand(SaveReadablePolishingPromptSettings);
-        ResetReadablePolishingPromptSettingsCommand = new RelayCommand(ResetReadablePolishingPromptSettings);
-        SelectActiveReadablePolishingPromptModelFamilyCommand = new RelayCommand(SelectActiveReadablePolishingPromptModelFamily);
+        InitializeCommands();
 
         InitializeReadablePolishingPromptSettings();
         MarkInterruptedModelDownloads();
@@ -741,227 +630,227 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICollectionView FilteredSegments { get; }
 
-    public ICommand AddAudioCommand { get; }
+    public ICommand AddAudioCommand { get; private set; } = null!;
 
-    public ICommand DeleteJobCommand { get; }
+    public ICommand DeleteJobCommand { get; private set; } = null!;
 
-    public ICommand ClearAllJobsCommand { get; }
+    public ICommand ClearAllJobsCommand { get; private set; } = null!;
 
-    public ICommand ClearJobSearchCommand { get; }
+    public ICommand ClearJobSearchCommand { get; private set; } = null!;
 
-    public ICommand ClearSegmentSearchCommand { get; }
+    public ICommand ClearSegmentSearchCommand { get; private set; } = null!;
 
-    public ICommand RestoreJobCommand { get; }
+    public ICommand RestoreJobCommand { get; private set; } = null!;
 
-    public ICommand PermanentlyDeleteJobCommand { get; }
+    public ICommand PermanentlyDeleteJobCommand { get; private set; } = null!;
 
-    public ICommand PermanentlyDeleteAllDeletedJobsCommand { get; }
+    public ICommand PermanentlyDeleteAllDeletedJobsCommand { get; private set; } = null!;
 
-    public ICommand RunSelectedJobCommand { get; }
+    public ICommand RunSelectedJobCommand { get; private set; } = null!;
 
-    public ICommand RunPostReviewCommand { get; }
+    public ICommand RunPostReviewCommand { get; private set; } = null!;
 
-    public ICommand RunPostSummaryCommand { get; }
+    public ICommand RunPostSummaryCommand { get; private set; } = null!;
 
-    public ICommand RunReadablePolishingCommand { get; }
+    public ICommand RunReadablePolishingCommand { get; private set; } = null!;
 
-    public ICommand CopyReadablePolishedContentCommand { get; }
+    public ICommand CopyReadablePolishedContentCommand { get; private set; } = null!;
 
-    public ICommand ShowReadableTranscriptTabCommand { get; }
+    public ICommand ShowReadableTranscriptTabCommand { get; private set; } = null!;
 
-    public ICommand ShowRawTranscriptTabCommand { get; }
+    public ICommand ShowRawTranscriptTabCommand { get; private set; } = null!;
 
-    public ICommand ShowDiffTranscriptTabCommand { get; }
+    public ICommand ShowDiffTranscriptTabCommand { get; private set; } = null!;
 
-    public ICommand ShowReviewCandidateTranscriptTabCommand { get; }
+    public ICommand ShowReviewCandidateTranscriptTabCommand { get; private set; } = null!;
 
-    public ICommand RunPostReviewAndSummaryCommand { get; }
+    public ICommand RunPostReviewAndSummaryCommand { get; private set; } = null!;
 
-    public ICommand CancelCommand { get; }
+    public ICommand CancelCommand { get; private set; } = null!;
 
-    public ICommand PlayPauseAudioCommand { get; }
+    public ICommand PlayPauseAudioCommand { get; private set; } = null!;
 
-    public ICommand SkipToPreviousSegmentCommand { get; }
+    public ICommand SkipToPreviousSegmentCommand { get; private set; } = null!;
 
-    public ICommand SkipToNextSegmentCommand { get; }
+    public ICommand SkipToNextSegmentCommand { get; private set; } = null!;
 
-    public ICommand OpenSettingsCommand { get; }
+    public ICommand OpenSettingsCommand { get; private set; } = null!;
 
-    public ICommand OpenLogsCommand { get; }
+    public ICommand OpenLogsCommand { get; private set; } = null!;
 
-    public ICommand ExportLogsCommand { get; }
+    public ICommand ExportLogsCommand { get; private set; } = null!;
 
-    public ICommand OpenLogFolderCommand { get; }
+    public ICommand OpenLogFolderCommand { get; private set; } = null!;
 
-    public ICommand OpenCleanupToolCommand { get; }
+    public ICommand OpenCleanupToolCommand { get; private set; } = null!;
 
-    public ICommand ImportDomainPresetCommand { get; }
+    public ICommand ImportDomainPresetCommand { get; private set; } = null!;
 
-    public ICommand ApplyLoadedDomainPresetCommand { get; }
+    public ICommand ApplyLoadedDomainPresetCommand { get; private set; } = null!;
 
-    public ICommand ClearDomainPresetCommand { get; }
+    public ICommand ClearDomainPresetCommand { get; private set; } = null!;
 
-    public ICommand OpenSetupCommand { get; }
+    public ICommand OpenSetupCommand { get; private set; } = null!;
 
-    public ICommand CloseSetupWizardModalCommand { get; }
+    public ICommand CloseSetupWizardModalCommand { get; private set; } = null!;
 
-    public ICommand OpenSelectedDetailPanelCommand { get; }
+    public ICommand OpenSelectedDetailPanelCommand { get; private set; } = null!;
 
-    public ICommand CloseDetailPanelCommand { get; }
+    public ICommand CloseDetailPanelCommand { get; private set; } = null!;
 
-    public ICommand SetupBackCommand { get; }
+    public ICommand SetupBackCommand { get; private set; } = null!;
 
-    public ICommand SetupNextCommand { get; }
+    public ICommand SetupNextCommand { get; private set; } = null!;
 
-    public ICommand SetupUseRecommendedCommand { get; }
+    public ICommand SetupUseRecommendedCommand { get; private set; } = null!;
 
-    public ICommand SetupAcceptLicensesCommand { get; }
+    public ICommand SetupAcceptLicensesCommand { get; private set; } = null!;
 
-    public ICommand SetupInstallSelectedPresetCommand { get; }
+    public ICommand SetupInstallSelectedPresetCommand { get; private set; } = null!;
 
-    public ICommand SetupCancelInstallCommand { get; }
+    public ICommand SetupCancelInstallCommand { get; private set; } = null!;
 
-    public ICommand SetupDownloadAsrCommand { get; }
+    public ICommand SetupDownloadAsrCommand { get; private set; } = null!;
 
-    public ICommand SetupDownloadReviewCommand { get; }
+    public ICommand SetupDownloadReviewCommand { get; private set; } = null!;
 
-    public ICommand SetupInstallDiarizationRuntimeCommand { get; }
+    public ICommand SetupInstallDiarizationRuntimeCommand { get; private set; } = null!;
 
-    public ICommand SetupInstallAsrCudaRuntimeCommand { get; }
+    public ICommand SetupInstallAsrCudaRuntimeCommand { get; private set; } = null!;
 
-    public ICommand SetupInstallCudaReviewRuntimeCommand { get; }
+    public ICommand SetupInstallCudaReviewRuntimeCommand { get; private set; } = null!;
 
-    public ICommand SetupRegisterLocalAsrCommand { get; }
+    public ICommand SetupRegisterLocalAsrCommand { get; private set; } = null!;
 
-    public ICommand SetupRegisterLocalReviewCommand { get; }
+    public ICommand SetupRegisterLocalReviewCommand { get; private set; } = null!;
 
-    public ICommand SetupImportOfflinePackCommand { get; }
+    public ICommand SetupImportOfflinePackCommand { get; private set; } = null!;
 
-    public ICommand SetupChooseStorageRootCommand { get; }
+    public ICommand SetupChooseStorageRootCommand { get; private set; } = null!;
 
-    public ICommand SetupRunSmokeCommand { get; }
+    public ICommand SetupRunSmokeCommand { get; private set; } = null!;
 
-    public ICommand SetupCompleteCommand { get; }
+    public ICommand SetupCompleteCommand { get; private set; } = null!;
 
-    public ICommand ShowModelCatalogCommand { get; }
+    public ICommand ShowModelCatalogCommand { get; private set; } = null!;
 
-    public ICommand RegisterPreinstalledModelsCommand { get; }
+    public ICommand RegisterPreinstalledModelsCommand { get; private set; } = null!;
 
-    public ICommand DownloadSelectedModelCommand { get; }
+    public ICommand DownloadSelectedModelCommand { get; private set; } = null!;
 
-    public ICommand PauseSelectedModelDownloadCommand { get; }
+    public ICommand PauseSelectedModelDownloadCommand { get; private set; } = null!;
 
-    public ICommand ResumeSelectedModelDownloadCommand { get; }
+    public ICommand ResumeSelectedModelDownloadCommand { get; private set; } = null!;
 
-    public ICommand CancelSelectedModelDownloadCommand { get; }
+    public ICommand CancelSelectedModelDownloadCommand { get; private set; } = null!;
 
-    public ICommand RetrySelectedModelDownloadCommand { get; }
+    public ICommand RetrySelectedModelDownloadCommand { get; private set; } = null!;
 
-    public ICommand UseSelectedModelCommand { get; }
+    public ICommand UseSelectedModelCommand { get; private set; } = null!;
 
-    public ICommand ShowSelectedModelLicenseCommand { get; }
+    public ICommand ShowSelectedModelLicenseCommand { get; private set; } = null!;
 
-    public ICommand DeleteSelectedModelFilesCommand { get; }
+    public ICommand DeleteSelectedModelFilesCommand { get; private set; } = null!;
 
-    public ICommand AcceptDraftCommand { get; }
+    public ICommand AcceptDraftCommand { get; private set; } = null!;
 
-    public ICommand RejectDraftCommand { get; }
+    public ICommand RejectDraftCommand { get; private set; } = null!;
 
-    public ICommand ApplyManualEditCommand { get; }
+    public ICommand ApplyManualEditCommand { get; private set; } = null!;
 
-    public ICommand SelectPreviousDraftCommand { get; }
+    public ICommand SelectPreviousDraftCommand { get; private set; } = null!;
 
-    public ICommand SelectNextDraftCommand { get; }
+    public ICommand SelectNextDraftCommand { get; private set; } = null!;
 
-    public ICommand FocusSelectedDraftSegmentCommand { get; }
+    public ICommand FocusSelectedDraftSegmentCommand { get; private set; } = null!;
 
-    public ICommand SaveSegmentEditCommand { get; }
+    public ICommand SaveSegmentEditCommand { get; private set; } = null!;
 
-    public ICommand BeginSegmentInlineEditCommand { get; }
+    public ICommand BeginSegmentInlineEditCommand { get; private set; } = null!;
 
-    public ICommand SaveSegmentInlineEditCommand { get; }
+    public ICommand SaveSegmentInlineEditCommand { get; private set; } = null!;
 
-    public ICommand CancelSegmentInlineEditCommand { get; }
+    public ICommand CancelSegmentInlineEditCommand { get; private set; } = null!;
 
-    public ICommand RevertSegmentEditCommand { get; }
+    public ICommand RevertSegmentEditCommand { get; private set; } = null!;
 
-    public ICommand BeginSpeakerInlineEditCommand { get; }
+    public ICommand BeginSpeakerInlineEditCommand { get; private set; } = null!;
 
-    public ICommand SaveSpeakerInlineEditCommand { get; }
+    public ICommand SaveSpeakerInlineEditCommand { get; private set; } = null!;
 
-    public ICommand SaveSpeakerAliasCommand { get; }
+    public ICommand SaveSpeakerAliasCommand { get; private set; } = null!;
 
-    public ICommand UndoLastOperationCommand { get; }
+    public ICommand UndoLastOperationCommand { get; private set; } = null!;
 
-    public ICommand ExportSelectedJobCommand { get; }
+    public ICommand ExportSelectedJobCommand { get; private set; } = null!;
 
-    public ICommand ExportTxtCommand { get; }
+    public ICommand ExportTxtCommand { get; private set; } = null!;
 
-    public ICommand ExportJsonCommand { get; }
+    public ICommand ExportJsonCommand { get; private set; } = null!;
 
-    public ICommand ExportSrtCommand { get; }
+    public ICommand ExportSrtCommand { get; private set; } = null!;
 
-    public ICommand ExportDocxCommand { get; }
+    public ICommand ExportDocxCommand { get; private set; } = null!;
 
-    public ICommand ExportRawTxtCommand { get; }
+    public ICommand ExportRawTxtCommand { get; private set; } = null!;
 
-    public ICommand ExportRawMarkdownCommand { get; }
+    public ICommand ExportRawMarkdownCommand { get; private set; } = null!;
 
-    public ICommand ExportRawXlsxCommand { get; }
+    public ICommand ExportRawXlsxCommand { get; private set; } = null!;
 
-    public ICommand ExportRawJsonCommand { get; }
+    public ICommand ExportRawJsonCommand { get; private set; } = null!;
 
-    public ICommand ExportRawSrtCommand { get; }
+    public ICommand ExportRawSrtCommand { get; private set; } = null!;
 
-    public ICommand ExportRawVttCommand { get; }
+    public ICommand ExportRawVttCommand { get; private set; } = null!;
 
-    public ICommand ExportRawDocxCommand { get; }
+    public ICommand ExportRawDocxCommand { get; private set; } = null!;
 
-    public ICommand ExportPolishedTxtCommand { get; }
+    public ICommand ExportPolishedTxtCommand { get; private set; } = null!;
 
-    public ICommand ExportPolishedMarkdownCommand { get; }
+    public ICommand ExportPolishedMarkdownCommand { get; private set; } = null!;
 
-    public ICommand ExportPolishedXlsxCommand { get; }
+    public ICommand ExportPolishedXlsxCommand { get; private set; } = null!;
 
-    public ICommand ExportPolishedDocxCommand { get; }
+    public ICommand ExportPolishedDocxCommand { get; private set; } = null!;
 
-    public ICommand ExportReadablePolishedTxtCommand { get; }
+    public ICommand ExportReadablePolishedTxtCommand { get; private set; } = null!;
 
-    public ICommand ExportReadablePolishedMarkdownCommand { get; }
+    public ICommand ExportReadablePolishedMarkdownCommand { get; private set; } = null!;
 
-    public ICommand ExportReadablePolishedXlsxCommand { get; }
+    public ICommand ExportReadablePolishedXlsxCommand { get; private set; } = null!;
 
-    public ICommand ExportReadablePolishedDocxCommand { get; }
+    public ICommand ExportReadablePolishedDocxCommand { get; private set; } = null!;
 
-    public ICommand ExportSummaryMarkdownCommand { get; }
+    public ICommand ExportSummaryMarkdownCommand { get; private set; } = null!;
 
-    public ICommand ExportSummaryTextCommand { get; }
+    public ICommand ExportSummaryTextCommand { get; private set; } = null!;
 
-    public ICommand OpenExportFolderCommand { get; }
+    public ICommand OpenExportFolderCommand { get; private set; } = null!;
 
-    public ICommand ZoomOutCommand { get; }
+    public ICommand ZoomOutCommand { get; private set; } = null!;
 
-    public ICommand ZoomInCommand { get; }
+    public ICommand ZoomInCommand { get; private set; } = null!;
 
-    public ICommand ResetZoomCommand { get; }
+    public ICommand ResetZoomCommand { get; private set; } = null!;
 
-    public ICommand RunDatabaseMaintenanceCommand { get; }
+    public ICommand RunDatabaseMaintenanceCommand { get; private set; } = null!;
 
-    public ICommand CheckForUpdatesCommand { get; }
+    public ICommand CheckForUpdatesCommand { get; private set; } = null!;
 
-    public ICommand DownloadUpdateCommand { get; }
+    public ICommand DownloadUpdateCommand { get; private set; } = null!;
 
-    public ICommand InstallVerifiedUpdateCommand { get; }
+    public ICommand InstallVerifiedUpdateCommand { get; private set; } = null!;
 
-    public ICommand DismissUpdateNotificationCommand { get; }
+    public ICommand DismissUpdateNotificationCommand { get; private set; } = null!;
 
-    public ICommand OpenUpdateReleaseNotesCommand { get; }
+    public ICommand OpenUpdateReleaseNotesCommand { get; private set; } = null!;
 
-    public ICommand SaveReadablePolishingPromptSettingsCommand { get; }
+    public ICommand SaveReadablePolishingPromptSettingsCommand { get; private set; } = null!;
 
-    public ICommand ResetReadablePolishingPromptSettingsCommand { get; }
+    public ICommand ResetReadablePolishingPromptSettingsCommand { get; private set; } = null!;
 
-    public ICommand SelectActiveReadablePolishingPromptModelFamilyCommand { get; }
+    public ICommand SelectActiveReadablePolishingPromptModelFamilyCommand { get; private set; } = null!;
 
     public JobSummary? SelectedJob
     {

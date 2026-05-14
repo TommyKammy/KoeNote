@@ -314,34 +314,13 @@ public sealed partial class MainWindowViewModel
 
             SetSetupInstallStatus("Review runtime", "確認済み", Paths.LlamaCompletionPath);
 
-            if (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady)
+            if (!await InstallCudaRuntimeForPresetAsync(
+                CreateAsrCudaRuntimeInstallSpec(),
+                displayName,
+                cancellation.Token,
+                optionalFailureSuffix: " ASR GPU acceleration was not installed, but CPU ASR remains available. You can retry ASR GPU runtime installation later from Setup."))
             {
-                SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: preparing NVIDIA CUDA/cuDNN runtime for selected ASR model...";
-                ModelDownloadProgressStageText = "確認中";
-                IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallAsrCudaRuntimeAsync(
-                    cancellation.Token,
-                    CreateRuntimeInstallProgress());
-                RefreshSetupWizard();
-                if (!runtimeResult.IsSucceeded)
-                {
-                    var message = BuildAsrCudaRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
-                    var fallbackMessage = $"{message} ASR GPU acceleration was not installed, but CPU ASR remains available. You can retry ASR GPU runtime installation later from Setup.";
-                    SetSetupInstallStatus("ASR GPU runtime", "未導入", fallbackMessage);
-                    SetupAsrCudaRuntimeSummary = fallbackMessage;
-                    LatestLog = fallbackMessage;
-                }
-                else
-                {
-                    SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {runtimeResult.InstallPath}";
-                    SetSetupInstallStatus("ASR GPU runtime", "完了", runtimeResult.InstallPath);
-                    LatestLog = runtimeResult.Message;
-                }
-            }
-            else if (SetupAsrCudaRuntimeRecommended)
-            {
-                SetSetupInstallStatus("ASR GPU runtime", "スキップ", "導入済みです");
+                return;
             }
 
             if (!SetupDiarizationRuntimeReady)
@@ -392,37 +371,12 @@ public sealed partial class MainWindowViewModel
                 SetSetupInstallStatus("話者識別", "スキップ", "導入済みです");
             }
 
-            if (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady)
+            if (!await InstallCudaRuntimeForPresetAsync(
+                CreateCudaReviewRuntimeInstallSpec(),
+                displayName,
+                cancellation.Token))
             {
-                SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: preparing NVIDIA CUDA runtime for detected NVIDIA GPU...";
-                ModelDownloadProgressStageText = "確認中";
-                IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallCudaReviewRuntimeAsync(
-                    cancellation.Token,
-                    CreateRuntimeInstallProgress());
-                RefreshSetupWizard();
-                if (!runtimeResult.IsSucceeded)
-                {
-                    var message = AppendFailureCategory(
-                        BuildCudaReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory),
-                        runtimeResult.FailureCategory);
-                    SetSetupInstallStatus("GPU高速化", "失敗", message);
-                    SetupCudaReviewRuntimeSummary = message;
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
-                }
-                else
-                {
-                    SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {runtimeResult.InstallPath}";
-                    SetSetupInstallStatus("GPU高速化", "完了", runtimeResult.InstallPath);
-                    LatestLog = runtimeResult.Message;
-                }
-            }
-            else if (SetupCudaReviewRuntimeRecommended)
-            {
-                SetSetupInstallStatus("GPU高速化", "スキップ", "導入済みです");
+                return;
             }
 
             if (!SetupTernaryReviewRuntimeReady)
@@ -565,77 +519,97 @@ public sealed partial class MainWindowViewModel
 
     private async Task SetupInstallCudaReviewRuntimeAsync()
     {
-        const string displayName = "CUDA review runtime";
+        await SetupInstallCudaRuntimeAsync(CreateCudaReviewRuntimeInstallSpec());
+    }
+
+    private async Task SetupInstallAsrCudaRuntimeAsync()
+    {
+        await SetupInstallCudaRuntimeAsync(CreateAsrCudaRuntimeInstallSpec());
+    }
+
+    private async Task SetupInstallCudaRuntimeAsync(SetupCudaRuntimeInstallSpec spec)
+    {
+        var displayName = spec.DisplayName;
         ResetSetupInstallStatuses();
         BeginModelDownloadProgress(displayName);
-        SetSetupInstallStatus("GPU高速化", "導入中", "検出されたNVIDIA GPU向けのReview runtime");
-        ModelDownloadProgressSummary = "Installing CUDA review runtime: preparing NVIDIA CUDA redist...";
-        ModelDownloadProgressStageText = "確認中";
+        SetSetupInstallStatus(spec.InstallPlanItemName, "導入中", spec.InstallPlanSummary);
+        ModelDownloadProgressSummary = spec.ProgressSummary;
+        ModelDownloadProgressStageText = spec.InitialStageText;
         IsModelDownloadProgressIndeterminate = true;
 
         try
         {
-            var result = await _setupWizardService.InstallCudaReviewRuntimeAsync(progress: CreateRuntimeInstallProgress());
+            var result = await spec.InstallAsync(CancellationToken.None, CreateRuntimeInstallProgress());
             RefreshSetupWizard();
             var message = result.IsSucceeded
-                ? $"CUDA review runtime installed: {result.InstallPath}"
-                : AppendFailureCategory(
-                    BuildCudaReviewRuntimeSetupFailureMessage(result.Message, result.FailureCategory),
-                    result.FailureCategory);
-            SetupCudaReviewRuntimeSummary = message;
-            SetSetupInstallStatus("GPU高速化", result.IsSucceeded ? "完了" : "失敗", message);
+                ? spec.BuildInstalledSummary(result.InstallPath)
+                : spec.BuildFailureMessage(result.Message, result.FailureCategory);
+            spec.SetSummary(message);
+            SetSetupInstallStatus(spec.InstallPlanItemName, result.IsSucceeded ? "完了" : "失敗", message);
             CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
             if (result.IsSucceeded)
             {
-                ModelDownloadNotification = "GPU高速化runtimeの導入が完了しました。";
+                ModelDownloadNotification = spec.SuccessNotification;
             }
+
             LatestLog = result.IsSucceeded ? result.Message : message;
         }
         catch (OperationCanceledException)
         {
             RefreshSetupWizard();
-            const string message = "GPU高速化runtimeの導入を中止しました。Wizardの一括導入から再試行してください。";
-            SetSetupInstallStatus("GPU高速化", "失敗", message);
+            var message = spec.CancelledMessage;
+            SetSetupInstallStatus(spec.InstallPlanItemName, "失敗", message);
             CompleteModelDownloadProgress(displayName, succeeded: false, message);
             LatestLog = message;
         }
     }
 
-    private async Task SetupInstallAsrCudaRuntimeAsync()
+    private async Task<bool> InstallCudaRuntimeForPresetAsync(
+        SetupCudaRuntimeInstallSpec spec,
+        string presetDisplayName,
+        CancellationToken cancellationToken,
+        string? optionalFailureSuffix = null)
     {
-        const string displayName = "CUDA ASR runtime";
-        ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
-        SetSetupInstallStatus("ASR GPU runtime", "導入中", "NVIDIA GPU向けのASR CUDA runtime");
-        ModelDownloadProgressSummary = "Installing CUDA ASR runtime: preparing NVIDIA CUDA/cuDNN redist...";
-        ModelDownloadProgressStageText = "確認中";
+        if (!spec.IsRecommended())
+        {
+            return true;
+        }
+
+        if (spec.IsReady())
+        {
+            SetSetupInstallStatus(spec.InstallPlanItemName, "スキップ", "導入済みです");
+            return true;
+        }
+
+        SetSetupInstallStatus(spec.InstallPlanItemName, "導入中", spec.InstallPlanSummary);
+        ModelDownloadProgressSummary = $"Installing {presetDisplayName}: {spec.PresetProgressDetail}";
+        ModelDownloadProgressStageText = spec.InitialStageText;
         IsModelDownloadProgressIndeterminate = true;
-
-        try
+        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress());
+        RefreshSetupWizard();
+        if (result.IsSucceeded)
         {
-            var result = await _setupWizardService.InstallAsrCudaRuntimeAsync(progress: CreateRuntimeInstallProgress());
-            RefreshSetupWizard();
-            var message = result.IsSucceeded
-                ? $"CUDA ASR runtime installed: {result.InstallPath}"
-                : BuildAsrCudaRuntimeSetupFailureMessage(result.Message, result.FailureCategory);
-            SetupAsrCudaRuntimeSummary = message;
-            SetSetupInstallStatus("ASR GPU runtime", result.IsSucceeded ? "完了" : "失敗", message);
-            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
-            if (result.IsSucceeded)
-            {
-                ModelDownloadNotification = "ASR GPU runtimeの導入が完了しました。";
-            }
-
-            LatestLog = result.IsSucceeded ? result.Message : message;
+            spec.SetSummary(spec.BuildInstalledSummary(result.InstallPath));
+            SetSetupInstallStatus(spec.InstallPlanItemName, "完了", result.InstallPath);
+            LatestLog = result.Message;
+            return true;
         }
-        catch (OperationCanceledException)
+
+        var message = spec.BuildFailureMessage(result.Message, result.FailureCategory);
+        if (!string.IsNullOrWhiteSpace(optionalFailureSuffix))
         {
-            RefreshSetupWizard();
-            const string message = "ASR GPU runtimeの導入を中止しました。";
-            SetSetupInstallStatus("ASR GPU runtime", "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            message += optionalFailureSuffix;
+            SetSetupInstallStatus(spec.InstallPlanItemName, "未導入", message);
+            spec.SetSummary(message);
             LatestLog = message;
+            return true;
         }
+
+        SetSetupInstallStatus(spec.InstallPlanItemName, "失敗", message);
+        spec.SetSummary(message);
+        CompleteModelDownloadProgress(presetDisplayName, succeeded: false, message);
+        LatestLog = message;
+        return false;
     }
 
     private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress()
@@ -1167,6 +1141,62 @@ public sealed partial class MainWindowViewModel
             : "CUDA ASR runtime is not required for the selected ASR model.";
     }
 
+    private SetupCudaRuntimeInstallSpec CreateAsrCudaRuntimeInstallSpec()
+    {
+        return new SetupCudaRuntimeInstallSpec(
+            "CUDA ASR runtime",
+            "ASR GPU runtime",
+            "NVIDIA GPU向けのASR CUDA runtime",
+            "Installing CUDA ASR runtime: preparing NVIDIA CUDA/cuDNN redist...",
+            "preparing NVIDIA CUDA/cuDNN runtime for selected ASR model...",
+            "確認中",
+            "ASR GPU runtimeの導入が完了しました。",
+            "ASR GPU runtimeの導入を中止しました。",
+            IsRecommended: () => SetupAsrCudaRuntimeRecommended,
+            IsReady: () => SetupAsrCudaRuntimeReady,
+            InstallAsync: async (cancellationToken, progress) =>
+            {
+                var result = await _setupWizardService.InstallAsrCudaRuntimeAsync(cancellationToken, progress);
+                return new SetupCudaRuntimeInstallResult(
+                    result.IsSucceeded,
+                    result.Message,
+                    result.InstallPath,
+                    result.FailureCategory);
+            },
+            BuildFailureMessage: BuildAsrCudaRuntimeSetupFailureMessage,
+            BuildInstalledSummary: installPath => $"CUDA ASR runtime installed: {installPath}",
+            SetSummary: value => SetupAsrCudaRuntimeSummary = value);
+    }
+
+    private SetupCudaRuntimeInstallSpec CreateCudaReviewRuntimeInstallSpec()
+    {
+        return new SetupCudaRuntimeInstallSpec(
+            "CUDA review runtime",
+            "GPU高速化",
+            "検出されたNVIDIA GPU向けのReview runtime",
+            "Installing CUDA review runtime: preparing NVIDIA CUDA redist...",
+            "preparing NVIDIA CUDA runtime for detected NVIDIA GPU...",
+            "確認中",
+            "GPU高速化runtimeの導入が完了しました。",
+            "GPU高速化runtimeの導入を中止しました。Wizardの一括導入から再試行してください。",
+            IsRecommended: () => SetupCudaReviewRuntimeRecommended,
+            IsReady: () => SetupCudaReviewRuntimeReady,
+            InstallAsync: async (cancellationToken, progress) =>
+            {
+                var result = await _setupWizardService.InstallCudaReviewRuntimeAsync(cancellationToken, progress);
+                return new SetupCudaRuntimeInstallResult(
+                    result.IsSucceeded,
+                    result.Message,
+                    result.InstallPath,
+                    result.FailureCategory);
+            },
+            BuildFailureMessage: (message, failureCategory) => AppendFailureCategory(
+                BuildCudaReviewRuntimeSetupFailureMessage(message, failureCategory),
+                failureCategory),
+            BuildInstalledSummary: installPath => $"CUDA review runtime installed: {installPath}",
+            SetSummary: value => SetupCudaReviewRuntimeSummary = value);
+    }
+
     private IReadOnlyList<SetupInstallPlanItem> BuildSetupInstallPlanItems()
     {
         var items = new List<SetupInstallPlanItem>
@@ -1351,4 +1381,26 @@ public sealed partial class MainWindowViewModel
             ? message
             : $"{message} Failure category: {failureCategory}";
     }
+
+    private sealed record SetupCudaRuntimeInstallSpec(
+        string DisplayName,
+        string InstallPlanItemName,
+        string InstallPlanSummary,
+        string ProgressSummary,
+        string PresetProgressDetail,
+        string InitialStageText,
+        string SuccessNotification,
+        string CancelledMessage,
+        Func<bool> IsRecommended,
+        Func<bool> IsReady,
+        Func<CancellationToken, IProgress<RuntimeInstallProgress>?, Task<SetupCudaRuntimeInstallResult>> InstallAsync,
+        Func<string, string, string> BuildFailureMessage,
+        Func<string, string> BuildInstalledSummary,
+        Action<string> SetSummary);
+
+    private sealed record SetupCudaRuntimeInstallResult(
+        bool IsSucceeded,
+        string Message,
+        string InstallPath,
+        string FailureCategory);
 }

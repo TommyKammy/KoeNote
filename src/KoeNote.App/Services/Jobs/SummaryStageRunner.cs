@@ -24,10 +24,10 @@ public sealed class SummaryStageRunner(
     {
         var startedAt = DateTimeOffset.Now;
         var outputDirectory = Path.Combine(paths.Jobs, job.JobId, "summary");
-        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Running, 10));
+        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Running, JobRunProgressPlan.SummaryRunning));
         jobRepository.MarkSummaryRunning(job);
         report(new JobRunUpdate(RefreshJobViews: true));
-        stageProgressRepository.Upsert(job.JobId, "summary", "running", 10, startedAt: startedAt);
+        stageProgressRepository.Upsert(job.JobId, "summary", "running", JobRunProgressPlan.SummaryRunning, startedAt: startedAt);
         report(new JobRunUpdate(LatestLog: $"Running summary for {job.FileName}"));
 
         try
@@ -68,14 +68,14 @@ public sealed class SummaryStageRunner(
             report(new JobRunUpdate(
                 JobRunStage.Summary,
                 status == "succeeded" ? JobRunStageState.Succeeded : JobRunStageState.Failed,
-                100,
+                status == "succeeded" ? JobRunProgressPlan.Completed : JobRunProgressPlan.SummaryFailed,
                 result.Duration,
                 status == "succeeded" ? null : "summary_failed"));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "summary",
                 status,
-                100,
+                status == "succeeded" ? JobRunProgressPlan.Completed : JobRunProgressPlan.SummaryFailed,
                 startedAt,
                 finishedAt,
                 result.Duration.TotalSeconds,
@@ -96,12 +96,12 @@ public sealed class SummaryStageRunner(
         catch (OperationCanceledException)
         {
             var finishedAt = DateTimeOffset.Now;
-            report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Cancelled, 100, finishedAt - startedAt));
+            report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Cancelled, JobRunProgressPlan.Completed, finishedAt - startedAt));
             stageProgressRepository.Upsert(
                 job.JobId,
                 "summary",
                 "cancelled",
-                100,
+                JobRunProgressPlan.Completed,
                 startedAt,
                 finishedAt,
                 (finishedAt - startedAt).TotalSeconds,
@@ -123,12 +123,12 @@ public sealed class SummaryStageRunner(
     public void Skip(JobSummary job, Action<JobRunUpdate> report, string reason)
     {
         var now = DateTimeOffset.Now;
-        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Skipped, 100, TimeSpan.Zero));
+        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Skipped, JobRunProgressPlan.Completed, TimeSpan.Zero));
         stageProgressRepository.Upsert(
             job.JobId,
             "summary",
             "skipped",
-            100,
+            JobRunProgressPlan.Completed,
             now,
             now,
             0,
@@ -149,12 +149,12 @@ public sealed class SummaryStageRunner(
         string outputDirectory)
     {
         var finishedAt = DateTimeOffset.Now;
-        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Failed, 100, finishedAt - startedAt, errorCategory));
+        report(new JobRunUpdate(JobRunStage.Summary, JobRunStageState.Failed, JobRunProgressPlan.SummaryFailed, finishedAt - startedAt, errorCategory));
         stageProgressRepository.Upsert(
             job.JobId,
             "summary",
             "failed",
-            100,
+            JobRunProgressPlan.SummaryFailed,
             startedAt,
             finishedAt,
             (finishedAt - startedAt).TotalSeconds,

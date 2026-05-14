@@ -41,3 +41,16 @@ public interface ISummaryStageRunner
 
     void Skip(JobSummary job, Action<JobRunUpdate> report, string reason);
 }
+
+public interface IReadablePolishingStageRunner
+{
+    Task<ReadablePolishingStageResult> RunAsync(
+        JobSummary job,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken);
+}
+
+public sealed record ReadablePolishingStageResult(
+    bool Succeeded,
+    bool Cancelled,
+    string Message);

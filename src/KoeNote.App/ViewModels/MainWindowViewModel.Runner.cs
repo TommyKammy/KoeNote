@@ -71,7 +71,7 @@ public sealed partial class MainWindowViewModel
 
     private void ApplyRunUpdate(JobRunUpdate update)
     {
-        if (update.Stage is { } stage && update.StageState is { } state && update.ProgressPercent is { } progressPercent)
+        if (update.Stage is { } stage && update.StageState is { } state && update.StageProgressPercent is { } stageProgressPercent)
         {
             if (stage == JobRunStage.Summary)
             {
@@ -81,8 +81,8 @@ public sealed partial class MainWindowViewModel
             {
                 var stageStatus = GetStageStatus(stage);
                 stageStatus.IsRunning = state == JobRunStageState.Running;
-                stageStatus.Status = GetStageStatusText(state, update.ErrorCategory);
-                stageStatus.ProgressPercent = progressPercent;
+                stageStatus.Status = update.StageStatusText ?? GetStageStatusText(state, update.ErrorCategory);
+                stageStatus.ProgressPercent = stageProgressPercent;
 
                 if (state == JobRunStageState.Running)
                 {
@@ -99,6 +99,11 @@ public sealed partial class MainWindowViewModel
                     StartPolishedTranscriptTabHighlight();
                 }
             }
+        }
+
+        if (update.JobProgressPercent is { } jobProgressPercent && SelectedJob is not null)
+        {
+            SelectedJob.ProgressPercent = jobProgressPercent;
         }
 
         if (update.Segments is not null)
