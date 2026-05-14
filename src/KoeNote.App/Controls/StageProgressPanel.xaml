@@ -5,203 +5,196 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
         <Style x:Key="StageDotBorderStyle" TargetType="Border">
-            <Setter Property="Width" Value="30" />
-            <Setter Property="Height" Value="30" />
-            <Setter Property="CornerRadius" Value="15" />
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="#CFE8DA" />
-            <Setter Property="BorderThickness" Value="2" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="#0B6B3A"
-                                      BlurRadius="9"
-                                      ShadowDepth="0"
-                                      Opacity="0.10" />
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#BBF7D0" />
+            <Setter Property="BorderThickness" Value="1.5" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsDone}" Value="True">
                     <Setter Property="Background" Value="{StaticResource AccentBrush}" />
                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                    <Setter Property="Effect">
-                        <Setter.Value>
-                            <DropShadowEffect Color="#0B6B3A"
-                                              BlurRadius="10"
-                                              ShadowDepth="0"
-                                              Opacity="0.25" />
-                        </Setter.Value>
-                    </Setter>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsDoing}" Value="True">
                     <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                    <Setter Property="BorderThickness" Value="2.5" />
+                    <Setter Property="BorderThickness" Value="2" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSkipped}" Value="True">
-                    <Setter Property="Background" Value="#F8FAFC" />
+                    <Setter Property="Background" Value="#F1F5F9" />
                     <Setter Property="BorderBrush" Value="#CBD5E1" />
-                    <Setter Property="Effect" Value="{x:Null}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="StageBadgeTextStyle" TargetType="TextBlock">
-            <Setter Property="Text" Value="未開始" />
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Text" Value="" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsDone}" Value="True">
                     <Setter Property="Text" Value="完了" />
                     <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsDoing}" Value="True">
                     <Setter Property="Text" Value="処理中" />
                     <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                    <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSkipped}" Value="True">
                     <Setter Property="Text" Value="スキップ" />
                     <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                    <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="StageDurationTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-            <Setter Property="TextAlignment" Value="Center" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="LineHeight" Value="14" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding DurationText}" Value="00:00:00">
                     <Setter Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-
     </UserControl.Resources>
 
-    <Border Style="{StaticResource PanelBorder}" Padding="14,12">
+    <Border Style="{StaticResource PanelBorder}" Padding="12,8">
         <DockPanel>
             <StackPanel DockPanel.Dock="Top"
                         Orientation="Horizontal"
                         Margin="0,0,0,8">
-                <Border Style="{StaticResource LucideInlineIconBadge}">
+                <Border Style="{StaticResource LucideInlineIconBadge}"
+                        Background="{StaticResource AccentLightBrush}"
+                        CornerRadius="4">
                     <Path Style="{StaticResource LucidePathIcon}"
-                          Width="14"
-                          Height="14"
+                          Width="12"
+                          Height="12"
+                          Stroke="{StaticResource AccentBrush}"
                           Data="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
                 </Border>
                 <TextBlock Text="処理ステージ"
                            Style="{StaticResource SectionTitle}"
-                           FontSize="15"
+                           FontSize="11"
+                           FontWeight="SemiBold"
                            Margin="0"
                            VerticalAlignment="Center" />
             </StackPanel>
 
             <ItemsControl ItemsSource="{Binding StageStatuses}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <UniformGrid Rows="1" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="38" />
-                                <RowDefinition Height="22" />
-                                <RowDefinition Height="18" />
-                                <RowDefinition Height="16" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="38" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <!-- Vertical connector above (if ShowConnectorBefore) -->
+                            <Border Width="1"
+                                    Height="7"
+                                    HorizontalAlignment="Left"
+                                    Margin="10,0,0,0"
+                                    Visibility="{Binding ShowConnectorBefore, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{StaticResource BorderBrushSoft}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="Background" Value="#86EFAC" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
 
-                            <Border Grid.Column="0"
-                                    Height="2"
-                                    VerticalAlignment="Center"
-                                    Background="#8ED9B1"
-                                    Visibility="{Binding ShowConnectorBefore, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <Border Grid.Column="2"
-                                    Height="2"
-                                    VerticalAlignment="Center"
-                                    Background="#8ED9B1"
-                                    Visibility="{Binding ShowConnectorAfter, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <!-- Stage row -->
+                            <Grid Margin="0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Column="1"
-                                  Width="38"
-                                  Height="38"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center">
-                                <Border Style="{StaticResource StageDotBorderStyle}" />
-                                <Ellipse Width="18"
-                                         Height="18"
-                                         Fill="{StaticResource AccentBrush}"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center">
-                                    <Ellipse.Style>
-                                        <Style TargetType="Ellipse">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsDoing}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Ellipse.Style>
-                                </Ellipse>
-                                <Path Data="M8,22 L17,31 L36,12"
-                                      Stroke="#FFFFFF"
-                                      StrokeThickness="3"
-                                      StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round"
-                                      Stretch="Uniform"
-                                      Width="16"
-                                      Height="16"
+                                <!-- Circle icon -->
+                                <Grid Width="22" Height="22"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center">
-                                    <Path.Style>
-                                        <Style TargetType="Path">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsDone}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Path.Style>
-                                </Path>
+                                    <Border Style="{StaticResource StageDotBorderStyle}" />
+                                    <Ellipse Width="10" Height="10"
+                                             Fill="{StaticResource AccentBrush}"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDoing}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                    <Path Data="M8,22 L17,31 L36,12"
+                                          Stroke="#FFFFFF"
+                                          StrokeThickness="2.5"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round"
+                                          Stretch="Uniform"
+                                          Width="10"
+                                          Height="10"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </Grid>
+
+                                <!-- Name + Duration -->
+                                <StackPanel Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Margin="8,0,4,0">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}" />
+                                    <TextBlock Text="{Binding DurationText}"
+                                               Style="{StaticResource StageDurationTextStyle}" />
+                                </StackPanel>
+
+                                <!-- Badge -->
+                                <TextBlock Grid.Column="2"
+                                           Style="{StaticResource StageBadgeTextStyle}" />
                             </Grid>
 
-                            <TextBlock Grid.Row="1"
-                                       Grid.ColumnSpan="3"
-                                       Text="{Binding Name}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextBrush}"
-                                       TextAlignment="Center"
-                                       VerticalAlignment="Bottom"
-                                       LineHeight="16"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,4,0,0" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.ColumnSpan="3"
-                                       Style="{StaticResource StageBadgeTextStyle}" />
-
-                            <Grid Grid.Row="3"
-                                  Grid.ColumnSpan="3"
-                                  Margin="0,0,0,0">
-                                <TextBlock Text="{Binding DurationText}"
-                                           Style="{StaticResource StageDurationTextStyle}" />
-                            </Grid>
-                        </Grid>
+                            <!-- Vertical connector below (if ShowConnectorAfter) -->
+                            <Border Width="1"
+                                    Height="7"
+                                    HorizontalAlignment="Left"
+                                    Margin="10,0,0,0"
+                                    Visibility="{Binding ShowConnectorAfter, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{StaticResource BorderBrushSoft}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="Background" Value="#86EFAC" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

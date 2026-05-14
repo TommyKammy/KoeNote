@@ -52,15 +52,14 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="ReviewApplyButton" TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
-            <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-            <Setter Property="Height" Value="48" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="10,6" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style x:Key="ReviewSecondaryButton" TargetType="Button" BasedOn="{StaticResource OutlineNeutralButton}">
-            <Setter Property="Height" Value="48" />
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="8,6" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
@@ -74,7 +73,7 @@
     <Border Style="{StaticResource PanelBorder}">
         <DockPanel>
             <Border DockPanel.Dock="Top"
-                    Padding="18,18,18,12"
+                    Padding="14,12,14,10"
                     BorderBrush="{StaticResource BorderBrushSoft}"
                     BorderThickness="0,0,0,1">
                 <Grid>
@@ -86,12 +85,16 @@
 
                     <StackPanel VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <Border Style="{StaticResource LucideCardIconBadge}">
+                            <Border Style="{StaticResource LucideCardIconBadge}"
+                                    Background="{StaticResource AccentLightBrush}"
+                                    CornerRadius="5">
                                 <Path Style="{StaticResource LucidePathIcon}"
+                                      Stroke="{StaticResource AccentBrush}"
                                       Data="M21.64 3.64l-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72M14 7l3 3M5 6v4M19 14v4M10 2v2M7 8H3M21 16h-4M11 3H9" />
                             </Border>
                             <TextBlock Text="レビュー候補"
                                        Style="{StaticResource SectionTitle}"
+                                       FontSize="13"
                                        Margin="0"
                                        VerticalAlignment="Center" />
                         </StackPanel>
@@ -126,18 +129,23 @@
                     </StackPanel>
 
                     <Button Grid.Column="2"
-                            Padding="7,4"
+                            Width="28"
+                            Height="28"
+                            Padding="0"
                             MinWidth="0"
                             VerticalAlignment="Center"
                             Margin="8,0,0,0"
                             Command="{Binding CloseDetailPanelCommand}"
                             ToolTip="閉じる">
-                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" />
+                        <TextBlock Text="&#xE711;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedBrush}" />
                     </Button>
                 </Grid>
             </Border>
 
-            <Grid Margin="18">
+            <Grid Margin="14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="3*" MinHeight="160" />
@@ -159,10 +167,13 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource LucideInlineIconBadge}">
+                                    <Border Style="{StaticResource LucideInlineIconBadge}"
+                                            Background="{StaticResource AccentLightBrush}"
+                                            CornerRadius="4">
                                         <Path Style="{StaticResource LucidePathIcon}"
                                               Width="14"
                                               Height="14"
+                                              Stroke="{StaticResource AccentBrush}"
                                               Data="M10 5h11M10 12h11M10 19h11M3 10l3-3-3-3M3 20l3-3-3-3" />
                                     </Border>
                                     <TextBlock Text="要約"
@@ -197,28 +208,34 @@
                                                Margin="0,0,12,0"
                                                Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
                                     <Button Command="{Binding RunPostSummaryCommand}"
-                                            Content="{Binding SummaryActionText}"
                                             ToolTip="{Binding SummaryActionToolTip}"
-                                            MinWidth="118"
-                                            Height="34"
-                                            Padding="12,5"
-                                            Style="{StaticResource OutlineSuccessButton}" />
+                                            MinWidth="90"
+                                            Height="28"
+                                            Padding="10,4"
+                                            Style="{StaticResource OutlineSuccessButton}">
+                                        <TextBlock Text="{Binding SummaryActionText}"
+                                                   Foreground="#FFFFFF"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold" />
+                                    </Button>
                                 </StackPanel>
                             </Grid>
 
                             <Border Background="#FAFBFC"
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="1"
-                                    CornerRadius="0"
-                                    Padding="12"
+                                    CornerRadius="8"
+                                    Padding="16,14"
                                     Style="{StaticResource VisibleWhenNoSummaryStyle}">
                                 <StackPanel>
                                     <TextBlock Text="要約はまだありません"
                                                FontWeight="SemiBold"
+                                               TextAlignment="Center"
                                                Margin="0,0,0,6" />
-                                    <TextBlock Text="整文結果を確認してから、要約を生成してください。"
+                                    <TextBlock Text="「生成」を押すとAIが要約を作成します"
                                                Style="{StaticResource MutedText}"
-                                               TextWrapping="Wrap" />
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center" />
                                 </StackPanel>
                             </Border>
 
@@ -255,7 +272,7 @@
                                         Background="#FAFBFC"
                                         BorderBrush="{StaticResource BorderBrushSoft}"
                                         BorderThickness="1"
-                                        CornerRadius="0"
+                                        CornerRadius="8"
                                         Padding="16">
                                     <StackPanel>
                                         <TextBlock Text="レビュー候補はありません"
@@ -274,9 +291,9 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="&#xE8A7;"
                                                            Style="{StaticResource IconText}"
-                                                           Foreground="{StaticResource AccentBrush}" />
+                                                           Foreground="#FFFFFF" />
                                                 <TextBlock Text="整文タブを開く"
-                                                           Foreground="{StaticResource AccentBrush}"
+                                                           Foreground="#FFFFFF"
                                                            FontSize="12"
                                                            FontWeight="SemiBold" />
                                             </StackPanel>
@@ -342,7 +359,7 @@
                         <Border Background="#FAFBFC"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1"
-                                CornerRadius="0"
+                                CornerRadius="6"
                                 Padding="10"
                                 Margin="0,5,0,14"
                                 PreviewMouseLeftButtonUp="FocusDraftSegmentOnClick">
@@ -451,9 +468,9 @@
                                             Command="{Binding AcceptDraftCommand}"
                                             ToolTip="レビュー候補を反映して、次の候補へ進みます">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
+                                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
                                             <TextBlock Text="適用"
-                                                       Foreground="{StaticResource AccentBrush}"
+                                                       Foreground="#FFFFFF"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>

@@ -4,15 +4,15 @@
              xmlns:controls="clr-namespace:KoeNote.App.Controls">
     <UserControl.Resources>
         <Style x:Key="PlayerRoundButton" TargetType="Button" BasedOn="{StaticResource PlayerIconButton}">
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
             <Setter Property="Background" Value="#F8FAFC" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
         <Style x:Key="PlayerPrimaryButton" TargetType="Button" BasedOn="{StaticResource PlayerIconButton}">
-            <Setter Property="Width" Value="44" />
-            <Setter Property="Height" Value="44" />
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
@@ -23,59 +23,68 @@
             BorderBrush="{StaticResource BorderBrushSoft}"
             BorderThickness="1"
             CornerRadius="0"
-            MinHeight="116"
-            Padding="14,12">
+            MinHeight="88"
+            Padding="12,8">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid Margin="0,0,0,10">
+            <Grid Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="34"
-                            Height="34"
-                            CornerRadius="7"
+                    <Border Width="26"
+                            Height="26"
+                            CornerRadius="5"
                             Background="{StaticResource AccentLightBrush}"
-                            Margin="0,0,10,0">
+                            Margin="0,0,8,0">
                         <TextBlock Text="&#xEC4F;"
                                    FontFamily="Segoe MDL2 Assets"
                                    Foreground="{StaticResource AccentBrush}"
-                                   FontSize="17"
+                                   FontSize="13"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center" />
                     </Border>
                     <StackPanel VerticalAlignment="Center" MinWidth="0">
-                        <TextBlock Text="{Binding SelectedJobSourcePath}"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextBrush}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding SelectedJobSourcePath}"
-                                   MaxWidth="520" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding SelectedJobFileName}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding SelectedJobSourcePath}"
+                                       MaxWidth="320" />
+                            <TextBlock Text="{Binding SelectedJobDirectory}"
+                                       FontSize="11"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Bottom"
+                                       Margin="6,0,0,1"
+                                       MaxWidth="220" />
+                        </StackPanel>
                         <TextBlock Text="{Binding PlaybackTimeDisplay}"
                                    Style="{StaticResource MutedText}"
                                    FontSize="11"
-                                   Margin="0,2,0,0" />
+                                   Margin="0,1,0,0" />
                     </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="14,0,0,0">
+                            Margin="10,0,0,0">
                     <TextBlock Text="{Binding PlaybackVolumeIcon}"
                                FontFamily="Segoe MDL2 Assets"
                                Foreground="{StaticResource MutedBrush}"
-                               FontSize="16"
+                               FontSize="14"
                                VerticalAlignment="Center"
-                               Margin="0,0,6,0" />
-                    <Slider Width="92"
+                               Margin="0,0,5,0" />
+                    <Slider Width="76"
                             Minimum="0"
                             Maximum="1"
                             Value="{Binding PlaybackVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -83,9 +92,9 @@
                             VerticalAlignment="Center"
                             ToolTip="音量" />
                     <ComboBox Style="{StaticResource ToolbarComboBox}"
-                              Width="76"
-                              Height="34"
-                              Margin="10,0,0,0"
+                              Width="70"
+                              Height="28"
+                              Margin="8,0,0,0"
                               ItemsSource="{Binding PlaybackRates}"
                               SelectedItem="{Binding PlaybackRate, Mode=TwoWay}"
                               ItemStringFormat="{}{0:0.##}x"
@@ -99,25 +108,25 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                     <Button Style="{StaticResource PlayerRoundButton}"
                             Command="{Binding SkipToPreviousSegmentCommand}"
                             ToolTip="前のセグメントへ">
-                        <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
+                        <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
                     </Button>
                     <Button Style="{StaticResource PlayerPrimaryButton}"
                             Command="{Binding PlayPauseAudioCommand}"
                             ToolTip="{Binding SelectedJobPlaybackPath}"
-                            Margin="6,0">
+                            Margin="5,0">
                         <TextBlock Text="{Binding PlayPauseAudioIcon}"
                                    FontFamily="Segoe MDL2 Assets"
-                                   FontSize="20"
+                                   FontSize="16"
                                    Foreground="#FFFFFF" />
                     </Button>
                     <Button Style="{StaticResource PlayerRoundButton}"
                             Command="{Binding SkipToNextSegmentCommand}"
                             ToolTip="次のセグメントへ">
-                        <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="15" />
+                        <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
                     </Button>
                 </StackPanel>
 
@@ -126,12 +135,12 @@
                         BorderBrush="{StaticResource BorderBrushSoft}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="10,8"
+                        Padding="8,4"
                         VerticalAlignment="Stretch">
                     <controls:AudioWaveformControl Samples="{Binding PlaybackWaveformSamples}"
                                                     PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     DurationSeconds="{Binding PlaybackDurationSeconds}"
-                                                    Height="42"
+                                                    Height="30"
                                                     Cursor="Hand"
                                                     ToolTip="{Binding SelectedJobPlaybackPath}" />
                 </Border>

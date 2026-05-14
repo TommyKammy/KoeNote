@@ -47,22 +47,61 @@
     <Setter Property="Background" Value="#FFFFFF" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinWidth" Value="104" />
-    <Setter Property="Padding" Value="13,0" />
-    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinWidth" Value="88" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+</Style>
+
+<Style x:Key="HeaderRunButton" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinWidth" Value="80" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="Margin" Value="0,0,0,0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="Button">
+                <Border x:Name="Chrome"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="7"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="#15803D" />
+                        <Setter TargetName="Chrome" Property="BorderBrush" Value="#15803D" />
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="#166534" />
+                        <Setter TargetName="Chrome" Property="BorderBrush" Value="#166534" />
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.38" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
 </Style>
 
 <Style x:Key="HeaderRunMenuButton" TargetType="Button" BasedOn="{StaticResource HeaderOutlineButton}">
-    <Setter Property="Width" Value="34" />
-    <Setter Property="MinWidth" Value="34" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="MinWidth" Value="30" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Margin" Value="-6,0,10,0" />
+    <Setter Property="Margin" Value="2,0,8,0" />
 </Style>
 
 <Style x:Key="HeaderGhostButton" TargetType="Button" BasedOn="{StaticResource HeaderButtonBase}">
-    <Setter Property="Height" Value="34" />
-    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Padding" Value="12,0" />
 </Style>
 
 <Style x:Key="HeaderReviewToggle" TargetType="ToggleButton">
@@ -70,10 +109,10 @@
     <Setter Property="Background" Value="#F8FAFC" />
     <Setter Property="BorderBrush" Value="#E2E8F0" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinWidth" Value="104" />
-    <Setter Property="Padding" Value="13,0" />
-    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinWidth" Value="88" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="Margin" Value="0,0,8,0" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
         <Setter.Value>
@@ -116,14 +155,37 @@
     </Style.Triggers>
 </Style>
 
-<Style x:Key="HeaderModelBadgeButton" TargetType="Button" BasedOn="{StaticResource HeaderButtonBase}">
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinWidth" Value="156" />
-    <Setter Property="Padding" Value="12,0" />
+<Style x:Key="HeaderModelBadgeButton" TargetType="Button">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Padding" Value="10,0" />
     <Setter Property="Background" Value="{StaticResource AccentLightBrush}" />
-    <Setter Property="BorderBrush" Value="#B7D8C4" />
+    <Setter Property="BorderBrush" Value="#BBF7D0" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="Button">
+                <Border x:Name="Chrome"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="20"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="#DCFCE7" />
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter TargetName="Chrome" Property="Background" Value="#BBF7D0" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
 </Style>
 
 <Style x:Key="HeaderToggleTrack" TargetType="Border">
@@ -155,10 +217,10 @@
 </Style>
 
 <Style x:Key="HeaderIconButton" TargetType="Button" BasedOn="{StaticResource HeaderButtonBase}">
-    <Setter Property="Width" Value="34" />
-    <Setter Property="Height" Value="34" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Margin" Value="2,0,0,0" />
+    <Setter Property="Margin" Value="1,0,0,0" />
 </Style>
 
 <Style x:Key="HeaderToolIcon" TargetType="TextBlock" BasedOn="{StaticResource IconText}">
@@ -185,9 +247,9 @@
 </Style>
 
 <Style x:Key="HeaderRunIcon" TargetType="TextBlock" BasedOn="{StaticResource HeaderToolIcon}">
-    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-    <Setter Property="FontSize" Value="16" />
-    <Setter Property="Margin" Value="0,0,9,0" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="Margin" Value="0,0,7,0" />
 </Style>
 
 <Style x:Key="HeaderIconOnlyText" TargetType="TextBlock">

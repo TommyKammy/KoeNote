@@ -972,6 +972,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 }
 
                 OnPropertyChanged(nameof(SelectedJobSourcePath));
+                OnPropertyChanged(nameof(SelectedJobFileName));
+                OnPropertyChanged(nameof(SelectedJobDirectory));
                 OnPropertyChanged(nameof(SelectedJobNormalizedAudioPath));
                 OnPropertyChanged(nameof(SelectedJobPlaybackPath));
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
@@ -1546,6 +1548,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string SelectedJobSourcePath => SelectedJob?.SourceAudioPath ?? "";
 
+    public string SelectedJobFileName => System.IO.Path.GetFileName(SelectedJobSourcePath);
+
+    public string SelectedJobDirectory => System.IO.Path.GetDirectoryName(SelectedJobSourcePath) ?? "";
+
     public string SelectedJobNormalizedAudioPath => SelectedJob?.NormalizedAudioPath ?? "";
 
     public string SelectedJobPlaybackPath => ResolveSelectedJobPlaybackPath() ?? "";
@@ -1992,7 +1998,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         ? SummaryContent
         : "要約はまだ生成されていません。";
 
-    public string SummaryActionText => HasSummaryContent ? "要約を再生成" : "要約を生成";
+    public string SummaryActionText => HasSummaryContent ? "再生成" : "生成";
 
     public string SummaryActionToolTip => HasSummaryContent
         ? IsSummaryStale

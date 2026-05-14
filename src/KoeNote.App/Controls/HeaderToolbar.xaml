@@ -31,12 +31,12 @@
                            VerticalAlignment="Center"
                            Margin="0,0,14,0" />
 
-                <Button Style="{StaticResource HeaderOutlineButton}"
+                <Button Style="{StaticResource HeaderRunButton}"
                         Command="{Binding RunSelectedJobCommand}"
                         ToolTip="{Binding RunPreflightDetail}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="&#xE768;" Style="{StaticResource HeaderRunIcon}" />
-                        <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" />
+                        <TextBlock Text="実行" Style="{StaticResource HeaderToolText}" Foreground="#FFFFFF" />
                     </StackPanel>
                 </Button>
 
@@ -72,7 +72,7 @@
                         Command="{Binding CancelCommand}"
                         ToolTip="実行中の処理を中止">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE739;" Style="{StaticResource HeaderToolIcon}" />
+                        <TextBlock Text="&#xE71A;" Style="{StaticResource HeaderToolIcon}" />
                         <TextBlock Text="中止" Style="{StaticResource HeaderToolText}" />
                     </StackPanel>
                 </Button>
@@ -155,7 +155,8 @@
 
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="8,0,0,0">
+                            Margin="8,0,0,0"
+                            Opacity="0.5">
                     <Button Style="{StaticResource HeaderIconButton}"
                             Command="{Binding ZoomOutCommand}"
                             ToolTip="{Binding MainContentZoomToolTip}">
@@ -164,7 +165,7 @@
                     <Button Style="{StaticResource HeaderGhostButton}"
                             Command="{Binding ResetZoomCommand}"
                             Padding="8,0"
-                            MinWidth="52"
+                            MinWidth="38"
                             ToolTip="表示倍率を100%に戻す">
                         <TextBlock Text="{Binding MainContentZoomPercentText}"
                                    Style="{StaticResource HeaderToolText}"
@@ -199,16 +200,15 @@
                         </ToolTip>
                     </Button.ToolTip>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8B7;"
-                                   FontFamily="Segoe MDL2 Assets"
+                        <TextBlock Text="&#x1F916;"
+                                   FontFamily="Segoe UI Emoji"
                                    FontSize="13"
-                                   Foreground="{StaticResource AccentBrush}"
-                                   Margin="0,0,7,0" />
+                                   Margin="0,0,6,0" />
                         <TextBlock Text="{Binding AsrModel}"
                                    Foreground="{StaticResource AccentBrush}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   MaxWidth="126"
+                                   MaxWidth="100"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Button>
@@ -227,21 +227,6 @@
                         Command="{Binding OpenSettingsCommand}"
                         ToolTip="設定">
                     <TextBlock Text="&#xE713;" Style="{StaticResource HeaderIconOnlyText}" />
-                </Button>
-                <Button Style="{StaticResource HeaderIconButton}"
-                        Command="{Binding OpenSetupCommand}"
-                        ToolTip="{Binding SetupPlaceholderText}">
-                    <TextBlock Text="&#xE9D9;" Style="{StaticResource HeaderIconOnlyText}" />
-                </Button>
-                <Button Style="{StaticResource HeaderIconButton}"
-                        Command="{Binding ShowModelCatalogCommand}"
-                        ToolTip="モデル">
-                    <TextBlock Text="&#xE8B7;" Style="{StaticResource HeaderIconOnlyText}" />
-                </Button>
-                <Button Style="{StaticResource HeaderIconButton}"
-                        Command="{Binding OpenLogsCommand}"
-                        ToolTip="ログ">
-                    <TextBlock Text="&#xE8A5;" Style="{StaticResource HeaderIconOnlyText}" />
                 </Button>
                 <Button Style="{StaticResource HeaderIconButton}"
                         Command="{Binding CheckForUpdatesCommand}"
