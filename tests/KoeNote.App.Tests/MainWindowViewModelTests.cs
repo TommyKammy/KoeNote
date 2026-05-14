@@ -1563,8 +1563,8 @@ public sealed class MainWindowViewModelTests
 
         viewModel.ExportSelectedJobToFolder(string.Empty);
 
-        Assert.StartsWith("レビュー候補の出力に失敗しました:", viewModel.ExportWarning, StringComparison.Ordinal);
-        Assert.StartsWith("レビュー候補の出力に失敗しました:", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.StartsWith("整文の出力に失敗しました:", viewModel.ExportWarning, StringComparison.Ordinal);
+        Assert.StartsWith("整文の出力に失敗しました:", viewModel.LatestLog, StringComparison.Ordinal);
         Assert.Contains(viewModel.Logs, entry => entry.Stage == "export" && entry.Level == "error");
     }
 
@@ -1582,10 +1582,11 @@ public sealed class MainWindowViewModelTests
 
         var viewModel = new MainWindowViewModel(paths);
 
-        Assert.True(viewModel.ExportTxtCommand.CanExecute(null));
+        Assert.False(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.False(viewModel.ExportTxtCommand.CanExecute(null));
         Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
-        Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
+        Assert.False(viewModel.ExportDocxCommand.CanExecute(null));
         Assert.True(viewModel.ExportRawXlsxCommand.CanExecute(null));
         Assert.True(viewModel.ExportPolishedXlsxCommand.CanExecute(null));
         Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
@@ -1605,6 +1606,9 @@ public sealed class MainWindowViewModelTests
             "profile"));
         viewModel.SelectedJob = job;
 
+        Assert.True(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.True(viewModel.ExportTxtCommand.CanExecute(null));
+        Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedMarkdownCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedXlsxCommand.CanExecute(null));

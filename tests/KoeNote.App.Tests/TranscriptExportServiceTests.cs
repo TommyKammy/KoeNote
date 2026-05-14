@@ -28,7 +28,11 @@ public sealed class TranscriptExportServiceTests
         ]);
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        var result = new TranscriptExportService(paths).ExportJob("job-001", output);
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            null,
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished));
 
         Assert.True(result.HasUnresolvedDrafts);
         Assert.Equal(1, result.PendingDraftCount);
@@ -54,6 +58,41 @@ public sealed class TranscriptExportServiceTests
 
         var logs = new JobLogRepository(paths).ReadLatest("job-001");
         Assert.Contains(logs, entry => entry.Stage == "export" && entry.Level == "warning");
+    }
+
+    [Fact]
+    public void ExportJob_DefaultSourceWritesReadableDocumentFormats()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            "job-001",
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Alice: 読める本文です。",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash("job-001"),
+            "seg-001..seg-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        var result = new TranscriptExportService(paths).ExportJob("job-001", output);
+
+        Assert.Equal(4, result.FilePaths.Count);
+        Assert.True(File.Exists(Path.Combine(output, "meeting.txt")));
+        Assert.True(File.Exists(Path.Combine(output, "meeting.md")));
+        Assert.True(File.Exists(Path.Combine(output, "meeting.docx")));
+        Assert.True(File.Exists(Path.Combine(output, "meeting.xlsx")));
+        Assert.False(File.Exists(Path.Combine(output, "meeting.json")));
+        Assert.False(File.Exists(Path.Combine(output, "meeting.srt")));
+        Assert.Contains("読める本文です。", File.ReadAllText(Path.Combine(output, "meeting.txt")), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -89,7 +128,11 @@ public sealed class TranscriptExportServiceTests
         ]);
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        var result = new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Text]);
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Text],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished));
 
         var file = Assert.Single(result.FilePaths);
         Assert.Equal(Path.Combine(output, "selected.txt"), file);
@@ -111,7 +154,7 @@ public sealed class TranscriptExportServiceTests
             "job-001",
             output,
             [TranscriptExportFormat.Text, TranscriptExportFormat.Docx],
-            new TranscriptExportOptions("custom name", IncludeTimestamps: false));
+            new TranscriptExportOptions("custom name", IncludeTimestamps: false, Source: TranscriptExportSource.Polished));
 
         Assert.Contains(Path.Combine(output, "custom name.txt"), result.FilePaths);
         Assert.Contains(Path.Combine(output, "custom name.docx"), result.FilePaths);
@@ -134,7 +177,7 @@ public sealed class TranscriptExportServiceTests
             "job-001",
             output,
             TranscriptExportFormat.Text,
-            new TranscriptExportOptions(IncludeTimestamps: false));
+            new TranscriptExportOptions(IncludeTimestamps: false, Source: TranscriptExportSource.Polished));
 
         var file = Assert.Single(result.FilePaths);
         Assert.Equal(output, file);
@@ -151,7 +194,11 @@ public sealed class TranscriptExportServiceTests
         ]);
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        var result = new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Docx]);
+        var result = new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Docx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished));
 
         var file = Assert.Single(result.FilePaths);
         Assert.Equal(Path.Combine(output, "docx-export.docx"), file);
@@ -395,7 +442,10 @@ public sealed class TranscriptExportServiceTests
             "job-001",
             output,
             [TranscriptExportFormat.Xlsx, TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Docx],
-            new TranscriptExportOptions(IncludeTimestamps: false, MergeConsecutiveSpeakers: true));
+            new TranscriptExportOptions(
+                IncludeTimestamps: false,
+                Source: TranscriptExportSource.Polished,
+                MergeConsecutiveSpeakers: true));
 
         using (var archive = ZipFile.OpenRead(Path.Combine(output, "merge-export.xlsx")))
         {
@@ -464,7 +514,11 @@ public sealed class TranscriptExportServiceTests
         ]);
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Xlsx]);
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished));
 
         using var archive = ZipFile.OpenRead(Path.Combine(output, "no-merge.xlsx"));
         var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
@@ -520,7 +574,7 @@ public sealed class TranscriptExportServiceTests
             "job-001",
             output,
             [TranscriptExportFormat.Json, TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt],
-            new TranscriptExportOptions(MergeConsecutiveSpeakers: true));
+            new TranscriptExportOptions(Source: TranscriptExportSource.Polished, MergeConsecutiveSpeakers: true));
 
         var json = File.ReadAllText(Path.Combine(output, "non-readable.json"));
         Assert.Contains("\"SegmentId\": \"seg-001\"", json, StringComparison.Ordinal);
@@ -545,7 +599,11 @@ public sealed class TranscriptExportServiceTests
         ]);
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
-        new TranscriptExportService(paths).ExportJob("job-001", output, [TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt]);
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt],
+            new TranscriptExportOptions(Source: TranscriptExportSource.Raw));
 
         var srt = File.ReadAllText(Path.Combine(output, "subtitle.srt"));
         Assert.Contains($"spk-1: first line{Environment.NewLine}second line", srt, StringComparison.Ordinal);

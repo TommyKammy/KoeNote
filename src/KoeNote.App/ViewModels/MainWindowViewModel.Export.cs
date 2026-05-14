@@ -16,7 +16,7 @@ public sealed partial class MainWindowViewModel
 
     private Task ExportSelectedJobFormatAsync(TranscriptExportFormat format)
     {
-        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.Polished);
+        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.ReadablePolished);
     }
 
     private Task ExportSelectedJobFormatAsync(TranscriptExportFormat format, TranscriptExportSource source)
@@ -26,7 +26,7 @@ public sealed partial class MainWindowViewModel
 
     private Task ExportSelectedJobWithDialogAsync(TranscriptExportFormat? format)
     {
-        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.Polished);
+        return ExportSelectedJobWithDialogAsync(format, TranscriptExportSource.ReadablePolished);
     }
 
     private Task ExportSelectedJobWithDialogAsync(TranscriptExportFormat? format, TranscriptExportSource source)
@@ -52,7 +52,7 @@ public sealed partial class MainWindowViewModel
 
     public void ExportSelectedJobToFile(string outputPath, TranscriptExportFormat format)
     {
-        ExportSelectedJobToFile(outputPath, format, TranscriptExportSource.Polished);
+        ExportSelectedJobToFile(outputPath, format, TranscriptExportSource.ReadablePolished);
     }
 
     public void ExportSelectedJobToFile(string outputPath, TranscriptExportFormat format, TranscriptExportSource source)
@@ -93,7 +93,7 @@ public sealed partial class MainWindowViewModel
 
     public void ExportSelectedJobToFolder(string outputDirectory, TranscriptExportFormat? format = null)
     {
-        ExportSelectedJobToFolder(outputDirectory, format, TranscriptExportSource.Polished);
+        ExportSelectedJobToFolder(outputDirectory, format, TranscriptExportSource.ReadablePolished);
     }
 
     public void ExportSelectedJobToFolder(

@@ -104,6 +104,12 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"実行\"", headerXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("整文まで実行", headerXaml, StringComparison.Ordinal);
+        Assert.True(
+            headerXaml.IndexOf("<MenuItem Header=\"整文\"", StringComparison.Ordinal) <
+            headerXaml.IndexOf("<MenuItem Header=\"素起こし\"", StringComparison.Ordinal));
+        Assert.True(
+            headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedDocxCommand}\"", StringComparison.Ordinal) <
+            headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedXlsxCommand}\"", StringComparison.Ordinal));
         Assert.Contains("HeaderModelBadgeButton", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleTrack", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleThumb", headerXaml, StringComparison.Ordinal);

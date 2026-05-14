@@ -42,7 +42,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         Directory.CreateDirectory(outputDirectory);
         var selectedFormats = formats is { Count: > 0 }
             ? formats
-            : [TranscriptExportFormat.Text, TranscriptExportFormat.Markdown, TranscriptExportFormat.Json, TranscriptExportFormat.Srt, TranscriptExportFormat.Vtt];
+            : GetDefaultFormats(exportOptions.Source);
         var filePaths = new List<string>();
         var baseName = SanitizeFileName(string.IsNullOrWhiteSpace(exportOptions.BaseFileName)
             ? snapshot.Title
@@ -244,6 +244,28 @@ public sealed class TranscriptExportService(AppPaths paths)
             TranscriptExportFormat.Docx => "docx",
             TranscriptExportFormat.Xlsx => "xlsx",
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
+        };
+    }
+
+    private static IReadOnlyCollection<TranscriptExportFormat> GetDefaultFormats(TranscriptExportSource source)
+    {
+        return source switch
+        {
+            TranscriptExportSource.ReadablePolished =>
+            [
+                TranscriptExportFormat.Text,
+                TranscriptExportFormat.Markdown,
+                TranscriptExportFormat.Docx,
+                TranscriptExportFormat.Xlsx
+            ],
+            _ =>
+            [
+                TranscriptExportFormat.Text,
+                TranscriptExportFormat.Markdown,
+                TranscriptExportFormat.Json,
+                TranscriptExportFormat.Srt,
+                TranscriptExportFormat.Vtt
+            ]
         };
     }
 

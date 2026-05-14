@@ -18,7 +18,7 @@ public sealed class TranscriptExportDialogService
             AddExtension = true,
             OverwritePrompt = true,
             FileName = CreateDefaultFileName(jobFileName, defaultFormat, source),
-            Filter = CreateFilter(format),
+            Filter = CreateFilter(format, source),
             FilterIndex = 1,
             DefaultExt = GetExtension(defaultFormat),
             InitialDirectory = initialDirectory
@@ -29,7 +29,7 @@ public sealed class TranscriptExportDialogService
             return null;
         }
 
-        var selectedFormat = format ?? GetFormatFromFilterIndex(dialog.FilterIndex);
+        var selectedFormat = format ?? GetFormatFromFilterIndex(dialog.FilterIndex, source);
         return new TranscriptExportDialogSelection(
             EnsureExtension(dialog.FileName, selectedFormat),
             selectedFormat,
@@ -68,22 +68,38 @@ public sealed class TranscriptExportDialogService
         var suffix = source switch
         {
             TranscriptExportSource.Raw => ".raw",
-            TranscriptExportSource.Polished => ".polished",
-            TranscriptExportSource.ReadablePolished => ".readable-polished",
+            TranscriptExportSource.Polished => ".review-candidate",
+            TranscriptExportSource.ReadablePolished => string.Empty,
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
         return $"{baseName}{suffix}.{GetExtension(format)}";
     }
 
-    private static string CreateFilter(TranscriptExportFormat? format)
+    private static string CreateFilter(TranscriptExportFormat? format, TranscriptExportSource source)
     {
-        return format is null
-            ? "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|JSON (*.json)|*.json|SRT subtitles (*.srt)|*.srt|WebVTT subtitles (*.vtt)|*.vtt|Word document (*.docx)|*.docx"
-            : $"{GetFilterLabel(format.Value)} (*.{GetExtension(format.Value)})|*.{GetExtension(format.Value)}";
+        if (format is not null)
+        {
+            return $"{GetFilterLabel(format.Value)} (*.{GetExtension(format.Value)})|*.{GetExtension(format.Value)}";
+        }
+
+        return source == TranscriptExportSource.ReadablePolished
+            ? "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|Word document (*.docx)|*.docx|Excel workbook (*.xlsx)|*.xlsx"
+            : "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|JSON (*.json)|*.json|SRT subtitles (*.srt)|*.srt|WebVTT subtitles (*.vtt)|*.vtt|Word document (*.docx)|*.docx";
     }
 
-    private static TranscriptExportFormat GetFormatFromFilterIndex(int filterIndex)
+    private static TranscriptExportFormat GetFormatFromFilterIndex(int filterIndex, TranscriptExportSource source)
     {
+        if (source == TranscriptExportSource.ReadablePolished)
+        {
+            return filterIndex switch
+            {
+                2 => TranscriptExportFormat.Markdown,
+                3 => TranscriptExportFormat.Docx,
+                4 => TranscriptExportFormat.Xlsx,
+                _ => TranscriptExportFormat.Text
+            };
+        }
+
         return filterIndex switch
         {
             2 => TranscriptExportFormat.Markdown,

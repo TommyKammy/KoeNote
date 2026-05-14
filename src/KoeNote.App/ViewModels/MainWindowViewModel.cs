@@ -376,11 +376,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SaveSpeakerInlineEditCommand = new RelayCommand(SaveSpeakerInlineEditAsync, CanEditSelectedSpeaker);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
-        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportSelectedJob);
-        ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportSelectedJob);
-        ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json), CanExportSelectedJob);
-        ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt), CanExportSelectedJob);
-        ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportSelectedJob);
+        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportReadablePolishing);
+        ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportReadablePolishing);
+        ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Polished), CanExportSelectedJob);
+        ExportDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx), CanExportReadablePolishing);
         ExportRawTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawMarkdownCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Markdown, TranscriptExportSource.Raw), CanExportSelectedJob);
         ExportRawXlsxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Xlsx, TranscriptExportSource.Raw), CanExportSelectedJob);
