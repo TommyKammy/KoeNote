@@ -205,65 +205,65 @@
                             <Button Command="{Binding DownloadSelectedModelCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE896;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="ダウンロード" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE896;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="ダウンロード" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding UseSelectedModelCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="使用する" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="使用する" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding ShowSelectedModelLicenseCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="ライセンス" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE8A5;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="ライセンス" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding RegisterPreinstalledModelsCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="再検出" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="再検出" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding PauseSelectedModelDownloadCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE769;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="一時停止" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE769;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="一時停止" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding ResumeSelectedModelDownloadCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="再開" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE768;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="再開" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding RetrySelectedModelDownloadCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="再試行" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="再試行" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding CancelSelectedModelDownloadCommand}"
                                     Style="{StaticResource ModelActionButton}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="中止" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="中止" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding DeleteSelectedModelFilesCommand}"
                                     Style="{StaticResource ModelActionButton}"
                                     ToolTip="選択したモデルファイルと導入済み登録を削除します。">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="モデルファイルを削除" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                    <TextBlock Text="&#xE74D;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
+                                    <TextBlock Text="モデルファイルを削除" Foreground="#FFFFFF" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                         </WrapPanel>

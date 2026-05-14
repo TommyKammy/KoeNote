@@ -201,7 +201,7 @@
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="SelectedPlate" Property="Background" Value="#FFFFFF" />
                                 <Setter TargetName="AccentLine" Property="Background" Value="{StaticResource AccentBrush}" />
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
@@ -211,6 +211,18 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="TranscriptTabHeaderText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#9CA3AF" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="TranscriptCardTabControl" TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -252,6 +264,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="話者:"
@@ -323,9 +336,18 @@
                                         </Button>
                                     </Grid>
                                     <ToggleButton Grid.Column="3"
-                                                  Style="{StaticResource TranscriptInlineToggle}"
                                                   IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"
                                                   ToolTip="再生位置に合わせてセグメントへ自動スクロール">
+                                        <ToggleButton.Style>
+                                            <Style TargetType="ToggleButton" BasedOn="{StaticResource TranscriptInlineToggle}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedTranscriptTabIndex}" Value="0">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ToggleButton.Style>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <TextBlock Text="自動スクロール"
                                                        Foreground="{StaticResource MutedBrush}"
@@ -337,6 +359,60 @@
                                             </Grid>
                                         </StackPanel>
                                     </ToggleButton>
+
+                                    <Button Grid.Column="4"
+                                            Command="{Binding RunReadablePolishingCommand}"
+                                            ToolTip="{Binding ReadablePolishedActionToolTip}"
+                                            VerticalAlignment="Center">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Setter Property="Height" Value="26" />
+                                                <Setter Property="Padding" Value="10,4" />
+                                                <Setter Property="Margin" Value="10,0,0,0" />
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect Color="#22C55E" ShadowDepth="0" BlurRadius="0" Opacity="0" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedTranscriptTabIndex}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsReadablePolishingInProgress}" Value="True">
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard x:Name="PolishGlowSB">
+                                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
+                                                                                     From="4" To="16"
+                                                                                     Duration="0:0:0.85" />
+                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                                                                                     From="0.55" To="1.0"
+                                                                                     Duration="0:0:0.85" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <StopStoryboard BeginStoryboardName="PolishGlowSB" />
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="&#xE70F;"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="12"
+                                                       Foreground="#FFFFFF"
+                                                       Margin="0,0,6,0"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding ReadablePolishedActionText}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#FFFFFF"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
                                 </Grid>
                             </Border>
                             <ContentPresenter x:Name="PART_SelectedContentHost"
@@ -363,13 +439,22 @@
             <TabControl Style="{StaticResource TranscriptCardTabControl}"
                         ItemContainerStyle="{StaticResource TranscriptTabItem}"
                         SelectedIndex="{Binding SelectedTranscriptTabIndex, Mode=TwoWay}">
-                <TabItem Header="整文">
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Text="整文" Style="{StaticResource TranscriptTabHeaderText}" />
+                    </TabItem.Header>
                     <controls:ReadablePolishedPanel />
                 </TabItem>
-                <TabItem Header="素起こし">
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Text="素起こし" Style="{StaticResource TranscriptTabHeaderText}" />
+                    </TabItem.Header>
                     <controls:TranscriptSegmentList DisplayMode="Raw" />
                 </TabItem>
-                <TabItem Header="差分">
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Text="差分" Style="{StaticResource TranscriptTabHeaderText}" />
+                    </TabItem.Header>
                     <controls:TranscriptSegmentList DisplayMode="Diff" />
                 </TabItem>
                 <TabItem>
@@ -405,8 +490,8 @@
                                 </Border.Style>
                             </Border>
                             <TextBlock Text="レビュー候補"
+                                       Style="{StaticResource TranscriptTabHeaderText}"
                                        HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
                                        TextTrimming="None" />
                         </Grid>
                     </TabItem.Header>
