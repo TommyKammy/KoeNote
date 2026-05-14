@@ -34,10 +34,6 @@
                       VerticalScrollBarVisibility="Auto">
             <Grid Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}">
-                <Grid.LayoutTransform>
-                    <ScaleTransform ScaleX="{Binding MainContentZoomScale}"
-                                    ScaleY="{Binding MainContentZoomScale}" />
-                </Grid.LayoutTransform>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4*" MinWidth="176" />
                     <ColumnDefinition Width="1" />
@@ -254,17 +250,19 @@
                             <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" />
                         </Button>
                     </Grid>
-                    <TabControl BorderThickness="0"
-                                Background="Transparent"
+                    <TabControl Style="{StaticResource CardTabControl}"
                                 SelectedIndex="{Binding SelectedDetailPanelTabIndex, Mode=TwoWay}">
                         <TabItem Header="設定">
                             <controls:SettingsTab />
                         </TabItem>
-                        <TabItem Header="セットアップ">
-                            <controls:SetupWizardTab />
+                        <TabItem Header="辞書プリセット">
+                            <controls:DomainPresetTab />
                         </TabItem>
                         <TabItem Header="モデル">
                             <controls:ModelCatalogTab />
+                        </TabItem>
+                        <TabItem Header="セットアップ">
+                            <controls:SetupWizardTab />
                         </TabItem>
                         <TabItem Header="ログ">
                             <DockPanel>

@@ -45,6 +45,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private const int RawTranscriptTabIndex = 1;
     private const int DiffTranscriptTabIndex = 2;
     private const int ReviewCandidateTranscriptTabIndex = 3;
+    private const double TranscriptBodyBaseFontSize = 14.0;
+    private const double TranscriptBodyBaseLineHeight = 22.0;
+    private const double ReadableDocumentBaseFontSize = 14.0;
+    private const double ReadableDocumentBaseLineHeight = 23.0;
 
     private readonly JobRepository _jobRepository;
     private readonly JobLogRepository _jobLogRepository;
@@ -1649,7 +1653,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedLogPanelTabIndex;
         set
         {
-            if (SetField(ref _selectedLogPanelTabIndex, Math.Clamp(value, 0, 3)) &&
+            if (SetField(ref _selectedLogPanelTabIndex, Math.Clamp(value, 0, 4)) &&
                 OpenSelectedDetailPanelCommand is RelayCommand openWideCommand)
             {
                 openWideCommand.RaiseCanExecuteChanged();
@@ -1662,7 +1666,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedDetailPanelTabIndex;
         set
         {
-            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 3)))
+            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 4)))
             {
                 OnPropertyChanged(nameof(DetailPanelTitle));
                 SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex;
@@ -1703,9 +1707,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string DetailPanelTitle => SelectedDetailPanelTabIndex switch
     {
         0 => "設定",
-        1 => "セットアップ / モデル導入",
+        1 => "辞書プリセット",
         2 => "モデル",
-        3 => "ログ",
+        3 => "セットアップ / モデル導入",
+        4 => "ログ",
         _ => "詳細"
     };
 
@@ -2107,6 +2112,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string MainContentZoomToolTip => _mainContentZoomState.ToolTip;
 
+    public double TranscriptContentFontScale => _mainContentZoomState.Scale;
+
+    public double TranscriptBodyFontSize => TranscriptBodyBaseFontSize * TranscriptContentFontScale;
+
+    public double TranscriptBodyLineHeight => TranscriptBodyBaseLineHeight * TranscriptContentFontScale;
+
+    public double ReadableDocumentFontSize => ReadableDocumentBaseFontSize * TranscriptContentFontScale;
+
+    public double ReadableDocumentLineHeight => ReadableDocumentBaseLineHeight * TranscriptContentFontScale;
+
     public string AsrContextText
     {
         get => _asrContextText;
@@ -2378,6 +2393,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(MainContentZoomScale));
         OnPropertyChanged(nameof(MainContentZoomPercentText));
         OnPropertyChanged(nameof(MainContentZoomToolTip));
+        OnPropertyChanged(nameof(TranscriptContentFontScale));
+        OnPropertyChanged(nameof(TranscriptBodyFontSize));
+        OnPropertyChanged(nameof(TranscriptBodyLineHeight));
+        OnPropertyChanged(nameof(ReadableDocumentFontSize));
+        OnPropertyChanged(nameof(ReadableDocumentLineHeight));
         UpdateZoomCommandStates();
     }
 

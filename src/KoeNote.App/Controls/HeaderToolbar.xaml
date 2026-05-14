@@ -153,30 +153,6 @@
                     </StackPanel>
                 </Button>
 
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="8,0,0,0"
-                            Opacity="0.5">
-                    <Button Style="{StaticResource HeaderIconButton}"
-                            Command="{Binding ZoomOutCommand}"
-                            ToolTip="{Binding MainContentZoomToolTip}">
-                        <TextBlock Text="&#xE71F;" Style="{StaticResource HeaderIconOnlyText}" />
-                    </Button>
-                    <Button Style="{StaticResource HeaderGhostButton}"
-                            Command="{Binding ResetZoomCommand}"
-                            Padding="8,0"
-                            MinWidth="38"
-                            ToolTip="表示倍率を100%に戻す">
-                        <TextBlock Text="{Binding MainContentZoomPercentText}"
-                                   Style="{StaticResource HeaderToolText}"
-                                   FontSize="11" />
-                    </Button>
-                    <Button Style="{StaticResource HeaderIconButton}"
-                            Command="{Binding ZoomInCommand}"
-                            ToolTip="{Binding MainContentZoomToolTip}">
-                        <TextBlock Text="&#xE8A3;" Style="{StaticResource HeaderIconOnlyText}" />
-                    </Button>
-                </StackPanel>
             </StackPanel>
 
             <StackPanel Grid.Column="2"

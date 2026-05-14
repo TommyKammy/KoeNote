@@ -159,74 +159,100 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0">
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource LucideInlineIconBadge}"
-                                            Background="{StaticResource AccentLightBrush}"
-                                            CornerRadius="4">
-                                        <Path Style="{StaticResource LucidePathIcon}"
-                                              Width="14"
-                                              Height="14"
-                                              Stroke="{StaticResource AccentBrush}"
-                                              Data="M10 5h11M10 12h11M10 19h11M3 10l3-3-3-3M3 20l3-3-3-3" />
-                                    </Border>
-                                    <TextBlock Text="要約"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="本文が更新されています"
-                                               Foreground="{StaticResource WarningBrush}"
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Style="{StaticResource LucideInlineIconBadge}"
+                                        Background="{StaticResource AccentLightBrush}"
+                                        CornerRadius="4">
+                                    <Path Style="{StaticResource LucidePathIcon}"
+                                          Width="14"
+                                          Height="14"
+                                          Stroke="{StaticResource AccentBrush}"
+                                          Data="M10 5h11M10 12h11M10 19h11M3 10l3-3-3-3M3 20l3-3-3-3" />
+                                </Border>
+                                <TextBlock Text="要約"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="本文が更新されています"
+                                           Foreground="{StaticResource WarningBrush}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,12,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSummaryStale}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="生成中"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,12,0"
+                                           Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
+                                <Button Command="{Binding RunPostSummaryCommand}"
+                                        ToolTip="{Binding SummaryActionToolTip}"
+                                        MinWidth="90"
+                                        Height="28"
+                                        Padding="10,4"
+                                        Style="{StaticResource OutlineSuccessButton}">
+                                    <TextBlock Text="{Binding SummaryActionText}"
+                                               Foreground="#FFFFFF"
                                                FontSize="12"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,12,0">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSummaryStale}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <TextBlock Text="生成中"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,12,0"
-                                               Style="{StaticResource VisibleWhenSummaryRunningStyle}" />
-                                    <Button Command="{Binding RunPostSummaryCommand}"
-                                            ToolTip="{Binding SummaryActionToolTip}"
-                                            MinWidth="90"
-                                            Height="28"
-                                            Padding="10,4"
-                                            Style="{StaticResource OutlineSuccessButton}">
-                                        <TextBlock Text="{Binding SummaryActionText}"
-                                                   Foreground="#FFFFFF"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold" />
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                                               FontWeight="SemiBold" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
 
-                            <Border Background="#FAFBFC"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    Padding="16,14"
-                                    Style="{StaticResource VisibleWhenNoSummaryStyle}">
-                                <StackPanel>
+                        <Border Grid.Row="1"
+                                Background="#FAFBFC"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="18"
+                                Style="{StaticResource VisibleWhenNoSummaryStyle}">
+                            <Grid>
+                                <StackPanel HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <Grid Width="34"
+                                          Height="34"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,10">
+                                        <Grid.RenderTransform>
+                                            <ScaleTransform ScaleX="1.18" ScaleY="1.18" CenterX="17" CenterY="17" />
+                                        </Grid.RenderTransform>
+                                        <Path Fill="#E9E2F4"
+                                              Data="M8 3H19L25 9V28H8Z" />
+                                        <Path Fill="#CDBDE7"
+                                              Data="M19 3V9H25Z" />
+                                        <Path Stroke="#B9A7D6"
+                                              StrokeThickness="1.35"
+                                              StrokeStartLineCap="Round"
+                                              Data="M11 12.5H21M11 16.5H21M11 20.5H18" />
+                                        <Path Fill="#F97316"
+                                              Data="M18.5 24L25.5 17C26.1 16.4 27.1 16.4 27.7 17L28.3 17.6C28.9 18.2 28.9 19.2 28.3 19.8L21.3 26.8L17.9 27.4Z" />
+                                        <Path Fill="#7C3AED"
+                                              Data="M17.9 27.4L18.5 24L21.3 26.8Z" />
+                                        <Path Stroke="#FFFFFF"
+                                              StrokeThickness="1.15"
+                                              StrokeStartLineCap="Round"
+                                              Data="M24.7 17.8L27.5 20.6" />
+                                    </Grid>
                                     <TextBlock Text="要約はまだありません"
                                                FontWeight="SemiBold"
                                                TextAlignment="Center"
@@ -236,9 +262,8 @@
                                                TextWrapping="Wrap"
                                                TextAlignment="Center" />
                                 </StackPanel>
-                            </Border>
-
-                        </StackPanel>
+                            </Grid>
+                        </Border>
 
                         <TextBox Grid.Row="1"
                                  Text="{Binding SummaryContentDisplay, Mode=OneWay}"

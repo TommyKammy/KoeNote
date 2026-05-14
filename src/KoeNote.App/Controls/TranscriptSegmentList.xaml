@@ -62,19 +62,14 @@
                             Margin="0,0,8,0"
                             ToolTip="修正済み原文からレビュー候補を再生成します" />
                     <Button Command="{Binding RunReadablePolishingCommand}"
-                            Padding="12,6"
+                            Padding="10,6"
                             MinWidth="0"
                             Style="{StaticResource OutlineSuccessButton}"
                             ToolTip="修正済み原文から整文を再生成します">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE70F;"
-                                       Style="{StaticResource IconText}"
-                                       Foreground="{StaticResource AccentBrush}" />
-                            <TextBlock Text="この原文から再整文"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       FontSize="12"
-                                       FontWeight="SemiBold" />
-                        </StackPanel>
+                        <TextBlock Text="再整文"
+                                   Foreground="#FFFFFF"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
                     </Button>
                 </WrapPanel>
             </Grid>
@@ -113,6 +108,9 @@
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                                 <MultiDataTrigger>
@@ -189,14 +187,18 @@
                                        FontSize="12"
                                        VerticalAlignment="Top" />
                             <Border Grid.Column="1"
-                                    Background="#F1F5F9"
+                                    Background="{Binding Speaker, Converter={StaticResource SpeakerChipBrushConverter}}"
+                                    BorderBrush="{Binding Speaker, Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Border}"
+                                    BorderThickness="1"
                                     CornerRadius="12"
                                     Padding="9,4"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     MouseLeftButtonDown="OnSpeakerMouseLeftButtonDown"
                                     Style="{StaticResource SpeakerDisplayStyle}">
-                                <TextBlock Text="{Binding Speaker}" FontSize="12" Foreground="#475569" />
+                                <TextBlock Text="{Binding Speaker}"
+                                           FontSize="12"
+                                           Foreground="{Binding Speaker, Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Foreground}" />
                             </Border>
                             <TextBox Grid.Column="1"
                                      Tag="InlineSpeakerEditor"
@@ -215,9 +217,9 @@
                                        Text="{Binding Text}"
                                        TextWrapping="Wrap"
                                        TextTrimming="None"
-                                       FontSize="14"
+                                       FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                        FontWeight="Normal"
-                                       LineHeight="22"
+                                       LineHeight="{Binding DataContext.TranscriptBodyLineHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                        Style="{StaticResource InlineDisplayTextStyle}"
                                        MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
                             <Grid Grid.Column="2"
@@ -240,8 +242,9 @@
                                                    Margin="0,0,0,4" />
                                         <TextBlock Text="{Binding RawTranscriptText}"
                                                    TextWrapping="Wrap"
+                                                   FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                    FontWeight="Normal"
-                                                   LineHeight="21" />
+                                                   LineHeight="{Binding DataContext.TranscriptBodyLineHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Row="1"
@@ -269,8 +272,9 @@
                                                    Margin="0,0,0,4" />
                                         <TextBlock Text="{Binding PolishedTranscriptText}"
                                                    TextWrapping="Wrap"
+                                                   FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                    FontWeight="Normal"
-                                                   LineHeight="21" />
+                                                   LineHeight="{Binding DataContext.TranscriptBodyLineHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -281,6 +285,7 @@
                                          AcceptsReturn="True"
                                          MinHeight="54"
                                          Padding="10,8"
+                                         FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                          VerticalContentAlignment="Top"
                                          LostKeyboardFocus="OnInlineSegmentEditorLostKeyboardFocus"
                                          ToolTip="選択中のセグメントを編集します。別の場所をクリックすると自動保存されます。" />

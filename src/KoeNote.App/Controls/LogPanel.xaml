@@ -41,18 +41,21 @@
                             </StackPanel>
                         </Button>
                     </Grid>
-                    <TabControl BorderThickness="0" Background="Transparent" SelectedIndex="{Binding SelectedLogPanelTabIndex, Mode=TwoWay}">
-                        <TabItem Header="ログ">
-                            <controls:LogEntriesTab DataContext="{Binding DataContext, ElementName=Root}" />
-                        </TabItem>
+                    <TabControl Style="{StaticResource CardTabControl}" SelectedIndex="{Binding SelectedLogPanelTabIndex, Mode=TwoWay}">
                         <TabItem Header="設定">
                             <controls:SettingsTab DataContext="{Binding DataContext, ElementName=Root}" />
+                        </TabItem>
+                        <TabItem Header="辞書プリセット">
+                            <controls:DomainPresetTab DataContext="{Binding DataContext, ElementName=Root}" />
+                        </TabItem>
+                        <TabItem Header="モデル">
+                            <controls:ModelCatalogTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
                         <TabItem Header="セットアップ">
                             <controls:SetupWizardTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
-                        <TabItem Header="モデル">
-                            <controls:ModelCatalogTab DataContext="{Binding DataContext, ElementName=Root}" />
+                        <TabItem Header="ログ">
+                            <controls:LogEntriesTab DataContext="{Binding DataContext, ElementName=Root}" />
                         </TabItem>
                     </TabControl>
                 </DockPanel>

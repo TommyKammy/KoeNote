@@ -51,6 +51,32 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="TranscriptZoomButton" TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        </Style>
+        <Style x:Key="TranscriptZoomTextButton" TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        </Style>
+        <Style x:Key="TranscriptZoomIconText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
         <Style x:Key="SpeakerChipComboBox" TargetType="ComboBox">
             <Setter Property="Height" Value="26" />
             <Setter Property="Background" Value="#F3F4F6" />
@@ -69,11 +95,14 @@
                             <ToggleButton x:Name="ToggleButton"
                                           Background="{TemplateBinding Background}"
                                           Focusable="False"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Tag="{Binding SelectionBoxItem, RelativeSource={RelativeSource TemplatedParent}}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
                                         <Border x:Name="Chrome"
-                                                Background="{TemplateBinding Background}"
+                                                Background="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource SpeakerChipBrushConverter}}"
+                                                BorderBrush="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Border}"
+                                                BorderThickness="1"
                                                 CornerRadius="13"
                                                 Padding="10,0,8,0">
                                             <Grid>
@@ -81,20 +110,23 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <ContentPresenter HorizontalAlignment="Left"
-                                                                  VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                           Foreground="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Foreground}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" />
                                                 <TextBlock Grid.Column="1"
                                                            Text="&#xE70D;"
                                                            FontFamily="Segoe MDL2 Assets"
                                                            FontSize="8"
-                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Foreground="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Foreground}"
                                                            VerticalAlignment="Center"
                                                            Margin="5,0,0,0" />
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Chrome" Property="Background" Value="#E5E7EB" />
+                                                <Setter TargetName="Chrome" Property="Opacity" Value="0.82" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -128,32 +160,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="PillSearchTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="Chrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="14">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -239,6 +245,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="文字起こし"
                                                FontSize="13"
@@ -252,6 +259,31 @@
                                               KeyboardNavigation.TabIndex="1"
                                               VerticalAlignment="Center"
                                               Background="Transparent" />
+                                    <StackPanel Grid.Column="2"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Right"
+                                                Margin="10,0,0,0">
+                                        <Button Style="{StaticResource TranscriptZoomButton}"
+                                                Command="{Binding ZoomOutCommand}"
+                                                ToolTip="{Binding MainContentZoomToolTip}">
+                                            <TextBlock Text="&#xE71F;" Style="{StaticResource TranscriptZoomIconText}" />
+                                        </Button>
+                                        <Button Style="{StaticResource TranscriptZoomTextButton}"
+                                                Command="{Binding ResetZoomCommand}"
+                                                ToolTip="本文フォントサイズを100%に戻す">
+                                            <TextBlock Text="{Binding MainContentZoomPercentText}"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" />
+                                        </Button>
+                                        <Button Style="{StaticResource TranscriptZoomButton}"
+                                                Command="{Binding ZoomInCommand}"
+                                                ToolTip="{Binding MainContentZoomToolTip}">
+                                            <TextBlock Text="&#xE8A3;" Style="{StaticResource TranscriptZoomIconText}" />
+                                        </Button>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                             <Border DockPanel.Dock="Top"
@@ -279,32 +311,64 @@
                                               MinWidth="70"
                                               Margin="0,0,8,0"
                                               HorizontalAlignment="Left"
-                                              HorizontalContentAlignment="Left" />
+                                              HorizontalContentAlignment="Left">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{Binding Converter={StaticResource SpeakerChipBrushConverter}}"
+                                                        BorderBrush="{Binding Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Border}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="12"
+                                                        Padding="9,4"
+                                                        Margin="0,1">
+                                                    <TextBlock Text="{Binding}"
+                                                               Foreground="{Binding Converter={StaticResource SpeakerChipBrushConverter}, ConverterParameter=Foreground}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                     <Grid Grid.Column="2"
                                           Width="200"
                                           Height="28"
-                                          HorizontalAlignment="Left">
+                                          HorizontalAlignment="Left"
+                                          Background="Transparent"
+                                          PreviewMouseLeftButtonDown="OnSegmentSearchBoxPreviewMouseLeftButtonDown">
+                                        <Border Background="#FFFFFF"
+                                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                                BorderThickness="1"
+                                                CornerRadius="14" />
                                         <TextBox x:Name="SegmentSearchTextBox"
-                                                 Style="{StaticResource PillSearchTextBox}"
+                                                 Style="{StaticResource SearchPillTextBox}"
                                                  Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                                 Height="28"
-                                                 Padding="30,0,32,0"
-                                                 VerticalContentAlignment="Center"
+                                                 GotKeyboardFocus="OnSegmentSearchBoxGotKeyboardFocus"
+                                                 PreviewMouseLeftButtonDown="OnSegmentSearchTextBoxPreviewMouseLeftButtonDown"
                                                  ToolTip="発話内容を検索" />
-                                        <TextBlock Text="&#xE721;"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="13"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Left"
-                                                   Margin="12,0,0,0"
-                                                   IsHitTestVisible="False" />
+                                        <Grid Width="14"
+                                              Height="14"
+                                              Margin="12,0,0,0"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              IsHitTestVisible="False">
+                                            <Ellipse Width="8"
+                                                     Height="8"
+                                                     Stroke="#2563EB"
+                                                     StrokeThickness="1.7"
+                                                     HorizontalAlignment="Left"
+                                                     VerticalAlignment="Top"
+                                                     Margin="1.5,1.5,0,0" />
+                                            <Path Data="M8.6 8.6 L12.5 12.5"
+                                                  Stroke="{StaticResource MutedBrush}"
+                                                  StrokeThickness="1.7"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Grid>
                                         <TextBlock Text="テキストを検索"
                                                    Foreground="{StaticResource MutedBrush}"
                                                    FontSize="12"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Left"
-                                                   Margin="32,0,0,0"
+                                                   Margin="36,0,0,0"
                                                    IsHitTestVisible="False">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">

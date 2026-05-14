@@ -33,7 +33,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ZoomCommands_AdjustAndPersistMainContentZoom()
+    public void ZoomCommands_AdjustAndPersistTranscriptContentFontScale()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var paths = new AppPaths(root, root, AppContext.BaseDirectory);
@@ -41,17 +41,28 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(1.0, first.MainContentZoomScale);
         Assert.Equal("100%", first.MainContentZoomPercentText);
+        Assert.Equal(14.0, first.TranscriptBodyFontSize);
+        Assert.Equal(22.0, first.TranscriptBodyLineHeight);
+        Assert.Equal(14.0, first.ReadableDocumentFontSize);
+        Assert.Equal(23.0, first.ReadableDocumentLineHeight);
+        Assert.Contains("本文", first.MainContentZoomToolTip, StringComparison.Ordinal);
 
         first.ZoomInCommand.Execute(null);
         Assert.Equal(1.1, first.MainContentZoomScale, 3);
         Assert.Equal("110%", first.MainContentZoomPercentText);
+        Assert.Equal(15.4, first.TranscriptBodyFontSize, 3);
+        Assert.Equal(24.2, first.TranscriptBodyLineHeight, 3);
+        Assert.Equal(15.4, first.ReadableDocumentFontSize, 3);
+        Assert.Equal(25.3, first.ReadableDocumentLineHeight, 3);
         Assert.True(first.ZoomOutCommand.CanExecute(null));
 
         var second = new MainWindowViewModel(paths);
         Assert.Equal(1.1, second.MainContentZoomScale, 3);
+        Assert.Equal(15.4, second.TranscriptBodyFontSize, 3);
 
         second.ResetZoomCommand.Execute(null);
         Assert.Equal(1.0, second.MainContentZoomScale);
+        Assert.Equal(14.0, second.TranscriptBodyFontSize);
         Assert.False(second.ResetZoomCommand.CanExecute(null));
     }
 
@@ -2128,8 +2139,8 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("モデル", viewModel.DetailPanelTitle);
 
         viewModel.OpenLogsCommand.Execute(null);
-        Assert.Equal(3, viewModel.SelectedLogPanelTabIndex);
-        Assert.Equal(3, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal(4, viewModel.SelectedLogPanelTabIndex);
+        Assert.Equal(4, viewModel.SelectedDetailPanelTabIndex);
         Assert.Equal("ログ", viewModel.DetailPanelTitle);
 
         viewModel.OpenSetupCommand.Execute(null);
@@ -2334,6 +2345,13 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsDetailPanelOpen);
         Assert.Equal(2, viewModel.SelectedDetailPanelTabIndex);
         Assert.Equal("モデル", viewModel.DetailPanelTitle);
+
+        viewModel.SelectedLogPanelTabIndex = 1;
+        viewModel.OpenSelectedDetailPanelCommand.Execute(null);
+
+        Assert.True(viewModel.IsDetailPanelOpen);
+        Assert.Equal(1, viewModel.SelectedDetailPanelTabIndex);
+        Assert.Equal("辞書プリセット", viewModel.DetailPanelTitle);
 
         viewModel.CloseDetailPanelCommand.Execute(null);
         Assert.False(viewModel.IsDetailPanelOpen);

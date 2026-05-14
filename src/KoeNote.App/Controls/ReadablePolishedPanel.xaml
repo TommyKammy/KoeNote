@@ -99,7 +99,7 @@
                          BorderThickness="0"
                          Background="Transparent"
                          Padding="0"
-                         FontSize="14"
+                         FontSize="{Binding ReadableDocumentFontSize}"
                          FontWeight="Normal"
                          Foreground="{StaticResource TextBrush}"
                          TextWrapping="Wrap"
@@ -111,9 +111,9 @@
                               HorizontalScrollBarVisibility="Disabled"
                               Style="{StaticResource VisibleWhenNoReadablePolishedContent}">
                     <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
-                               FontSize="14"
+                               FontSize="{Binding ReadableDocumentFontSize}"
                                FontWeight="Normal"
-                               LineHeight="23"
+                               LineHeight="{Binding ReadableDocumentLineHeight}"
                                Foreground="{StaticResource TextBrush}"
                                TextWrapping="Wrap" />
                 </ScrollViewer>

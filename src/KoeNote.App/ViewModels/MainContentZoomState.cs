@@ -27,7 +27,7 @@ internal sealed class MainContentZoomState
 
     public string PercentText => $"{Scale * 100:0}%";
 
-    public string ToolTip => $"表示倍率 {PercentText}";
+    public string ToolTip => $"文字起こし本文のフォントサイズ {PercentText}";
 
     public bool CanZoomOut => Scale > MinScale + 0.001;
 

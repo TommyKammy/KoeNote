@@ -17,7 +17,7 @@ public sealed partial class MainWindowViewModel
     private Task OpenLogsAsync()
     {
         RefreshLogs();
-        OpenDetailPanel(3);
+        OpenDetailPanel(4);
         LatestLog = "Logs opened.";
         return Task.CompletedTask;
     }
@@ -180,7 +180,7 @@ public sealed partial class MainWindowViewModel
 
     private void OpenDetailPanel(int logPanelTabIndex)
     {
-        SelectedLogPanelTabIndex = Math.Clamp(logPanelTabIndex, 0, 3);
+        SelectedLogPanelTabIndex = Math.Clamp(logPanelTabIndex, 0, 4);
         SelectedDetailPanelTabIndex = SelectedLogPanelTabIndex;
         OnPropertyChanged(nameof(DetailPanelTitle));
         IsDetailPanelOpen = true;
