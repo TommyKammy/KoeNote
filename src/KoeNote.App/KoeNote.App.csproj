@@ -32,6 +32,10 @@
              Link="README.distribution.md"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
+    <Content Include="..\..\distribution\presets\*.json"
+             Link="presets\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always" />
     <Content Include="..\..\scripts\asr\*.py"
              Link="scripts\asr\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"

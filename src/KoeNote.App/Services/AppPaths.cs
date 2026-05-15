@@ -13,7 +13,8 @@ public sealed record AppPathOptions(
     string? LocalAppDataRoot = null,
     string? ProgramDataRoot = null,
     string? AppBaseDirectory = null,
-    InstallScope InstallScope = InstallScope.CurrentUser);
+    InstallScope InstallScope = InstallScope.CurrentUser,
+    string? DocumentsRoot = null);
 
 public sealed class AppPaths
 {
@@ -33,6 +34,14 @@ public sealed class AppPaths
         var localAppData = options.LocalAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var programData = options.ProgramDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var baseDirectory = options.AppBaseDirectory ?? AppContext.BaseDirectory;
+        var documents = options.DocumentsRoot
+            ?? (options.AppDataRoot is null
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                : Path.Combine(appData, "Documents"));
+        if (string.IsNullOrWhiteSpace(documents))
+        {
+            documents = Path.Combine(appData, "Documents");
+        }
 
         InstallScope = options.InstallScope;
         Root = Path.Combine(appData, "KoeNote");
@@ -48,7 +57,10 @@ public sealed class AppPaths
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         UpdateDownloads = Path.Combine(localAppData, "KoeNote", "updates");
         UpdateHistoryPath = Path.Combine(UpdateDownloads, "history.jsonl");
+        UserDocumentsKoeNoteDirectory = Path.Combine(documents, "KoeNote");
+        DomainPresetDirectory = Path.Combine(UserDocumentsKoeNoteDirectory, "dic_preset");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
+        BundledDomainPresetDirectory = Path.Combine(baseDirectory, "presets");
         AsrRuntimeDirectory = Path.Combine(RuntimeTools, "asr");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
         PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
@@ -105,6 +117,12 @@ public sealed class AppPaths
     public string UpdateDownloads { get; }
 
     public string UpdateHistoryPath { get; }
+
+    public string UserDocumentsKoeNoteDirectory { get; }
+
+    public string DomainPresetDirectory { get; }
+
+    public string BundledDomainPresetDirectory { get; }
 
     public string PythonPackages { get; }
 
@@ -173,6 +191,8 @@ public sealed class AppPaths
         Directory.CreateDirectory(PythonPackages);
         Directory.CreateDirectory(PythonEnvironments);
         Directory.CreateDirectory(UpdateBackups);
+        Directory.CreateDirectory(DomainPresetDirectory);
+        CopyBundledDomainPresets();
 
         if (!File.Exists(SettingsPath))
         {
@@ -183,6 +203,26 @@ public sealed class AppPaths
                   "networkAccess": false
                 }
                 """);
+        }
+    }
+
+    private void CopyBundledDomainPresets()
+    {
+        if (!Directory.Exists(BundledDomainPresetDirectory))
+        {
+            return;
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(BundledDomainPresetDirectory, "*.json", SearchOption.TopDirectoryOnly))
+        {
+            var destinationPath = Path.Combine(DomainPresetDirectory, Path.GetFileName(sourcePath));
+            if (Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase) ||
+                File.Exists(destinationPath))
+            {
+                continue;
+            }
+
+            File.Copy(sourcePath, destinationPath);
         }
     }
 }

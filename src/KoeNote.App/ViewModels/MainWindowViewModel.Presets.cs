@@ -8,10 +8,12 @@ public sealed partial class MainWindowViewModel
 {
     private Task ImportDomainPresetAsync()
     {
+        Directory.CreateDirectory(Paths.DomainPresetDirectory);
         var dialog = new OpenFileDialog
         {
             Title = "専門領域プリセットを選択",
             Filter = "KoeNote プリセット (*.json)|*.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = Paths.DomainPresetDirectory,
             Multiselect = false
         };
 

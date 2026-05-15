@@ -94,7 +94,8 @@
                 CornerRadius="0"
                 Padding="18">
             <Grid>
-                <TextBox Text="{Binding ReadablePolishedContent, Mode=OneWay}"
+                <TextBox x:Name="ReadablePolishedTextBox"
+                         Text="{Binding ReadablePolishedContent, Mode=OneWay}"
                          IsReadOnly="True"
                          BorderThickness="0"
                          Background="Transparent"

@@ -502,7 +502,13 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshPlaybackState()
     {
-        PlaybackDurationSeconds = _audioPlaybackService.Duration.TotalSeconds;
+        var durationSeconds = _audioPlaybackService.Duration.TotalSeconds;
+        if (durationSeconds <= 0 && Segments.Count > 0)
+        {
+            durationSeconds = Segments.Max(static segment => segment.EndSeconds);
+        }
+
+        PlaybackDurationSeconds = durationSeconds;
 
         _isRefreshingPlaybackPosition = true;
         try

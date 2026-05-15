@@ -85,7 +85,10 @@
                                    FontSize="12"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
-                        <Grid>
+                        <Grid Width="30"
+                              Height="17"
+                              Margin="8,0,0,0"
+                              ClipToBounds="True">
                             <Border Style="{StaticResource HeaderToggleTrack}" />
                             <Ellipse Style="{StaticResource HeaderToggleThumb}" />
                         </Grid>

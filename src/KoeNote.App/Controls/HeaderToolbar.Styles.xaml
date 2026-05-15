@@ -193,7 +193,6 @@
     <Setter Property="Height" Value="17" />
     <Setter Property="CornerRadius" Value="9" />
     <Setter Property="Background" Value="#CBD5E1" />
-    <Setter Property="Margin" Value="8,0,0,0" />
     <Style.Triggers>
         <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
@@ -210,8 +209,35 @@
     <Setter Property="Margin" Value="2,0,0,0" />
     <Style.Triggers>
         <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
-            <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Margin" Value="15,0,0,0" />
+            <DataTrigger.EnterActions>
+                <BeginStoryboard>
+                    <Storyboard>
+                        <ThicknessAnimation Storyboard.TargetProperty="Margin"
+                                            From="2,0,0,0"
+                                            To="15,0,0,0"
+                                            Duration="0:0:0.18">
+                            <ThicknessAnimation.EasingFunction>
+                                <CubicEase EasingMode="EaseOut" />
+                            </ThicknessAnimation.EasingFunction>
+                        </ThicknessAnimation>
+                    </Storyboard>
+                </BeginStoryboard>
+            </DataTrigger.EnterActions>
+            <DataTrigger.ExitActions>
+                <BeginStoryboard>
+                    <Storyboard>
+                        <ThicknessAnimation Storyboard.TargetProperty="Margin"
+                                            From="15,0,0,0"
+                                            To="2,0,0,0"
+                                            Duration="0:0:0.18">
+                            <ThicknessAnimation.EasingFunction>
+                                <CubicEase EasingMode="EaseOut" />
+                            </ThicknessAnimation.EasingFunction>
+                        </ThicknessAnimation>
+                    </Storyboard>
+                </BeginStoryboard>
+            </DataTrigger.ExitActions>
         </DataTrigger>
     </Style.Triggers>
 </Style>

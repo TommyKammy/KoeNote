@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Media;
 
 namespace KoeNote.App.Services.Audio;
@@ -31,12 +32,15 @@ public interface IAudioPlaybackService
 public sealed class AudioPlaybackService : IAudioPlaybackService
 {
     private readonly MediaPlayer _player = new();
+    private TimeSpan _clockPosition = TimeSpan.Zero;
+    private DateTimeOffset? _clockStartedAt;
+    private double _playbackRate = 1.0;
 
     public AudioPlaybackService()
     {
         _player.MediaOpened += (_, _) => PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         _player.MediaEnded += (_, _) => Stop();
-        _player.MediaFailed += (_, _) => Stop();
+        _player.MediaFailed += (_, _) => ContinueWithClockFallback();
     }
 
     public event EventHandler? PlaybackStateChanged;
@@ -45,11 +49,28 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
 
     public string? CurrentPath { get; private set; }
 
-    public TimeSpan Position => _player.Position;
+    public TimeSpan Position => ClampToDuration(IsPlaying ? EstimatePlaybackPosition() : _clockPosition);
 
-    public TimeSpan Duration => _player.NaturalDuration.HasTimeSpan
-        ? _player.NaturalDuration.TimeSpan
-        : TimeSpan.Zero;
+    public TimeSpan Duration
+    {
+        get
+        {
+            try
+            {
+                return _player.NaturalDuration.HasTimeSpan
+                    ? _player.NaturalDuration.TimeSpan
+                    : TimeSpan.Zero;
+            }
+            catch (InvalidOperationException)
+            {
+                return TimeSpan.Zero;
+            }
+            catch (COMException)
+            {
+                return TimeSpan.Zero;
+            }
+        }
+    }
 
     public bool Toggle(string audioPath)
     {
@@ -75,8 +96,21 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
             return true;
         }
 
-        _player.Open(new Uri(fullPath, UriKind.Absolute));
+        try
+        {
+            _player.Open(new Uri(fullPath, UriKind.Absolute));
+        }
+        catch (InvalidOperationException)
+        {
+            // Keep the file selected so the UI clock can still be used on hosts without audio playback support.
+        }
+        catch (COMException)
+        {
+            // Keep the file selected so the UI clock can still be used on hosts without audio playback support.
+        }
+
         CurrentPath = fullPath;
+        ResetPlaybackClock();
         SetIsPlaying(false);
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         return true;
@@ -94,18 +128,55 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
             position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds, 0, Duration.TotalSeconds));
         }
 
-        _player.Position = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+        var targetPosition = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+        try
+        {
+            _player.Position = targetPosition;
+            _clockPosition = ClampToDuration(ReadPlayerPosition());
+        }
+        catch (InvalidOperationException)
+        {
+            _clockPosition = ClampToDuration(targetPosition);
+        }
+        catch (COMException)
+        {
+            _clockPosition = ClampToDuration(targetPosition);
+        }
+
+        _clockStartedAt = IsPlaying ? DateTimeOffset.UtcNow : null;
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void SetPlaybackRate(double rate)
     {
-        _player.SpeedRatio = rate > 0 ? rate : 1.0;
+        _clockPosition = Position;
+        _clockStartedAt = IsPlaying ? DateTimeOffset.UtcNow : null;
+        _playbackRate = rate > 0 ? rate : 1.0;
+        try
+        {
+            _player.SpeedRatio = _playbackRate;
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (COMException)
+        {
+        }
     }
 
     public void SetVolume(double volume)
     {
-        _player.Volume = Math.Clamp(volume, 0, 1);
+        try
+        {
+            _player.Volume = Math.Clamp(volume, 0, 1);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (COMException)
+        {
+        }
+
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -113,24 +184,62 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
     {
         if (CurrentPath is not null)
         {
-            _player.Stop();
-            _player.Close();
+            try
+            {
+                _player.Stop();
+                _player.Close();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (COMException)
+            {
+            }
+
             CurrentPath = null;
         }
 
+        ResetPlaybackClock();
         SetIsPlaying(false);
     }
 
     private bool Play()
     {
-        _player.Play();
+        var playerPosition = ReadPlayerPosition();
+        _clockPosition = ClampToDuration(playerPosition > TimeSpan.Zero ? playerPosition : _clockPosition);
+        _clockStartedAt = DateTimeOffset.UtcNow;
+        try
+        {
+            _player.Play();
+        }
+        catch (InvalidOperationException)
+        {
+            // Continue with the UI playback clock when the host cannot render audio.
+        }
+        catch (COMException)
+        {
+            // Continue with the UI playback clock when the host cannot render audio.
+        }
+
         SetIsPlaying(true);
         return true;
     }
 
     private bool Pause()
     {
-        _player.Pause();
+        _clockPosition = Position;
+        _clockStartedAt = null;
+        try
+        {
+            _player.Pause();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (COMException)
+        {
+        }
+
         SetIsPlaying(false);
         return false;
     }
@@ -144,5 +253,75 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
 
         IsPlaying = isPlaying;
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private TimeSpan EstimatePlaybackPosition()
+    {
+        if (_clockStartedAt is null)
+        {
+            return ClampToDuration(_clockPosition);
+        }
+
+        var elapsed = DateTimeOffset.UtcNow - _clockStartedAt.Value;
+        var estimatedPosition = _clockPosition + TimeSpan.FromSeconds(elapsed.TotalSeconds * _playbackRate);
+        var playerPosition = ReadPlayerPosition();
+        var position = ClampToDuration(playerPosition > estimatedPosition ? playerPosition : estimatedPosition);
+        if (Duration > TimeSpan.Zero && position >= Duration)
+        {
+            _clockPosition = Duration;
+            _clockStartedAt = null;
+            SetIsPlaying(false);
+        }
+
+        return position;
+    }
+
+    private TimeSpan ClampToDuration(TimeSpan position)
+    {
+        if (position < TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var duration = Duration;
+        return duration > TimeSpan.Zero && position > duration ? duration : position;
+    }
+
+    private void ResetPlaybackClock()
+    {
+        _clockPosition = TimeSpan.Zero;
+        _clockStartedAt = null;
+    }
+
+    private void ContinueWithClockFallback()
+    {
+        var playerPosition = ReadPlayerPosition();
+        if (playerPosition > _clockPosition)
+        {
+            _clockPosition = ClampToDuration(playerPosition);
+        }
+
+        if (IsPlaying && _clockStartedAt is null)
+        {
+            _clockStartedAt = DateTimeOffset.UtcNow;
+        }
+
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private TimeSpan ReadPlayerPosition()
+    {
+        try
+        {
+            return _player.Position;
+        }
+        catch (InvalidOperationException)
+        {
+            return TimeSpan.Zero;
+        }
+        catch (COMException)
+        {
+            return TimeSpan.Zero;
+        }
     }
 }

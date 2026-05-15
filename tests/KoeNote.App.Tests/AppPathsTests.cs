@@ -58,6 +58,60 @@ public sealed class AppPathsTests
         Assert.False(Directory.Exists(paths.MachineModels));
     }
 
+    [Fact]
+    public void EnsureCreated_CreatesDomainPresetDirectoryAndCopiesBundledJsonPresets()
+    {
+        var root = CreateTempRoot();
+        var localRoot = Path.Combine(root, "local");
+        var documentsRoot = Path.Combine(root, "documents");
+        var appBaseDirectory = Path.Combine(root, "app");
+        var bundledPresetDirectory = Path.Combine(appBaseDirectory, "presets");
+        Directory.CreateDirectory(bundledPresetDirectory);
+        File.WriteAllText(Path.Combine(bundledPresetDirectory, "preset-a.json"), """{"name":"a"}""");
+        File.WriteAllText(Path.Combine(bundledPresetDirectory, "preset-b.json"), """{"name":"b"}""");
+        File.WriteAllText(Path.Combine(bundledPresetDirectory, "domain-preset.schema.json"), """{"name":"schema"}""");
+
+        var paths = new AppPaths(new AppPathOptions(
+            AppDataRoot: root,
+            LocalAppDataRoot: localRoot,
+            AppBaseDirectory: appBaseDirectory,
+            DocumentsRoot: documentsRoot));
+
+        paths.EnsureCreated();
+
+        Assert.Equal(Path.Combine(documentsRoot, "KoeNote", "dic_preset"), paths.DomainPresetDirectory);
+        Assert.True(Directory.Exists(paths.DomainPresetDirectory));
+        Assert.Equal(3, Directory.EnumerateFiles(paths.DomainPresetDirectory, "*.json").Count());
+        Assert.True(File.Exists(Path.Combine(paths.DomainPresetDirectory, "preset-a.json")));
+        Assert.True(File.Exists(Path.Combine(paths.DomainPresetDirectory, "preset-b.json")));
+        Assert.True(File.Exists(Path.Combine(paths.DomainPresetDirectory, "domain-preset.schema.json")));
+    }
+
+    [Fact]
+    public void EnsureCreated_DoesNotOverwriteExistingUserDomainPreset()
+    {
+        var root = CreateTempRoot();
+        var localRoot = Path.Combine(root, "local");
+        var documentsRoot = Path.Combine(root, "documents");
+        var appBaseDirectory = Path.Combine(root, "app");
+        var bundledPresetDirectory = Path.Combine(appBaseDirectory, "presets");
+        var userPresetDirectory = Path.Combine(documentsRoot, "KoeNote", "dic_preset");
+        Directory.CreateDirectory(bundledPresetDirectory);
+        Directory.CreateDirectory(userPresetDirectory);
+        File.WriteAllText(Path.Combine(bundledPresetDirectory, "preset-a.json"), """{"name":"bundled"}""");
+        File.WriteAllText(Path.Combine(userPresetDirectory, "preset-a.json"), """{"name":"user"}""");
+
+        var paths = new AppPaths(new AppPathOptions(
+            AppDataRoot: root,
+            LocalAppDataRoot: localRoot,
+            AppBaseDirectory: appBaseDirectory,
+            DocumentsRoot: documentsRoot));
+
+        paths.EnsureCreated();
+
+        Assert.Equal("""{"name":"user"}""", File.ReadAllText(Path.Combine(paths.DomainPresetDirectory, "preset-a.json")));
+    }
+
     private static string CreateTempRoot()
     {
         return Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
