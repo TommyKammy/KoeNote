@@ -123,7 +123,14 @@ def safe_supported_compute_types(device: str) -> object:
     try:
         import ctranslate2
 
-        return ctranslate2.get_supported_compute_types(device)
+        supported = ctranslate2.get_supported_compute_types(device)
+        if isinstance(supported, set):
+            return sorted(str(item) for item in supported)
+        if isinstance(supported, tuple):
+            return [str(item) for item in supported]
+        if isinstance(supported, list):
+            return [str(item) for item in supported]
+        return str(supported)
     except Exception as exc:
         return f"error: {type(exc).__name__}: {exc}"
 
