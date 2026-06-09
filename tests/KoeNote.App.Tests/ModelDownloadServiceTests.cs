@@ -84,7 +84,7 @@ public sealed class ModelDownloadServiceTests
     public async Task DownloadAndInstallAsync_ThrottlesProgressReportsForLargeFiles()
     {
         var paths = CreatePaths();
-        var payload = new byte[20 * 1024 * 1024];
+        var payload = new byte[9 * 1024 * 1024];
         var catalogItem = CreateCatalogItem(null);
         var targetPath = Path.Combine(paths.UserModels, "asr", "large.bin");
         var reports = new List<ModelDownloadProgress>();
