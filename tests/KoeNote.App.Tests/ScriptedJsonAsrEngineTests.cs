@@ -30,6 +30,12 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("ctranslate2_cuda_device_count", script);
         Assert.Contains("supported_compute_types_cuda", script);
         Assert.Contains("KOENOTE_ASR_TOOLS_DIR", script);
+        Assert.Contains("KOENOTE_CTRANSLATE2_CUDA_DIR", script);
+        Assert.Contains("nvidia-smi", script);
+        Assert.Contains("gpu_probe", script);
+        Assert.Contains("transcribe_start", script);
+        Assert.Contains("--execution-profile", script);
+        Assert.Contains("--chunk-seconds", script);
     }
 
     [Fact]
@@ -42,6 +48,7 @@ public sealed class ScriptedJsonAsrEngineTests
         var audioPath = Path.Combine(paths.Root, "audio.wav");
         var modelPath = Path.Combine(paths.Root, "model");
         Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "tools", "asr"));
+        Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"));
         Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
         Directory.CreateDirectory(modelPath);
         File.WriteAllText(scriptPath, "print('ok')");
@@ -68,6 +75,13 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Equal(
             Path.Combine(AppContext.BaseDirectory, "tools", "asr"),
             runner.Environment["KOENOTE_ASR_TOOLS_DIR"]);
+        Assert.Equal(
+            Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"),
+            runner.Environment["KOENOTE_CTRANSLATE2_CUDA_DIR"]);
+        Assert.StartsWith(
+            Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"),
+            path,
+            StringComparison.OrdinalIgnoreCase);
 
         var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
         var log = File.ReadAllText(logPath);
@@ -81,8 +95,52 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("exit_code: 0", log);
         Assert.Contains("exit_summary: success", log);
         Assert.Contains("koenote_asr_tools_dir:", log);
+        Assert.Contains("koenote_ctranslate2_cuda_dir:", log);
         Assert.Contains("## stdout", log);
         Assert.Contains("ok", log);
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_PassesExplicitFasterWhisperGpuProfileArguments()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var runner = new CapturingAsrProcessRunner();
+        var engine = CreateEngine(paths, runner);
+
+        await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "faster-whisper-large-v3-turbo",
+                scriptPath),
+            new AsrOptions(
+                Device: "cuda",
+                ComputeType: "float16",
+                ExecutionProfileId: AsrExecutionProfiles.CudaFloat16,
+                AttemptNumber: 2,
+                ChunkSeconds: 300));
+
+        Assert.NotNull(runner.Arguments);
+        Assert.Contains("--device", runner.Arguments);
+        Assert.Contains("cuda", runner.Arguments);
+        Assert.Contains("--compute-type", runner.Arguments);
+        Assert.Contains("float16", runner.Arguments);
+        Assert.Contains("--execution-profile", runner.Arguments);
+        Assert.Contains(AsrExecutionProfiles.CudaFloat16, runner.Arguments);
+        Assert.Contains("--attempt-number", runner.Arguments);
+        Assert.Contains("2", runner.Arguments);
+        Assert.Contains("--chunk-seconds", runner.Arguments);
+        Assert.Contains("300", runner.Arguments);
     }
 
     [Fact]
@@ -270,6 +328,7 @@ public sealed class ScriptedJsonAsrEngineTests
     private sealed class CapturingAsrProcessRunner : ExternalProcessRunner
     {
         public IReadOnlyDictionary<string, string>? Environment { get; private set; }
+        public IReadOnlyList<string>? Arguments { get; private set; }
 
         public override Task<ProcessRunResult> RunAsync(
             string fileName,
@@ -279,6 +338,7 @@ public sealed class ScriptedJsonAsrEngineTests
             IReadOnlyDictionary<string, string>? environment = null)
         {
             Environment = environment;
+            Arguments = arguments;
             var outputJsonIndex = arguments
                 .Select((argument, index) => (argument, index))
                 .First(item => item.argument == "--output-json")

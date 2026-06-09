@@ -35,6 +35,22 @@
                                   MinHeight="32"
                                   Margin="0,0,0,12" />
 
+                        <TextBlock Text="ASR実行profile" Style="{StaticResource SettingsFieldLabel}" />
+                        <ComboBox ItemsSource="{Binding AvailableAsrExecutionProfiles}"
+                                  SelectedItem="{Binding SelectedAsrExecutionProfile, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayName"
+                                  MinHeight="32"
+                                  Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding SelectedAsrExecutionProfile.Detail}"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,8" />
+
+                        <CheckBox Content="長尺音声はGPU ASRを分割実行する"
+                                  IsChecked="{Binding EnableChunkedGpuAsr, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  Margin="0,0,0,10" />
+
                         <CheckBox Content="整文ステージを有効にする"
                                   IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Margin="0,0,0,10" />

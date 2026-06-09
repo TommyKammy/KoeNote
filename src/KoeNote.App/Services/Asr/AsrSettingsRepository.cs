@@ -5,8 +5,12 @@ public sealed record AsrSettings(
     string HotwordsText,
     string EngineId = "faster-whisper-large-v3-turbo",
     bool EnableReviewStage = true,
-    bool EnableSummaryStage = false)
+    bool EnableSummaryStage = false,
+    string ExecutionProfileId = AsrExecutionProfiles.CudaFloat16,
+    bool EnableChunkedGpuAsr = true)
 {
+    public string NormalizedExecutionProfileId => AsrExecutionProfiles.Normalize(ExecutionProfileId);
+
     public IReadOnlyList<string> Hotwords => HotwordsText
         .Split(['\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -21,7 +25,8 @@ public sealed class AsrSettingsRepository(AppPaths paths)
         using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT context_text, hotwords_text, engine_id, enable_review_stage, enable_summary_stage
+            SELECT context_text, hotwords_text, engine_id, enable_review_stage, enable_summary_stage,
+                   execution_profile_id, enable_chunked_gpu_asr
             FROM asr_settings
             WHERE settings_id = 1;
             """;
@@ -37,7 +42,9 @@ public sealed class AsrSettingsRepository(AppPaths paths)
             reader.GetString(1),
             reader.GetString(2),
             reader.GetInt32(3) != 0,
-            reader.GetInt32(4) != 0);
+            reader.GetInt32(4) != 0,
+            reader.GetString(5),
+            reader.GetInt32(6) != 0);
     }
 
     public void Save(AsrSettings settings)
@@ -45,14 +52,34 @@ public sealed class AsrSettingsRepository(AppPaths paths)
         using var connection = SqliteConnectionFactory.Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO asr_settings (settings_id, context_text, hotwords_text, engine_id, enable_review_stage, enable_summary_stage, updated_at)
-            VALUES (1, $context_text, $hotwords_text, $engine_id, $enable_review_stage, $enable_summary_stage, $updated_at)
+            INSERT INTO asr_settings (
+                settings_id,
+                context_text,
+                hotwords_text,
+                engine_id,
+                enable_review_stage,
+                enable_summary_stage,
+                execution_profile_id,
+                enable_chunked_gpu_asr,
+                updated_at)
+            VALUES (
+                1,
+                $context_text,
+                $hotwords_text,
+                $engine_id,
+                $enable_review_stage,
+                $enable_summary_stage,
+                $execution_profile_id,
+                $enable_chunked_gpu_asr,
+                $updated_at)
             ON CONFLICT(settings_id) DO UPDATE SET
                 context_text = excluded.context_text,
                 hotwords_text = excluded.hotwords_text,
                 engine_id = excluded.engine_id,
                 enable_review_stage = excluded.enable_review_stage,
                 enable_summary_stage = excluded.enable_summary_stage,
+                execution_profile_id = excluded.execution_profile_id,
+                enable_chunked_gpu_asr = excluded.enable_chunked_gpu_asr,
                 updated_at = excluded.updated_at;
             """;
         command.Parameters.AddWithValue("$context_text", settings.ContextText);
@@ -60,6 +87,8 @@ public sealed class AsrSettingsRepository(AppPaths paths)
         command.Parameters.AddWithValue("$engine_id", settings.EngineId);
         command.Parameters.AddWithValue("$enable_review_stage", settings.EnableReviewStage ? 1 : 0);
         command.Parameters.AddWithValue("$enable_summary_stage", settings.EnableSummaryStage ? 1 : 0);
+        command.Parameters.AddWithValue("$execution_profile_id", settings.NormalizedExecutionProfileId);
+        command.Parameters.AddWithValue("$enable_chunked_gpu_asr", settings.EnableChunkedGpuAsr ? 1 : 0);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
     }

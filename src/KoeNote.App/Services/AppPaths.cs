@@ -62,6 +62,7 @@ public sealed class AppPaths
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         BundledDomainPresetDirectory = Path.Combine(baseDirectory, "presets");
         AsrRuntimeDirectory = Path.Combine(RuntimeTools, "asr");
+        AsrCTranslate2RuntimeDirectory = Path.Combine(RuntimeTools, "asr-ctranslate2-cuda");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
         PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
         AsrPythonEnvironment = Path.Combine(PythonEnvironments, "asr");
@@ -143,6 +144,8 @@ public sealed class AppPaths
     public string RuntimeTools { get; }
 
     public string AsrRuntimeDirectory { get; }
+
+    public string AsrCTranslate2RuntimeDirectory { get; }
 
     public string Models { get; }
 

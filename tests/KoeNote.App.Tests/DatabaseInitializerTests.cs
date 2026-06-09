@@ -51,13 +51,15 @@ public sealed class DatabaseInitializerTests
         Assert.Contains("llm_task_settings", tables);
         Assert.Contains("readable_polishing_prompt_settings", tables);
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("is_deleted", ReadColumnNames(connection, "jobs"));
         Assert.Contains("deleted_at", ReadColumnNames(connection, "jobs"));
         Assert.Contains("delete_reason", ReadColumnNames(connection, "jobs"));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("execution_profile_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_chunked_gpu_asr", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("source", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("source_ref_id", ReadColumnNames(connection, "correction_drafts"));
         Assert.Contains("asr_run_id", ReadColumnNames(connection, "transcript_segments"));
@@ -102,11 +104,13 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], ReadSchemaVersions(connection));
         Assert.Contains("last_error_category", ReadColumnNames(connection, "jobs"));
         Assert.Contains("asr_settings", ReadTableNames(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("execution_profile_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_chunked_gpu_asr", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("speaker_aliases", ReadTableNames(connection));
         Assert.Contains("review_operation_history", ReadTableNames(connection));
         Assert.Contains("user_terms", ReadTableNames(connection));
@@ -220,7 +224,7 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], ReadSchemaVersions(connection));
     }
 
     [Fact]
@@ -240,9 +244,11 @@ public sealed class DatabaseInitializerTests
         }.ToString());
         connection.Open();
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], ReadSchemaVersions(connection));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], ReadSchemaVersions(connection));
         Assert.Contains("engine_id", ReadColumnNames(connection, "asr_settings"));
         Assert.Contains("enable_review_stage", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("execution_profile_id", ReadColumnNames(connection, "asr_settings"));
+        Assert.Contains("enable_chunked_gpu_asr", ReadColumnNames(connection, "asr_settings"));
     }
 
     private static string CreateTempDirectory()

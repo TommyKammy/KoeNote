@@ -121,11 +121,11 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         var current = asrSettingsRepository.Load();
         var nextContext = MergeContext(current.ContextText, preset.AsrContext);
         var hotwordMerge = MergeHotwords(current.Hotwords, preset.Hotwords);
-        var next = new AsrSettings(
-            nextContext,
-            string.Join(Environment.NewLine, hotwordMerge.Hotwords),
-            current.EngineId,
-            current.EnableReviewStage);
+        var next = current with
+        {
+            ContextText = nextContext,
+            HotwordsText = string.Join(Environment.NewLine, hotwordMerge.Hotwords)
+        };
 
         var importId = Guid.NewGuid().ToString("N");
         var databaseResult = ImportDatabaseEntries(preset, importId, defaultJobId);
@@ -225,11 +225,11 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
             contextRemoved = !string.Equals(current.ContextText.Trim(), nextContext.Trim(), StringComparison.Ordinal);
             if (contextRemoved || removedHotwords > 0)
             {
-                asrSettingsRepository.Save(new AsrSettings(
-                    nextContext,
-                    string.Join(Environment.NewLine, nextHotwords),
-                    current.EngineId,
-                    current.EnableReviewStage));
+                asrSettingsRepository.Save(current with
+                {
+                    ContextText = nextContext,
+                    HotwordsText = string.Join(Environment.NewLine, nextHotwords)
+                });
             }
         }
 

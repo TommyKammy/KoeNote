@@ -1,3 +1,5 @@
+using KoeNote.App.Services.Asr;
+
 namespace KoeNote.App.Services.Database;
 
 internal static class KoeNoteDatabaseMigrations
@@ -21,7 +23,8 @@ internal static class KoeNoteDatabaseMigrations
         new(15, "transcript derivatives", ApplyTranscriptDerivativesSchema),
         new(16, "summary stage toggle", ApplySummaryStageToggle),
         new(17, "LLM profile task settings", ApplyLlmProfileTaskSettingsSchema),
-        new(18, "readable polishing prompt settings", ApplyReadablePolishingPromptSettingsSchema)
+        new(18, "readable polishing prompt settings", ApplyReadablePolishingPromptSettingsSchema),
+        new(19, "ASR execution profile settings", ApplyAsrExecutionProfileSettingsSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -630,6 +633,29 @@ internal static class KoeNoteDatabaseMigrations
                 updated_at TEXT NOT NULL
             );
             """);
+    }
+
+    private static void ApplyAsrExecutionProfileSettingsSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS asr_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                context_text TEXT NOT NULL DEFAULT '',
+                hotwords_text TEXT NOT NULL DEFAULT '',
+                engine_id TEXT NOT NULL DEFAULT 'faster-whisper-large-v3-turbo',
+                enable_review_stage INTEGER NOT NULL DEFAULT 1,
+                enable_summary_stage INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            """);
+        migration.AddColumnIfMissing(
+            "asr_settings",
+            "execution_profile_id",
+            $"TEXT NOT NULL DEFAULT '{AsrExecutionProfiles.CudaFloat16}'");
+        migration.AddColumnIfMissing(
+            "asr_settings",
+            "enable_chunked_gpu_asr",
+            "INTEGER NOT NULL DEFAULT 1");
     }
 
 }

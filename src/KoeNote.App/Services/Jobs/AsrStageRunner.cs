@@ -40,13 +40,13 @@ public sealed class AsrStageRunner(
                 ? effectiveAsrSettings.EngineId
                 : "faster-whisper-large-v3-turbo";
             var engine = asrEngineRegistry.GetRequired(engineId);
-            var result = await engine.TranscribeAsync(
+            var config = CreateAsrConfig(engineId, outputDirectory);
+            var result = await TranscribeWithRetryAsync(
+                engine,
                 new AsrInput(job.JobId, normalizedAudioPath),
-                CreateAsrConfig(engineId, outputDirectory),
-                new AsrOptions(
-                    effectiveAsrSettings.Hotwords,
-                    string.IsNullOrWhiteSpace(effectiveAsrSettings.ContextText) ? null : effectiveAsrSettings.ContextText,
-                    TimeSpan.FromHours(2)),
+                config,
+                effectiveAsrSettings,
+                report,
                 cancellationToken);
 
             jobRepository.MarkAsrSucceeded(job);
@@ -181,6 +181,88 @@ public sealed class AsrStageRunner(
             "diarization",
             "warning",
             $"Speaker diarization skipped: {diarizationResult.Status}");
+    }
+
+    private async Task<AsrResult> TranscribeWithRetryAsync(
+        IAsrEngine engine,
+        AsrInput input,
+        AsrEngineConfig config,
+        AsrSettings settings,
+        Action<JobRunUpdate> report,
+        CancellationToken cancellationToken)
+    {
+        var profiles = ShouldUseExplicitFasterWhisperProfile(config.ModelId)
+            ? AsrExecutionProfiles.BuildNativeCrashRetryLadder(settings.ExecutionProfileId)
+            : [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
+        if (profiles[0].IsGpu && !AsrCudaRuntimeLayout.HasPackage(paths))
+        {
+            profiles = [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
+        }
+
+        AsrWorkerException? lastException = null;
+
+        for (var index = 0; index < profiles.Count; index++)
+        {
+            var profile = profiles[index];
+            try
+            {
+                report(new JobRunUpdate(LatestLog: $"Running ASR with profile {profile.ProfileId}..."));
+                return await engine.TranscribeAsync(
+                    input,
+                    config,
+                    CreateAsrOptions(settings, profile, index + 1, ShouldUseExplicitFasterWhisperProfile(config.ModelId)),
+                    cancellationToken);
+            }
+            catch (AsrWorkerException exception) when (
+                exception.Category == AsrFailureCategory.NativeCrash &&
+                profile.IsGpu &&
+                index + 1 < profiles.Count)
+            {
+                lastException = exception;
+                var nextProfile = profiles[index + 1];
+                jobLogRepository.AddEvent(
+                    input.JobId,
+                    "asr",
+                    "warning",
+                    $"ASR native crash with GPU profile {profile.ProfileId}; retrying on GPU profile {nextProfile.ProfileId}. Worker log: {exception.WorkerLogPath ?? "(none)"}");
+                report(new JobRunUpdate(
+                    RefreshLogs: true,
+                    LatestLog: $"ASR GPU profile {profile.ProfileId} crashed; retrying with {nextProfile.ProfileId}."));
+            }
+        }
+
+        throw lastException ?? new AsrWorkerException(AsrFailureCategory.NativeCrash, "ASR failed before a retry result was produced.");
+    }
+
+    private static AsrOptions CreateAsrOptions(
+        AsrSettings settings,
+        AsrExecutionProfile profile,
+        int attemptNumber,
+        bool supportsExplicitFasterWhisperOptions)
+    {
+        var context = string.IsNullOrWhiteSpace(settings.ContextText) ? null : settings.ContextText;
+        if (!supportsExplicitFasterWhisperOptions)
+        {
+            return new AsrOptions(settings.Hotwords, context, TimeSpan.FromHours(2));
+        }
+
+        return new AsrOptions(
+            settings.Hotwords,
+            context,
+            TimeSpan.FromHours(2),
+            profile.Device,
+            profile.ComputeType,
+            profile.ProfileId,
+            attemptNumber,
+            settings.EnableChunkedGpuAsr && profile.IsGpu ? 300 : null);
+    }
+
+    private static bool ShouldUseExplicitFasterWhisperProfile(string modelId)
+    {
+        return modelId.Equals("faster-whisper-large-v3-turbo", StringComparison.OrdinalIgnoreCase) ||
+            modelId.Equals("faster-whisper-large-v3", StringComparison.OrdinalIgnoreCase) ||
+            modelId.Equals("whisper-base", StringComparison.OrdinalIgnoreCase) ||
+            modelId.Equals("whisper-small", StringComparison.OrdinalIgnoreCase);
     }
 
     private AsrEngineConfig CreateAsrConfig(string engineId, string outputDirectory)

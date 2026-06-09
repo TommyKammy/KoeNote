@@ -38,7 +38,14 @@ public sealed partial class MainWindowViewModel
                 LatestLog = "整文ステージの準備が未完了のため、この実行では整文をスキップします。";
             }
 
-            var asrSettings = new AsrSettings(AsrContextText, AsrHotwordsText, SelectedAsrEngineId, enableReviewForRun, EnableSummaryStage: false);
+            var asrSettings = new AsrSettings(
+                AsrContextText,
+                AsrHotwordsText,
+                SelectedAsrEngineId,
+                enableReviewForRun,
+                EnableSummaryStage: false,
+                SelectedAsrExecutionProfileId,
+                EnableChunkedGpuAsr);
             var runSucceeded = await _jobRunCoordinator.RunAsync(job, asrSettings, ApplyRunUpdate, cancellation.Token);
             var readablePolishingAttempted = false;
             var readablePolishingSucceeded = false;

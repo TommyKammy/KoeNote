@@ -170,6 +170,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _asrContextText = string.Empty;
     private string _asrHotwordsText = string.Empty;
     private string _selectedAsrEngineId = "faster-whisper-large-v3-turbo";
+    private string _selectedAsrExecutionProfileId = AsrExecutionProfiles.CudaFloat16;
+    private bool _enableChunkedGpuAsr = true;
     private AsrEngineOption? _selectedSettingsAsrEngine;
     private bool _enableReviewStage = true;
     private bool _enableSummaryStage;
@@ -288,6 +290,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _asrHotwordsText = asrSettings.HotwordsText;
         _enableReviewStage = asrSettings.EnableReviewStage;
         _enableSummaryStage = false;
+        _selectedAsrExecutionProfileId = asrSettings.NormalizedExecutionProfileId;
+        _enableChunkedGpuAsr = asrSettings.EnableChunkedGpuAsr;
         RefreshOptionalStageToggleStatuses();
         _selectedAsrEngineId = ResolveInitialAsrEngineId(asrSettings.EngineId);
         UpdateSelectedSettingsAsrEngine();
@@ -567,6 +571,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<StatusItem> EnvironmentStatus { get; } = [];
 
     public ObservableCollection<AsrEngineOption> AvailableAsrEngines { get; } = [];
+
+    public ObservableCollection<AsrExecutionProfile> AvailableAsrExecutionProfiles { get; } =
+        new(AsrExecutionProfiles.All);
 
     public ObservableCollection<JobSummary> Jobs { get; } = [];
 
@@ -2060,6 +2067,46 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                     runCommand.RaiseCanExecuteChanged();
                 }
 
+                ScheduleSaveAsrSettings();
+            }
+        }
+    }
+
+    public string SelectedAsrExecutionProfileId
+    {
+        get => _selectedAsrExecutionProfileId;
+        set
+        {
+            var normalized = AsrExecutionProfiles.Normalize(value);
+            if (SetField(ref _selectedAsrExecutionProfileId, normalized))
+            {
+                OnPropertyChanged(nameof(SelectedAsrExecutionProfile));
+                ScheduleSaveAsrSettings();
+            }
+        }
+    }
+
+    public AsrExecutionProfile SelectedAsrExecutionProfile
+    {
+        get => AsrExecutionProfiles.Resolve(SelectedAsrExecutionProfileId);
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SelectedAsrExecutionProfileId = value.ProfileId;
+        }
+    }
+
+    public bool EnableChunkedGpuAsr
+    {
+        get => _enableChunkedGpuAsr;
+        set
+        {
+            if (SetField(ref _enableChunkedGpuAsr, value))
+            {
                 ScheduleSaveAsrSettings();
             }
         }

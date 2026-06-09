@@ -107,6 +107,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             Directory.CreateDirectory(backupRoot);
             Report(progress, "インストール中", "CUDA ASR runtime の NVIDIA DLL を tools\\asr に配置しています...");
             CopyStagedFiles(stagingRoot, paths.AsrRuntimeDirectory, backupRoot, copiedFiles);
+            MirrorNvidiaFilesToCTranslate2Runtime(paths.AsrRuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory);
 
             Report(progress, "検証中", "CUDA ASR runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
@@ -196,6 +197,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             Directory.CreateDirectory(paths.AsrRuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
             CopyStagedFiles(stagingRoot, paths.AsrRuntimeDirectory, backupRoot, copiedFiles);
+            MirrorNvidiaFilesToCTranslate2Runtime(paths.AsrRuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory);
 
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, actualSha256);
             return IsInstalled()
@@ -496,6 +498,22 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
 
             File.Copy(stagedFile, destinationPath, overwrite: true);
             copiedFiles.Add(destinationPath);
+        }
+    }
+
+    private static void MirrorNvidiaFilesToCTranslate2Runtime(string sourceRoot, string destinationRoot)
+    {
+        if (!Directory.Exists(sourceRoot))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(destinationRoot);
+        foreach (var sourcePath in Directory.EnumerateFiles(sourceRoot, "*.dll", SearchOption.TopDirectoryOnly)
+                     .Where(static file => AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns.Any(pattern =>
+                         MatchesPattern(Path.GetFileName(file), pattern))))
+        {
+            File.Copy(sourcePath, Path.Combine(destinationRoot, Path.GetFileName(sourcePath)), overwrite: true);
         }
     }
 

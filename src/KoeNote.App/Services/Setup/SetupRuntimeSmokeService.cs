@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
@@ -20,6 +21,7 @@ internal sealed class SetupRuntimeSmokeService(
         return
         [
             CheckAsrRuntimeInvocationPrerequisites(state),
+            CheckAsrGpuRuntimeProbe(),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -49,6 +51,28 @@ internal sealed class SetupRuntimeSmokeService(
         }
 
         return new SetupSmokeCheck("ASR runtime smoke", true, $"Ready: {paths.FasterWhisperScriptPath}");
+    }
+
+    private SetupSmokeCheck CheckAsrGpuRuntimeProbe()
+    {
+        if (!AsrCudaRuntimeLayout.HasPackage(paths))
+        {
+            return new SetupSmokeCheck(
+                "ASR GPU profile smoke",
+                true,
+                "ASR CUDA runtime is not installed; GPU profile probe skipped.");
+        }
+
+        var preferred = AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory)
+            ? paths.AsrCTranslate2RuntimeDirectory
+            : paths.AsrRuntimeDirectory;
+        var hasNvidiaDlls = AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(preferred);
+        return new SetupSmokeCheck(
+            "ASR GPU profile smoke",
+            hasNvidiaDlls,
+            hasNvidiaDlls
+                ? $"CTranslate2 CUDA DLL path is ready: {preferred}"
+                : $"CTranslate2 CUDA DLLs are missing. Reinstall ASR CUDA runtime: {preferred}");
     }
 
     private SetupSmokeCheck CheckReviewRuntimePathBridge(SetupState state)
