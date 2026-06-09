@@ -60,6 +60,14 @@ public sealed class DiarizationRuntimeService(
     {
         try
         {
+            if (IsPipNoIndexEnabled())
+            {
+                return DiarizationRuntimeInstallResult.Failed(
+                    "diarize install failed because pip package index access is disabled by PIP_NO_INDEX.",
+                    paths.DiarizationPythonEnvironment,
+                    FailureCategoryNetworkUnavailable);
+            }
+
             Directory.CreateDirectory(paths.PythonEnvironments);
             var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken);
             if (!runtime.IsSucceeded || runtime.Command is null)
@@ -197,6 +205,15 @@ public sealed class DiarizationRuntimeService(
                 $"diarize install failed because pip could not reach the package index. Check the network connection or proxy settings, then retry. Details: {error}",
             _ => $"diarize install failed: {error}"
         };
+    }
+
+    private static bool IsPipNoIndexEnabled()
+    {
+        var value = Environment.GetEnvironmentVariable("PIP_NO_INDEX");
+        return !string.IsNullOrWhiteSpace(value) &&
+            !value.Equals("0", StringComparison.OrdinalIgnoreCase) &&
+            !value.Equals("false", StringComparison.OrdinalIgnoreCase) &&
+            !value.Equals("no", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ClassifyPipInstallFailure(string error)
