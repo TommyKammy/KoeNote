@@ -21,6 +21,8 @@ using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
 
+[Trait("Category", "Slow")]
+[Trait("Category", "UiIntegration")]
 public sealed class MainWindowViewModelTests
 {
     [Fact]
