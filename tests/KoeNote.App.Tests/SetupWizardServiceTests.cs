@@ -645,6 +645,11 @@ public sealed class SetupWizardServiceTests
         CreateCudaReviewRuntime(paths);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "faster-whisper-large-v3-turbo",
+            ExecutionProfileId: AsrExecutionProfiles.Auto));
         var installedModels = new InstalledModelRepository(paths);
         UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
         UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
@@ -666,6 +671,9 @@ public sealed class SetupWizardServiceTests
         Assert.Contains(smoke.Checks, check => check.Name == "speaker diarization smoke" && check.IsOk);
         Assert.True(completed.IsCompleted);
         Assert.Equal(SetupStep.Complete, completed.CurrentStep);
+        Assert.Equal(
+            AsrExecutionProfiles.CudaFloat16,
+            new AsrSettingsRepository(paths).Load().ExecutionProfileId);
 
         var rerunSmoke = wizard.RunSmokeCheck();
         var rerunState = wizard.LoadState();

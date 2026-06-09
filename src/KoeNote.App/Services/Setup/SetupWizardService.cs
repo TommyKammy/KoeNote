@@ -8,6 +8,7 @@ namespace KoeNote.App.Services.Setup;
 
 public sealed class SetupWizardService
 {
+    private readonly AppPaths _paths;
     private readonly SetupStateService _stateService;
     private readonly SetupModelSelectionService _selectionService;
     private readonly SetupModelInstallService _installService;
@@ -18,6 +19,7 @@ public sealed class SetupWizardService
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
     private readonly TernaryReviewRuntimeService _ternaryReviewRuntimeService;
     private readonly CudaReviewRuntimeService _cudaReviewRuntimeService;
+    private readonly AsrSettingsRepository _asrSettingsRepository;
     private SetupPresetRecommendation? _presetRecommendation;
     private bool _automaticPresetRecommendationApplied;
 
@@ -35,13 +37,16 @@ public sealed class SetupWizardService
         ISetupHostResourceProbe? hostResourceProbe = null,
         AsrCudaRuntimeService? asrCudaRuntimeService = null,
         TernaryReviewRuntimeService? ternaryReviewRuntimeService = null,
-        CudaReviewRuntimeService? cudaReviewRuntimeService = null)
+        CudaReviewRuntimeService? cudaReviewRuntimeService = null,
+        AsrSettingsRepository? asrSettingsRepository = null)
     {
+        _paths = paths;
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
         _asrCudaRuntimeService = asrCudaRuntimeService ?? new AsrCudaRuntimeService(paths, new HttpClient());
         _diarizationRuntimeService = diarizationRuntimeService;
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
+        _asrSettingsRepository = asrSettingsRepository ?? new AsrSettingsRepository(paths);
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
         var resourceProbe = hostResourceProbe ?? new WindowsSetupHostResourceProbe();
@@ -373,16 +378,37 @@ public sealed class SetupWizardService
 
     public SetupSmokeResult RunSmokeCheck()
     {
-        return _readinessService.RunSmokeCheck();
+        var result = _readinessService.RunSmokeCheck();
+        PersistKnownGoodAsrGpuProfile(result.IsSucceeded);
+        return result;
     }
 
     public SetupState CompleteIfReady()
     {
-        return _readinessService.CompleteIfReady();
+        var state = _readinessService.CompleteIfReady();
+        PersistKnownGoodAsrGpuProfile(state.LastSmokeSucceeded);
+        return state;
     }
 
     public IReadOnlyList<SetupStepItem> BuildStepItems(SetupState state)
     {
         return SetupStepBuilder.Build(state, _readinessService.GetStepReadiness(state));
+    }
+
+    private void PersistKnownGoodAsrGpuProfile(bool smokeSucceeded)
+    {
+        if (!smokeSucceeded || !AsrCudaRuntimeLayout.HasPackage(_paths))
+        {
+            return;
+        }
+
+        var current = _asrSettingsRepository.Load();
+        var currentProfile = AsrExecutionProfiles.Resolve(current.ExecutionProfileId);
+        if (currentProfile.ProfileId.Equals(AsrExecutionProfiles.CpuInt8, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _asrSettingsRepository.Save(current with { ExecutionProfileId = AsrExecutionProfiles.CudaFloat16 });
     }
 }

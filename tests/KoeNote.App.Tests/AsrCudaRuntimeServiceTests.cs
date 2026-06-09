@@ -82,6 +82,10 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
         Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "readme.txt")));
         Assert.True(File.Exists(paths.AsrCudaRuntimeMarkerPath));
     }
@@ -109,6 +113,7 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.True(result.IsSucceeded);
         Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
         Assert.Equal("local cudnn", File.ReadAllText(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.Equal("local cudnn", File.ReadAllText(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
     }
 
     [Fact]

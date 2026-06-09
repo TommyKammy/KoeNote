@@ -68,6 +68,7 @@ public sealed class ScriptedJsonAsrEngine(
                 config,
                 asrRunId,
                 arguments,
+                options,
                 scriptJsonPath,
                 processResult,
                 processEnvironment);
@@ -160,6 +161,35 @@ public sealed class ScriptedJsonAsrEngine(
             arguments.Add("--condition-on-previous-text");
             arguments.Add("false");
         }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(options.Device))
+            {
+                arguments.Add("--device");
+                arguments.Add(options.Device);
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.ComputeType))
+            {
+                arguments.Add("--compute-type");
+                arguments.Add(options.ComputeType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.ExecutionProfileId))
+            {
+                arguments.Add("--execution-profile");
+                arguments.Add(options.ExecutionProfileId);
+            }
+
+            arguments.Add("--attempt-number");
+            arguments.Add(Math.Max(1, options.AttemptNumber).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            if (options.ChunkSeconds is > 0)
+            {
+                arguments.Add("--chunk-seconds");
+                arguments.Add(options.ChunkSeconds.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
 
         return arguments;
     }
@@ -212,6 +242,7 @@ public sealed class ScriptedJsonAsrEngine(
         AsrEngineConfig config,
         string asrRunId,
         IReadOnlyList<string> arguments,
+        AsrOptions options,
         string outputJsonPath,
         ProcessRunResult processResult,
         AsrProcessEnvironment processEnvironment)
@@ -225,6 +256,9 @@ public sealed class ScriptedJsonAsrEngine(
             ["argument_summary"] = BuildArgumentSummary(arguments),
             ["model_id"] = config.ModelId,
             ["model_version"] = config.ModelVersion ?? "(unset)",
+            ["execution_profile_id"] = options.ExecutionProfileId ?? "(unset)",
+            ["attempt_number"] = Math.Max(1, options.AttemptNumber).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["chunk_seconds"] = options.ChunkSeconds?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(unset)",
             ["model_path"] = config.ModelPath,
             ["normalized_audio_path"] = input.NormalizedAudioPath,
             ["output_json_path"] = outputJsonPath,
@@ -236,6 +270,9 @@ public sealed class ScriptedJsonAsrEngine(
                 : string.Join(";", processEnvironment.AddedPathEntries),
             ["koenote_asr_tools_dir"] = processEnvironment.Environment.TryGetValue("KOENOTE_ASR_TOOLS_DIR", out var asrToolsDir)
                 ? asrToolsDir
+                : "(unset)",
+            ["koenote_ctranslate2_cuda_dir"] = processEnvironment.Environment.TryGetValue("KOENOTE_CTRANSLATE2_CUDA_DIR", out var ctranslate2CudaDir)
+                ? ctranslate2CudaDir
                 : "(unset)"
         };
 
@@ -296,8 +333,15 @@ public sealed class ScriptedJsonAsrEngine(
 
     private static AsrProcessEnvironment BuildProcessEnvironment(AsrEngineConfig config)
     {
-        var pathEntries = new List<string>();
+        var ctranslate2PathEntries = new List<string>();
         var appAsrTools = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
+        var appCTranslate2Cuda = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        if (Directory.Exists(appCTranslate2Cuda))
+        {
+            ctranslate2PathEntries.Add(appCTranslate2Cuda);
+        }
+
+        var pathEntries = new List<string>(ctranslate2PathEntries);
         if (Directory.Exists(appAsrTools))
         {
             pathEntries.Add(appAsrTools);
@@ -306,6 +350,13 @@ public sealed class ScriptedJsonAsrEngine(
         var workerDirectory = Path.GetDirectoryName(config.WorkerPath);
         if (!string.IsNullOrWhiteSpace(workerDirectory))
         {
+            var siblingCTranslate2Cuda = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr-ctranslate2-cuda"));
+            if (Directory.Exists(siblingCTranslate2Cuda))
+            {
+                ctranslate2PathEntries.Add(siblingCTranslate2Cuda);
+                pathEntries.Add(siblingCTranslate2Cuda);
+            }
+
             var siblingAsrTools = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr"));
             if (Directory.Exists(siblingAsrTools))
             {
@@ -323,7 +374,19 @@ public sealed class ScriptedJsonAsrEngine(
         var addedPathEntries = pathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         pathEntries.Add(existingPath);
         environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
-        environment["KOENOTE_ASR_TOOLS_DIR"] = addedPathEntries[0];
+        var ctranslate2Entries = ctranslate2PathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (ctranslate2Entries.Length > 0)
+        {
+            environment["KOENOTE_CTRANSLATE2_CUDA_DIR"] = ctranslate2Entries[0];
+        }
+
+        var asrToolsEntry = addedPathEntries.FirstOrDefault(entry =>
+            Path.GetFileName(entry).Equals("asr", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(asrToolsEntry))
+        {
+            environment["KOENOTE_ASR_TOOLS_DIR"] = asrToolsEntry;
+        }
+
         return new AsrProcessEnvironment(environment, addedPathEntries);
     }
 

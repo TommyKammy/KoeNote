@@ -5,12 +5,19 @@ namespace KoeNote.App.Tests;
 public sealed class AsrSettingsRepositoryTests
 {
     [Fact]
-    public void SaveAndLoad_RestoresContextHotwordsEngineIdAndStageToggles()
+    public void SaveAndLoad_RestoresContextHotwordsEngineIdStageTogglesAndAsrExecutionProfile()
     {
         var paths = TestDatabase.CreateRepositoryFixture().Paths;
         var repository = new AsrSettingsRepository(paths);
 
-        repository.Save(new AsrSettings("product meeting", "KoeNote\r\nRTX 3060,Whisper", "faster-whisper-large-v3-turbo", false, true));
+        repository.Save(new AsrSettings(
+            "product meeting",
+            "KoeNote\r\nRTX 3060,Whisper",
+            "faster-whisper-large-v3-turbo",
+            false,
+            true,
+            AsrExecutionProfiles.CudaInt8Float16,
+            EnableChunkedGpuAsr: false));
 
         var restored = repository.Load();
         Assert.Equal("product meeting", restored.ContextText);
@@ -18,6 +25,8 @@ public sealed class AsrSettingsRepositoryTests
         Assert.Equal("faster-whisper-large-v3-turbo", restored.EngineId);
         Assert.False(restored.EnableReviewStage);
         Assert.True(restored.EnableSummaryStage);
+        Assert.Equal(AsrExecutionProfiles.CudaInt8Float16, restored.ExecutionProfileId);
+        Assert.False(restored.EnableChunkedGpuAsr);
         Assert.Equal(["KoeNote", "RTX 3060", "Whisper"], restored.Hotwords);
     }
 
@@ -33,6 +42,8 @@ public sealed class AsrSettingsRepositoryTests
         Assert.Equal("faster-whisper-large-v3-turbo", restored.EngineId);
         Assert.True(restored.EnableReviewStage);
         Assert.False(restored.EnableSummaryStage);
+        Assert.Equal(AsrExecutionProfiles.CudaFloat16, restored.ExecutionProfileId);
+        Assert.True(restored.EnableChunkedGpuAsr);
         Assert.Empty(restored.Hotwords);
     }
 

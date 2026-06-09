@@ -8,7 +8,10 @@ import gc
 import importlib.metadata as metadata
 import json
 import os
+import subprocess
 import sys
+import tempfile
+import wave
 from pathlib import Path
 
 try:
@@ -23,11 +26,16 @@ def add_windows_dll_directories() -> None:
         return
 
     candidates = []
+    ctranslate2_configured = os.environ.get("KOENOTE_CTRANSLATE2_CUDA_DIR")
+    if ctranslate2_configured:
+        candidates.append(ctranslate2_configured)
+
     configured = os.environ.get("KOENOTE_ASR_TOOLS_DIR")
     if configured:
         candidates.append(configured)
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr-ctranslate2-cuda")))
     candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr")))
 
     for candidate in candidates:
@@ -80,17 +88,88 @@ def collect_asr_tools_files() -> list[str]:
     return present
 
 
+def collect_dll_candidates() -> list[dict[str, object]]:
+    names = {
+        "cublas64_12.dll",
+        "cublasLt64_12.dll",
+        "cudart64_12.dll",
+        "cudnn64_9.dll",
+        "zlibwapi.dll",
+    }
+    roots: list[str] = []
+    for env_name in ("KOENOTE_CTRANSLATE2_CUDA_DIR", "KOENOTE_ASR_TOOLS_DIR"):
+        value = os.environ.get(env_name)
+        if value:
+            roots.append(value)
+    roots.extend(os.environ.get("PATH", "").split(os.pathsep)[:20])
+
+    candidates: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for root_value in roots:
+        root = Path(root_value)
+        if not root.is_dir():
+            continue
+
+        for name in names:
+            candidate = root / name
+            key = str(candidate).lower()
+            if key in seen or not candidate.exists():
+                continue
+
+            seen.add(key)
+            try:
+                size = candidate.stat().st_size
+            except OSError:
+                size = None
+            candidates.append({"name": name, "path": str(candidate), "size": size})
+    return candidates
+
+
+def run_nvidia_smi_probe() -> dict[str, object]:
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,driver_version,memory.total,memory.free,compute_cap",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception as exc:
+        return {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    return {
+        "available": result.returncode == 0,
+        "exit_code": result.returncode,
+        "stdout": result.stdout.strip()[:1000],
+        "stderr": result.stderr.strip()[:1000],
+    }
+
+
 def write_startup_diagnostics(args: argparse.Namespace) -> None:
     write_diagnostic(
         "startup",
         requested_device=args.device,
         requested_compute_type=args.compute_type,
+        execution_profile=args.execution_profile,
+        attempt_number=args.attempt_number,
+        chunk_seconds=args.chunk_seconds,
         model_path=args.model,
         audio_path=args.audio,
         output_json_path=args.output_json,
         koenote_asr_tools_dir=os.environ.get("KOENOTE_ASR_TOOLS_DIR"),
+        koenote_ctranslate2_cuda_dir=os.environ.get("KOENOTE_CTRANSLATE2_CUDA_DIR"),
         path_head=os.environ.get("PATH", "").split(os.pathsep)[:5],
         asr_tools_files=collect_asr_tools_files(),
+    )
+
+    write_diagnostic(
+        "gpu_probe",
+        nvidia_smi=run_nvidia_smi_probe(),
+        dll_candidates=collect_dll_candidates(),
     )
 
     try:
@@ -147,7 +226,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--context", default=None)
     parser.add_argument("--hotword", action="append", default=[])
     parser.add_argument("--chunk-length", type=int, default=None)
+    parser.add_argument("--chunk-seconds", type=int, default=None)
     parser.add_argument("--condition-on-previous-text", choices=["true", "false"], default="true")
+    parser.add_argument("--execution-profile", default="auto")
+    parser.add_argument("--attempt-number", type=int, default=1)
     parser.add_argument("--diarization", choices=["auto", "off", "pyannote"], default="auto")
     parser.add_argument("--diarization-model", default="pyannote/speaker-diarization-3.1")
     parser.add_argument("--hf-token", default=None)
@@ -163,6 +245,137 @@ def release_gpu_memory() -> None:
             torch.cuda.empty_cache()
     except Exception:
         pass
+
+
+def should_use_explicit_chunks(audio_path: str, chunk_seconds: int | None) -> bool:
+    if chunk_seconds is None or chunk_seconds <= 0:
+        return False
+
+    return Path(audio_path).suffix.lower() == ".wav"
+
+
+def transcribe_audio(
+    model: object,
+    audio_path: str,
+    transcribe_options: dict[str, object],
+    chunk_seconds: int | None,
+) -> tuple[list[dict[str, object]], str | None]:
+    if not should_use_explicit_chunks(audio_path, chunk_seconds):
+        write_diagnostic("transcribe_start", mode="single", audio_path=audio_path)
+        segments, info = model.transcribe(audio_path, **transcribe_options)
+        segment_items = [
+            {
+                "id": index,
+                "start": float(segment.start),
+                "end": float(segment.end),
+                "text": segment.text.strip(),
+                "speaker": None,
+            }
+            for index, segment in enumerate(segments)
+        ]
+        detected_language = getattr(info, "language", None)
+        del segments
+        del info
+        return segment_items, detected_language
+
+    return transcribe_wav_chunks(model, audio_path, transcribe_options, int(chunk_seconds or 0))
+
+
+def transcribe_wav_chunks(
+    model: object,
+    audio_path: str,
+    transcribe_options: dict[str, object],
+    chunk_seconds: int,
+) -> tuple[list[dict[str, object]], str | None]:
+    segment_items: list[dict[str, object]] = []
+    detected_language: str | None = None
+
+    with wave.open(audio_path, "rb") as source:
+        frame_rate = source.getframerate()
+        frame_count = source.getnframes()
+        duration_seconds = frame_count / float(frame_rate or 1)
+        if duration_seconds <= chunk_seconds:
+            write_diagnostic(
+                "transcribe_start",
+                mode="single",
+                audio_path=audio_path,
+                duration_seconds=duration_seconds,
+                chunk_seconds=chunk_seconds,
+            )
+            segments, info = model.transcribe(audio_path, **transcribe_options)
+            segment_items = [
+                {
+                    "id": index,
+                    "start": float(segment.start),
+                    "end": float(segment.end),
+                    "text": segment.text.strip(),
+                    "speaker": None,
+                }
+                for index, segment in enumerate(segments)
+            ]
+            detected_language = getattr(info, "language", None)
+            del segments
+            del info
+            return segment_items, detected_language
+
+        params = source.getparams()
+        frames_per_chunk = max(1, int(frame_rate * chunk_seconds))
+        write_diagnostic(
+            "transcribe_start",
+            mode="chunked",
+            audio_path=audio_path,
+            duration_seconds=duration_seconds,
+            chunk_seconds=chunk_seconds,
+            frame_rate=frame_rate,
+        )
+
+        with tempfile.TemporaryDirectory(prefix="koenote-asr-chunks-") as temp_dir:
+            chunk_index = 0
+            next_segment_id = 0
+            while source.tell() < frame_count:
+                start_frame = source.tell()
+                frames = source.readframes(frames_per_chunk)
+                if not frames:
+                    break
+
+                chunk_path = os.path.join(temp_dir, f"chunk-{chunk_index:04d}.wav")
+                with wave.open(chunk_path, "wb") as chunk:
+                    chunk.setparams(params)
+                    chunk.writeframes(frames)
+
+                offset_seconds = start_frame / float(frame_rate or 1)
+                write_diagnostic(
+                    "chunk_transcribe_start",
+                    chunk_index=chunk_index,
+                    offset_seconds=offset_seconds,
+                    chunk_path=chunk_path,
+                )
+                segments, info = model.transcribe(chunk_path, **transcribe_options)
+                chunk_count = 0
+                for segment in segments:
+                    segment_items.append({
+                        "id": next_segment_id,
+                        "start": offset_seconds + float(segment.start),
+                        "end": offset_seconds + float(segment.end),
+                        "text": segment.text.strip(),
+                        "speaker": None,
+                    })
+                    next_segment_id += 1
+                    chunk_count += 1
+
+                if detected_language is None:
+                    detected_language = getattr(info, "language", None)
+                del segments
+                del info
+                release_gpu_memory()
+                write_diagnostic(
+                    "chunk_transcribe_done",
+                    chunk_index=chunk_index,
+                    segment_count=chunk_count,
+                )
+                chunk_index += 1
+
+    return segment_items, detected_language
 
 
 def run_pyannote_diarization(audio_path: str, model_name: str, token: str) -> list[dict[str, object]]:
@@ -262,22 +475,15 @@ def main() -> int:
         model_device=str(getattr(model, "device", "unknown")),
         model_compute_type=str(getattr(model, "compute_type", "unknown")),
     )
-    segments, info = model.transcribe(args.audio, **transcribe_options)
+    segment_items, detected_language = transcribe_audio(
+        model,
+        args.audio,
+        transcribe_options,
+        args.chunk_seconds,
+    )
+    detected_language = detected_language or args.language
+    write_diagnostic("transcribe_done", segment_count=len(segment_items), detected_language=detected_language)
 
-    segment_items = [
-        {
-            "id": index,
-            "start": float(segment.start),
-            "end": float(segment.end),
-            "text": segment.text.strip(),
-            "speaker": None,
-        }
-        for index, segment in enumerate(segments)
-    ]
-    detected_language = getattr(info, "language", args.language)
-
-    del segments
-    del info
     del model
     release_gpu_memory()
 

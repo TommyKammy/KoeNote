@@ -34,7 +34,12 @@ public sealed record AsrInput(
 public sealed record AsrOptions(
     IReadOnlyList<string>? Hotwords = null,
     string? Context = null,
-    TimeSpan? Timeout = null);
+    TimeSpan? Timeout = null,
+    string? Device = null,
+    string? ComputeType = null,
+    string? ExecutionProfileId = null,
+    int AttemptNumber = 1,
+    int? ChunkSeconds = null);
 
 public sealed record AsrEngineCheckResult(
     bool IsAvailable,
