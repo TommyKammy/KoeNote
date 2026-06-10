@@ -19,7 +19,6 @@ public sealed class SetupWizardService
     private readonly DiarizationRuntimeService _diarizationRuntimeService;
     private readonly TernaryReviewRuntimeService _ternaryReviewRuntimeService;
     private readonly CudaReviewRuntimeService _cudaReviewRuntimeService;
-    private readonly AsrSettingsRepository _asrSettingsRepository;
     private SetupPresetRecommendation? _presetRecommendation;
     private bool _automaticPresetRecommendationApplied;
 
@@ -38,7 +37,7 @@ public sealed class SetupWizardService
         AsrCudaRuntimeService? asrCudaRuntimeService = null,
         TernaryReviewRuntimeService? ternaryReviewRuntimeService = null,
         CudaReviewRuntimeService? cudaReviewRuntimeService = null,
-        AsrSettingsRepository? asrSettingsRepository = null)
+        ISetupRuntimeSmokeService? runtimeSmokeService = null)
     {
         _paths = paths;
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
@@ -46,7 +45,6 @@ public sealed class SetupWizardService
         _diarizationRuntimeService = diarizationRuntimeService;
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
-        _asrSettingsRepository = asrSettingsRepository ?? new AsrSettingsRepository(paths);
         _stateService = stateService;
         _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
         var resourceProbe = hostResourceProbe ?? new WindowsSetupHostResourceProbe();
@@ -66,7 +64,8 @@ public sealed class SetupWizardService
             toolStatusService,
             modelCatalogService,
             installedModelRepository,
-            resourceProbe);
+            resourceProbe,
+            runtimeSmokeService);
     }
 
     public SetupState LoadState()
@@ -376,18 +375,14 @@ public sealed class SetupWizardService
         });
     }
 
-    public SetupSmokeResult RunSmokeCheck()
+    public async Task<SetupSmokeResult> RunSmokeCheckAsync(CancellationToken cancellationToken = default)
     {
-        var result = _readinessService.RunSmokeCheck();
-        PersistKnownGoodAsrGpuProfile(result.IsSucceeded);
-        return result;
+        return await _readinessService.RunSmokeCheckAsync(cancellationToken);
     }
 
     public SetupState CompleteIfReady()
     {
-        var state = _readinessService.CompleteIfReady();
-        PersistKnownGoodAsrGpuProfile(state.LastSmokeSucceeded);
-        return state;
+        return _readinessService.CompleteIfReady();
     }
 
     public IReadOnlyList<SetupStepItem> BuildStepItems(SetupState state)
@@ -395,20 +390,4 @@ public sealed class SetupWizardService
         return SetupStepBuilder.Build(state, _readinessService.GetStepReadiness(state));
     }
 
-    private void PersistKnownGoodAsrGpuProfile(bool smokeSucceeded)
-    {
-        if (!smokeSucceeded || !AsrCudaRuntimeLayout.HasPackage(_paths))
-        {
-            return;
-        }
-
-        var current = _asrSettingsRepository.Load();
-        var currentProfile = AsrExecutionProfiles.Resolve(current.ExecutionProfileId);
-        if (currentProfile.ProfileId.Equals(AsrExecutionProfiles.CpuInt8, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        _asrSettingsRepository.Save(current with { ExecutionProfileId = AsrExecutionProfiles.CudaFloat16 });
-    }
 }

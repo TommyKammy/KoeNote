@@ -75,10 +75,10 @@ internal sealed class SetupReadinessService(
         ];
     }
 
-    public SetupSmokeResult RunSmokeCheck()
+    public async Task<SetupSmokeResult> RunSmokeCheckAsync(CancellationToken cancellationToken = default)
     {
         var state = stateService.Load();
-        var checks = BuildSmokeChecks(state);
+        var checks = await BuildSmokeChecksAsync(state, runRuntimeActions: true, cancellationToken);
         var succeeded = checks.All(static check => check.IsOk);
         var updated = stateService.Save(state with
         {
@@ -97,7 +97,7 @@ internal sealed class SetupReadinessService(
         var updated = stateService.Save(state with
         {
             CurrentStep = ready ? SetupStep.Complete : SetupStep.SmokeTest,
-            LastSmokeSucceeded = smokeSucceeded,
+            LastSmokeSucceeded = state.LastSmokeSucceeded && smokeSucceeded,
             IsCompleted = ready
         });
         WriteReport(updated, checks);
@@ -132,6 +132,7 @@ internal sealed class SetupReadinessService(
             .Where(static model => model.Verified && (File.Exists(model.FilePath) || Directory.Exists(model.FilePath)))
             .ToArray();
         return state.LicenseAccepted &&
+            state.LastSmokeSucceeded &&
             smokeSucceeded &&
             selectedModels.Any(model => model.Role.Equals("asr", StringComparison.OrdinalIgnoreCase)) &&
             selectedModels.Any(model => model.Role.Equals("review", StringComparison.OrdinalIgnoreCase));
@@ -143,8 +144,12 @@ internal sealed class SetupReadinessService(
         return new SetupSmokeCheck(name, exists, exists ? path : $"Missing: {path}");
     }
 
-    private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state)
+    private async Task<IReadOnlyList<SetupSmokeCheck>> BuildSmokeChecksAsync(
+        SetupState state,
+        bool runRuntimeActions,
+        CancellationToken cancellationToken)
     {
+        var resources = hostResourceProbe.GetResources();
         List<SetupSmokeCheck> checks =
         [
             CheckFile("ffmpeg", paths.FfmpegPath),
@@ -157,7 +162,7 @@ internal sealed class SetupReadinessService(
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
 
-        if (hostResourceProbe.GetResources().NvidiaGpuDetected)
+        if (resources.NvidiaGpuDetected)
         {
             checks.Add(new SetupSmokeCheck(
                 "ASR CUDA runtime",
@@ -166,7 +171,39 @@ internal sealed class SetupReadinessService(
             checks.Add(CheckCudaReviewRuntime());
         }
 
-        checks.AddRange((runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository)).Run(state));
+        var runtimeChecks = await (runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository))
+            .RunAsync(state, runRuntimeActions, resources.NvidiaGpuDetected, cancellationToken);
+        checks.AddRange(runtimeChecks);
+
+        return checks;
+    }
+
+    private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state)
+    {
+        var resources = hostResourceProbe.GetResources();
+        List<SetupSmokeCheck> checks =
+        [
+            CheckFile("ffmpeg", paths.FfmpegPath),
+            new("faster-whisper runtime", FasterWhisperRuntimeLayout.HasPackage(paths), FasterWhisperRuntimeLayout.HasPackage(paths) ? paths.AsrPythonEnvironment : $"Not installed: {paths.AsrPythonEnvironment}"),
+            CheckSelectedModel("ASR model", state.SelectedAsrModelId),
+            CheckSelectedModel("Review LLM model", state.SelectedReviewModelId),
+            CheckSelectedReviewRuntime(state.SelectedReviewModelId),
+            CheckDiarizationRuntime(),
+            new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
+            new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
+        ];
+
+        if (resources.NvidiaGpuDetected)
+        {
+            checks.Add(new SetupSmokeCheck(
+                "ASR CUDA runtime",
+                AsrCudaRuntimeLayout.HasPackage(paths),
+                AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrCTranslate2RuntimeDirectory : $"Not installed: {paths.AsrCTranslate2RuntimeDirectory}"));
+            checks.Add(CheckCudaReviewRuntime());
+        }
+
+        checks.AddRange((runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository))
+            .RunReadiness(state, resources.NvidiaGpuDetected));
 
         return checks;
     }
