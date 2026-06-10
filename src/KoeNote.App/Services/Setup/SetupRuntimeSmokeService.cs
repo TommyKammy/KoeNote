@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Text;
 using KoeNote.App.Services.Asr;
@@ -140,7 +141,7 @@ public sealed class SetupRuntimeSmokeService(
                     ? $"{profile.ProfileId}: process succeeded but output JSON was not created"
                     : SummarizeProfileFailure(profile, attempt.Result.ExitCode, attempt.Result.StandardOutput, attempt.Result.StandardError));
             }
-            catch (Exception exception) when (exception is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException)
+            catch (Exception exception) when (exception is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
             {
                 failures.Add($"{profile.ProfileId}: {exception.GetType().Name} - {exception.Message}");
             }
@@ -270,20 +271,26 @@ public sealed class SetupRuntimeSmokeService(
 
     private IReadOnlyDictionary<string, string> BuildAsrSmokeEnvironment()
     {
-        var pathEntries = new[]
-            {
-                paths.AsrCTranslate2RuntimeDirectory,
-                paths.AsrRuntimeDirectory,
-                Environment.GetEnvironmentVariable("PATH") ?? string.Empty
-            }
-            .Where(static value => !string.IsNullOrWhiteSpace(value));
-
-        return new Dictionary<string, string>
+        var environment = new Dictionary<string, string>();
+        if (Directory.Exists(paths.AsrCTranslate2RuntimeDirectory))
         {
-            ["PATH"] = string.Join(Path.PathSeparator, pathEntries),
-            ["KOENOTE_ASR_TOOLS_DIR"] = paths.AsrRuntimeDirectory,
-            ["KOENOTE_CTRANSLATE2_CUDA_DIR"] = paths.AsrCTranslate2RuntimeDirectory
-        };
+            var existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            var pathEntries = new[]
+                {
+                    paths.AsrCTranslate2RuntimeDirectory,
+                    existingPath
+                }
+                .Where(static value => !string.IsNullOrWhiteSpace(value));
+            environment["PATH"] = string.Join(Path.PathSeparator, pathEntries);
+            environment["KOENOTE_CTRANSLATE2_CUDA_DIR"] = paths.AsrCTranslate2RuntimeDirectory;
+        }
+
+        if (Directory.Exists(paths.AsrRuntimeDirectory))
+        {
+            environment["KOENOTE_ASR_TOOLS_DIR"] = paths.AsrRuntimeDirectory;
+        }
+
+        return environment;
     }
 
     private SetupSmokeCheck CheckReviewRuntimePathBridge(SetupState state)

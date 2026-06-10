@@ -832,6 +832,13 @@ public sealed class SetupWizardServiceTests
         Assert.Contains(AsrExecutionProfiles.CudaInt8Float16, runner.Arguments[1]);
         Assert.Contains(AsrExecutionProfiles.CudaFloat32, runner.Arguments[2]);
         Assert.Contains("float32", runner.Arguments[2]);
+        var smokeEnvironment = runner.Environments[0];
+        Assert.True(smokeEnvironment.TryGetValue("PATH", out var smokePath));
+        var smokePathEntries = smokePath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(smokePathEntries, entry => string.Equals(entry, paths.AsrCTranslate2RuntimeDirectory, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(smokePathEntries, entry => string.Equals(entry, paths.AsrRuntimeDirectory, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(paths.AsrRuntimeDirectory, smokeEnvironment["KOENOTE_ASR_TOOLS_DIR"]);
+        Assert.Equal(paths.AsrCTranslate2RuntimeDirectory, smokeEnvironment["KOENOTE_CTRANSLATE2_CUDA_DIR"]);
         Assert.Equal(
             AsrExecutionProfiles.CudaFloat32,
             new AsrSettingsRepository(paths).Load().ExecutionProfileId);
@@ -894,6 +901,57 @@ public sealed class SetupWizardServiceTests
             check.Name == "ASR GPU profile smoke" &&
             !check.IsOk &&
             check.Detail.Contains("Skipped because ASR runtime smoke failed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SetupWizard_GpuAsrSmoke_ReportsNonStartableAsrPythonAsSmokeFailure()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.FasterWhisperModelPath);
+        Touch(paths.ReviewModelPath);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "faster-whisper-large-v3-turbo",
+            ExecutionProfileId: AsrExecutionProfiles.Auto));
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3-turbo", "asr", "faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var runner = new ThrowingAsrSmokeProcessRunner(new System.ComponentModel.Win32Exception(193));
+        var runtimeSmokeService = new SetupRuntimeSmokeService(
+            paths,
+            installedModels,
+            runner,
+            new AsrSettingsRepository(paths));
+        var wizard = CreateWizard(
+            paths,
+            hostResourceProbe: new FixedHostResourceProbe(
+                totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                maxGpuMemoryGb: 8,
+                nvidiaGpuDetected: true),
+            runtimeSmokeService: runtimeSmokeService);
+        wizard.SelectModel("asr", "faster-whisper-large-v3-turbo");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = await wizard.RunSmokeCheckAsync();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        Assert.Equal(3, runner.Calls);
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR GPU profile smoke" &&
+            !check.IsOk &&
+            check.Detail.Contains("Win32Exception", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1474,6 +1532,8 @@ public sealed class SetupWizardServiceTests
 
         public List<IReadOnlyList<string>> Arguments { get; } = [];
 
+        public List<IReadOnlyDictionary<string, string>> Environments { get; } = [];
+
         public override Task<ProcessRunResult> RunAsync(
             string fileName,
             IReadOnlyList<string> arguments,
@@ -1482,6 +1542,9 @@ public sealed class SetupWizardServiceTests
             IReadOnlyDictionary<string, string>? environment = null)
         {
             Arguments.Add(arguments.ToArray());
+            Environments.Add(environment is null
+                ? new Dictionary<string, string>()
+                : new Dictionary<string, string>(environment));
             var result = results[Math.Min(_index, results.Length - 1)];
             _index++;
             if (result.ExitCode == 0)
@@ -1496,6 +1559,22 @@ public sealed class SetupWizardServiceTests
             }
 
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class ThrowingAsrSmokeProcessRunner(Exception exception) : ExternalProcessRunner
+    {
+        public int Calls { get; private set; }
+
+        public override Task<ProcessRunResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Calls++;
+            throw exception;
         }
     }
 
