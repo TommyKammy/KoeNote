@@ -28,11 +28,26 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("faster_whisper_version", script);
         Assert.Contains("ctranslate2_version", script);
         Assert.Contains("ctranslate2_cuda_device_count", script);
+        Assert.Contains("selected_cuda_device_index", script);
+        Assert.Contains("cuda_visible_devices", script);
         Assert.Contains("supported_compute_types_cuda", script);
+        Assert.Contains("NVIDIA_SMI_GPU_QUERY", script);
+        Assert.Contains("index,name,driver_version,memory.total,memory.free,compute_cap", script);
+        Assert.Contains("parse_nvidia_smi_gpus", script);
+        Assert.Contains("memory_total_mb", script);
+        Assert.Contains("memory_free_mb", script);
         Assert.Contains("KOENOTE_ASR_TOOLS_DIR", script);
         Assert.Contains("KOENOTE_CTRANSLATE2_CUDA_DIR", script);
+        Assert.Contains("ctranslate2*.dll", script);
+        Assert.Contains("_ext*.pyd", script);
         Assert.Contains("nvidia-smi", script);
         Assert.Contains("gpu_probe", script);
+        Assert.Contains("gpu_memory_snapshot", script);
+        Assert.Contains("before_model_load", script);
+        Assert.Contains("after_model_load", script);
+        Assert.Contains("before_transcribe", script);
+        Assert.Contains("model_load_failed", script);
+        Assert.Contains("transcribe_failed", script);
         Assert.Contains("transcribe_start", script);
         Assert.Contains("--execution-profile", script);
         Assert.Contains("--chunk-seconds", script);
@@ -146,6 +161,13 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("2", runner.Arguments);
         Assert.Contains("--chunk-seconds", runner.Arguments);
         Assert.Contains("300", runner.Arguments);
+
+        var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("requested_device: cuda", log);
+        Assert.Contains("requested_compute_type: float16", log);
+        Assert.Contains($"execution_profile_id: {AsrExecutionProfiles.CudaFloat16}", log);
+        Assert.Contains("attempt_number: 2", log);
     }
 
     [Fact]

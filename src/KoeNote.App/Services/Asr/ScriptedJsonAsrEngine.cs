@@ -256,6 +256,8 @@ public sealed class ScriptedJsonAsrEngine(
             ["argument_summary"] = BuildArgumentSummary(arguments),
             ["model_id"] = config.ModelId,
             ["model_version"] = config.ModelVersion ?? "(unset)",
+            ["requested_device"] = options.Device ?? "(unset)",
+            ["requested_compute_type"] = options.ComputeType ?? "(unset)",
             ["execution_profile_id"] = options.ExecutionProfileId ?? "(unset)",
             ["attempt_number"] = Math.Max(1, options.AttemptNumber).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["chunk_seconds"] = options.ChunkSeconds?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(unset)",

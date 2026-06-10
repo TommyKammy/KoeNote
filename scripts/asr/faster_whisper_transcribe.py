@@ -14,6 +14,8 @@ import tempfile
 import wave
 from pathlib import Path
 
+NVIDIA_SMI_GPU_QUERY = "index,name,driver_version,memory.total,memory.free,compute_cap"
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -84,12 +86,14 @@ def collect_asr_tools_files() -> list[str]:
 
 
 def collect_dll_candidates() -> list[dict[str, object]]:
-    names = {
-        "cublas64_12.dll",
-        "cublasLt64_12.dll",
-        "cudart64_12.dll",
-        "cudnn64_9.dll",
+    patterns = {
+        "cublas64_*.dll",
+        "cublasLt64_*.dll",
+        "cudart64_*.dll",
+        "cudnn*.dll",
         "zlibwapi.dll",
+        "ctranslate2*.dll",
+        "_ext*.pyd",
     }
     roots: list[str] = []
     for env_name in ("KOENOTE_CTRANSLATE2_CUDA_DIR", "KOENOTE_ASR_TOOLS_DIR"):
@@ -105,19 +109,60 @@ def collect_dll_candidates() -> list[dict[str, object]]:
         if not root.is_dir():
             continue
 
-        for name in names:
-            candidate = root / name
-            key = str(candidate).lower()
-            if key in seen or not candidate.exists():
-                continue
+        for pattern in patterns:
+            for candidate in root.glob(pattern):
+                if not candidate.is_file():
+                    continue
+                key = str(candidate).lower()
+                if key in seen:
+                    continue
 
-            seen.add(key)
-            try:
-                size = candidate.stat().st_size
-            except OSError:
-                size = None
-            candidates.append({"name": name, "path": str(candidate), "size": size})
+                seen.add(key)
+                try:
+                    size = candidate.stat().st_size
+                except OSError:
+                    size = None
+                candidates.append({"name": candidate.name, "path": str(candidate), "size": size})
     return candidates
+
+
+def parse_optional_int(value: str) -> int | None:
+    try:
+        return int(value.strip())
+    except ValueError:
+        return None
+
+
+def parse_nvidia_smi_gpus(stdout: str) -> list[dict[str, object]]:
+    gpus: list[dict[str, object]] = []
+    for line in stdout.splitlines():
+        values = [value.strip() for value in line.split(",")]
+        if len(values) < 6:
+            continue
+
+        index, name, driver_version, memory_total, memory_free, compute_cap = values[:6]
+        gpus.append({
+            "index": parse_optional_int(index),
+            "name": name,
+            "driver_version": driver_version,
+            "memory_total_mb": parse_optional_int(memory_total),
+            "memory_free_mb": parse_optional_int(memory_free),
+            "compute_capability": compute_cap,
+        })
+    return gpus
+
+
+def resolve_selected_cuda_device_index(device: str) -> str | None:
+    if device.lower() == "cpu":
+        return None
+
+    visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible_devices:
+        first_visible = next((item.strip() for item in visible_devices.split(",") if item.strip()), None)
+        if first_visible:
+            return first_visible
+
+    return "0" if device.lower() == "cuda" else "auto"
 
 
 def run_nvidia_smi_probe() -> dict[str, object]:
@@ -125,7 +170,7 @@ def run_nvidia_smi_probe() -> dict[str, object]:
         result = subprocess.run(
             [
                 "nvidia-smi",
-                "--query-gpu=name,driver_version,memory.total,memory.free,compute_cap",
+                f"--query-gpu={NVIDIA_SMI_GPU_QUERY}",
                 "--format=csv,noheader,nounits",
             ],
             capture_output=True,
@@ -136,12 +181,23 @@ def run_nvidia_smi_probe() -> dict[str, object]:
     except Exception as exc:
         return {"available": False, "error": f"{type(exc).__name__}: {exc}"}
 
+    stdout = result.stdout.strip()
     return {
         "available": result.returncode == 0,
         "exit_code": result.returncode,
-        "stdout": result.stdout.strip()[:1000],
+        "query": NVIDIA_SMI_GPU_QUERY,
+        "gpus": parse_nvidia_smi_gpus(stdout) if result.returncode == 0 else [],
+        "stdout": stdout[:1000],
         "stderr": result.stderr.strip()[:1000],
     }
+
+
+def write_gpu_memory_snapshot(stage: str) -> None:
+    write_diagnostic("gpu_memory_snapshot", stage=stage, nvidia_smi=run_nvidia_smi_probe())
+
+
+def write_phase_failure(event: str, exc: BaseException) -> None:
+    write_diagnostic(event, error_type=type(exc).__name__, error=str(exc)[:1000])
 
 
 def write_startup_diagnostics(args: argparse.Namespace) -> None:
@@ -149,6 +205,8 @@ def write_startup_diagnostics(args: argparse.Namespace) -> None:
         "startup",
         requested_device=args.device,
         requested_compute_type=args.compute_type,
+        selected_cuda_device_index=resolve_selected_cuda_device_index(args.device),
+        cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
         execution_profile=args.execution_profile,
         attempt_number=args.attempt_number,
         chunk_seconds=args.chunk_seconds,
@@ -457,25 +515,40 @@ def main() -> int:
         "model_load_start",
         requested_device=args.device,
         requested_compute_type=args.compute_type,
+        selected_cuda_device_index=resolve_selected_cuda_device_index(args.device),
         local_files_only=args.local_files_only,
     )
+    write_gpu_memory_snapshot("before_model_load")
 
-    model = WhisperModel(
-        args.model,
-        device=args.device,
-        compute_type=args.compute_type,
-        local_files_only=args.local_files_only)
+    try:
+        model = WhisperModel(
+            args.model,
+            device=args.device,
+            compute_type=args.compute_type,
+            local_files_only=args.local_files_only)
+    except BaseException as exc:
+        write_phase_failure("model_load_failed", exc)
+        raise
+
     write_diagnostic(
         "model_loaded",
         model_device=str(getattr(model, "device", "unknown")),
         model_compute_type=str(getattr(model, "compute_type", "unknown")),
     )
-    segment_items, detected_language = transcribe_audio(
-        model,
-        args.audio,
-        transcribe_options,
-        args.chunk_seconds,
-    )
+    write_gpu_memory_snapshot("after_model_load")
+    write_gpu_memory_snapshot("before_transcribe")
+
+    try:
+        segment_items, detected_language = transcribe_audio(
+            model,
+            args.audio,
+            transcribe_options,
+            args.chunk_seconds,
+        )
+    except BaseException as exc:
+        write_phase_failure("transcribe_failed", exc)
+        raise
+
     detected_language = detected_language or args.language
     write_diagnostic("transcribe_done", segment_count=len(segment_items), detected_language=detected_language)
 
