@@ -96,7 +96,8 @@ jobs:
       - name: Build
         run: dotnet build $env:SOLUTION_PATH --configuration Release --no-restore
 
-      - name: Full tests
-        run: |
-          dotnet test $env:FAST_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
-          dotnet test $env:UI_INTEGRATION_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
+      - name: Fast tests
+        run: dotnet test $env:FAST_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
+
+      - name: UI integration tests
+        run: dotnet test $env:UI_INTEGRATION_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
