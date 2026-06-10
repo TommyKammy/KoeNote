@@ -16,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
   SOLUTION_PATH: KoeNote.slnx
   TEST_PROJECT_PATH: tests/KoeNote.App.Tests/KoeNote.App.Tests.csproj
 
@@ -40,6 +41,14 @@ jobs:
 
       - name: Show .NET info
         run: dotnet --info
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.csproj', '**/*.props', '**/*.targets', 'NuGet.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore
         run: dotnet restore $env:SOLUTION_PATH
@@ -71,6 +80,14 @@ jobs:
 
       - name: Show .NET info
         run: dotnet --info
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.csproj', '**/*.props', '**/*.targets', 'NuGet.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore
         run: dotnet restore $env:SOLUTION_PATH
