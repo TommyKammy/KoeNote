@@ -176,6 +176,108 @@ public sealed class ScriptedJsonAsrEngineTests
     }
 
     [Fact]
+    public async Task TranscribeAsync_ChunkedGpuAsr_SplitsWavAndOffsetsMergedSegments()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
+        Directory.CreateDirectory(modelPath);
+        var runner = new ChunkedAsrProcessRunner();
+        var engine = CreateEngine(paths, runner);
+
+        var result = await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "faster-whisper-large-v3-turbo",
+                scriptPath),
+            new AsrOptions(
+                Device: "cuda",
+                ComputeType: "float16",
+                ExecutionProfileId: AsrExecutionProfiles.CudaFloat16,
+                AttemptNumber: 1,
+                ChunkSeconds: 1));
+
+        Assert.Equal(3, runner.Arguments.Count);
+        Assert.All(runner.Arguments, arguments =>
+        {
+            Assert.Contains("--device", arguments);
+            Assert.Contains("cuda", arguments);
+            Assert.DoesNotContain("--chunk-seconds", arguments);
+        });
+        Assert.Equal(3, result.Segments.Count);
+        Assert.Equal("000001", result.Segments[0].SegmentId);
+        Assert.Equal("000002", result.Segments[1].SegmentId);
+        Assert.Equal("000003", result.Segments[2].SegmentId);
+        Assert.Equal(0.1, result.Segments[0].StartSeconds, precision: 3);
+        Assert.Equal(1.1, result.Segments[1].StartSeconds, precision: 3);
+        Assert.Equal(2.1, result.Segments[2].StartSeconds, precision: 3);
+        Assert.Equal("chunk 1", result.Segments[0].RawText);
+        Assert.Equal("chunk 2", result.Segments[1].RawText);
+        Assert.Equal("chunk 3", result.Segments[2].RawText);
+        Assert.Equal(TimeSpan.FromSeconds(3), result.Duration);
+
+        var rawOutput = File.ReadAllText(result.RawOutputPath);
+        Assert.Contains("\"segments\"", rawOutput);
+        Assert.Contains("\"chunk 3\"", rawOutput);
+        var logDirectory = Path.Combine(paths.Jobs, "job-001", "logs");
+        Assert.Equal(3, Directory.GetFiles(logDirectory, "asr-*-chunk-*.log").Length);
+        var firstChunkLog = File.ReadAllText(Directory.GetFiles(logDirectory, "asr-*-chunk-001.log").Single());
+        Assert.Contains("chunk_index: 1", firstChunkLog);
+        Assert.Contains("chunk_count: 3", firstChunkLog);
+        Assert.Contains("chunk_offset_seconds: 0.000", firstChunkLog);
+        Assert.Equal("succeeded", ReadSingleRunStatus(paths));
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_ChunkedGpuAsr_ReportsChunkFailureWithWorkerLog()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
+        Directory.CreateDirectory(modelPath);
+        var runner = new ChunkedAsrProcessRunner(failAtChunk: 2);
+        var engine = CreateEngine(paths, runner);
+
+        var exception = await Assert.ThrowsAsync<AsrWorkerException>(() => engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "faster-whisper-large-v3-turbo",
+                scriptPath),
+            new AsrOptions(
+                Device: "cuda",
+                ComputeType: "float16",
+                ExecutionProfileId: AsrExecutionProfiles.CudaFloat16,
+                ChunkSeconds: 1)));
+
+        Assert.Equal(AsrFailureCategory.ProcessFailed, exception.Category);
+        Assert.Contains("chunk 2/3", exception.Message);
+        Assert.Contains("Worker log:", exception.Message);
+        Assert.NotNull(exception.WorkerLogPath);
+        Assert.True(File.Exists(exception.WorkerLogPath));
+        var log = File.ReadAllText(exception.WorkerLogPath);
+        Assert.Contains("chunk_index: 2", log);
+        Assert.Contains("chunk_count: 3", log);
+        Assert.Equal("failed", ReadSingleRunStatus(paths));
+        Assert.Equal("ProcessFailed", ReadSingleRunErrorCategory(paths));
+    }
+
+    [Fact]
     public async Task TranscribeAsync_LogsForcedFasterWhisperArguments()
     {
         var paths = CreatePaths();
@@ -394,6 +496,32 @@ public sealed class ScriptedJsonAsrEngineTests
         throw new FileNotFoundException("Could not find scripts/asr/faster_whisper_transcribe.py.");
     }
 
+    private static void WriteSilentPcmWav(string path, int sampleRate, double durationSeconds)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var sampleCount = (int)Math.Round(sampleRate * durationSeconds);
+        var dataBytes = sampleCount * sizeof(short);
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+        writer.Write(36 + dataBytes);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write((short)1);
+        writer.Write(sampleRate);
+        writer.Write(sampleRate * sizeof(short));
+        writer.Write((short)sizeof(short));
+        writer.Write((short)16);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+        writer.Write(dataBytes);
+        for (var index = 0; index < sampleCount; index++)
+        {
+            writer.Write((short)0);
+        }
+    }
+
     private sealed class CapturingAsrProcessRunner : ExternalProcessRunner
     {
         public IReadOnlyDictionary<string, string>? Environment { get; private set; }
@@ -422,6 +550,41 @@ public sealed class ScriptedJsonAsrEngineTests
                 }
                 """);
             return Task.FromResult(new ProcessRunResult(0, TimeSpan.FromSeconds(1), "ok", string.Empty));
+        }
+    }
+
+    private sealed class ChunkedAsrProcessRunner(int? failAtChunk = null) : ExternalProcessRunner
+    {
+        public List<IReadOnlyList<string>> Arguments { get; } = [];
+
+        public override Task<ProcessRunResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Arguments.Add(arguments.ToArray());
+            var chunkNumber = Arguments.Count;
+            if (failAtChunk == chunkNumber)
+            {
+                return Task.FromResult(new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, $"chunk {chunkNumber} failed"));
+            }
+
+            var outputJsonIndex = arguments
+                .Select((argument, index) => (argument, index))
+                .First(item => item.argument == "--output-json")
+                .index;
+            var outputJsonPath = arguments[outputJsonIndex + 1];
+            Directory.CreateDirectory(Path.GetDirectoryName(outputJsonPath)!);
+            File.WriteAllText(outputJsonPath, $$"""
+                {
+                  "segments": [
+                    { "start": 0.1, "end": 0.4, "text": "chunk {{chunkNumber}}" }
+                  ]
+                }
+                """);
+            return Task.FromResult(new ProcessRunResult(0, TimeSpan.FromSeconds(1), $"chunk {chunkNumber}", string.Empty));
         }
     }
 
