@@ -224,6 +224,11 @@ public sealed class TranscriptSummaryServiceTests
         Assert.NotNull(derivative);
         Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
         Assert.Null(derivative.ErrorMessage);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("## 概要", chunk.Content, StringComparison.Ordinal);
+        Assert.Contains("## 主な内容", chunk.Content, StringComparison.Ordinal);
+        Assert.Contains("LLM 要約を利用できなかったため", chunk.Content, StringComparison.Ordinal);
+        AssertDoesNotContainMojibake(chunk.Content);
     }
 
     [Fact]
@@ -687,6 +692,15 @@ public sealed class TranscriptSummaryServiceTests
         }
 
         return builder.ToString();
+    }
+
+    private static void AssertDoesNotContainMojibake(string content)
+    {
+        string[] mojibakeFragments = ["縺", "繝", "譁", "蜀", "荳", "讎", "隕"];
+        foreach (var fragment in mojibakeFragments)
+        {
+            Assert.DoesNotContain(fragment, content, StringComparison.Ordinal);
+        }
     }
 
     private sealed class FakeSummaryRuntime(
