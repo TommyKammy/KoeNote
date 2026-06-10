@@ -633,10 +633,10 @@ public sealed class SetupWizardServiceTests
         CreateDiarizationRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));

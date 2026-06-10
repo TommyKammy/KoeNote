@@ -64,6 +64,11 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always"
              Condition="'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\..\tools\review-ternary')" />
+    <Content Include="..\..\tools\asr-ctranslate2-cuda\**\*"
+             Link="tools\asr-ctranslate2-cuda\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always"
+             Condition="'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\..\tools\asr-ctranslate2-cuda')" />
     <Content Include="catalog\model-catalog.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="Always" />
@@ -77,6 +82,8 @@
     <ItemGroup>
       <AsrRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\asr\**\*"
                       Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\asr')" />
+      <AsrCTranslate2RuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\asr-ctranslate2-cuda\**\*"
+                                 Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\asr-ctranslate2-cuda')" />
       <ReviewRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\review\**\*"
                          Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\review')" />
       <TernaryReviewRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\review-ternary\**\*"
@@ -84,6 +91,9 @@
     </ItemGroup>
     <Copy SourceFiles="@(AsrRuntimeTool)"
           DestinationFiles="@(AsrRuntimeTool->'$(TargetDir)tools\asr\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(AsrCTranslate2RuntimeTool)"
+          DestinationFiles="@(AsrCTranslate2RuntimeTool->'$(TargetDir)tools\asr-ctranslate2-cuda\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ReviewRuntimeTool)"
           DestinationFiles="@(ReviewRuntimeTool->'$(TargetDir)tools\review\%(RecursiveDir)%(Filename)%(Extension)')"

@@ -28,17 +28,9 @@ public static class AsrCudaRuntimeLayout
 
     public static bool HasPackage(AppPaths paths)
     {
-        if (!Directory.Exists(paths.AsrRuntimeDirectory))
-        {
-            return false;
-        }
-
-        var installedFileNames = Directory
-            .EnumerateFiles(paths.AsrRuntimeDirectory, "*", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
-            .Cast<string>();
-        return File.Exists(paths.AsrCudaRuntimeMarkerPath) && HasRequiredFiles(installedFileNames);
+        return File.Exists(paths.AsrCudaRuntimeMarkerPath) &&
+            HasBundledRuntimeFiles(paths.AsrRuntimeDirectory) &&
+            HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory);
     }
 
     public static bool HasRequiredFiles(IEnumerable<string> fileNames)

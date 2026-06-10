@@ -78,10 +78,10 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.Contains(progress.Items, item => item.StageText == "展開中");
         Assert.Contains(progress.Items, item => item.StageText == "インストール中");
         Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
-        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll")));
@@ -112,7 +112,7 @@ public sealed class AsrCudaRuntimeServiceTests
 
         Assert.True(result.IsSucceeded);
         Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
-        Assert.Equal("local cudnn", File.ReadAllText(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
         Assert.Equal("local cudnn", File.ReadAllText(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
     }
 
@@ -164,6 +164,26 @@ public sealed class AsrCudaRuntimeServiceTests
     }
 
     [Fact]
+    public async Task InstallAsync_MigratesExistingNvidiaDllsToDedicatedCTranslate2Directory()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithBundledAsrRuntime(root);
+        File.WriteAllText(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"), "old cudart");
+        File.WriteAllText(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"), "old cublas");
+        File.WriteAllText(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"), "old cublasLt");
+        File.WriteAllText(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"), "old cudnn");
+        var service = new AsrCudaRuntimeService(paths, new HttpClient(new FailingHandler()), CreateOptions());
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
+        Assert.Equal("old cudnn", File.ReadAllText(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.Equal("nvidia-redist:migrated-from-tools-asr", File.ReadAllText(paths.AsrCudaRuntimeMarkerPath));
+    }
+
+    [Fact]
     public async Task InstallAsync_KeepsLegacyAllInOneZipAsExplicitFallback()
     {
         var root = CreateRoot();
@@ -194,6 +214,9 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.True(result.IsSucceeded);
         Assert.Equal(expectedSha256, result.Sha256);
         Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
+        Assert.True(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe")));
+        Assert.False(File.Exists(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
     }
 
     [Fact]
