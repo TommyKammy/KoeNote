@@ -247,6 +247,8 @@ public sealed class ScriptedJsonAsrEngine(
         ProcessRunResult processResult,
         AsrProcessEnvironment processEnvironment)
     {
+        var requestedDevice = GetArgumentValue(arguments, "--device", options.Device ?? "(unset)");
+        var requestedComputeType = GetArgumentValue(arguments, "--compute-type", options.ComputeType ?? "(unset)");
         var metadata = new Dictionary<string, string>
         {
             ["engine_id"] = EngineId,
@@ -256,6 +258,8 @@ public sealed class ScriptedJsonAsrEngine(
             ["argument_summary"] = BuildArgumentSummary(arguments),
             ["model_id"] = config.ModelId,
             ["model_version"] = config.ModelVersion ?? "(unset)",
+            ["requested_device"] = requestedDevice,
+            ["requested_compute_type"] = requestedComputeType,
             ["execution_profile_id"] = options.ExecutionProfileId ?? "(unset)",
             ["attempt_number"] = Math.Max(1, options.AttemptNumber).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["chunk_seconds"] = options.ChunkSeconds?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(unset)",
@@ -283,6 +287,19 @@ public sealed class ScriptedJsonAsrEngine(
             processResult.StandardError,
             metadata,
             $"asr-{asrRunId}.log");
+    }
+
+    private static string GetArgumentValue(IReadOnlyList<string> arguments, string optionName, string fallback)
+    {
+        for (var index = 0; index < arguments.Count - 1; index++)
+        {
+            if (arguments[index].Equals(optionName, StringComparison.OrdinalIgnoreCase))
+            {
+                return arguments[index + 1];
+            }
+        }
+
+        return fallback;
     }
 
     private static string BuildArgumentSummary(IReadOnlyList<string> arguments)
