@@ -173,6 +173,11 @@ public sealed class ScriptedJsonAsrEngine(
                 "asr",
                 "info",
                 $"Running ASR chunk {chunk.Index}/{chunks.Count} at {chunk.OffsetSeconds:F1}s...");
+            if (File.Exists(chunkJsonPath))
+            {
+                File.Delete(chunkJsonPath);
+            }
+
             var processResult = await processRunner.RunAsync(
                 config.RuntimePath,
                 arguments,

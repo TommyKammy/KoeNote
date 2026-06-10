@@ -278,6 +278,50 @@ public sealed class ScriptedJsonAsrEngineTests
     }
 
     [Fact]
+    public async Task TranscribeAsync_ChunkedGpuAsr_RejectsStaleChunkJsonAfterWorkerFailure()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        var outputDirectory = Path.Combine(paths.Jobs, "job-001", "asr");
+        File.WriteAllText(scriptPath, "print('ok')");
+        WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
+        Directory.CreateDirectory(modelPath);
+        var config = new AsrEngineConfig(
+            "python",
+            modelPath,
+            outputDirectory,
+            "faster-whisper-large-v3-turbo",
+            scriptPath);
+        var options = new AsrOptions(
+            Device: "cuda",
+            ComputeType: "float16",
+            ExecutionProfileId: AsrExecutionProfiles.CudaFloat16,
+            ChunkSeconds: 1);
+        var firstEngine = CreateEngine(paths, new ChunkedAsrProcessRunner());
+
+        var firstResult = await firstEngine.TranscribeAsync(new AsrInput("job-001", audioPath), config, options);
+        Assert.Contains(firstResult.Segments, segment => segment.RawText == "chunk 2");
+        var staleChunkPath = Path.Combine(outputDirectory, "chunks", "chunk-002.json");
+        Assert.True(File.Exists(staleChunkPath));
+
+        var secondRunner = new ChunkedAsrProcessRunner(failAtChunk: 2);
+        var secondEngine = CreateEngine(paths, secondRunner);
+        var exception = await Assert.ThrowsAsync<AsrWorkerException>(() =>
+            secondEngine.TranscribeAsync(new AsrInput("job-001", audioPath), config, options));
+
+        Assert.Equal(AsrFailureCategory.ProcessFailed, exception.Category);
+        Assert.Contains("chunk 2/3", exception.Message);
+        Assert.False(File.Exists(staleChunkPath));
+        Assert.Equal(2, secondRunner.Arguments.Count);
+        Assert.Equal("failed", ReadLatestRunStatus(paths));
+        Assert.Equal("ProcessFailed", ReadLatestRunErrorCategory(paths));
+    }
+
+    [Fact]
     public async Task TranscribeAsync_LogsForcedFasterWhisperArguments()
     {
         var paths = CreatePaths();
@@ -467,6 +511,18 @@ public sealed class ScriptedJsonAsrEngineTests
         return Convert.ToString(command.ExecuteScalar()) ?? "";
     }
 
+    private static string ReadLatestRunStatus(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status FROM asr_runs ORDER BY created_at DESC, asr_run_id DESC LIMIT 1;";
+        return Convert.ToString(command.ExecuteScalar()) ?? "";
+    }
+
     private static string ReadSingleRunErrorCategory(AppPaths paths)
     {
         using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
@@ -476,6 +532,18 @@ public sealed class ScriptedJsonAsrEngineTests
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT error_category FROM asr_runs;";
+        return Convert.ToString(command.ExecuteScalar()) ?? "";
+    }
+
+    private static string ReadLatestRunErrorCategory(AppPaths paths)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath
+        }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT error_category FROM asr_runs ORDER BY created_at DESC, asr_run_id DESC LIMIT 1;";
         return Convert.ToString(command.ExecuteScalar()) ?? "";
     }
 
