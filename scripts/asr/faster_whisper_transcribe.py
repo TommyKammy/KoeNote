@@ -30,13 +30,8 @@ def add_windows_dll_directories() -> None:
     if ctranslate2_configured:
         candidates.append(ctranslate2_configured)
 
-    configured = os.environ.get("KOENOTE_ASR_TOOLS_DIR")
-    if configured:
-        candidates.append(configured)
-
     script_directory = os.path.dirname(os.path.abspath(__file__))
     candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr-ctranslate2-cuda")))
-    candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr")))
 
     for candidate in candidates:
         if not os.path.isdir(candidate):

@@ -334,6 +334,7 @@ public sealed class ScriptedJsonAsrEngine(
     private static AsrProcessEnvironment BuildProcessEnvironment(AsrEngineConfig config)
     {
         var ctranslate2PathEntries = new List<string>();
+        var asrToolEntries = new List<string>();
         var appAsrTools = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
         var appCTranslate2Cuda = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
         if (Directory.Exists(appCTranslate2Cuda))
@@ -344,7 +345,7 @@ public sealed class ScriptedJsonAsrEngine(
         var pathEntries = new List<string>(ctranslate2PathEntries);
         if (Directory.Exists(appAsrTools))
         {
-            pathEntries.Add(appAsrTools);
+            asrToolEntries.Add(appAsrTools);
         }
 
         var workerDirectory = Path.GetDirectoryName(config.WorkerPath);
@@ -360,28 +361,33 @@ public sealed class ScriptedJsonAsrEngine(
             var siblingAsrTools = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr"));
             if (Directory.Exists(siblingAsrTools))
             {
-                pathEntries.Add(siblingAsrTools);
+                asrToolEntries.Add(siblingAsrTools);
             }
         }
 
-        if (pathEntries.Count == 0)
+        var addedPathEntries = pathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var asrToolsEntry = asrToolEntries
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        if (addedPathEntries.Length == 0 && string.IsNullOrWhiteSpace(asrToolsEntry))
         {
             return new AsrProcessEnvironment(new Dictionary<string, string>(), []);
         }
 
-        var existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         var environment = new Dictionary<string, string>();
-        var addedPathEntries = pathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        pathEntries.Add(existingPath);
-        environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
+        if (addedPathEntries.Length > 0)
+        {
+            var existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            pathEntries.Add(existingPath);
+            environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+
         var ctranslate2Entries = ctranslate2PathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (ctranslate2Entries.Length > 0)
         {
             environment["KOENOTE_CTRANSLATE2_CUDA_DIR"] = ctranslate2Entries[0];
         }
 
-        var asrToolsEntry = addedPathEntries.FirstOrDefault(entry =>
-            Path.GetFileName(entry).Equals("asr", StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(asrToolsEntry))
         {
             environment["KOENOTE_ASR_TOOLS_DIR"] = asrToolsEntry;

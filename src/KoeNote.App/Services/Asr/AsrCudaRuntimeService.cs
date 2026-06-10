@@ -50,7 +50,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         Report(progress, "確認中", "CUDA ASR runtime の同梱ファイルと NVIDIA DLL を確認しています...");
         if (IsInstalled())
         {
-            return AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime is already installed.", paths.AsrRuntimeDirectory);
+            return AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime is already installed.", paths.AsrCTranslate2RuntimeDirectory);
         }
 
         if (!AsrCudaRuntimeLayout.HasBundledRuntimeFiles(paths.AsrRuntimeDirectory))
@@ -66,14 +66,46 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             return await InstallLegacyRuntimeAsync(cancellationToken);
         }
 
-        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrRuntimeDirectory))
+        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory))
         {
             var marker = "nvidia-redist:existing";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
             return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime is already installed.", paths.AsrRuntimeDirectory, marker)
+                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime is already installed.", paths.AsrCTranslate2RuntimeDirectory, marker)
                 : AsrCudaRuntimeInstallResult.Failed(
                     "CUDA ASR runtime files were present, but installation verification failed.",
+                    paths.AsrRuntimeDirectory,
+                    FailureCategoryInstallFailed,
+                    marker);
+        }
+
+        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrRuntimeDirectory))
+        {
+            try
+            {
+                MirrorNvidiaFilesToCTranslate2Runtime(paths.AsrRuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory, deleteSourceFiles: true);
+            }
+            catch (IOException exception)
+            {
+                return AsrCudaRuntimeInstallResult.Failed(
+                    $"CUDA ASR runtime migration failed: {exception.Message}",
+                    paths.AsrRuntimeDirectory,
+                    FailureCategoryInstallFailed);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return AsrCudaRuntimeInstallResult.Failed(
+                    $"CUDA ASR runtime migration failed: {exception.Message}",
+                    paths.AsrRuntimeDirectory,
+                    FailureCategoryInstallFailed);
+            }
+
+            var marker = "nvidia-redist:migrated-from-tools-asr";
+            File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
+            return IsInstalled()
+                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime migrated to dedicated CTranslate2 CUDA directory.", paths.AsrCTranslate2RuntimeDirectory, marker)
+                : AsrCudaRuntimeInstallResult.Failed(
+                    "CUDA ASR runtime files were present, but migration to the dedicated CTranslate2 CUDA directory failed.",
                     paths.AsrRuntimeDirectory,
                     FailureCategoryInstallFailed,
                     marker);
@@ -104,16 +136,16 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             }
 
             Directory.CreateDirectory(paths.AsrRuntimeDirectory);
+            Directory.CreateDirectory(paths.AsrCTranslate2RuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            Report(progress, "インストール中", "CUDA ASR runtime の NVIDIA DLL を tools\\asr に配置しています...");
-            CopyStagedFiles(stagingRoot, paths.AsrRuntimeDirectory, backupRoot, copiedFiles);
-            MirrorNvidiaFilesToCTranslate2Runtime(paths.AsrRuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory);
+            Report(progress, "インストール中", "CUDA ASR runtime の NVIDIA DLL を tools\\asr-ctranslate2-cuda に配置しています...");
+            CopyStagedFiles(stagingRoot, paths.AsrCTranslate2RuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
 
             Report(progress, "検証中", "CUDA ASR runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
             return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrRuntimeDirectory}", paths.AsrRuntimeDirectory, stagedResult.Sha256)
+                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}", paths.AsrCTranslate2RuntimeDirectory, stagedResult.Sha256)
                 : AsrCudaRuntimeInstallResult.Failed(
                     "CUDA ASR runtime files were copied, but installation verification failed.",
                     paths.AsrRuntimeDirectory,
@@ -195,13 +227,14 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             }
 
             Directory.CreateDirectory(paths.AsrRuntimeDirectory);
+            Directory.CreateDirectory(paths.AsrCTranslate2RuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            CopyStagedFiles(stagingRoot, paths.AsrRuntimeDirectory, backupRoot, copiedFiles);
-            MirrorNvidiaFilesToCTranslate2Runtime(paths.AsrRuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory);
+            CopyStagedFiles(stagingRoot, paths.AsrRuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredBundledFilePatterns);
+            CopyStagedFiles(stagingRoot, paths.AsrCTranslate2RuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
 
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, actualSha256);
             return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrRuntimeDirectory}", paths.AsrRuntimeDirectory, actualSha256)
+                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}", paths.AsrCTranslate2RuntimeDirectory, actualSha256)
                 : AsrCudaRuntimeInstallResult.Failed(
                     "CUDA ASR runtime files were copied, but installation verification failed.",
                     paths.AsrRuntimeDirectory,
@@ -479,10 +512,15 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         }
     }
 
-    private static void CopyStagedFiles(string stagingRoot, string destinationRoot, string backupRoot, ICollection<string> copiedFiles)
+    private static void CopyStagedFiles(
+        string stagingRoot,
+        string destinationRoot,
+        string backupRoot,
+        ICollection<string> copiedFiles,
+        IReadOnlyCollection<string> filePatterns)
     {
         foreach (var stagedFile in Directory.EnumerateFiles(stagingRoot, "*", SearchOption.TopDirectoryOnly)
-                     .Where(static file => AsrCudaRuntimeLayout.RequiredFilePatterns.Any(pattern =>
+                     .Where(file => filePatterns.Any(pattern =>
                          MatchesPattern(Path.GetFileName(file), pattern))))
         {
             var relativePath = Path.GetRelativePath(stagingRoot, stagedFile);
@@ -501,7 +539,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         }
     }
 
-    private static void MirrorNvidiaFilesToCTranslate2Runtime(string sourceRoot, string destinationRoot)
+    private static void MirrorNvidiaFilesToCTranslate2Runtime(string sourceRoot, string destinationRoot, bool deleteSourceFiles = false)
     {
         if (!Directory.Exists(sourceRoot))
         {
@@ -514,6 +552,10 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
                          MatchesPattern(Path.GetFileName(file), pattern))))
         {
             File.Copy(sourcePath, Path.Combine(destinationRoot, Path.GetFileName(sourcePath)), overwrite: true);
+            if (deleteSourceFiles)
+            {
+                File.Delete(sourcePath);
+            }
         }
     }
 

@@ -64,7 +64,7 @@
       "license": "NVIDIA CUDA Toolkit / cuDNN license terms",
       "source": "https://developer.download.nvidia.com/compute/cuda/redist/ and https://developer.download.nvidia.com/compute/cudnn/redist/",
       "expectedPath": "Downloaded or reused by Setup Wizard; not bundled in the MSI",
-      "notes": "Setup Wizard resolves URLs, sizes, and SHA256 hashes from NVIDIA redistributable manifests, then installs required DLLs such as cudart64_12.dll, cublas64_12.dll, cublasLt64_12.dll, and cudnn*.dll."
+      "notes": "Setup Wizard resolves URLs, sizes, and SHA256 hashes from NVIDIA redistributable manifests. Review DLLs are installed under tools/review, while ASR/faster-whisper CTranslate2 CUDA DLLs are installed under tools/asr-ctranslate2-cuda."
     },
     {
       "name": "Prism llama.cpp CPU x64 runtime",

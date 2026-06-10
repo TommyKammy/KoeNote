@@ -179,6 +179,7 @@ public sealed class VersioningTests
         Assert.Contains("cudart*.dll", guardScript);
         Assert.Contains("cudnn*.dll", guardScript);
         Assert.Contains("NVIDIA redistributable runtime file is not allowed", guardScript);
+        Assert.Contains("tools\\asr-ctranslate2-cuda", guardScript);
         Assert.Contains("\"artifact_tool_v2\"", guardScript);
         Assert.Contains("\"pandas\"", guardScript);
         Assert.Contains("\"numpy\"", guardScript);
@@ -222,6 +223,7 @@ public sealed class VersioningTests
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\python')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review-ternary')", appProject);
+        Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\asr-ctranslate2-cuda')", appProject);
     }
 
     [Fact]

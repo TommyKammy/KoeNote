@@ -433,10 +433,10 @@ public sealed class MainWindowViewModelTests
         CreateFasterWhisperRuntime(paths);
         Touch(paths.LlamaCompletionPath);
         CreateDiarizationRuntime(paths);
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
@@ -845,10 +845,10 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
         Assert.Contains("ASR GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
 
-        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudart64_12.dll"));
-        Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "crispasr.exe"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "crispasr.dll"));
         Touch(Path.Combine(viewModel.Paths.AsrRuntimeDirectory, "whisper.dll"));
@@ -2284,10 +2284,10 @@ public sealed class MainWindowViewModelTests
         Touch(paths.LlamaCompletionPath);
         CreateFasterWhisperRuntime(paths);
         CreateDiarizationRuntime(paths);
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudart64_12.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));

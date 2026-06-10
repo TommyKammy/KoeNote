@@ -36,10 +36,11 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("transcribe_start", script);
         Assert.Contains("--execution-profile", script);
         Assert.Contains("--chunk-seconds", script);
+        Assert.DoesNotContain("\"tools\", \"asr\")", script, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task TranscribeAsync_AddsBundledAsrToolsToProcessPath()
+    public async Task TranscribeAsync_UsesDedicatedCTranslate2CudaPathWithoutAsrToolsPath()
     {
         var paths = CreatePaths();
         paths.EnsureCreated();
@@ -68,18 +69,22 @@ public sealed class ScriptedJsonAsrEngineTests
 
         Assert.NotNull(runner.Environment);
         Assert.True(runner.Environment.TryGetValue("PATH", out var path));
+        var pathEntries = path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
+        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        Assert.DoesNotContain(asrToolsDirectory, pathEntries, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(
-            Path.Combine(AppContext.BaseDirectory, "tools", "asr"),
-            path,
-            StringComparison.OrdinalIgnoreCase);
+            ctranslate2CudaDirectory,
+            pathEntries,
+            StringComparer.OrdinalIgnoreCase);
         Assert.Equal(
-            Path.Combine(AppContext.BaseDirectory, "tools", "asr"),
+            asrToolsDirectory,
             runner.Environment["KOENOTE_ASR_TOOLS_DIR"]);
         Assert.Equal(
-            Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"),
+            ctranslate2CudaDirectory,
             runner.Environment["KOENOTE_CTRANSLATE2_CUDA_DIR"]);
         Assert.StartsWith(
-            Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"),
+            ctranslate2CudaDirectory,
             path,
             StringComparison.OrdinalIgnoreCase);
 

@@ -1132,12 +1132,12 @@ public sealed partial class MainWindowViewModel
     {
         if (SetupAsrCudaRuntimeReady)
         {
-            SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: {Paths.AsrRuntimeDirectory}";
+            SetupAsrCudaRuntimeSummary = $"CUDA ASR runtime installed: native={Paths.AsrRuntimeDirectory}; ctranslate2={Paths.AsrCTranslate2RuntimeDirectory}";
             return;
         }
 
         SetupAsrCudaRuntimeSummary = SetupAsrCudaRuntimeRecommended
-            ? $"NVIDIA GPU detected. KoeNote ASR GPU files are bundled; Setup Wizard will download NVIDIA CUDA/cuDNN redist DLLs if needed: {Paths.AsrRuntimeDirectory}"
+            ? $"NVIDIA GPU detected. KoeNote ASR GPU files are bundled; Setup Wizard will download NVIDIA CUDA/cuDNN redist DLLs if needed: {Paths.AsrCTranslate2RuntimeDirectory}"
             : "CUDA ASR runtime is not required for the selected ASR model.";
     }
 

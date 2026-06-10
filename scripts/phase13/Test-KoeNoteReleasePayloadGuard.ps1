@@ -53,6 +53,7 @@ function Get-RelativePath {
 $failures = New-Object System.Collections.Generic.List[string]
 $reviewRuntimeDir = Join-Path $payloadRoot "tools\review"
 $asrRuntimeDir = Join-Path $payloadRoot "tools\asr"
+$asrCTranslate2RuntimeDir = Join-Path $payloadRoot "tools\asr-ctranslate2-cuda"
 $bundledPythonDir = Join-Path $payloadRoot "tools\python"
 $ffmpegRuntimeDir = Join-Path $payloadRoot "tools"
 
@@ -82,7 +83,7 @@ $nvidiaRedistributablePatterns = @(
     "cusparse*.dll"
 )
 
-foreach ($runtimeDir in @($reviewRuntimeDir, $asrRuntimeDir)) {
+foreach ($runtimeDir in @($reviewRuntimeDir, $asrRuntimeDir, $asrCTranslate2RuntimeDir)) {
     if (-not (Test-Path -LiteralPath $runtimeDir -PathType Container)) {
         continue
     }
