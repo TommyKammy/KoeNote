@@ -72,6 +72,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly ModelDownloadService _modelDownloadService;
     private readonly ModelLicenseViewer _modelLicenseViewer;
     private readonly SetupWizardService _setupWizardService;
+    private readonly SetupFlowCoordinator _setupFlowCoordinator;
     private readonly IAudioPlaybackService _audioPlaybackService;
     private readonly TextDiffService _textDiffService = new();
     private readonly StatusBarInfoService _statusBarInfoService;
@@ -225,6 +226,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _modelDownloadService = services.ModelDownloadService;
         _modelLicenseViewer = services.ModelLicenseViewer;
         _setupWizardService = services.SetupWizardService;
+        _setupFlowCoordinator = new SetupFlowCoordinator(paths, _setupWizardService);
         _audioPlaybackService = services.AudioPlaybackService;
         _audioPlaybackService.PlaybackStateChanged += (_, _) =>
         {
