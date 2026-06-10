@@ -11,6 +11,18 @@ on:
   schedule:
     - cron: "0 18 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOLUTION_PATH: KoeNote.slnx
+  TEST_PROJECT_PATH: tests/KoeNote.App.Tests/KoeNote.App.Tests.csproj
+
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   pr-fast:
     name: Build and Fast Test
@@ -30,53 +42,18 @@ jobs:
         run: dotnet --info
 
       - name: Restore
-        shell: pwsh
-        run: |
-          $solutions = @(
-            Get-ChildItem -Path . -Filter *.sln -Recurse
-            Get-ChildItem -Path . -Filter *.slnx -Recurse
-          )
-          if ($solutions.Count -eq 0) {
-            Write-Host "No solution file yet; skipping restore."
-            return
-          }
-
-          foreach ($solution in $solutions) {
-            dotnet restore $solution.FullName
-          }
+        run: dotnet restore $env:SOLUTION_PATH
 
       - name: Build
-        shell: pwsh
-        run: |
-          $solutions = @(
-            Get-ChildItem -Path . -Filter *.sln -Recurse
-            Get-ChildItem -Path . -Filter *.slnx -Recurse
-          )
-          if ($solutions.Count -eq 0) {
-            Write-Host "No solution file yet; skipping build."
-            return
-          }
-
-          foreach ($solution in $solutions) {
-            dotnet build $solution.FullName --configuration Release --no-restore
-          }
+        run: dotnet build $env:SOLUTION_PATH --configuration Release --no-restore
 
       - name: Fast tests
-        shell: pwsh
         run: |
-          $testProjects = Get-ChildItem -Path . -Filter *Tests.csproj -Recurse
-          if ($testProjects.Count -eq 0) {
-            Write-Host "No test projects yet; skipping tests."
-            return
-          }
-
-          foreach ($project in $testProjects) {
-            dotnet test $project.FullName `
-              --configuration Release `
-              --no-build `
-              --verbosity normal `
-              --filter "Category!=Slow&Category!=UiIntegration"
-          }
+          dotnet test $env:TEST_PROJECT_PATH `
+            --configuration Release `
+            --no-build `
+            --verbosity normal `
+            --filter "Category!=Slow&Category!=UiIntegration"
 
   full:
     name: Build and Full Test
@@ -96,46 +73,10 @@ jobs:
         run: dotnet --info
 
       - name: Restore
-        shell: pwsh
-        run: |
-          $solutions = @(
-            Get-ChildItem -Path . -Filter *.sln -Recurse
-            Get-ChildItem -Path . -Filter *.slnx -Recurse
-          )
-          if ($solutions.Count -eq 0) {
-            Write-Host "No solution file yet; skipping restore."
-            return
-          }
-
-          foreach ($solution in $solutions) {
-            dotnet restore $solution.FullName
-          }
+        run: dotnet restore $env:SOLUTION_PATH
 
       - name: Build
-        shell: pwsh
-        run: |
-          $solutions = @(
-            Get-ChildItem -Path . -Filter *.sln -Recurse
-            Get-ChildItem -Path . -Filter *.slnx -Recurse
-          )
-          if ($solutions.Count -eq 0) {
-            Write-Host "No solution file yet; skipping build."
-            return
-          }
-
-          foreach ($solution in $solutions) {
-            dotnet build $solution.FullName --configuration Release --no-restore
-          }
+        run: dotnet build $env:SOLUTION_PATH --configuration Release --no-restore
 
       - name: Full tests
-        shell: pwsh
-        run: |
-          $testProjects = Get-ChildItem -Path . -Filter *Tests.csproj -Recurse
-          if ($testProjects.Count -eq 0) {
-            Write-Host "No test projects yet; skipping tests."
-            return
-          }
-
-          foreach ($project in $testProjects) {
-            dotnet test $project.FullName --configuration Release --no-build --verbosity normal
-          }
+        run: dotnet test $env:TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
