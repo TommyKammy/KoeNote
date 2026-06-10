@@ -18,7 +18,8 @@ concurrency:
 env:
   NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
   SOLUTION_PATH: KoeNote.slnx
-  TEST_PROJECT_PATH: tests/KoeNote.App.Tests/KoeNote.App.Tests.csproj
+  FAST_TEST_PROJECT_PATH: tests/KoeNote.App.Tests/KoeNote.App.Tests.csproj
+  UI_INTEGRATION_TEST_PROJECT_PATH: tests/KoeNote.App.UiIntegrationTests/KoeNote.App.UiIntegrationTests.csproj
 
 defaults:
   run:
@@ -58,7 +59,7 @@ jobs:
 
       - name: Fast tests
         run: |
-          dotnet test $env:TEST_PROJECT_PATH `
+          dotnet test $env:FAST_TEST_PROJECT_PATH `
             --configuration Release `
             --no-build `
             --verbosity normal `
@@ -96,4 +97,6 @@ jobs:
         run: dotnet build $env:SOLUTION_PATH --configuration Release --no-restore
 
       - name: Full tests
-        run: dotnet test $env:TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
+        run: |
+          dotnet test $env:FAST_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal
+          dotnet test $env:UI_INTEGRATION_TEST_PROJECT_PATH --configuration Release --no-build --verbosity normal

@@ -244,7 +244,7 @@ public sealed class ModelDownloadServiceTests
             service.ResumeDownloadAndInstallAsync(
                 catalogItem,
                 downloadId,
-                new Progress<ModelDownloadProgress>(reports.Add),
+                new SynchronousProgress<ModelDownloadProgress>(reports.Add),
                 cancellation.Token));
 
         var report = Assert.Single(reports);
