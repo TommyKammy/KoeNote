@@ -38,7 +38,8 @@ public sealed class SetupWizardService
         AsrCudaRuntimeService? asrCudaRuntimeService = null,
         TernaryReviewRuntimeService? ternaryReviewRuntimeService = null,
         CudaReviewRuntimeService? cudaReviewRuntimeService = null,
-        AsrSettingsRepository? asrSettingsRepository = null)
+        AsrSettingsRepository? asrSettingsRepository = null,
+        ISetupRuntimeSmokeService? runtimeSmokeService = null)
     {
         _paths = paths;
         _fasterWhisperRuntimeService = fasterWhisperRuntimeService;
@@ -66,7 +67,8 @@ public sealed class SetupWizardService
             toolStatusService,
             modelCatalogService,
             installedModelRepository,
-            resourceProbe);
+            resourceProbe,
+            runtimeSmokeService);
     }
 
     public SetupState LoadState()
@@ -404,7 +406,8 @@ public sealed class SetupWizardService
 
         var current = _asrSettingsRepository.Load();
         var currentProfile = AsrExecutionProfiles.Resolve(current.ExecutionProfileId);
-        if (currentProfile.ProfileId.Equals(AsrExecutionProfiles.CpuInt8, StringComparison.OrdinalIgnoreCase))
+        if (currentProfile.IsGpu ||
+            currentProfile.ProfileId.Equals(AsrExecutionProfiles.CpuInt8, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }

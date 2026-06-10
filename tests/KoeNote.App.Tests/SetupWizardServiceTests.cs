@@ -572,6 +572,33 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_CompleteIfReady_RequiresExplicitFinalSmoke()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var wizard = CreateWizard(paths);
+        wizard.SelectModel("asr", "kotoba-whisper-v2.2-faster");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(completed.IsCompleted);
+        Assert.False(completed.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
+    }
+
+    [Fact]
     public void SetupWizard_ExistingDataSummary_DetectsReinstallReusableData()
     {
         var paths = CreatePaths();
@@ -681,6 +708,76 @@ public sealed class SetupWizardServiceTests
         Assert.True(rerunSmoke.IsSucceeded);
         Assert.True(rerunState.IsCompleted);
         Assert.Equal(SetupStep.Complete, rerunState.CurrentStep);
+    }
+
+    [Fact]
+    public void SetupWizard_GpuAsrSmoke_PersistsFirstWorkingCudaProfile()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.FasterWhisperModelPath);
+        Touch(paths.ReviewModelPath);
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        CreateCudaReviewRuntime(paths);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "faster-whisper-large-v3-turbo",
+            ExecutionProfileId: AsrExecutionProfiles.Auto));
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3-turbo", "asr", "faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var runner = new SequenceAsrSmokeProcessRunner(
+            new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, "CUDA out of memory"),
+            new ProcessRunResult(0, TimeSpan.FromSeconds(1), "ok", string.Empty));
+        var runtimeSmokeService = new SetupRuntimeSmokeService(
+            paths,
+            installedModels,
+            runner,
+            new AsrSettingsRepository(paths));
+        var wizard = CreateWizard(
+            paths,
+            hostResourceProbe: new FixedHostResourceProbe(
+                totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                maxGpuMemoryGb: 8,
+                nvidiaGpuDetected: true),
+            runtimeSmokeService: runtimeSmokeService);
+        wizard.SelectModel("asr", "faster-whisper-large-v3-turbo");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = wizard.RunSmokeCheck();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.True(smoke.IsSucceeded);
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(2, runner.Arguments.Count);
+        Assert.Contains(AsrExecutionProfiles.CudaFloat16, runner.Arguments[0]);
+        Assert.Contains("float16", runner.Arguments[0]);
+        Assert.Contains(AsrExecutionProfiles.CudaInt8Float16, runner.Arguments[1]);
+        Assert.Contains("int8_float16", runner.Arguments[1]);
+        Assert.Contains("--diarization", runner.Arguments[1]);
+        Assert.Contains("off", runner.Arguments[1]);
+        Assert.Equal(
+            AsrExecutionProfiles.CudaInt8Float16,
+            new AsrSettingsRepository(paths).Load().ExecutionProfileId);
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR GPU profile smoke" &&
+            check.IsOk &&
+            check.Detail.Contains(AsrExecutionProfiles.CudaInt8Float16, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -967,7 +1064,8 @@ public sealed class SetupWizardServiceTests
         AppPaths paths,
         HttpClient? httpClient = null,
         ISetupHostResourceProbe? hostResourceProbe = null,
-        CudaReviewRuntimeService? cudaReviewRuntimeService = null)
+        CudaReviewRuntimeService? cudaReviewRuntimeService = null,
+        ISetupRuntimeSmokeService? runtimeSmokeService = null)
     {
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
@@ -991,7 +1089,8 @@ public sealed class SetupWizardServiceTests
             new FasterWhisperRuntimeService(paths, new ExternalProcessRunner()),
             new DiarizationRuntimeService(paths, new ExternalProcessRunner()),
             hostResourceProbe ?? new FixedHostResourceProbe(null, null, nvidiaGpuDetected: false),
-            cudaReviewRuntimeService: cudaReviewRuntimeService);
+            cudaReviewRuntimeService: cudaReviewRuntimeService,
+            runtimeSmokeService: runtimeSmokeService);
     }
 
     private static AppPaths CreatePaths(InstallScope installScope = InstallScope.CurrentUser)
@@ -1141,6 +1240,37 @@ public sealed class SetupWizardServiceTests
             {
                 Content = new ByteArrayContent(archive)
             });
+        }
+    }
+
+    private sealed class SequenceAsrSmokeProcessRunner(params ProcessRunResult[] results) : ExternalProcessRunner
+    {
+        private int _index;
+
+        public List<IReadOnlyList<string>> Arguments { get; } = [];
+
+        public override Task<ProcessRunResult> RunAsync(
+            string fileName,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default,
+            IReadOnlyDictionary<string, string>? environment = null)
+        {
+            Arguments.Add(arguments.ToArray());
+            var result = results[Math.Min(_index, results.Length - 1)];
+            _index++;
+            if (result.ExitCode == 0)
+            {
+                var outputJsonIndex = arguments
+                    .Select((argument, index) => (argument, index))
+                    .First(item => item.argument == "--output-json")
+                    .index;
+                var outputJsonPath = arguments[outputJsonIndex + 1];
+                Directory.CreateDirectory(Path.GetDirectoryName(outputJsonPath)!);
+                File.WriteAllText(outputJsonPath, """{"segments":[]}""");
+            }
+
+            return Task.FromResult(result);
         }
     }
 

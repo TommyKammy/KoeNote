@@ -78,7 +78,7 @@ internal sealed class SetupReadinessService(
     public SetupSmokeResult RunSmokeCheck()
     {
         var state = stateService.Load();
-        var checks = BuildSmokeChecks(state);
+        var checks = BuildSmokeChecks(state, runRuntimeActions: true);
         var succeeded = checks.All(static check => check.IsOk);
         var updated = stateService.Save(state with
         {
@@ -97,7 +97,7 @@ internal sealed class SetupReadinessService(
         var updated = stateService.Save(state with
         {
             CurrentStep = ready ? SetupStep.Complete : SetupStep.SmokeTest,
-            LastSmokeSucceeded = smokeSucceeded,
+            LastSmokeSucceeded = state.LastSmokeSucceeded && smokeSucceeded,
             IsCompleted = ready
         });
         WriteReport(updated, checks);
@@ -126,12 +126,13 @@ internal sealed class SetupReadinessService(
         out IReadOnlyList<SetupSmokeCheck> checks,
         out bool smokeSucceeded)
     {
-        checks = BuildSmokeChecks(state);
+        checks = BuildSmokeChecks(state, runRuntimeActions: false);
         smokeSucceeded = checks.All(static check => check.IsOk);
         var selectedModels = GetSelectedInstalledModels(state)
             .Where(static model => model.Verified && (File.Exists(model.FilePath) || Directory.Exists(model.FilePath)))
             .ToArray();
         return state.LicenseAccepted &&
+            state.LastSmokeSucceeded &&
             smokeSucceeded &&
             selectedModels.Any(model => model.Role.Equals("asr", StringComparison.OrdinalIgnoreCase)) &&
             selectedModels.Any(model => model.Role.Equals("review", StringComparison.OrdinalIgnoreCase));
@@ -143,7 +144,7 @@ internal sealed class SetupReadinessService(
         return new SetupSmokeCheck(name, exists, exists ? path : $"Missing: {path}");
     }
 
-    private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state)
+    private IReadOnlyList<SetupSmokeCheck> BuildSmokeChecks(SetupState state, bool runRuntimeActions)
     {
         List<SetupSmokeCheck> checks =
         [
@@ -166,7 +167,7 @@ internal sealed class SetupReadinessService(
             checks.Add(CheckCudaReviewRuntime());
         }
 
-        checks.AddRange((runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository)).Run(state));
+        checks.AddRange((runtimeSmokeService ?? new SetupRuntimeSmokeService(paths, installedModelRepository)).Run(state, runRuntimeActions));
 
         return checks;
     }
