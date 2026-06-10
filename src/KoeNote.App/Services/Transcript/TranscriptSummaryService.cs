@@ -894,11 +894,11 @@ public sealed partial class TranscriptSummaryService(
     private static string BuildFallbackChunkSummary(TranscriptSummaryChunk chunk)
     {
         return $"""
-            ## 讎りｦ・
+            ## 概要
 
-            LLM隕∫ｴ・′蛻ｩ逕ｨ縺ｧ縺阪↑縺九▲縺溘◆繧√√％縺ｮ繝√Ε繝ｳ繧ｯ縺ｯ譁・ｭ苓ｵｷ縺薙＠謚懃ｲ九→縺励※菫晏ｭ倥＠縺ｾ縺励◆縲・
+            LLM 要約を利用できなかったため、このチャンクは文字起こしの抜粋として保存しました。
 
-            ## 荳ｻ縺ｪ蜀・ｮｹ
+            ## 主な内容
 
             {TrimForSummary(chunk.Content, 1000)}
             """;
