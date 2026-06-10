@@ -781,6 +781,122 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_GpuAsrSmoke_TriesCudaFloat32CompatibilityProfile()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.FasterWhisperModelPath);
+        Touch(paths.ReviewModelPath);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "faster-whisper-large-v3-turbo",
+            ExecutionProfileId: AsrExecutionProfiles.Auto));
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3-turbo", "asr", "faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var runner = new SequenceAsrSmokeProcessRunner(
+            new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, "float16 failed"),
+            new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, "int8_float16 failed"),
+            new ProcessRunResult(0, TimeSpan.FromSeconds(1), "ok", string.Empty));
+        var runtimeSmokeService = new SetupRuntimeSmokeService(
+            paths,
+            installedModels,
+            runner,
+            new AsrSettingsRepository(paths));
+        var wizard = CreateWizard(
+            paths,
+            hostResourceProbe: new FixedHostResourceProbe(
+                totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                maxGpuMemoryGb: 8,
+                nvidiaGpuDetected: true),
+            runtimeSmokeService: runtimeSmokeService);
+        wizard.SelectModel("asr", "faster-whisper-large-v3-turbo");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = await wizard.RunSmokeCheckAsync();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.True(smoke.IsSucceeded);
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(3, runner.Arguments.Count);
+        Assert.Contains(AsrExecutionProfiles.CudaFloat16, runner.Arguments[0]);
+        Assert.Contains(AsrExecutionProfiles.CudaInt8Float16, runner.Arguments[1]);
+        Assert.Contains(AsrExecutionProfiles.CudaFloat32, runner.Arguments[2]);
+        Assert.Contains("float32", runner.Arguments[2]);
+        Assert.Equal(
+            AsrExecutionProfiles.CudaFloat32,
+            new AsrSettingsRepository(paths).Load().ExecutionProfileId);
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR GPU profile smoke" &&
+            check.IsOk &&
+            check.Detail.Contains(AsrExecutionProfiles.CudaFloat32, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SetupWizard_GpuAsrSmoke_SkipsProbeWhenAsrRuntimePrerequisitesFail()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.FasterWhisperModelPath);
+        Touch(paths.ReviewModelPath);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new AsrSettingsRepository(paths).Save(new AsrSettings(
+            string.Empty,
+            string.Empty,
+            "faster-whisper-large-v3-turbo",
+            ExecutionProfileId: AsrExecutionProfiles.Auto));
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3-turbo", "asr", "faster-whisper-large-v3-turbo", paths.FasterWhisperModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        var runner = new SequenceAsrSmokeProcessRunner(new ProcessRunResult(1, TimeSpan.FromSeconds(1), string.Empty, "should not run"));
+        var runtimeSmokeService = new SetupRuntimeSmokeService(
+            paths,
+            installedModels,
+            runner,
+            new AsrSettingsRepository(paths));
+        var wizard = CreateWizard(
+            paths,
+            hostResourceProbe: new FixedHostResourceProbe(
+                totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                maxGpuMemoryGb: 8,
+                nvidiaGpuDetected: true),
+            runtimeSmokeService: runtimeSmokeService);
+        wizard.SelectModel("asr", "faster-whisper-large-v3-turbo");
+        wizard.SelectModel("review", "llm-jp-4-8b-thinking-q4-k-m");
+        wizard.AcceptLicenses();
+
+        var smoke = await wizard.RunSmokeCheckAsync();
+        var completed = wizard.CompleteIfReady();
+
+        Assert.False(smoke.IsSucceeded);
+        Assert.False(completed.IsCompleted);
+        Assert.Empty(runner.Arguments);
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR runtime smoke" &&
+            !check.IsOk &&
+            check.Detail.Contains("ASR Python runtime is missing", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR GPU profile smoke" &&
+            !check.IsOk &&
+            check.Detail.Contains("Skipped because ASR runtime smoke failed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task SetupWizard_GpuAsrSmoke_SkipsCudaProbeWhenNvidiaGpuIsNotDetected()
     {
         var paths = CreatePathsWithoutTernaryRuntime();

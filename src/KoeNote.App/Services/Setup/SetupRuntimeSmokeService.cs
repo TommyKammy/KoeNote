@@ -30,10 +30,13 @@ public sealed class SetupRuntimeSmokeService(
 
     public IReadOnlyList<SetupSmokeCheck> RunReadiness(SetupState state, bool nvidiaGpuDetected)
     {
+        var asrRuntimeSmoke = CheckAsrRuntimeInvocationPrerequisites(state);
         return
         [
-            CheckAsrRuntimeInvocationPrerequisites(state),
-            CheckAsrGpuRuntimeReadiness(state, nvidiaGpuDetected),
+            asrRuntimeSmoke,
+            asrRuntimeSmoke.IsOk
+                ? CheckAsrGpuRuntimeReadiness(state, nvidiaGpuDetected)
+                : CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -50,10 +53,13 @@ public sealed class SetupRuntimeSmokeService(
             return RunReadiness(state, nvidiaGpuDetected);
         }
 
+        var asrRuntimeSmoke = CheckAsrRuntimeInvocationPrerequisites(state);
         return
         [
-            CheckAsrRuntimeInvocationPrerequisites(state),
-            await CheckAsrGpuRuntimeProbeAsync(state, nvidiaGpuDetected, cancellationToken),
+            asrRuntimeSmoke,
+            asrRuntimeSmoke.IsOk
+                ? await CheckAsrGpuRuntimeProbeAsync(state, nvidiaGpuDetected, cancellationToken)
+                : CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -110,7 +116,8 @@ public sealed class SetupRuntimeSmokeService(
         var profiles = new[]
         {
             AsrExecutionProfiles.Resolve(AsrExecutionProfiles.CudaFloat16),
-            AsrExecutionProfiles.Resolve(AsrExecutionProfiles.CudaInt8Float16)
+            AsrExecutionProfiles.Resolve(AsrExecutionProfiles.CudaInt8Float16),
+            AsrExecutionProfiles.Resolve(AsrExecutionProfiles.CudaFloat32)
         };
         var failures = new List<string>();
         for (var index = 0; index < profiles.Length; index++)
@@ -143,6 +150,14 @@ public sealed class SetupRuntimeSmokeService(
             "ASR GPU profile smoke",
             false,
             $"GPU ASR smoke failed for all CUDA profiles. {string.Join(" | ", failures)}");
+    }
+
+    private static SetupSmokeCheck CreateSkippedAsrGpuSmokeCheck(SetupSmokeCheck asrRuntimeSmoke)
+    {
+        return new SetupSmokeCheck(
+            "ASR GPU profile smoke",
+            false,
+            $"Skipped because ASR runtime smoke failed: {asrRuntimeSmoke.Detail}");
     }
 
     private SetupSmokeCheck CheckAsrGpuRuntimeReadiness(SetupState state, bool nvidiaGpuDetected)
