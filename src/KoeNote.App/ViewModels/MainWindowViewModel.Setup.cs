@@ -109,7 +109,12 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
-            var draft = CreateSetupPresetDraft(_setupSelectionDraft ?? _setupState, presetId);
+            var draft = _setupFlowCoordinator.CreatePresetDraft(
+                _setupSelectionDraft ?? _setupState,
+                presetId,
+                SetupModelPresetChoices,
+                SetupAsrModelChoices,
+                SetupReviewModelChoices);
             _setupSelectionDraft = draft;
             _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
                 entry.ModelId.Equals(draft.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase));
@@ -812,34 +817,36 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
-        _setupPresetRecommendation = _setupWizardService.GetPresetRecommendation();
-        _setupState = _setupWizardService.LoadState();
+        var snapshot = _setupFlowCoordinator.BuildSnapshot(_setupSelectionDraft, refreshSmokeChecks);
+        _setupPresetRecommendation = snapshot.Recommendation;
+        _setupState = snapshot.State;
+        _setupSelectionDraft = snapshot.SelectionDraft;
         RefreshDiarizationRuntimeSummary();
         SetupSteps.Clear();
-        foreach (var step in _setupWizardService.BuildStepItems(_setupState))
+        foreach (var step in snapshot.StepItems)
         {
             SetupSteps.Add(step);
         }
 
         SetupAsrModelChoices.Clear();
-        foreach (var entry in _setupWizardService.GetSelectableModels("asr"))
+        foreach (var entry in snapshot.AsrModelChoices)
         {
             SetupAsrModelChoices.Add(entry);
         }
 
         SetupReviewModelChoices.Clear();
-        foreach (var entry in _setupWizardService.GetSelectableModels("review"))
+        foreach (var entry in snapshot.ReviewModelChoices)
         {
             SetupReviewModelChoices.Add(entry);
         }
 
         SetupModelPresetChoices.Clear();
-        foreach (var preset in _setupWizardService.GetModelPresets())
+        foreach (var preset in snapshot.PresetChoices)
         {
             SetupModelPresetChoices.Add(preset);
         }
 
-        var displayState = _setupSelectionDraft ?? CreateAutomaticRecommendationDraft(_setupState);
+        var displayState = snapshot.DisplayState;
         _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
             entry.ModelId.Equals(displayState.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase)) ??
             SetupAsrModelChoices.FirstOrDefault();
@@ -853,11 +860,10 @@ public sealed partial class MainWindowViewModel
             preset.PresetId.Equals(displayState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
         RefreshAvailableAsrEngines();
 
-        if (refreshSmokeChecks)
+        if (snapshot.SmokeChecks is not null)
         {
             SetupSmokeChecks.Clear();
-            foreach (var check in _setupWizardService.GetEnvironmentChecks()
-                .Select(static check => new SetupSmokeCheck(check.Name, check.IsOk, check.Detail)))
+            foreach (var check in snapshot.SmokeChecks)
             {
                 SetupSmokeChecks.Add(check);
             }
@@ -917,13 +923,13 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(RunPreflightSummary));
         OnPropertyChanged(nameof(RunPreflightDetail));
         SetupModelAudits.Clear();
-        foreach (var audit in _setupWizardService.GetSelectedModelAudit())
+        foreach (var audit in snapshot.ModelAudits)
         {
             SetupModelAudits.Add(audit);
         }
 
         SetupExistingData.Clear();
-        foreach (var item in _setupWizardService.GetExistingDataSummary())
+        foreach (var item in snapshot.ExistingData)
         {
             SetupExistingData.Add(item);
         }
@@ -936,60 +942,6 @@ public sealed partial class MainWindowViewModel
         }
 
         UpdateSetupDownloadCommandStates();
-    }
-
-    private SetupState CreateAutomaticRecommendationDraft(SetupState state)
-    {
-        if (state.IsCompleted ||
-            state.CurrentStep is not (SetupStep.Welcome or SetupStep.SetupMode) ||
-            !string.Equals(state.SelectedModelPresetId, "recommended", StringComparison.OrdinalIgnoreCase))
-        {
-            return state;
-        }
-
-        var presetId = _setupPresetRecommendation?.PresetId;
-        if (string.IsNullOrWhiteSpace(presetId) ||
-            presetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase) ||
-            !SetupModelPresetChoices.Any(preset => preset.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase)))
-        {
-            return state;
-        }
-
-        _setupSelectionDraft = CreateSetupPresetDraft(state, presetId);
-        return _setupSelectionDraft;
-    }
-
-    private SetupState CreateSetupPresetDraft(SetupState state, string presetId)
-    {
-        var preset = SetupModelPresetChoices.FirstOrDefault(candidate =>
-            candidate.PresetId.Equals(presetId, StringComparison.OrdinalIgnoreCase));
-        if (preset is null)
-        {
-            throw new InvalidOperationException($"Model preset is not in the catalog: {presetId}");
-        }
-
-        if (!SetupAsrModelChoices.Any(entry => entry.ModelId.Equals(preset.AsrModelId, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException($"Preset references missing asr model: {preset.AsrModelId}");
-        }
-
-        if (!SetupReviewModelChoices.Any(entry => entry.ModelId.Equals(preset.ReviewModelId, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException($"Preset references missing review model: {preset.ReviewModelId}");
-        }
-
-        return state with
-        {
-            IsCompleted = false,
-            LastSmokeSucceeded = false,
-            SetupMode = preset.PresetId,
-            SelectedModelPresetId = preset.PresetId,
-            SelectedAsrModelId = preset.AsrModelId,
-            SelectedReviewModelId = preset.ReviewModelId,
-            StorageRoot = string.IsNullOrWhiteSpace(state.StorageRoot)
-                ? Paths.DefaultModelStorageRoot
-                : state.StorageRoot
-        };
     }
 
     private void CommitSetupSelectionDraft()

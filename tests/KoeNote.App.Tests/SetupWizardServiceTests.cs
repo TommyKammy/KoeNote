@@ -177,6 +177,54 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupFlowCoordinator_BuildSnapshot_CreatesDisplayDraftForHostRecommendedPreset()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 8L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false,
+            logicalProcessorCount: 4));
+        var coordinator = new SetupFlowCoordinator(paths, wizard);
+
+        var snapshot = coordinator.BuildSnapshot(selectionDraft: null, refreshSmokeChecks: false);
+        var persisted = wizard.LoadState();
+
+        Assert.Equal("recommended", persisted.SelectedModelPresetId);
+        Assert.Equal("recommended", snapshot.State.SelectedModelPresetId);
+        Assert.Equal("ultra_lightweight", snapshot.DisplayState.SelectedModelPresetId);
+        Assert.Equal("whisper-base", snapshot.DisplayState.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", snapshot.DisplayState.SelectedReviewModelId);
+        Assert.Equal(snapshot.DisplayState, snapshot.SelectionDraft);
+        Assert.Null(snapshot.SmokeChecks);
+        Assert.NotEmpty(snapshot.StepItems);
+        Assert.NotEmpty(snapshot.AsrModelChoices);
+        Assert.NotEmpty(snapshot.ReviewModelChoices);
+        Assert.NotEmpty(snapshot.PresetChoices);
+    }
+
+    [Fact]
+    public void SetupFlowCoordinator_CreatePresetDraft_ValidatesSelectablePresetModels()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths);
+        var coordinator = new SetupFlowCoordinator(paths, wizard);
+        var snapshot = coordinator.BuildSnapshot(selectionDraft: null, refreshSmokeChecks: false);
+
+        var draft = coordinator.CreatePresetDraft(
+            snapshot.State,
+            "ultra_lightweight",
+            snapshot.PresetChoices,
+            snapshot.AsrModelChoices,
+            snapshot.ReviewModelChoices);
+
+        Assert.Equal("ultra_lightweight", draft.SelectedModelPresetId);
+        Assert.Equal("whisper-base", draft.SelectedAsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", draft.SelectedReviewModelId);
+        Assert.Equal(paths.UserModels, draft.StorageRoot);
+    }
+
+    [Fact]
     public void SetupWizard_GuidedNext_DoesNotDownrankNvidiaGpuWhenVramIsUnknown()
     {
         var paths = CreatePaths();
