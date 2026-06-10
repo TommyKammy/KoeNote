@@ -686,15 +686,16 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private Task SetupRunSmokeAsync()
+    private async Task SetupRunSmokeAsync()
     {
-        var result = _setupWizardService.RunSmokeCheck();
+        var result = await _setupWizardService.RunSmokeCheckAsync();
         SetupSmokeChecks.Clear();
         foreach (var check in result.Checks)
         {
             SetupSmokeChecks.Add(check);
         }
 
+        SyncAsrExecutionProfileFromSettings();
         _setupState = _setupWizardService.LoadState();
         if (result.IsSucceeded)
         {
@@ -705,19 +706,19 @@ public sealed partial class MainWindowViewModel
         LatestLog = result.IsSucceeded
             ? $"最終確認に成功しました。Report: {result.ReportPath}"
             : $"最終確認で不足項目が見つかりました。Report: {result.ReportPath}";
-        return Task.CompletedTask;
     }
 
-    private Task SetupCompleteAsync()
+    private async Task SetupCompleteAsync()
     {
         CommitSetupSelectionDraft();
-        var checkResult = _setupWizardService.RunSmokeCheck();
+        var checkResult = await _setupWizardService.RunSmokeCheckAsync();
         SetupSmokeChecks.Clear();
         foreach (var check in checkResult.Checks)
         {
             SetupSmokeChecks.Add(check);
         }
 
+        SyncAsrExecutionProfileFromSettings();
         _setupState = _setupWizardService.CompleteIfReady();
         RefreshSetupWizard(refreshSmokeChecks: false);
         if (_setupState.IsCompleted)
@@ -731,7 +732,12 @@ public sealed partial class MainWindowViewModel
             : firstMissing is null
                 ? "セットアップはまだ完了していません。モデル導入とライセンス同意を確認してください。"
                 : $"セットアップはまだ完了していません。不足項目: {firstMissing.Name} - {firstMissing.Detail}";
-        return Task.CompletedTask;
+    }
+
+    private void SyncAsrExecutionProfileFromSettings()
+    {
+        var settings = _asrSettingsRepository.Load();
+        SelectedAsrExecutionProfileId = settings.NormalizedExecutionProfileId;
     }
 
     private void ApplySetupModelSelectionDraft(string role, string modelId)

@@ -9,7 +9,13 @@ namespace KoeNote.App.Services.Setup;
 
 public interface ISetupRuntimeSmokeService
 {
-    IReadOnlyList<SetupSmokeCheck> Run(SetupState state, bool runAsrGpuSmoke);
+    IReadOnlyList<SetupSmokeCheck> RunReadiness(SetupState state, bool nvidiaGpuDetected);
+
+    Task<IReadOnlyList<SetupSmokeCheck>> RunAsync(
+        SetupState state,
+        bool runAsrGpuSmoke,
+        bool nvidiaGpuDetected,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class SetupRuntimeSmokeService(
@@ -22,12 +28,32 @@ public sealed class SetupRuntimeSmokeService(
     private readonly ExternalProcessRunner _processRunner = processRunner ?? new ExternalProcessRunner();
     private readonly AsrSettingsRepository _asrSettingsRepository = asrSettingsRepository ?? new AsrSettingsRepository(paths);
 
-    public IReadOnlyList<SetupSmokeCheck> Run(SetupState state, bool runAsrGpuSmoke)
+    public IReadOnlyList<SetupSmokeCheck> RunReadiness(SetupState state, bool nvidiaGpuDetected)
     {
         return
         [
             CheckAsrRuntimeInvocationPrerequisites(state),
-            CheckAsrGpuRuntimeProbe(state, runAsrGpuSmoke),
+            CheckAsrGpuRuntimeReadiness(state, nvidiaGpuDetected),
+            CheckReviewRuntimePathBridge(state),
+            CheckDiarizationRuntimeData()
+        ];
+    }
+
+    public async Task<IReadOnlyList<SetupSmokeCheck>> RunAsync(
+        SetupState state,
+        bool runAsrGpuSmoke,
+        bool nvidiaGpuDetected,
+        CancellationToken cancellationToken = default)
+    {
+        if (!runAsrGpuSmoke)
+        {
+            return RunReadiness(state, nvidiaGpuDetected);
+        }
+
+        return
+        [
+            CheckAsrRuntimeInvocationPrerequisites(state),
+            await CheckAsrGpuRuntimeProbeAsync(state, nvidiaGpuDetected, cancellationToken),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -59,44 +85,15 @@ public sealed class SetupRuntimeSmokeService(
         return new SetupSmokeCheck("ASR runtime smoke", true, $"Ready: {paths.FasterWhisperScriptPath}");
     }
 
-    private SetupSmokeCheck CheckAsrGpuRuntimeProbe(SetupState state, bool runAsrGpuSmoke)
+    private async Task<SetupSmokeCheck> CheckAsrGpuRuntimeProbeAsync(
+        SetupState state,
+        bool nvidiaGpuDetected,
+        CancellationToken cancellationToken)
     {
-        if (!AsrCudaRuntimeLayout.HasPackage(paths))
+        var readiness = CheckAsrGpuRuntimeProbePreconditions(state, nvidiaGpuDetected);
+        if (readiness is not null)
         {
-            return new SetupSmokeCheck(
-                "ASR GPU profile smoke",
-                true,
-                "ASR CUDA runtime is not installed; GPU profile probe skipped.");
-        }
-
-        var preferred = AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory)
-            ? paths.AsrCTranslate2RuntimeDirectory
-            : paths.AsrRuntimeDirectory;
-        if (!AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(preferred))
-        {
-            return new SetupSmokeCheck(
-                "ASR GPU profile smoke",
-                false,
-                $"CTranslate2 CUDA DLLs are missing. Reinstall ASR CUDA runtime: {preferred}");
-        }
-
-        if (!runAsrGpuSmoke)
-        {
-            var knownProfile = AsrExecutionProfiles.Resolve(_asrSettingsRepository.Load().ExecutionProfileId);
-            return new SetupSmokeCheck(
-                "ASR GPU profile smoke",
-                knownProfile.IsGpu,
-                knownProfile.IsGpu
-                    ? $"Known-good GPU ASR profile: {knownProfile.ProfileId}"
-                    : "Run final verification to select a working GPU ASR profile.");
-        }
-
-        if (!ShouldUseExplicitFasterWhisperProfile(state.SelectedAsrModelId))
-        {
-            return new SetupSmokeCheck(
-                "ASR GPU profile smoke",
-                true,
-                $"Selected ASR model does not use explicit GPU profile probing: {state.SelectedAsrModelId}");
+            return readiness;
         }
 
         var installed = string.IsNullOrWhiteSpace(state.SelectedAsrModelId)
@@ -121,7 +118,7 @@ public sealed class SetupRuntimeSmokeService(
             var profile = profiles[index];
             try
             {
-                var attempt = RunAsrGpuSmokeProfile(installed.FilePath, profile, index + 1);
+                var attempt = await RunAsrGpuSmokeProfileAsync(installed.FilePath, profile, index + 1, cancellationToken);
                 if (attempt.Result.ExitCode == 0 && File.Exists(attempt.OutputJsonPath))
                 {
                     var current = _asrSettingsRepository.Load();
@@ -148,7 +145,68 @@ public sealed class SetupRuntimeSmokeService(
             $"GPU ASR smoke failed for all CUDA profiles. {string.Join(" | ", failures)}");
     }
 
-    private AsrGpuSmokeAttempt RunAsrGpuSmokeProfile(string modelPath, AsrExecutionProfile profile, int attemptNumber)
+    private SetupSmokeCheck CheckAsrGpuRuntimeReadiness(SetupState state, bool nvidiaGpuDetected)
+    {
+        var readiness = CheckAsrGpuRuntimeProbePreconditions(state, nvidiaGpuDetected);
+        if (readiness is not null)
+        {
+            return readiness;
+        }
+
+        var knownProfile = AsrExecutionProfiles.Resolve(_asrSettingsRepository.Load().ExecutionProfileId);
+        return new SetupSmokeCheck(
+            "ASR GPU profile smoke",
+            knownProfile.IsGpu,
+            knownProfile.IsGpu
+                ? $"Known-good GPU ASR profile: {knownProfile.ProfileId}"
+                : "Run final verification to select a working GPU ASR profile.");
+    }
+
+    private SetupSmokeCheck? CheckAsrGpuRuntimeProbePreconditions(SetupState state, bool nvidiaGpuDetected)
+    {
+        if (!nvidiaGpuDetected)
+        {
+            return new SetupSmokeCheck(
+                "ASR GPU profile smoke",
+                true,
+                "NVIDIA GPU is not detected; GPU ASR profile probe skipped.");
+        }
+
+        if (!AsrCudaRuntimeLayout.HasPackage(paths))
+        {
+            return new SetupSmokeCheck(
+                "ASR GPU profile smoke",
+                true,
+                "ASR CUDA runtime is not installed; GPU profile probe skipped.");
+        }
+
+        if (!ShouldUseExplicitFasterWhisperProfile(state.SelectedAsrModelId))
+        {
+            return new SetupSmokeCheck(
+                "ASR GPU profile smoke",
+                true,
+                $"Selected ASR model does not use explicit GPU profile probing: {state.SelectedAsrModelId}");
+        }
+
+        var preferred = AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory)
+            ? paths.AsrCTranslate2RuntimeDirectory
+            : paths.AsrRuntimeDirectory;
+        if (!AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(preferred))
+        {
+            return new SetupSmokeCheck(
+                "ASR GPU profile smoke",
+                false,
+                $"CTranslate2 CUDA DLLs are missing. Reinstall ASR CUDA runtime: {preferred}");
+        }
+
+        return null;
+    }
+
+    private async Task<AsrGpuSmokeAttempt> RunAsrGpuSmokeProfileAsync(
+        string modelPath,
+        AsrExecutionProfile profile,
+        int attemptNumber,
+        CancellationToken cancellationToken)
     {
         var smokeRoot = Path.Combine(paths.Root, "setup-smoke", "asr-gpu");
         Directory.CreateDirectory(smokeRoot);
@@ -186,13 +244,12 @@ public sealed class SetupRuntimeSmokeService(
             "--local-files-only"
         };
 
-        var result = _processRunner.RunAsync(
+        var result = await _processRunner.RunAsync(
                 paths.AsrPythonPath,
                 arguments,
                 TimeSpan.FromMinutes(3),
-                environment: BuildAsrSmokeEnvironment())
-            .GetAwaiter()
-            .GetResult();
+                cancellationToken,
+                BuildAsrSmokeEnvironment());
         return new AsrGpuSmokeAttempt(result, outputJsonPath);
     }
 
