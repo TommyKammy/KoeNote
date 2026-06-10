@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text.Json;
+using KoeNote.App.Models;
 using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.Services.Asr;
@@ -55,8 +57,25 @@ public sealed class ScriptedJsonAsrEngine(
         {
             ValidateInputs(input, config);
             Directory.CreateDirectory(config.OutputDirectory);
-            var arguments = BuildArguments(input, config, options, scriptJsonPath);
             var processEnvironment = BuildProcessEnvironment(config);
+            var chunks = new WavAudioChunker().SplitLongWav(
+                input.NormalizedAudioPath,
+                Path.Combine(config.OutputDirectory, "chunks"),
+                options.ChunkSeconds.GetValueOrDefault());
+            if (chunks.Count > 0)
+            {
+                return await TranscribeChunksAsync(
+                    input,
+                    config,
+                    options,
+                    asrRunId,
+                    timeout,
+                    processEnvironment,
+                    chunks,
+                    cancellationToken);
+            }
+
+            var arguments = BuildArguments(input, config, options, scriptJsonPath);
             var processResult = await processRunner.RunAsync(
                 config.RuntimePath,
                 arguments,
@@ -116,6 +135,143 @@ public sealed class ScriptedJsonAsrEngine(
             asrRunRepository.MarkFailed(asrRunId, AsrFailureCategory.Unknown.ToString());
             throw;
         }
+    }
+
+    private async Task<AsrResult> TranscribeChunksAsync(
+        AsrInput input,
+        AsrEngineConfig config,
+        AsrOptions options,
+        string asrRunId,
+        TimeSpan timeout,
+        AsrProcessEnvironment processEnvironment,
+        IReadOnlyList<WavAudioChunk> chunks,
+        CancellationToken cancellationToken)
+    {
+        var workerOptions = options with { ChunkSeconds = null };
+        var segments = new List<TranscriptSegment>();
+        var totalDuration = TimeSpan.Zero;
+        jobLogRepository.AddEvent(
+            input.JobId,
+            "asr",
+            "info",
+            $"Chunked GPU ASR enabled: {chunks.Count} chunks, up to {options.ChunkSeconds} seconds each.");
+
+        foreach (var chunk in chunks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var chunkInput = input with { NormalizedAudioPath = chunk.AudioPath };
+            var chunkJsonPath = Path.Combine(config.OutputDirectory, "chunks", $"chunk-{chunk.Index:D3}.json");
+            var chunkContext = new AsrChunkLogContext(
+                chunk.Index,
+                chunks.Count,
+                chunk.OffsetSeconds,
+                chunk.DurationSeconds,
+                chunk.AudioPath);
+            var arguments = BuildArguments(chunkInput, config, workerOptions, chunkJsonPath);
+            jobLogRepository.AddEvent(
+                input.JobId,
+                "asr",
+                "info",
+                $"Running ASR chunk {chunk.Index}/{chunks.Count} at {chunk.OffsetSeconds:F1}s...");
+            if (File.Exists(chunkJsonPath))
+            {
+                File.Delete(chunkJsonPath);
+            }
+
+            var processResult = await processRunner.RunAsync(
+                config.RuntimePath,
+                arguments,
+                timeout,
+                cancellationToken,
+                processEnvironment.Environment);
+            totalDuration += processResult.Duration;
+            var workerLogPath = SaveAsrWorkerLog(
+                chunkInput,
+                config,
+                asrRunId,
+                arguments,
+                workerOptions,
+                chunkJsonPath,
+                processResult,
+                processEnvironment,
+                chunkContext);
+
+            if (processResult.ExitCode != 0 && !File.Exists(chunkJsonPath))
+            {
+                var workerOutput = string.IsNullOrWhiteSpace(processResult.StandardError)
+                    ? processResult.StandardOutput
+                    : processResult.StandardError;
+                var category = ClassifyProcessFailure(processResult.ExitCode, workerOutput);
+                var exitSummary = DescribeExitCode(processResult.ExitCode);
+                throw new AsrWorkerException(
+                    category,
+                    $"{DisplayName} chunk {chunk.Index}/{chunks.Count} exited with code {processResult.ExitCode} ({exitSummary}): {processResult.StandardError} Worker log: {workerLogPath}",
+                    workerLogPath: workerLogPath);
+            }
+
+            var rawOutput = File.Exists(chunkJsonPath)
+                ? File.ReadAllText(chunkJsonPath, System.Text.Encoding.UTF8)
+                : AsrOutputExtractor.ExtractJson(processResult.StandardOutput, processResult.StandardError);
+            IReadOnlyList<TranscriptSegment> chunkSegments;
+            try
+            {
+                chunkSegments = normalizer.Normalize(input.JobId, rawOutput);
+            }
+            catch (AsrWorkerException exception) when (exception.Category == AsrFailureCategory.NoSegments)
+            {
+                jobLogRepository.AddEvent(
+                    input.JobId,
+                    "asr",
+                    "warning",
+                    $"ASR chunk {chunk.Index}/{chunks.Count} had no usable segments. Worker log: {workerLogPath}");
+                continue;
+            }
+            catch (AsrWorkerException exception)
+            {
+                throw new AsrWorkerException(
+                    exception.Category,
+                    $"{DisplayName} chunk {chunk.Index}/{chunks.Count} output failed validation: {exception.Message} Worker log: {workerLogPath}",
+                    exception,
+                    workerLogPath);
+            }
+
+            foreach (var segment in chunkSegments)
+            {
+                var segmentId = (segments.Count + 1).ToString("D6", System.Globalization.CultureInfo.InvariantCulture);
+                segments.Add(segment with
+                {
+                    SegmentId = segmentId,
+                    StartSeconds = segment.StartSeconds + chunk.OffsetSeconds,
+                    EndSeconds = segment.EndSeconds + chunk.OffsetSeconds,
+                    Source = sourceName,
+                    AsrRunId = asrRunId
+                });
+            }
+
+            jobLogRepository.AddEvent(
+                input.JobId,
+                "asr",
+                "info",
+                $"ASR chunk {chunk.Index}/{chunks.Count} completed: {chunkSegments.Count} segments. Worker log: {workerLogPath}");
+        }
+
+        if (segments.Count == 0)
+        {
+            throw new AsrWorkerException(AsrFailureCategory.NoSegments, "Chunked ASR did not produce any usable segments.");
+        }
+
+        var mergedRawOutput = SerializeMergedRawOutput(segments);
+        var rawOutputPath = resultStore.SaveRawOutput(config.OutputDirectory, mergedRawOutput);
+        var normalizedSegmentsPath = resultStore.SaveNormalizedSegments(config.OutputDirectory, segments);
+        transcriptSegmentRepository.ReplaceSegments(input.JobId, segments);
+        asrRunRepository.MarkSucceeded(asrRunId, totalDuration, rawOutputPath, normalizedSegmentsPath);
+        jobLogRepository.AddEvent(
+            input.JobId,
+            "asr",
+            "info",
+            $"Chunked GPU ASR merged {segments.Count} segments from {chunks.Count} chunks.");
+
+        return new AsrResult(asrRunId, input.JobId, rawOutputPath, normalizedSegmentsPath, segments, totalDuration);
     }
 
     private static IReadOnlyList<string> BuildArguments(
@@ -245,7 +401,8 @@ public sealed class ScriptedJsonAsrEngine(
         AsrOptions options,
         string outputJsonPath,
         ProcessRunResult processResult,
-        AsrProcessEnvironment processEnvironment)
+        AsrProcessEnvironment processEnvironment,
+        AsrChunkLogContext? chunkContext = null)
     {
         var requestedDevice = GetArgumentValue(arguments, "--device", options.Device ?? "(unset)");
         var requestedComputeType = GetArgumentValue(arguments, "--compute-type", options.ComputeType ?? "(unset)");
@@ -279,6 +436,16 @@ public sealed class ScriptedJsonAsrEngine(
                 ? ctranslate2CudaDir
                 : "(unset)"
         };
+        var logFileName = $"asr-{asrRunId}.log";
+        if (chunkContext is not null)
+        {
+            metadata["chunk_index"] = chunkContext.Index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            metadata["chunk_count"] = chunkContext.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            metadata["chunk_offset_seconds"] = chunkContext.OffsetSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+            metadata["chunk_duration_seconds"] = chunkContext.DurationSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+            metadata["chunk_audio_path"] = chunkContext.AudioPath;
+            logFileName = $"asr-{asrRunId}-chunk-{chunkContext.Index:D3}.log";
+        }
 
         return jobLogRepository.SaveWorkerLog(
             input.JobId,
@@ -286,7 +453,24 @@ public sealed class ScriptedJsonAsrEngine(
             processResult.StandardOutput,
             processResult.StandardError,
             metadata,
-            $"asr-{asrRunId}.log");
+            logFileName);
+    }
+
+    private static string SerializeMergedRawOutput(IReadOnlyList<TranscriptSegment> segments)
+    {
+        var payload = new
+        {
+            segments = segments.Select(segment => new
+            {
+                segment_id = segment.SegmentId,
+                start = segment.StartSeconds,
+                end = segment.EndSeconds,
+                speaker_id = segment.SpeakerId,
+                text = segment.RawText,
+                asr_confidence = segment.AsrConfidence
+            })
+        };
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
     }
 
     private static string GetArgumentValue(IReadOnlyList<string> arguments, string optionName, string fallback)
@@ -439,4 +623,11 @@ public sealed class ScriptedJsonAsrEngine(
     private sealed record AsrProcessEnvironment(
         IReadOnlyDictionary<string, string> Environment,
         IReadOnlyList<string> AddedPathEntries);
+
+    private sealed record AsrChunkLogContext(
+        int Index,
+        int Count,
+        double OffsetSeconds,
+        double DurationSeconds,
+        string AudioPath);
 }
