@@ -32,8 +32,12 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("cuda_visible_devices", script);
         Assert.Contains("supported_compute_types_cuda", script);
         Assert.Contains("NVIDIA_SMI_GPU_QUERY", script);
-        Assert.Contains("index,name,driver_version,memory.total,memory.free,compute_cap", script);
+        Assert.Contains("index,name,driver_version,memory.total,memory.free", script);
+        Assert.Contains("NVIDIA_SMI_COMPUTE_CAP_QUERY", script);
+        Assert.Contains("index,compute_cap", script);
         Assert.Contains("parse_nvidia_smi_gpus", script);
+        Assert.Contains("parse_nvidia_smi_compute_caps", script);
+        Assert.Contains("compute_cap_error", script);
         Assert.Contains("memory_total_mb", script);
         Assert.Contains("memory_free_mb", script);
         Assert.Contains("KOENOTE_ASR_TOOLS_DIR", script);
@@ -43,6 +47,7 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("nvidia-smi", script);
         Assert.Contains("gpu_probe", script);
         Assert.Contains("gpu_memory_snapshot", script);
+        Assert.Contains("should_probe_gpu_memory", script);
         Assert.Contains("before_model_load", script);
         Assert.Contains("after_model_load", script);
         Assert.Contains("before_transcribe", script);
@@ -168,6 +173,43 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("requested_compute_type: float16", log);
         Assert.Contains($"execution_profile_id: {AsrExecutionProfiles.CudaFloat16}", log);
         Assert.Contains("attempt_number: 2", log);
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_LogsForcedFasterWhisperArguments()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var runner = new CapturingAsrProcessRunner();
+        var engine = CreateEngine(paths, runner);
+
+        await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "kotoba-whisper-v2.2-faster",
+                scriptPath),
+            new AsrOptions());
+
+        Assert.NotNull(runner.Arguments);
+        Assert.Contains("--device", runner.Arguments);
+        Assert.Contains("auto", runner.Arguments);
+        Assert.Contains("--compute-type", runner.Arguments);
+        Assert.Contains("float32", runner.Arguments);
+
+        var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
+        var log = File.ReadAllText(logPath);
+        Assert.Contains("requested_device: auto", log);
+        Assert.Contains("requested_compute_type: float32", log);
     }
 
     [Fact]

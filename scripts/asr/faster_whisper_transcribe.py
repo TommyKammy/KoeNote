@@ -14,7 +14,8 @@ import tempfile
 import wave
 from pathlib import Path
 
-NVIDIA_SMI_GPU_QUERY = "index,name,driver_version,memory.total,memory.free,compute_cap"
+NVIDIA_SMI_GPU_QUERY = "index,name,driver_version,memory.total,memory.free"
+NVIDIA_SMI_COMPUTE_CAP_QUERY = "index,compute_cap"
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -133,23 +134,51 @@ def parse_optional_int(value: str) -> int | None:
         return None
 
 
-def parse_nvidia_smi_gpus(stdout: str) -> list[dict[str, object]]:
+def parse_nvidia_smi_gpus(stdout: str, compute_caps: dict[int, str] | None = None) -> list[dict[str, object]]:
     gpus: list[dict[str, object]] = []
     for line in stdout.splitlines():
         values = [value.strip() for value in line.split(",")]
-        if len(values) < 6:
+        if len(values) < 5:
             continue
 
-        index, name, driver_version, memory_total, memory_free, compute_cap = values[:6]
+        index, name, driver_version, memory_total, memory_free = values[:5]
+        parsed_index = parse_optional_int(index)
         gpus.append({
-            "index": parse_optional_int(index),
+            "index": parsed_index,
             "name": name,
             "driver_version": driver_version,
             "memory_total_mb": parse_optional_int(memory_total),
             "memory_free_mb": parse_optional_int(memory_free),
-            "compute_capability": compute_cap,
+            "compute_capability": compute_caps.get(parsed_index) if compute_caps is not None and parsed_index is not None else None,
         })
     return gpus
+
+
+def parse_nvidia_smi_compute_caps(stdout: str) -> dict[int, str]:
+    values: dict[int, str] = {}
+    for line in stdout.splitlines():
+        parts = [value.strip() for value in line.split(",")]
+        if len(parts) < 2:
+            continue
+
+        index = parse_optional_int(parts[0])
+        if index is not None and parts[1]:
+            values[index] = parts[1]
+    return values
+
+
+def run_nvidia_smi_query(query: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "nvidia-smi",
+            f"--query-gpu={query}",
+            "--format=csv,noheader,nounits",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
 
 
 def resolve_selected_cuda_device_index(device: str) -> str | None:
@@ -167,33 +196,44 @@ def resolve_selected_cuda_device_index(device: str) -> str | None:
 
 def run_nvidia_smi_probe() -> dict[str, object]:
     try:
-        result = subprocess.run(
-            [
-                "nvidia-smi",
-                f"--query-gpu={NVIDIA_SMI_GPU_QUERY}",
-                "--format=csv,noheader,nounits",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
+        result = run_nvidia_smi_query(NVIDIA_SMI_GPU_QUERY)
     except Exception as exc:
         return {"available": False, "error": f"{type(exc).__name__}: {exc}"}
 
     stdout = result.stdout.strip()
+    compute_caps: dict[int, str] = {}
+    compute_cap_error = None
+    if result.returncode == 0:
+        try:
+            compute_cap_result = run_nvidia_smi_query(NVIDIA_SMI_COMPUTE_CAP_QUERY)
+            if compute_cap_result.returncode == 0:
+                compute_caps = parse_nvidia_smi_compute_caps(compute_cap_result.stdout.strip())
+            else:
+                compute_cap_error = compute_cap_result.stderr.strip()[:1000]
+        except Exception as exc:
+            compute_cap_error = f"{type(exc).__name__}: {exc}"
+
     return {
         "available": result.returncode == 0,
         "exit_code": result.returncode,
         "query": NVIDIA_SMI_GPU_QUERY,
-        "gpus": parse_nvidia_smi_gpus(stdout) if result.returncode == 0 else [],
+        "compute_cap_query": NVIDIA_SMI_COMPUTE_CAP_QUERY,
+        "compute_cap_error": compute_cap_error,
+        "gpus": parse_nvidia_smi_gpus(stdout, compute_caps) if result.returncode == 0 else [],
         "stdout": stdout[:1000],
         "stderr": result.stderr.strip()[:1000],
     }
 
 
-def write_gpu_memory_snapshot(stage: str) -> None:
-    write_diagnostic("gpu_memory_snapshot", stage=stage, nvidia_smi=run_nvidia_smi_probe())
+def should_probe_gpu_memory(args: argparse.Namespace) -> bool:
+    device = args.device.lower()
+    execution_profile = args.execution_profile.lower()
+    return device == "cuda" or "cuda" in execution_profile
+
+
+def write_gpu_memory_snapshot(stage: str, args: argparse.Namespace) -> None:
+    if should_probe_gpu_memory(args):
+        write_diagnostic("gpu_memory_snapshot", stage=stage, nvidia_smi=run_nvidia_smi_probe())
 
 
 def write_phase_failure(event: str, exc: BaseException) -> None:
@@ -518,7 +558,7 @@ def main() -> int:
         selected_cuda_device_index=resolve_selected_cuda_device_index(args.device),
         local_files_only=args.local_files_only,
     )
-    write_gpu_memory_snapshot("before_model_load")
+    write_gpu_memory_snapshot("before_model_load", args)
 
     try:
         model = WhisperModel(
@@ -535,8 +575,8 @@ def main() -> int:
         model_device=str(getattr(model, "device", "unknown")),
         model_compute_type=str(getattr(model, "compute_type", "unknown")),
     )
-    write_gpu_memory_snapshot("after_model_load")
-    write_gpu_memory_snapshot("before_transcribe")
+    write_gpu_memory_snapshot("after_model_load", args)
+    write_gpu_memory_snapshot("before_transcribe", args)
 
     try:
         segment_items, detected_language = transcribe_audio(
