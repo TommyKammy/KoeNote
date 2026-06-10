@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net11.0-windows</TargetFramework>
@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="MainWindowViewModelTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelTests.cs" Link="MainWindowViewModelTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
