@@ -8,7 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelTests.cs" Link="MainWindowViewModelTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelCoreTests.cs" Link="MainWindowViewModelCoreTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelJobTests.cs" Link="MainWindowViewModelJobTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelModelTests.cs" Link="MainWindowViewModelModelTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelReviewTests.cs" Link="MainWindowViewModelReviewTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelSetupTests.cs" Link="MainWindowViewModelSetupTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\MainWindowViewModelUpdateTests.cs" Link="MainWindowViewModelUpdateTests.cs" />
+    <Compile Include="..\KoeNote.App.Tests\TestSupport\MainWindowViewModelTestBase.cs" Link="TestSupport\MainWindowViewModelTestBase.cs" />
   </ItemGroup>
 
   <ItemGroup>

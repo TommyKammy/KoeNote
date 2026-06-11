@@ -87,7 +87,25 @@ $targets = [ordered]@{
         )
     )
     viewmodel = @(
-        New-TestRun "viewmodel" $uiProject @("MainWindowViewModelTests")
+        New-TestRun "viewmodel" $uiProject @("MainWindowViewModel")
+    )
+    "viewmodel-core" = @(
+        New-TestRun "viewmodel-core" $uiProject @("MainWindowViewModelCoreTests")
+    )
+    "viewmodel-setup" = @(
+        New-TestRun "viewmodel-setup" $uiProject @("MainWindowViewModelSetupTests")
+    )
+    "viewmodel-jobs" = @(
+        New-TestRun "viewmodel-jobs" $uiProject @("MainWindowViewModelJobTests")
+    )
+    "viewmodel-models" = @(
+        New-TestRun "viewmodel-models" $uiProject @("MainWindowViewModelModelTests")
+    )
+    "viewmodel-review" = @(
+        New-TestRun "viewmodel-review" $uiProject @("MainWindowViewModelReviewTests")
+    )
+    "viewmodel-updates" = @(
+        New-TestRun "viewmodel-updates" $uiProject @("MainWindowViewModelUpdateTests")
     )
     jobs = @(
         New-TestRun "jobs" $unitProject @(
