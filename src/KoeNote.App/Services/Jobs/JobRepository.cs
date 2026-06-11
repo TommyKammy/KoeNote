@@ -61,16 +61,16 @@ public sealed class JobRepository(AppPaths paths)
             ORDER BY updated_at DESC
             LIMIT $limit;
             """;
-        command.Parameters.AddWithValue("$is_deleted", isDeleted ? 1 : 0);
-        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddValue("$is_deleted", isDeleted ? 1 : 0);
+        command.Parameters.AddValue("$limit", limit);
 
         using var reader = command.ExecuteReader();
         var jobs = new List<JobSummary>();
         while (reader.Read())
         {
             var sourceAudioPath = reader.GetString(2);
-            var createdAt = DateTimeOffset.Parse(reader.GetString(7));
-            var updatedAt = DateTimeOffset.Parse(reader.GetString(8));
+            var createdAt = reader.GetDateTimeOffset(7);
+            var updatedAt = reader.GetDateTimeOffset(8);
             jobs.Add(new JobSummary(
                 reader.GetString(0),
                 reader.GetString(1),
@@ -81,10 +81,10 @@ public sealed class JobRepository(AppPaths paths)
                 reader.GetInt32(6),
                 updatedAt,
                 createdAt,
-                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetNullableString(3),
                 reader.GetInt32(9) != 0,
-                reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
-                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.GetNullableDateTimeOffset(10),
+                reader.GetNullableString(11),
                 isDeleted ? CalculateDirectorySize(Path.Combine(paths.Jobs, reader.GetString(0))) : 0));
         }
 
@@ -121,10 +121,10 @@ public sealed class JobRepository(AppPaths paths)
                     OR status = '推敲候補なし'
                 );
             """;
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.Parameters.AddWithValue("$completed_stage", ReviewCandidateJobStateRules.Completed.CurrentStage);
-        command.Parameters.AddWithValue("$ready_stage", ReviewCandidateJobStateRules.Ready.CurrentStage);
-        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.Completed);
+        command.Parameters.AddValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddValue("$completed_stage", ReviewCandidateJobStateRules.Completed.CurrentStage);
+        command.Parameters.AddValue("$ready_stage", ReviewCandidateJobStateRules.Ready.CurrentStage);
+        command.Parameters.AddValue("$progress_percent", JobRunProgressPlan.Completed);
         command.ExecuteNonQuery();
     }
 
@@ -191,17 +191,17 @@ public sealed class JobRepository(AppPaths paths)
                 $review_model
             );
             """;
-        command.Parameters.AddWithValue("$job_id", job.JobId);
-        command.Parameters.AddWithValue("$title", job.Title);
-        command.Parameters.AddWithValue("$source_audio_path", job.SourceAudioPath);
-        command.Parameters.AddWithValue("$status", job.Status);
-        command.Parameters.AddWithValue("$current_stage", "created");
-        command.Parameters.AddWithValue("$progress_percent", job.ProgressPercent);
-        command.Parameters.AddWithValue("$created_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$asr_engine", "faster-whisper");
-        command.Parameters.AddWithValue("$asr_model", "faster-whisper-large-v3-turbo");
-        command.Parameters.AddWithValue("$review_model", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
+        command.Parameters.AddValue("$job_id", job.JobId);
+        command.Parameters.AddValue("$title", job.Title);
+        command.Parameters.AddValue("$source_audio_path", job.SourceAudioPath);
+        command.Parameters.AddValue("$status", job.Status);
+        command.Parameters.AddValue("$current_stage", "created");
+        command.Parameters.AddValue("$progress_percent", job.ProgressPercent);
+        command.Parameters.AddValue("$created_at", now.ToString("o"));
+        command.Parameters.AddValue("$updated_at", now.ToString("o"));
+        command.Parameters.AddValue("$asr_engine", "faster-whisper");
+        command.Parameters.AddValue("$asr_model", "faster-whisper-large-v3-turbo");
+        command.Parameters.AddValue("$review_model", "llm-jp-4-8B-thinking-Q4_K_M.gguf");
         command.ExecuteNonQuery();
 
         return job;
@@ -251,14 +251,14 @@ public sealed class JobRepository(AppPaths paths)
                 last_error_category = $last_error_category
             WHERE job_id = $job_id;
             """;
-        command.Parameters.AddWithValue("$status", status);
-        command.Parameters.AddWithValue("$current_stage", currentStage);
-        command.Parameters.AddWithValue("$progress_percent", progressPercent);
-        command.Parameters.AddWithValue("$normalized_audio_path", (object?)normalizedAudioPath ?? DBNull.Value);
-        command.Parameters.AddWithValue("$unreviewed_draft_count", (object?)unreviewedDraftCount ?? DBNull.Value);
-        command.Parameters.AddWithValue("$updated_at", job.UpdatedAt.ToString("o"));
-        command.Parameters.AddWithValue("$last_error_category", (object?)errorCategory ?? DBNull.Value);
-        command.Parameters.AddWithValue("$job_id", job.JobId);
+        command.Parameters.AddValue("$status", status);
+        command.Parameters.AddValue("$current_stage", currentStage);
+        command.Parameters.AddValue("$progress_percent", progressPercent);
+        command.Parameters.AddValue("$normalized_audio_path", normalizedAudioPath);
+        command.Parameters.AddValue("$unreviewed_draft_count", unreviewedDraftCount);
+        command.Parameters.AddValue("$updated_at", job.UpdatedAt.ToString("o"));
+        command.Parameters.AddValue("$last_error_category", errorCategory);
+        command.Parameters.AddValue("$job_id", job.JobId);
         command.ExecuteNonQuery();
     }
 
@@ -373,12 +373,12 @@ public sealed class JobRepository(AppPaths paths)
                     last_error_category = NULL
                 WHERE job_id = $job_id;
                 """;
-            jobCommand.Parameters.AddWithValue("$status", job.Status);
-            jobCommand.Parameters.AddWithValue("$current_stage", skippedState.CurrentStage);
-            jobCommand.Parameters.AddWithValue("$progress_percent", skippedState.ProgressPercent);
-            jobCommand.Parameters.AddWithValue("$normalized_audio_path", (object?)job.NormalizedAudioPath ?? DBNull.Value);
-            jobCommand.Parameters.AddWithValue("$updated_at", job.UpdatedAt.ToString("o"));
-            jobCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            jobCommand.Parameters.AddValue("$status", job.Status);
+            jobCommand.Parameters.AddValue("$current_stage", skippedState.CurrentStage);
+            jobCommand.Parameters.AddValue("$progress_percent", skippedState.ProgressPercent);
+            jobCommand.Parameters.AddValue("$normalized_audio_path", job.NormalizedAudioPath);
+            jobCommand.Parameters.AddValue("$updated_at", job.UpdatedAt.ToString("o"));
+            jobCommand.Parameters.AddValue("$job_id", job.JobId);
             jobCommand.ExecuteNonQuery();
         }
 
@@ -390,7 +390,7 @@ public sealed class JobRepository(AppPaths paths)
                 SET status = 'skipped'
                 WHERE job_id = $job_id AND status = 'pending';
                 """;
-            draftCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            draftCommand.Parameters.AddValue("$job_id", job.JobId);
             draftCommand.ExecuteNonQuery();
         }
 
@@ -402,7 +402,7 @@ public sealed class JobRepository(AppPaths paths)
                 SET review_state = 'none'
                 WHERE job_id = $job_id AND review_state = 'has_draft';
                 """;
-            segmentCommand.Parameters.AddWithValue("$job_id", job.JobId);
+            segmentCommand.Parameters.AddValue("$job_id", job.JobId);
             segmentCommand.ExecuteNonQuery();
         }
 
@@ -508,8 +508,8 @@ public sealed class JobRepository(AppPaths paths)
                 updated_at = $updated_at
             WHERE job_id = $job_id;
             """;
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddValue("$job_id", jobId);
         command.ExecuteNonQuery();
     }
 
@@ -542,10 +542,10 @@ public sealed class JobRepository(AppPaths paths)
             WHERE job_id = $job_id;
             """;
         var now = DateTimeOffset.Now.ToString("o");
-        command.Parameters.AddWithValue("$deleted_at", now);
-        command.Parameters.AddWithValue("$delete_reason", reason);
-        command.Parameters.AddWithValue("$updated_at", now);
-        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddValue("$deleted_at", now);
+        command.Parameters.AddValue("$delete_reason", reason);
+        command.Parameters.AddValue("$updated_at", now);
+        command.Parameters.AddValue("$job_id", jobId);
         command.ExecuteNonQuery();
     }
 
@@ -558,7 +558,7 @@ public sealed class JobRepository(AppPaths paths)
             FROM jobs
             WHERE job_id = $job_id AND is_deleted = 1;
             """;
-        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddValue("$job_id", jobId);
         return command.ExecuteScalar() is not null;
     }
 
@@ -579,7 +579,7 @@ public sealed class JobRepository(AppPaths paths)
                 AND NOT EXISTS (SELECT 1 FROM stage_progress WHERE stage_progress.job_id = jobs.job_id)
                 AND NOT EXISTS (SELECT 1 FROM asr_runs WHERE asr_runs.job_id = jobs.job_id);
             """;
-        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddValue("$job_id", jobId);
         return command.ExecuteScalar() is not null;
     }
 
@@ -600,7 +600,7 @@ public sealed class JobRepository(AppPaths paths)
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = sql;
-                command.Parameters.AddWithValue("$job_id", jobId);
+                command.Parameters.AddValue("$job_id", jobId);
                 command.ExecuteNonQuery();
             }
         }
