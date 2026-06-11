@@ -1,7 +1,5 @@
 using System.IO;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using KoeNote.App.Services.Asr;
 using Microsoft.Data.Sqlite;
 
@@ -74,19 +72,12 @@ public sealed record DomainPresetClearResult(
 
 public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsRepository asrSettingsRepository)
 {
-    private const int SupportedSchemaVersion = 1;
-    private const int MaxAsrHotwordLength = 24;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true
-    };
+    private readonly DomainPresetAsrSettingsMerger _asrSettingsMerger = new();
+    private readonly DomainPresetParser _presetParser = new();
 
     public DomainPresetPreview LoadPreview(string presetPath)
     {
-        var preset = LoadPreset(presetPath);
+        var preset = _presetParser.Load(presetPath);
         return new DomainPresetPreview(
             Path.GetFullPath(presetPath),
             preset.DisplayName,
@@ -102,25 +93,10 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
 
     public DomainPresetImportResult Import(string presetPath, string? defaultJobId = null)
     {
-        if (string.IsNullOrWhiteSpace(presetPath))
-        {
-            throw new ArgumentException("プリセットファイルを指定してください。", nameof(presetPath));
-        }
-
-        if (!File.Exists(presetPath))
-        {
-            throw new FileNotFoundException("プリセットファイルが見つかりません。", presetPath);
-        }
-
-        var json = File.ReadAllText(presetPath);
-        var preset = JsonSerializer.Deserialize<DomainPreset>(json, JsonOptions)
-            ?? throw new InvalidDataException("プリセットJSONを読み込めませんでした。");
-
-        preset.Validate();
-
+        var preset = _presetParser.Load(presetPath);
         var current = asrSettingsRepository.Load();
-        var nextContext = MergeContext(current.ContextText, preset.AsrContext);
-        var hotwordMerge = MergeHotwords(current.Hotwords, preset.Hotwords);
+        var nextContext = _asrSettingsMerger.MergeContext(current.ContextText, preset.AsrContext);
+        var hotwordMerge = _asrSettingsMerger.MergeHotwords(current.Hotwords, preset.Hotwords);
         var next = current with
         {
             ContextText = nextContext,
@@ -205,7 +181,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
             throw new InvalidDataException("このプリセット履歴はすでにクリア済みです。");
         }
 
-        var preset = TryLoadPreset(history.SourcePath);
+        var preset = _presetParser.TryLoad(history.SourcePath);
         var presetId = preset?.NormalizedPresetId ?? history.PresetId ?? history.DisplayName;
         var contextRemoved = false;
         var removedHotwords = 0;
@@ -217,10 +193,10 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         {
             var current = asrSettingsRepository.Load();
             var nextContext = history.ContextUpdated
-                ? RemoveContextBlock(current.ContextText, preset.AsrContext)
+                ? _asrSettingsMerger.RemoveContextBlock(current.ContextText, preset.AsrContext)
                 : current.ContextText.Trim();
-            var nextHotwords = ShouldRemovePresetHotwords(history, preset)
-                ? RemoveHotwords(current.Hotwords, preset.Hotwords, out removedHotwords)
+            var nextHotwords = _asrSettingsMerger.ShouldRemovePresetHotwords(history.AddedHotwordCount, preset.Hotwords)
+                ? _asrSettingsMerger.RemoveHotwords(current.Hotwords, preset.Hotwords, out removedHotwords)
                 : current.Hotwords;
             contextRemoved = !string.Equals(current.ContextText.Trim(), nextContext.Trim(), StringComparison.Ordinal);
             if (contextRemoved || removedHotwords > 0)
@@ -252,7 +228,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
                     entry.CorrectText.Trim(),
                     string.IsNullOrWhiteSpace(entry.Scope) ? "global" : entry.Scope.Trim());
 
-                if (IsAsrHotwordCandidate(entry.CorrectText))
+                if (_asrSettingsMerger.IsAsrHotwordCandidate(entry.CorrectText))
                 {
                     disabledUserTerms += DisableUserTerm(connection, transaction, entry.CorrectText.Trim());
                 }
@@ -314,43 +290,6 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
             reader.GetInt32(7),
             reader.GetInt32(8),
             reader.GetInt32(9));
-    }
-
-    private static DomainPreset? TryLoadPreset(string sourcePath)
-    {
-        try
-        {
-            if (!File.Exists(sourcePath))
-            {
-                return null;
-            }
-
-            var preset = JsonSerializer.Deserialize<DomainPreset>(File.ReadAllText(sourcePath), JsonOptions);
-            preset?.Validate();
-            return preset;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
-        {
-            return null;
-        }
-    }
-
-    private static DomainPreset LoadPreset(string presetPath)
-    {
-        if (string.IsNullOrWhiteSpace(presetPath))
-        {
-            throw new ArgumentException("プリセットファイルを指定してください。", nameof(presetPath));
-        }
-
-        if (!File.Exists(presetPath))
-        {
-            throw new FileNotFoundException("プリセットファイルが見つかりません。", presetPath);
-        }
-
-        var preset = JsonSerializer.Deserialize<DomainPreset>(File.ReadAllText(presetPath), JsonOptions)
-            ?? throw new InvalidDataException("プリセットJSONを読み込めませんでした。");
-        preset.Validate();
-        return preset;
     }
 
     private static string BuildPreviewDetails(DomainPreset preset)
@@ -443,127 +382,6 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         }
     }
 
-    private static string RemoveContextBlock(string currentContext, string? presetContext)
-    {
-        var preset = (presetContext ?? string.Empty).Trim();
-        if (preset.Length == 0)
-        {
-            return currentContext.Trim();
-        }
-
-        var blocks = currentContext
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(block => !string.Equals(block, preset, StringComparison.Ordinal))
-            .ToArray();
-        return string.Join(Environment.NewLine + Environment.NewLine, blocks);
-    }
-
-    private static IReadOnlyList<string> RemoveHotwords(
-        IReadOnlyList<string> currentHotwords,
-        IReadOnlyList<string> presetHotwords,
-        out int removedCount)
-    {
-        var presetSet = presetHotwords
-            .Select(NormalizeHotword)
-            .Where(static hotword => hotword.Length > 0)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var next = new List<string>();
-        removedCount = 0;
-        foreach (var hotword in currentHotwords)
-        {
-            var normalized = NormalizeHotword(hotword);
-            if (normalized.Length == 0)
-            {
-                continue;
-            }
-
-            if (presetSet.Contains(normalized))
-            {
-                removedCount++;
-                continue;
-            }
-
-            next.Add(normalized);
-        }
-
-        return next;
-    }
-
-    private static bool ShouldRemovePresetHotwords(DomainPresetImportHistoryItem history, DomainPreset preset)
-    {
-        var presetHotwordCount = preset.Hotwords
-            .Select(NormalizeHotword)
-            .Where(static hotword => hotword.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count();
-        return presetHotwordCount > 0 && history.AddedHotwordCount == presetHotwordCount;
-    }
-
-    private static string MergeContext(string currentContext, string? presetContext)
-    {
-        var current = currentContext.Trim();
-        var preset = (presetContext ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(preset))
-        {
-            return current;
-        }
-
-        if (string.IsNullOrWhiteSpace(current))
-        {
-            return preset;
-        }
-
-        if (current.Contains(preset, StringComparison.Ordinal))
-        {
-            return current;
-        }
-
-        return string.Join(Environment.NewLine + Environment.NewLine, current, preset);
-    }
-
-    private static HotwordMergeResult MergeHotwords(IReadOnlyList<string> currentHotwords, IReadOnlyList<string> presetHotwords)
-    {
-        var hotwords = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var hotword in currentHotwords)
-        {
-            var normalized = NormalizeHotword(hotword);
-            if (normalized.Length > 0 && seen.Add(normalized))
-            {
-                hotwords.Add(normalized);
-            }
-        }
-
-        var added = 0;
-        var skipped = 0;
-        foreach (var hotword in presetHotwords)
-        {
-            var normalized = NormalizeHotword(hotword);
-            if (normalized.Length == 0)
-            {
-                continue;
-            }
-
-            if (seen.Add(normalized))
-            {
-                hotwords.Add(normalized);
-                added++;
-            }
-            else
-            {
-                skipped++;
-            }
-        }
-
-        return new HotwordMergeResult(hotwords, added, skipped);
-    }
-
-    private static string NormalizeHotword(string hotword)
-    {
-        return hotword.Trim();
-    }
-
     private DatabaseImportResult ImportDatabaseEntries(DomainPreset preset, string importId, string? defaultJobId)
     {
         if (preset.CorrectionMemory.Count == 0 &&
@@ -603,7 +421,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
                 updatedMemory++;
             }
 
-            if (IsAsrHotwordCandidate(correctText))
+            if (_asrSettingsMerger.IsAsrHotwordCandidate(correctText))
             {
                 UpsertUserTerm(connection, transaction, correctText, now);
             }
@@ -696,7 +514,7 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         string presetPath,
         DomainPreset preset,
         bool contextUpdated,
-        HotwordMergeResult hotwordMerge,
+        DomainPresetHotwordMergeResult hotwordMerge,
         DatabaseImportResult databaseResult)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
@@ -1113,27 +931,6 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         command.ExecuteNonQuery();
     }
 
-    private static bool IsAsrHotwordCandidate(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var trimmed = value.Trim();
-        if (trimmed.Length > MaxAsrHotwordLength)
-        {
-            return false;
-        }
-
-        return !trimmed.Any(static character =>
-            char.IsWhiteSpace(character) ||
-            char.IsPunctuation(character) ||
-            char.IsSymbol(character));
-    }
-
-    private sealed record HotwordMergeResult(IReadOnlyList<string> Hotwords, int AddedCount, int SkippedCount);
-
     private sealed record DatabaseImportResult(
         int AddedCorrectionMemoryCount,
         int UpdatedCorrectionMemoryCount,
@@ -1142,70 +939,4 @@ public sealed class DomainPresetImportService(AppPaths paths, AsrSettingsReposit
         int SkippedSpeakerAliasCount,
         int AddedReviewGuidelineCount,
         int UpdatedReviewGuidelineCount);
-
-    private sealed record DomainPreset(
-        [property: JsonPropertyName("schema_version")] int SchemaVersion,
-        [property: JsonPropertyName("preset_id")] string? PresetId,
-        [property: JsonPropertyName("display_name")] string? DisplayNameValue,
-        [property: JsonPropertyName("description")] string? Description,
-        [property: JsonPropertyName("domain")] string? Domain,
-        [property: JsonPropertyName("asr_context")] string? AsrContext,
-        [property: JsonPropertyName("hotwords")] IReadOnlyList<string>? HotwordsValue,
-        [property: JsonPropertyName("correction_memory")] IReadOnlyList<CorrectionMemoryPresetEntry>? CorrectionMemoryValue,
-        [property: JsonPropertyName("speaker_aliases")] IReadOnlyList<SpeakerAliasPresetEntry>? SpeakerAliasesValue,
-        [property: JsonPropertyName("review_guidelines")] IReadOnlyList<string>? ReviewGuidelinesValue)
-    {
-        [JsonIgnore]
-        public string DisplayName => string.IsNullOrWhiteSpace(DisplayNameValue)
-            ? PresetId ?? Domain ?? "domain preset"
-            : DisplayNameValue.Trim();
-
-        [JsonIgnore]
-        public string? NormalizedPresetId => string.IsNullOrWhiteSpace(PresetId)
-            ? null
-            : PresetId.Trim();
-
-        [JsonIgnore]
-        public string GuidelinePresetId => NormalizedPresetId ?? DisplayName;
-
-        [JsonIgnore]
-        public IReadOnlyList<string> Hotwords => HotwordsValue ?? [];
-
-        [JsonIgnore]
-        public IReadOnlyList<CorrectionMemoryPresetEntry> CorrectionMemory => CorrectionMemoryValue ?? [];
-
-        [JsonIgnore]
-        public IReadOnlyList<SpeakerAliasPresetEntry> SpeakerAliases => SpeakerAliasesValue ?? [];
-
-        [JsonIgnore]
-        public IReadOnlyList<string> ReviewGuidelines => ReviewGuidelinesValue ?? [];
-
-        public void Validate()
-        {
-            if (SchemaVersion != SupportedSchemaVersion)
-            {
-                throw new InvalidDataException($"未対応のプリセット schema_version です: {SchemaVersion}");
-            }
-
-            if (string.IsNullOrWhiteSpace(AsrContext) &&
-                !Hotwords.Any(static hotword => !string.IsNullOrWhiteSpace(hotword)) &&
-                !CorrectionMemory.Any(static entry => !string.IsNullOrWhiteSpace(entry.WrongText) && !string.IsNullOrWhiteSpace(entry.CorrectText)) &&
-                !SpeakerAliases.Any(static entry => !string.IsNullOrWhiteSpace(entry.SpeakerId) && !string.IsNullOrWhiteSpace(entry.DisplayName)) &&
-                !ReviewGuidelines.Any(static guideline => !string.IsNullOrWhiteSpace(guideline)))
-            {
-                throw new InvalidDataException("プリセットには asr_context、hotwords、correction_memory、speaker_aliases、review_guidelines のいずれかが必要です。");
-            }
-        }
-    }
-
-    private sealed record CorrectionMemoryPresetEntry(
-        [property: JsonPropertyName("wrong_text")] string? WrongText,
-        [property: JsonPropertyName("correct_text")] string? CorrectText,
-        [property: JsonPropertyName("issue_type")] string? IssueType,
-        [property: JsonPropertyName("scope")] string? Scope);
-
-    private sealed record SpeakerAliasPresetEntry(
-        [property: JsonPropertyName("job_id")] string? JobId,
-        [property: JsonPropertyName("speaker_id")] string? SpeakerId,
-        [property: JsonPropertyName("display_name")] string? DisplayName);
 }
