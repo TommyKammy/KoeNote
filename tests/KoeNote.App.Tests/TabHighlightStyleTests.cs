@@ -129,6 +129,8 @@ public sealed class TabHighlightStyleTests
         var controlsXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Resources", "Controls.xaml"));
         var transcriptXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "TranscriptPanel.xaml"));
         var reviewXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReviewPanel.xaml"));
+        var reviewDraftEmptyStateXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReviewDraftEmptyState.xaml"));
+        var reviewDraftActionBarXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReviewDraftActionBar.xaml"));
         var audioPlayerXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "TranscriptAudioPlayer.xaml"));
         var listsXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Resources", "Lists.xaml"));
         var stageXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "StageProgressPanel.xaml"));
@@ -155,8 +157,12 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("x:Key=\"HeaderToggleThumb\"", headerStyles, StringComparison.Ordinal);
 
         Assert.DoesNotContain("ShowReadableTranscriptTabCommand", reviewXaml, StringComparison.Ordinal);
-        Assert.Contains("整文候補はありません", reviewXaml, StringComparison.Ordinal);
-        Assert.Contains("「整文」タブで結果を確認", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewDraftEmptyState Grid.Row=\"0\" />", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewDraftActionBar Grid.Row=\"1\" />", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("整文候補はありません", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
+        Assert.Contains("「整文」タブで結果を確認", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
+        Assert.Contains("この候補への操作", reviewDraftActionBarXaml, StringComparison.Ordinal);
+        Assert.Contains("レビュー候補を反映して、次の候補へ進みます", reviewDraftActionBarXaml, StringComparison.Ordinal);
         Assert.Contains("RunPostSummaryCommand", reviewXaml, StringComparison.Ordinal);
         Assert.Single(AllIndexesOf(reviewXaml, "Command=\"{Binding RunPostSummaryCommand}\""));
         Assert.Contains("TranscriptInlineToggle", transcriptXaml, StringComparison.Ordinal);
