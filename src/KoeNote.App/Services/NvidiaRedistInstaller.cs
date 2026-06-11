@@ -44,9 +44,15 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
     public NvidiaRedistStageResult? TryStageFromLocalInstall(
         string stagingRoot,
         IEnumerable<string> searchRoots,
-        IReadOnlyCollection<string> requiredFilePatterns)
+        IReadOnlyCollection<string> requiredFilePatterns,
+        bool allowMixedRoots = false)
     {
-        var matches = TryFindRequiredFiles(searchRoots, requiredFilePatterns);
+        var matches = allowMixedRoots
+            ? TryFindRequiredFiles(searchRoots, requiredFilePatterns)
+            : searchRoots
+                .Where(Directory.Exists)
+                .Select(root => TryFindRequiredFiles([root], requiredFilePatterns))
+                .FirstOrDefault(result => result is not null);
         if (matches is null)
         {
             return null;

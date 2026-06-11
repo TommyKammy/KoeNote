@@ -101,6 +101,46 @@ public sealed class CudaReviewRuntimeServiceTests
     }
 
     [Fact]
+    public async Task InstallAsync_DoesNotMixLocalCudaDllsAcrossSearchRoots()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithCpuRuntime(root);
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "koenote bridge");
+        var firstCudaBin = Path.Combine(root, "cuda-12.4", "bin");
+        var secondCudaBin = Path.Combine(root, "cuda-12.9", "bin");
+        Directory.CreateDirectory(firstCudaBin);
+        Directory.CreateDirectory(secondCudaBin);
+        File.WriteAllText(Path.Combine(firstCudaBin, "cudart64_12.dll"), "local cudart");
+        File.WriteAllText(Path.Combine(secondCudaBin, "cublas64_12.dll"), "local cublas");
+        File.WriteAllText(Path.Combine(secondCudaBin, "cublasLt64_12.dll"), "local cublasLt");
+        var cudartArchive = CreateArchive(("cuda/bin/cudart64_12.dll", "redist cudart"));
+        var cublasArchive = CreateArchive(
+            ("lib/bin/cublas64_12.dll", "redist cublas"),
+            ("lib/bin/cublasLt64_12.dll", "redist cublasLt"));
+        var manifest = CreateManifest(cudartArchive, cublasArchive);
+        var service = new CudaReviewRuntimeService(
+            paths,
+            new HttpClient(new MapHandler(new Dictionary<string, byte[]>
+            {
+                ["https://example.test/redist.json"] = manifest,
+                ["https://example.test/redist/cuda-cudart.zip"] = cudartArchive,
+                ["https://example.test/redist/libcublas.zip"] = cublasArchive
+            })),
+            new CudaReviewRuntimeOptions(
+                "https://example.test/redist.json",
+                "https://example.test/redist/",
+                LocalSearchRoots: [firstCudaBin, secondCudaBin]));
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
+        Assert.Equal("redist cudart", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.Equal("redist cublas", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll")));
+        Assert.Equal("redist cublasLt", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll")));
+    }
+
+    [Fact]
     public async Task InstallAsync_RequiresExistingCpuReviewRuntime()
     {
         var root = CreateRoot();

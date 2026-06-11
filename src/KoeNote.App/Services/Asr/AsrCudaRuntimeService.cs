@@ -292,7 +292,8 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         return _redistInstaller.TryStageFromLocalInstall(
             stagingRoot,
             EnumerateLocalSearchRoots(),
-            AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
+            AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns,
+            allowMixedRoots: true);
     }
 
     private IEnumerable<string> EnumerateLocalSearchRoots()
