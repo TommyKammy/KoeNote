@@ -4,89 +4,30 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private static readonly TimeSpan ModelCatalogProgressRefreshInterval = TimeSpan.FromSeconds(1);
-
     private void BeginModelDownloadProgress(string displayName)
     {
         _modelDownloadNotificationTimer.Stop();
-        IsModelDownloadInProgress = true;
-        IsModelDownloadProgressIndeterminate = false;
-        ModelDownloadProgressStageText = string.Empty;
-        ModelDownloadProgressPercent = 0;
-        ModelDownloadProgressSummary = $"Downloading {displayName}: preparing...";
-        IsModelDownloadNotificationError = false;
-        ModelDownloadNotification = string.Empty;
-        ResetModelCatalogProgressRefresh();
+        ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Begin(displayName));
     }
 
     private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
     {
-        if (GetUsableDownloadTotal(progress) is { } totalBytes)
-        {
-            ModelDownloadProgressStageText = string.Empty;
-            IsModelDownloadProgressIndeterminate = false;
-            ModelDownloadProgressPercent = progress.BytesDownloaded * 100d / totalBytes;
-        }
-        else
-        {
-            ModelDownloadProgressStageText = "ダウンロード中";
-            IsModelDownloadProgressIndeterminate = IsModelDownloadInProgress;
-            ModelDownloadProgressPercent = 0;
-        }
-
-        ModelDownloadProgressSummary = $"Downloading {displayName}: {FormatDownloadProgress(progress)}";
-        LatestLog = ModelDownloadProgressSummary;
+        ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Update(displayName, progress, IsModelDownloadInProgress));
     }
 
     private void RefreshModelCatalogForDownloadProgress(ModelDownloadProgress progress)
     {
-        var now = DateTimeOffset.UtcNow;
-        var percent = GetDownloadPercent(progress);
-        var isDifferentModel = !string.Equals(
-            _lastModelCatalogProgressRefreshModelId,
-            progress.ModelId,
-            StringComparison.OrdinalIgnoreCase);
-        var hasVisiblePercentChange = percent >= 0 && percent != _lastModelCatalogProgressRefreshPercent;
-        var hasElapsed = now - _lastModelCatalogProgressRefreshAt >= ModelCatalogProgressRefreshInterval;
-
-        if (!isDifferentModel && !hasVisiblePercentChange && !hasElapsed)
+        if (!_modelDownloadProgressPresenter.ShouldRefreshCatalog(progress, DateTimeOffset.UtcNow))
         {
             return;
         }
 
-        _lastModelCatalogProgressRefreshModelId = progress.ModelId;
-        _lastModelCatalogProgressRefreshAt = now;
-        _lastModelCatalogProgressRefreshPercent = percent;
         RefreshModelCatalogKeepingSelection(progress.ModelId);
-    }
-
-    private void ResetModelCatalogProgressRefresh()
-    {
-        _lastModelCatalogProgressRefreshAt = DateTimeOffset.MinValue;
-        _lastModelCatalogProgressRefreshModelId = null;
-        _lastModelCatalogProgressRefreshPercent = -1;
     }
 
     private void CompleteModelDownloadProgress(string displayName, bool succeeded, string? message = null)
     {
-        IsModelDownloadInProgress = false;
-        IsModelDownloadProgressIndeterminate = false;
-        ModelDownloadProgressStageText = string.Empty;
-        if (succeeded)
-        {
-            ModelDownloadProgressPercent = 100;
-            ModelDownloadProgressSummary = $"Completed {displayName}: 100%";
-            ModelDownloadNotification = $"Download completed: {displayName}";
-            IsModelDownloadNotificationError = false;
-            LatestLog = $"Model installed and verified: {displayName}";
-            ScheduleModelDownloadNotificationDismiss();
-            return;
-        }
-
-        ModelDownloadProgressSummary = message ?? $"Download stopped: {displayName}";
-        ModelDownloadNotification = ModelDownloadProgressSummary;
-        IsModelDownloadNotificationError = true;
-        LatestLog = ModelDownloadProgressSummary;
+        ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Complete(displayName, succeeded, message));
         ScheduleModelDownloadNotificationDismiss();
     }
 
@@ -102,42 +43,51 @@ public sealed partial class MainWindowViewModel
         IsModelDownloadNotificationError = false;
     }
 
-    private static string FormatDownloadProgress(ModelDownloadProgress progress)
+    private void ApplyModelDownloadProgressState(ModelDownloadProgressViewState state)
     {
-        if (GetUsableDownloadTotal(progress) is { } totalBytes)
+        if (state.IsInProgress is { } isInProgress)
         {
-            var percent = progress.BytesDownloaded * 100d / totalBytes;
-            return $"{percent:0}% ({FormatBytes(progress.BytesDownloaded)} / {FormatBytes(totalBytes)})";
+            IsModelDownloadInProgress = isInProgress;
         }
 
-        return FormatBytes(progress.BytesDownloaded);
-    }
+        if (state.IsIndeterminate is { } isIndeterminate)
+        {
+            IsModelDownloadProgressIndeterminate = isIndeterminate;
+        }
 
-    private static long? GetUsableDownloadTotal(ModelDownloadProgress progress)
-    {
-        return progress.BytesTotal is > 0 && progress.BytesDownloaded <= progress.BytesTotal.Value
-            ? progress.BytesTotal
-            : null;
-    }
+        if (state.StageText is not null)
+        {
+            ModelDownloadProgressStageText = state.StageText;
+        }
 
-    private static int GetDownloadPercent(ModelDownloadProgress progress)
-    {
-        return GetUsableDownloadTotal(progress) is { } totalBytes
-            ? (int)Math.Floor(progress.BytesDownloaded * 100d / totalBytes)
-            : -1;
+        if (state.Percent is { } percent)
+        {
+            ModelDownloadProgressPercent = percent;
+        }
+
+        if (state.Summary is not null)
+        {
+            ModelDownloadProgressSummary = state.Summary;
+        }
+
+        if (state.Notification is not null)
+        {
+            ModelDownloadNotification = state.Notification;
+        }
+
+        if (state.IsNotificationError is { } isNotificationError)
+        {
+            IsModelDownloadNotificationError = isNotificationError;
+        }
+
+        if (state.LatestLog is not null)
+        {
+            LatestLog = state.LatestLog;
+        }
     }
 
     private static string FormatBytes(long sizeBytes)
     {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        var value = (double)sizeBytes;
-        var index = 0;
-        while (value >= 1024 && index < units.Length - 1)
-        {
-            value /= 1024;
-            index++;
-        }
-
-        return $"{value:0.#} {units[index]}";
+        return ModelDownloadProgressPresenter.FormatByteSize(sizeBytes);
     }
 }

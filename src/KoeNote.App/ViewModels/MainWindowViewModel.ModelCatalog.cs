@@ -296,9 +296,8 @@ public sealed partial class MainWindowViewModel
         }
 
         SelectedModelCatalogEntry = selectedModelId is null
-            ? ModelCatalogEntries.FirstOrDefault()
-            : ModelCatalogEntries.FirstOrDefault(entry =>
-                entry.ModelId.Equals(selectedModelId, StringComparison.OrdinalIgnoreCase)) ?? ModelCatalogEntries.FirstOrDefault();
+            ? _modelCatalogPresenter.ResolveSelection(ModelCatalogEntries, preferredModelId: null)
+            : _modelCatalogPresenter.ResolveSelection(ModelCatalogEntries, selectedModelId);
         RefreshAvailableAsrEngines();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
@@ -315,8 +314,7 @@ public sealed partial class MainWindowViewModel
     private void RefreshModelCatalogKeepingSelection(string modelId)
     {
         RefreshModelCatalog();
-        SelectedModelCatalogEntry = ModelCatalogEntries.FirstOrDefault(entry =>
-            entry.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase)) ?? SelectedModelCatalogEntry;
+        SelectedModelCatalogEntry = _modelCatalogPresenter.ResolveSelection(ModelCatalogEntries, modelId) ?? SelectedModelCatalogEntry;
     }
 
     private void RegisterIfPresent(ModelCatalog catalog, string modelId, string path, string sourceType)
@@ -569,42 +567,34 @@ public sealed partial class MainWindowViewModel
 
     private bool CanDownloadSelectedModel()
     {
-        return SelectedModelCatalogEntry is { IsInstalled: false } entry &&
-            entry.IsDirectDownloadSupported &&
-            !IsDownloadRunning(entry.LatestDownloadJob);
+        return _modelCatalogPresenter.CanDownload(SelectedModelCatalogEntry);
     }
 
     private bool CanPauseSelectedModelDownload()
     {
-        return IsDownloadRunning(SelectedModelCatalogEntry?.LatestDownloadJob);
+        return _modelCatalogPresenter.CanPause(SelectedModelCatalogEntry);
     }
 
     private bool CanResumeSelectedModelDownload()
     {
-        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "paused" };
+        return _modelCatalogPresenter.CanResume(SelectedModelCatalogEntry);
     }
 
     private bool CanCancelSelectedModelDownload()
     {
-        return SelectedModelCatalogEntry?.LatestDownloadJob is { Status: "running" or "paused" };
+        return _modelCatalogPresenter.CanCancel(SelectedModelCatalogEntry);
     }
 
     private bool CanRetrySelectedModelDownload()
     {
-        return SelectedModelCatalogEntry is { IsInstalled: false, LatestDownloadJob.Status: "failed" or "cancelled" } entry &&
-            entry.IsDirectDownloadSupported;
+        return _modelCatalogPresenter.CanRetry(SelectedModelCatalogEntry);
     }
 
     private bool CanDeleteSelectedModelFiles()
     {
-        return SelectedModelCatalogEntry is { IsInstalled: true } entry &&
-            !IsRunInProgress &&
-            !IsModelDownloadInProgress &&
-            !IsDownloadRunning(entry.LatestDownloadJob);
-    }
-
-    private static bool IsDownloadRunning(ModelDownloadJob? job)
-    {
-        return string.Equals(job?.Status, "running", StringComparison.OrdinalIgnoreCase);
+        return _modelCatalogPresenter.CanDeleteFiles(
+            SelectedModelCatalogEntry,
+            IsRunInProgress,
+            IsModelDownloadInProgress);
     }
 }
