@@ -1,26 +1,4 @@
 param(
-    [ValidateSet(
-        "list",
-        "quick",
-        "asr",
-        "review",
-        "transcript",
-        "setup",
-        "viewmodel",
-        "jobs",
-        "models",
-        "updates",
-        "presets",
-        "export",
-        "llm",
-        "diarization",
-        "database",
-        "runtime",
-        "cleanup",
-        "eval",
-        "ui",
-        "all"
-    )]
     [string[]]$Target = @("quick"),
 
     [string]$Configuration = "Debug",
@@ -54,6 +32,15 @@ function New-TestRun {
         Project = $Project
         Filter = if ($Pattern.Count -eq 0) { $null } else { Join-TestFilter $Pattern }
     }
+}
+
+function Split-Target {
+    param([string[]]$Value)
+
+    return @($Value |
+        ForEach-Object { $_ -split "," } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
 $targets = [ordered]@{
@@ -182,7 +169,19 @@ $targets = [ordered]@{
     )
 }
 
-if ($Target -contains "list") {
+$selectedTargets = Split-Target $Target
+if ($selectedTargets.Count -eq 0) {
+    throw "No test target was specified."
+}
+
+$validTargets = @("list", "all") + @($targets.Keys)
+foreach ($targetName in $selectedTargets) {
+    if ($validTargets -notcontains $targetName) {
+        throw "Unknown target: $targetName. Valid targets: $($validTargets -join ', ')"
+    }
+}
+
+if ($selectedTargets -contains "list") {
     Write-Host "Available targets:"
     foreach ($name in $targets.Keys) {
         $runs = $targets[$name] | ForEach-Object { $_.Name }
@@ -191,18 +190,14 @@ if ($Target -contains "list") {
     exit 0
 }
 
-$requestedTargets = if ($Target -contains "all") {
+$requestedTargets = if ($selectedTargets -contains "all") {
     $targets.Keys
 }
 else {
-    $Target
+    $selectedTargets
 }
 
 $runsToExecute = foreach ($targetName in $requestedTargets) {
-    if (-not $targets.Contains($targetName)) {
-        throw "Unknown target: $targetName"
-    }
-
     $targets[$targetName]
 }
 
