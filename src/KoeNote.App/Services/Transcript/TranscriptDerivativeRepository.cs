@@ -74,22 +74,22 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
                 error_message = excluded.error_message,
                 updated_at = excluded.updated_at;
             """;
-        command.Parameters.AddWithValue("$derivative_id", derivativeId);
-        command.Parameters.AddWithValue("$job_id", request.JobId);
-        command.Parameters.AddWithValue("$kind", request.Kind);
-        command.Parameters.AddWithValue("$content_format", request.ContentFormat);
-        command.Parameters.AddWithValue("$content", request.Content);
-        command.Parameters.AddWithValue("$source_kind", request.SourceKind);
-        command.Parameters.AddWithValue("$source_transcript_hash", request.SourceTranscriptHash);
-        command.Parameters.AddWithValue("$source_segment_range", (object?)request.SourceSegmentRange ?? DBNull.Value);
-        command.Parameters.AddWithValue("$source_chunk_ids", (object?)request.SourceChunkIds ?? DBNull.Value);
-        command.Parameters.AddWithValue("$model_id", (object?)request.ModelId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$prompt_version", request.PromptVersion);
-        command.Parameters.AddWithValue("$generation_profile", request.GenerationProfile);
-        command.Parameters.AddWithValue("$status", request.Status);
-        command.Parameters.AddWithValue("$error_message", (object?)request.ErrorMessage ?? DBNull.Value);
-        command.Parameters.AddWithValue("$created_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
+        command.Parameters.AddValue("$derivative_id", derivativeId);
+        command.Parameters.AddValue("$job_id", request.JobId);
+        command.Parameters.AddValue("$kind", request.Kind);
+        command.Parameters.AddValue("$content_format", request.ContentFormat);
+        command.Parameters.AddValue("$content", request.Content);
+        command.Parameters.AddValue("$source_kind", request.SourceKind);
+        command.Parameters.AddValue("$source_transcript_hash", request.SourceTranscriptHash);
+        command.Parameters.AddValue("$source_segment_range", request.SourceSegmentRange);
+        command.Parameters.AddValue("$source_chunk_ids", request.SourceChunkIds);
+        command.Parameters.AddValue("$model_id", request.ModelId);
+        command.Parameters.AddValue("$prompt_version", request.PromptVersion);
+        command.Parameters.AddValue("$generation_profile", request.GenerationProfile);
+        command.Parameters.AddValue("$status", request.Status);
+        command.Parameters.AddValue("$error_message", request.ErrorMessage);
+        command.Parameters.AddValue("$created_at", now.ToString("o"));
+        command.Parameters.AddValue("$updated_at", now.ToString("o"));
         command.ExecuteNonQuery();
 
         return ReadById(derivativeId)
@@ -164,24 +164,24 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
                 error_message = excluded.error_message,
                 updated_at = excluded.updated_at;
             """;
-        command.Parameters.AddWithValue("$chunk_id", chunkId);
-        command.Parameters.AddWithValue("$derivative_id", request.DerivativeId);
-        command.Parameters.AddWithValue("$job_id", request.JobId);
-        command.Parameters.AddWithValue("$chunk_index", request.ChunkIndex);
-        command.Parameters.AddWithValue("$source_kind", request.SourceKind);
-        command.Parameters.AddWithValue("$source_segment_ids", request.SourceSegmentIds);
-        command.Parameters.AddWithValue("$source_start_seconds", (object?)request.SourceStartSeconds ?? DBNull.Value);
-        command.Parameters.AddWithValue("$source_end_seconds", (object?)request.SourceEndSeconds ?? DBNull.Value);
-        command.Parameters.AddWithValue("$source_transcript_hash", request.SourceTranscriptHash);
-        command.Parameters.AddWithValue("$content_format", request.ContentFormat);
-        command.Parameters.AddWithValue("$content", request.Content);
-        command.Parameters.AddWithValue("$model_id", (object?)request.ModelId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$prompt_version", request.PromptVersion);
-        command.Parameters.AddWithValue("$generation_profile", request.GenerationProfile);
-        command.Parameters.AddWithValue("$status", request.Status);
-        command.Parameters.AddWithValue("$error_message", (object?)request.ErrorMessage ?? DBNull.Value);
-        command.Parameters.AddWithValue("$created_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
+        command.Parameters.AddValue("$chunk_id", chunkId);
+        command.Parameters.AddValue("$derivative_id", request.DerivativeId);
+        command.Parameters.AddValue("$job_id", request.JobId);
+        command.Parameters.AddValue("$chunk_index", request.ChunkIndex);
+        command.Parameters.AddValue("$source_kind", request.SourceKind);
+        command.Parameters.AddValue("$source_segment_ids", request.SourceSegmentIds);
+        command.Parameters.AddValue("$source_start_seconds", request.SourceStartSeconds);
+        command.Parameters.AddValue("$source_end_seconds", request.SourceEndSeconds);
+        command.Parameters.AddValue("$source_transcript_hash", request.SourceTranscriptHash);
+        command.Parameters.AddValue("$content_format", request.ContentFormat);
+        command.Parameters.AddValue("$content", request.Content);
+        command.Parameters.AddValue("$model_id", request.ModelId);
+        command.Parameters.AddValue("$prompt_version", request.PromptVersion);
+        command.Parameters.AddValue("$generation_profile", request.GenerationProfile);
+        command.Parameters.AddValue("$status", request.Status);
+        command.Parameters.AddValue("$error_message", request.ErrorMessage);
+        command.Parameters.AddValue("$created_at", now.ToString("o"));
+        command.Parameters.AddValue("$updated_at", now.ToString("o"));
         command.ExecuteNonQuery();
 
         return ReadChunkById(chunkId)
@@ -218,7 +218,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             FROM transcript_derivatives
             WHERE derivative_id = $derivative_id;
             """;
-        command.Parameters.AddWithValue("$derivative_id", derivativeId);
+        command.Parameters.AddValue("$derivative_id", derivativeId);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadDerivative(reader) : null;
@@ -258,9 +258,9 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             ORDER BY updated_at DESC
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$kind", kind);
-        command.Parameters.AddWithValue("$status", TranscriptDerivativeStatuses.Succeeded);
+        command.Parameters.AddValue("$job_id", jobId);
+        command.Parameters.AddValue("$kind", kind);
+        command.Parameters.AddValue("$status", TranscriptDerivativeStatuses.Succeeded);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadDerivative(reader) : null;
@@ -299,7 +299,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             WHERE derivative_id = $derivative_id
             ORDER BY chunk_index ASC;
             """;
-        command.Parameters.AddWithValue("$derivative_id", derivativeId);
+        command.Parameters.AddValue("$derivative_id", derivativeId);
 
         using var reader = command.ExecuteReader();
         var chunks = new List<TranscriptDerivativeChunk>();
@@ -341,12 +341,12 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
               AND status = $succeeded
               AND source_transcript_hash <> $source_transcript_hash;
             """;
-        command.Parameters.AddWithValue("$stale", TranscriptDerivativeStatuses.Stale);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$source_kind", TranscriptDerivativeSourceKinds.Raw);
-        command.Parameters.AddWithValue("$succeeded", TranscriptDerivativeStatuses.Succeeded);
-        command.Parameters.AddWithValue("$source_transcript_hash", currentSourceTranscriptHash);
+        command.Parameters.AddValue("$stale", TranscriptDerivativeStatuses.Stale);
+        command.Parameters.AddValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.Parameters.AddValue("$job_id", jobId);
+        command.Parameters.AddValue("$source_kind", TranscriptDerivativeSourceKinds.Raw);
+        command.Parameters.AddValue("$succeeded", TranscriptDerivativeStatuses.Succeeded);
+        command.Parameters.AddValue("$source_transcript_hash", currentSourceTranscriptHash);
         return command.ExecuteNonQuery();
     }
 
@@ -395,7 +395,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             FROM transcript_derivative_chunks
             WHERE chunk_id = $chunk_id;
             """;
-        command.Parameters.AddWithValue("$chunk_id", chunkId);
+        command.Parameters.AddValue("$chunk_id", chunkId);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadChunk(reader) : null;
@@ -411,15 +411,15 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.IsDBNull(7) ? null : reader.GetString(7),
-            reader.IsDBNull(8) ? null : reader.GetString(8),
-            reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.GetNullableString(7),
+            reader.GetNullableString(8),
+            reader.GetNullableString(9),
             reader.GetString(10),
             reader.GetString(11),
             reader.GetString(12),
-            reader.IsDBNull(13) ? null : reader.GetString(13),
-            DateTimeOffset.Parse(reader.GetString(14), System.Globalization.CultureInfo.InvariantCulture),
-            DateTimeOffset.Parse(reader.GetString(15), System.Globalization.CultureInfo.InvariantCulture));
+            reader.GetNullableString(13),
+            reader.GetDateTimeOffset(14),
+            reader.GetDateTimeOffset(15));
     }
 
     private static TranscriptDerivativeChunk ReadChunk(Microsoft.Data.Sqlite.SqliteDataReader reader)
@@ -431,18 +431,18 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
             reader.GetInt32(3),
             reader.GetString(4),
             reader.GetString(5),
-            reader.IsDBNull(6) ? null : reader.GetDouble(6),
-            reader.IsDBNull(7) ? null : reader.GetDouble(7),
+            reader.GetNullableDouble(6),
+            reader.GetNullableDouble(7),
             reader.GetString(8),
             reader.GetString(9),
             reader.GetString(10),
-            reader.IsDBNull(11) ? null : reader.GetString(11),
+            reader.GetNullableString(11),
             reader.GetString(12),
             reader.GetString(13),
             reader.GetString(14),
-            reader.IsDBNull(15) ? null : reader.GetString(15),
-            DateTimeOffset.Parse(reader.GetString(16), System.Globalization.CultureInfo.InvariantCulture),
-            DateTimeOffset.Parse(reader.GetString(17), System.Globalization.CultureInfo.InvariantCulture));
+            reader.GetNullableString(15),
+            reader.GetDateTimeOffset(16),
+            reader.GetDateTimeOffset(17));
     }
 
     private static void ValidateRequest(TranscriptDerivativeSaveRequest request)
