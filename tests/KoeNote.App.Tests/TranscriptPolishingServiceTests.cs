@@ -51,6 +51,33 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public async Task PolishAsync_UsesSavedSpeakerAliasInRuntimeInputAndOutput()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "今日はテストです", "今日はテストです")
+        ]);
+        new TranscriptEditService(fixture.Paths).ApplySpeakerAlias("job-001", "Speaker_0", "佐藤");
+        TranscriptPolishingChunk? seenChunk = null;
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            new TranscriptDerivativeRepository(fixture.Paths),
+            new FakePolishingRuntime(chunk =>
+            {
+                seenChunk = chunk;
+                return $"[{FormatTestTimestamp(chunk.Segments[0].StartSeconds)} - {FormatTestTimestamp(chunk.Segments[^1].EndSeconds)}] {chunk.Segments[0].Speaker}: 読みやすい本文です。";
+            }));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.NotNull(seenChunk);
+        Assert.Equal("佐藤", seenChunk.Segments[0].Speaker);
+        Assert.Equal("Speaker_0", seenChunk.Segments[0].SpeakerId);
+        Assert.Contains("佐藤: 読みやすい本文です。", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Speaker_0:", result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PolishAsync_KeepsConsecutiveSpeakerBlocksTogetherWhenChunking()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();

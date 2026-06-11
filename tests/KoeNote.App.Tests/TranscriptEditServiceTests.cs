@@ -3,6 +3,7 @@ using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Transcript;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Tests;
@@ -36,6 +37,45 @@ public sealed class TranscriptEditServiceTests
 
         Assert.True(service.UndoLast());
         preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
+        Assert.Equal("Speaker_0", preview.Speaker);
+    }
+
+    [Fact]
+    public void ApplySpeakerAlias_IsRestoredAfterReplacingTranscriptSegments()
+    {
+        var paths = ArrangeSegment();
+        new TranscriptEditService(paths).ApplySpeakerAlias("job-001", "Speaker_0", "佐藤");
+
+        new TranscriptSegmentRepository(paths).ReplaceSegments("job-001", [
+            new TranscriptSegment("segment-002", "job-001", 2, 3, "Speaker_0", "new raw", "new normalized")
+        ]);
+
+        var preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
+        Assert.Equal("佐藤", preview.Speaker);
+        Assert.Equal("Speaker_0", preview.SpeakerId);
+        Assert.Equal("new normalized", preview.Text);
+
+        var readModel = Assert.Single(new TranscriptReadRepository(paths).ReadForJob("job-001"));
+        Assert.Equal("佐藤", readModel.Speaker);
+        Assert.Equal("Speaker_0", readModel.SpeakerId);
+    }
+
+    [Fact]
+    public void ReadPreviews_FallsBackToSpeakerIdWhenStoredAliasIsBlank()
+    {
+        var paths = ArrangeSegment();
+        using (var connection = Open(paths))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                INSERT INTO speaker_aliases (job_id, speaker_id, display_name, updated_at)
+                VALUES ('job-001', 'Speaker_0', '   ', $updated_at);
+                """;
+            command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            command.ExecuteNonQuery();
+        }
+
+        var preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
         Assert.Equal("Speaker_0", preview.Speaker);
     }
 
