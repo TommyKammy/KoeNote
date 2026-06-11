@@ -1,6 +1,7 @@
 <UserControl x:Class="KoeNote.App.Controls.ReviewPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:KoeNote.App.Controls"
              xmlns:models="clr-namespace:KoeNote.App.Models">
     <UserControl.Resources>
         <Style x:Key="VisibleWhenDraftStyle" TargetType="FrameworkElement">
@@ -8,14 +9,6 @@
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasReviewDraft}" Value="True">
                     <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="VisibleWhenNoDraftStyle" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Visible" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReviewDraft}" Value="True">
-                    <Setter Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -42,26 +35,6 @@
                     <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </Style.Triggers>
-        </Style>
-        <Style x:Key="VisibleWhenReviewOperationStyle" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsReviewOperationInProgress}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="ReviewApplyButton" TargetType="Button" BasedOn="{StaticResource OutlineSuccessButton}">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="ReviewSecondaryButton" TargetType="Button" BasedOn="{StaticResource OutlineNeutralButton}">
-            <Setter Property="Height" Value="38" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style x:Key="ReviewSubheading" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
@@ -291,30 +264,7 @@
                         <ScrollViewer Grid.Row="0"
                                       VerticalScrollBarVisibility="Auto">
                             <Grid>
-                                <Border Grid.Row="0"
-                                        Style="{StaticResource VisibleWhenNoDraftStyle}"
-                                        Background="#FAFBFC"
-                                        BorderBrush="{StaticResource BorderBrushSoft}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Padding="16">
-                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="&#x2728;"
-                                                   FontFamily="Segoe UI Emoji"
-                                                   FontSize="34"
-                                                   Foreground="#F59E0B"
-                                                   HorizontalAlignment="Center"
-                                                   Margin="0,0,0,10" />
-                                        <TextBlock Text="整文候補はありません"
-                                                   FontWeight="SemiBold"
-                                                   TextAlignment="Center"
-                                                   Margin="0,0,0,6" />
-                                        <TextBlock Text="「整文」タブで結果を確認し、&#x0A;承認すると候補がここに表示されます"
-                                                   Style="{StaticResource MutedText}"
-                                                   TextWrapping="Wrap"
-                                                   TextAlignment="Center" />
-                                    </StackPanel>
-                                </Border>
+                                <controls:ReviewDraftEmptyState Grid.Row="0" />
 
                                 <StackPanel Grid.Row="0"
                                             Style="{StaticResource VisibleWhenDraftStyle}">
@@ -445,80 +395,7 @@
                             </Grid>
                         </ScrollViewer>
 
-                        <Border Grid.Row="1"
-                                Margin="0,10,0,0"
-                                Padding="14"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="0,1,0,0"
-                                Background="#FFFFFF"
-                                Style="{StaticResource VisibleWhenDraftStyle}">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="この候補への操作"
-                                               Style="{StaticResource ReviewSubheading}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="保存中..."
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Style="{StaticResource VisibleWhenReviewOperationStyle}" />
-                                </Grid>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <Button Style="{StaticResource ReviewApplyButton}"
-                                            Command="{Binding AcceptDraftCommand}"
-                                            ToolTip="レビュー候補を反映して、次の候補へ進みます">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="#FFFFFF" />
-                                            <TextBlock Text="適用"
-                                                       Foreground="#FFFFFF"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <Button Grid.Column="2"
-                                            Style="{StaticResource ReviewSecondaryButton}"
-                                            Command="{Binding RejectDraftCommand}"
-                                            ToolTip="この候補を反映せず、次の候補へ進みます">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Text="&#xE711;" Style="{StaticResource IconText}" Foreground="{StaticResource DangerBrush}" />
-                                            <TextBlock Text="却下"
-                                                       Foreground="{StaticResource DangerBrush}"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <Button Grid.Column="4"
-                                            Style="{StaticResource ReviewSecondaryButton}"
-                                            Command="{Binding ApplyManualEditCommand}"
-                                            ToolTip="編集欄の内容を手修正として適用します">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Text="&#xE70F;" Style="{StaticResource IconText}" Foreground="{StaticResource TextBrush}" />
-                                            <TextBlock Text="手修正"
-                                                       Foreground="{StaticResource TextBrush}"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                        <controls:ReviewDraftActionBar Grid.Row="1" />
                     </Grid>
                 </Grid>
             </Grid>
