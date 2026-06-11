@@ -139,6 +139,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!ConfirmSpeakerNamesBeforeReadablePolishing(job))
+        {
+            return;
+        }
+
         using var cancellation = new CancellationTokenSource();
         _runCancellation = cancellation;
         IsPostProcessInProgress = true;

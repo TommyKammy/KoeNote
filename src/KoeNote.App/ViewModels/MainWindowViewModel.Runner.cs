@@ -1,6 +1,8 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
 
@@ -52,7 +54,14 @@ public sealed partial class MainWindowViewModel
             if (runSucceeded && enableReviewForRun && !cancellation.IsCancellationRequested)
             {
                 readablePolishingAttempted = true;
-                readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
+                if (ConfirmSpeakerNamesBeforeReadablePolishing(job))
+                {
+                    readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
+                }
+                else
+                {
+                    LoadReadablePolishedForSelectedJob();
+                }
             }
 
             LoadSummaryForSelectedJob();
@@ -162,6 +171,66 @@ public sealed partial class MainWindowViewModel
             LatestLog = "ASR native runtime crashed. Check the ASR worker log in the diagnostic package, then retry with a lighter ASR model or reinstall the ASR GPU runtime.";
         }
     }
+
+    private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job)
+    {
+        var speakerSummaries = new TranscriptReadRepository(Paths).ReadForJob(job.JobId)
+            .Where(static segment => !string.IsNullOrWhiteSpace(segment.SpeakerId))
+            .GroupBy(static segment => segment.SpeakerId!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(static group =>
+            {
+                var displayName = group
+                    .Select(static segment => segment.Speaker)
+                    .FirstOrDefault(static speaker => !string.IsNullOrWhiteSpace(speaker)) ?? group.Key;
+                return new SpeakerConfirmationSummary(group.Key, displayName.Trim(), group.Count());
+            })
+            .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (speakerSummaries.Count == 0)
+        {
+            return true;
+        }
+
+        var displayedSpeakers = string.Join(
+            Environment.NewLine,
+            speakerSummaries
+                .Take(8)
+                .Select(static summary => FormatSpeakerConfirmationLine(summary)));
+        if (speakerSummaries.Count > 8)
+        {
+            displayedSpeakers += $"{Environment.NewLine}- 他 {speakerSummaries.Count - 8} 件";
+        }
+
+        var request = new ConfirmationDialogRequest(
+            "話者名を確認",
+            "整文を開始する前に話者名を確認しますか？",
+            $"検出された話者:{Environment.NewLine}{displayedSpeakers}{Environment.NewLine}{Environment.NewLine}Speaker_0 などが残っている場合は、実名や役割名に直してから整文すると出力に反映しやすくなります。今は未設定のまま整文を開始することもできます。",
+            "確認して整文開始",
+            "あとで設定",
+            "\uE77B",
+            "#ECFDF5",
+            "#15803D",
+            "#16A34A",
+            "#16A34A",
+            "#FFFFFF");
+
+        if (ConfirmDialog(request))
+        {
+            return true;
+        }
+
+        LatestLog = "話者名確認のため、整文を開始しませんでした。";
+        return false;
+    }
+
+    private static string FormatSpeakerConfirmationLine(SpeakerConfirmationSummary summary)
+    {
+        return string.Equals(summary.DisplayName, summary.SpeakerId, StringComparison.OrdinalIgnoreCase)
+            ? $"- {summary.SpeakerId} ({summary.SegmentCount}件)"
+            : $"- {summary.DisplayName} ({summary.SpeakerId}, {summary.SegmentCount}件)";
+    }
+
+    private sealed record SpeakerConfirmationSummary(string SpeakerId, string DisplayName, int SegmentCount);
 
     private StageStatus GetStageStatus(JobRunStage stage)
     {
