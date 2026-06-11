@@ -47,4 +47,13 @@ public sealed class AsrSettingsRepositoryTests
         Assert.Empty(restored.Hotwords);
     }
 
+    [Fact]
+    public void AsrExecutionProfile_ToStringReturnsDisplayNameForComboBoxFallbackRendering()
+    {
+        var profile = AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto);
+
+        Assert.Equal(profile.DisplayName, profile.ToString());
+        Assert.DoesNotContain(nameof(AsrExecutionProfile.ProfileId), profile.ToString(), StringComparison.Ordinal);
+    }
+
 }

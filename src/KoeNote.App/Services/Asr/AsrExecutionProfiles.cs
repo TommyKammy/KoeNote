@@ -6,7 +6,10 @@ public sealed record AsrExecutionProfile(
     string Device,
     string ComputeType,
     bool IsGpu,
-    string Detail);
+    string Detail)
+{
+    public override string ToString() => DisplayName;
+}
 
 public static class AsrExecutionProfiles
 {
