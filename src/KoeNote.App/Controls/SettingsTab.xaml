@@ -68,28 +68,6 @@
                                    TextWrapping="Wrap"
                                    FontSize="12"
                                    Margin="0,0,0,8" />
-
-                        <TextBlock Text="現在のタスク設定" Style="{StaticResource SettingsFieldLabel}" Margin="0,6,0,4" />
-                        <Border Background="#F8FAFC"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="10"
-                                Margin="0,0,0,4">
-                            <StackPanel>
-                                <TextBlock Text="{Binding LlmReviewTaskSummary}"
-                                           TextWrapping="Wrap"
-                                           FontSize="12"
-                                           Margin="0,0,0,6" />
-                                <TextBlock Text="{Binding LlmSummaryTaskSummary}"
-                                           TextWrapping="Wrap"
-                                           FontSize="12"
-                                           Margin="0,0,0,6" />
-                                <TextBlock Text="{Binding LlmPolishingTaskSummary}"
-                                           TextWrapping="Wrap"
-                                           FontSize="12" />
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
                 </Border>
 

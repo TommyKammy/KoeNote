@@ -55,15 +55,15 @@ public sealed class TabHighlightStyleTests
     }
 
     [Fact]
-    public void SettingsTab_ShowsTaskSettingsAsReadOnlyDetails()
+    public void SettingsTab_HidesInternalTaskSettingsDetails()
     {
         var repoRoot = FindRepoRoot();
         var settingsXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "SettingsTab.xaml"));
 
-        Assert.Contains("Text=\"現在のタスク設定\"", settingsXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding LlmReviewTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding LlmSummaryTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding LlmPolishingTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"現在のタスク設定\"", settingsXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding LlmReviewTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding LlmSummaryTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding LlmPolishingTaskSummary}\"", settingsXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Header=\"Task settings\"", settingsXaml, StringComparison.Ordinal);
     }
 
