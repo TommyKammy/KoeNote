@@ -86,6 +86,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly LlmSettingsDisplayService _llmSettingsDisplayService;
     private readonly ReadablePolishingPromptSettingsRepository _readablePolishingPromptSettingsRepository;
     private readonly MainContentZoomState _mainContentZoomState;
+    private readonly ModelCatalogPresenter _modelCatalogPresenter = new();
+    private readonly ModelDownloadProgressPresenter _modelDownloadProgressPresenter = new();
     private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
@@ -155,9 +157,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private double _modelDownloadProgressPercent;
     private bool _isModelDownloadInProgress;
     private bool _isModelDownloadProgressIndeterminate;
-    private DateTimeOffset _lastModelCatalogProgressRefreshAt = DateTimeOffset.MinValue;
-    private string? _lastModelCatalogProgressRefreshModelId;
-    private int _lastModelCatalogProgressRefreshPercent = -1;
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private DiagnosticLogScopeOption? _selectedDiagnosticLogScope;
