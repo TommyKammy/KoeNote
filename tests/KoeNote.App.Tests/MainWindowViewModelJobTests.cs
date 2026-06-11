@@ -7,6 +7,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Llm;
@@ -868,6 +869,31 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Contains("読める本文です。", fixture.ViewModel.ReadablePolishedContent, StringComparison.Ordinal);
         Assert.Equal(0, fixture.ViewModel.SelectedTranscriptTabIndex);
         Assert.Equal("整文が完了しました。", fixture.ViewModel.LatestLog);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_ConfirmsSpeakerNamesBeforeReadablePolishing()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        ConfirmationDialogRequest? request = null;
+        fixture.ViewModel.ConfirmDialog = dialogRequest =>
+        {
+            request = dialogRequest;
+            return false;
+        };
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.NotNull(request);
+        Assert.Equal("話者名を確認", request.Title);
+        Assert.Equal("確認して整文開始", request.ConfirmText);
+        Assert.Equal("あとで設定", request.CancelText);
+        Assert.Contains("Speaker_0", request.Message, StringComparison.Ordinal);
+        Assert.False(fixture.ViewModel.HasReadablePolishedContent);
     }
 
     [Fact]

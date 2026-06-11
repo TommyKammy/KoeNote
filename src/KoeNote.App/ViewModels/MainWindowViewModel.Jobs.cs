@@ -12,6 +12,8 @@ public sealed partial class MainWindowViewModel
 {
     public Func<string, string, bool> ConfirmAction { get; set; } = ShowConfirmation;
 
+    public Func<ConfirmationDialogRequest, bool> ConfirmDialog { get; set; } = ShowConfirmation;
+
     private Task AddAudioAsync()
     {
         var dialog = new OpenFileDialog
@@ -587,5 +589,12 @@ public sealed partial class MainWindowViewModel
         return ConfirmationDialogService.Default.Confirm(
             Application.Current?.MainWindow,
             ConfirmationDialogRequest.Warning(title, message));
+    }
+
+    private static bool ShowConfirmation(ConfirmationDialogRequest request)
+    {
+        return ConfirmationDialogService.Default.Confirm(
+            Application.Current?.MainWindow,
+            request);
     }
 }

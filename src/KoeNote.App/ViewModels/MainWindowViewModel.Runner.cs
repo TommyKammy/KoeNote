@@ -1,5 +1,6 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.ViewModels;
@@ -52,7 +53,8 @@ public sealed partial class MainWindowViewModel
             if (runSucceeded && enableReviewForRun && !cancellation.IsCancellationRequested)
             {
                 readablePolishingAttempted = true;
-                readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
+                readablePolishingSucceeded = ConfirmSpeakerNamesBeforeReadablePolishing(job) &&
+                    await RunReadablePolishingForJobAsync(job, cancellation.Token);
             }
 
             LoadSummaryForSelectedJob();
@@ -163,6 +165,51 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job)
+    {
+        var speakerSummaries = _transcriptSegmentRepository.ReadSegments(job.JobId)
+            .Where(static segment => !string.IsNullOrWhiteSpace(segment.SpeakerId))
+            .GroupBy(static segment => segment.SpeakerId!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(static group => new SpeakerConfirmationSummary(group.Key, group.Count()))
+            .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (speakerSummaries.Count == 0)
+        {
+            return true;
+        }
+
+        var displayedSpeakers = string.Join(
+            Environment.NewLine,
+            speakerSummaries
+                .Take(8)
+                .Select(static summary => $"- {summary.SpeakerId} ({summary.SegmentCount}件)"));
+        if (speakerSummaries.Count > 8)
+        {
+            displayedSpeakers += $"{Environment.NewLine}- 他 {speakerSummaries.Count - 8} 件";
+        }
+
+        var request = new ConfirmationDialogRequest(
+            "話者名を確認",
+            "整文を開始する前に話者名を確認しますか？",
+            $"検出された話者ラベル:{Environment.NewLine}{displayedSpeakers}{Environment.NewLine}{Environment.NewLine}Speaker_0 などを実名や役割名に直してから整文すると、出力に反映しやすくなります。今は未設定のまま整文を開始することもできます。",
+            "確認して整文開始",
+            "あとで設定",
+            "\uE77B",
+            "#ECFDF5",
+            "#15803D",
+            "#16A34A",
+            "#16A34A",
+            "#FFFFFF");
+
+        if (ConfirmDialog(request))
+        {
+            return true;
+        }
+
+        LatestLog = "話者名確認のため、整文を開始しませんでした。";
+        return false;
+    }
+
     private StageStatus GetStageStatus(JobRunStage stage)
     {
         return stage switch
@@ -201,6 +248,8 @@ public sealed partial class MainWindowViewModel
 
         return duration.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
     }
+
+    private sealed record SpeakerConfirmationSummary(string SpeakerId, int SegmentCount);
 
     private void StartPolishedTranscriptTabHighlight()
     {

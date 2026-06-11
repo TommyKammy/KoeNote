@@ -7,6 +7,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
+using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Llm;
@@ -624,6 +625,33 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
 
         Assert.Contains("edited source text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunReadablePolishingAsync_ConfirmsSpeakerNamesBeforeStarting()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        Assert.NotNull(fixture.ViewModel.SelectedJob);
+        var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+        ]);
+        ConfirmationDialogRequest? request = null;
+        fixture.ViewModel.ConfirmDialog = dialogRequest =>
+        {
+            request = dialogRequest;
+            return false;
+        };
+
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.NotNull(request);
+        Assert.Equal("話者名を確認", request.Title);
+        Assert.Equal("あとで設定", request.CancelText);
+        Assert.Contains("Speaker_0", request.Message, StringComparison.Ordinal);
     }
 
     [Fact]
