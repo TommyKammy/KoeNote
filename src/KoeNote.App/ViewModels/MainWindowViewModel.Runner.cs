@@ -2,6 +2,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
 
@@ -53,8 +54,14 @@ public sealed partial class MainWindowViewModel
             if (runSucceeded && enableReviewForRun && !cancellation.IsCancellationRequested)
             {
                 readablePolishingAttempted = true;
-                readablePolishingSucceeded = ConfirmSpeakerNamesBeforeReadablePolishing(job) &&
-                    await RunReadablePolishingForJobAsync(job, cancellation.Token);
+                if (ConfirmSpeakerNamesBeforeReadablePolishing(job))
+                {
+                    readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
+                }
+                else
+                {
+                    LoadReadablePolishedForSelectedJob();
+                }
             }
 
             LoadSummaryForSelectedJob();
@@ -167,10 +174,16 @@ public sealed partial class MainWindowViewModel
 
     private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job)
     {
-        var speakerSummaries = _transcriptSegmentRepository.ReadSegments(job.JobId)
+        var speakerSummaries = new TranscriptReadRepository(Paths).ReadForJob(job.JobId)
             .Where(static segment => !string.IsNullOrWhiteSpace(segment.SpeakerId))
             .GroupBy(static segment => segment.SpeakerId!.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(static group => new SpeakerConfirmationSummary(group.Key, group.Count()))
+            .Select(static group =>
+            {
+                var displayName = group
+                    .Select(static segment => segment.Speaker)
+                    .FirstOrDefault(static speaker => !string.IsNullOrWhiteSpace(speaker)) ?? group.Key;
+                return new SpeakerConfirmationSummary(group.Key, displayName.Trim(), group.Count());
+            })
             .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (speakerSummaries.Count == 0)
@@ -182,7 +195,7 @@ public sealed partial class MainWindowViewModel
             Environment.NewLine,
             speakerSummaries
                 .Take(8)
-                .Select(static summary => $"- {summary.SpeakerId} ({summary.SegmentCount}件)"));
+                .Select(static summary => FormatSpeakerConfirmationLine(summary)));
         if (speakerSummaries.Count > 8)
         {
             displayedSpeakers += $"{Environment.NewLine}- 他 {speakerSummaries.Count - 8} 件";
@@ -191,7 +204,7 @@ public sealed partial class MainWindowViewModel
         var request = new ConfirmationDialogRequest(
             "話者名を確認",
             "整文を開始する前に話者名を確認しますか？",
-            $"検出された話者ラベル:{Environment.NewLine}{displayedSpeakers}{Environment.NewLine}{Environment.NewLine}Speaker_0 などを実名や役割名に直してから整文すると、出力に反映しやすくなります。今は未設定のまま整文を開始することもできます。",
+            $"検出された話者:{Environment.NewLine}{displayedSpeakers}{Environment.NewLine}{Environment.NewLine}Speaker_0 などが残っている場合は、実名や役割名に直してから整文すると出力に反映しやすくなります。今は未設定のまま整文を開始することもできます。",
             "確認して整文開始",
             "あとで設定",
             "\uE77B",
@@ -209,6 +222,15 @@ public sealed partial class MainWindowViewModel
         LatestLog = "話者名確認のため、整文を開始しませんでした。";
         return false;
     }
+
+    private static string FormatSpeakerConfirmationLine(SpeakerConfirmationSummary summary)
+    {
+        return string.Equals(summary.DisplayName, summary.SpeakerId, StringComparison.OrdinalIgnoreCase)
+            ? $"- {summary.SpeakerId} ({summary.SegmentCount}件)"
+            : $"- {summary.DisplayName} ({summary.SpeakerId}, {summary.SegmentCount}件)";
+    }
+
+    private sealed record SpeakerConfirmationSummary(string SpeakerId, string DisplayName, int SegmentCount);
 
     private StageStatus GetStageStatus(JobRunStage stage)
     {
@@ -248,8 +270,6 @@ public sealed partial class MainWindowViewModel
 
         return duration.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
     }
-
-    private sealed record SpeakerConfirmationSummary(string SpeakerId, int SegmentCount);
 
     private void StartPolishedTranscriptTabHighlight()
     {

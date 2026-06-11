@@ -877,6 +877,8 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         var fixture = CreateRunReadyViewModel(
             enableReviewStage: true,
             new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(job.JobId, "Speaker_0", "佐藤");
         ConfirmationDialogRequest? request = null;
         fixture.ViewModel.ConfirmDialog = dialogRequest =>
         {
@@ -892,8 +894,46 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal("話者名を確認", request.Title);
         Assert.Equal("確認して整文開始", request.ConfirmText);
         Assert.Equal("あとで設定", request.CancelText);
+        Assert.Contains("佐藤", request.Message, StringComparison.Ordinal);
         Assert.Contains("Speaker_0", request.Message, StringComparison.Ordinal);
         Assert.False(fixture.ViewModel.HasReadablePolishedContent);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_ReloadsStaleReadablePolishedContentWhenSpeakerConfirmationIsCanceled()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        var paths = fixture.ViewModel.Paths;
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "old raw text")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: existing polished",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        fixture.ViewModel.SelectedJob = null;
+        fixture.ViewModel.SelectedJob = fixture.ViewModel.Jobs.Single(item => item.JobId == job.JobId);
+        fixture.ViewModel.ConfirmDialog = _ => false;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.True(fixture.ViewModel.HasReadablePolishedContent);
+        Assert.Contains("existing polished", fixture.ViewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        Assert.Contains("古い整文", fixture.ViewModel.ReadablePolishedStatus, StringComparison.Ordinal);
     }
 
     [Fact]
