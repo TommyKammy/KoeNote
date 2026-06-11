@@ -12,7 +12,7 @@ public sealed partial class MainWindowViewModel
 
     private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
     {
-        ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Update(displayName, progress));
+        ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Update(displayName, progress, IsModelDownloadInProgress));
     }
 
     private void RefreshModelCatalogForDownloadProgress(ModelDownloadProgress progress)

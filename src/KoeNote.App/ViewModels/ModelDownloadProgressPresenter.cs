@@ -24,7 +24,7 @@ internal sealed class ModelDownloadProgressPresenter
             LatestLog: null);
     }
 
-    public ModelDownloadProgressViewState Update(string displayName, ModelDownloadProgress progress)
+    public ModelDownloadProgressViewState Update(string displayName, ModelDownloadProgress progress, bool isDownloadInProgress)
     {
         var totalBytes = GetUsableDownloadTotal(progress);
         var stageText = totalBytes.HasValue ? string.Empty : "ダウンロード中";
@@ -35,8 +35,8 @@ internal sealed class ModelDownloadProgressPresenter
             Summary: summary,
             StageText: stageText,
             Percent: percent,
-            IsInProgress: true,
-            IsIndeterminate: !totalBytes.HasValue,
+            IsInProgress: null,
+            IsIndeterminate: !totalBytes.HasValue && isDownloadInProgress,
             Notification: null,
             IsNotificationError: null,
             LatestLog: summary);
