@@ -70,6 +70,61 @@ public sealed class MainWindowViewModelCoreTests : MainWindowViewModelTestBase
         Assert.All(viewModel.StageStatuses, stage => Assert.Equal("未開始", stage.Status));
     }
 
+    [Theory]
+    [InlineData(JobRunStageState.Skipped)]
+    [InlineData(JobRunStageState.Failed)]
+    [InlineData(JobRunStageState.Cancelled)]
+    public void ReviewNonSucceededRunUpdate_KeepsCurrentTranscriptTabAndHighlightState(JobRunStageState state)
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SelectedTranscriptTabIndex = 2;
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "ApplyRunUpdate",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        method?.Invoke(viewModel, [
+            new JobRunUpdate(
+                JobRunStage.Review,
+                state,
+                100)
+        ]);
+
+        Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
+        Assert.False(viewModel.IsPolishedTranscriptTabHighlighted);
+        Assert.Equal(string.Empty, viewModel.PolishedTranscriptTabHighlightTag);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 3)]
+    [InlineData(4, 3)]
+    public void SelectedTranscriptTabIndex_ClampsToAvailableTabs(int value, int expected)
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedTranscriptTabIndex = value;
+
+        Assert.Equal(expected, viewModel.SelectedTranscriptTabIndex);
+    }
+
+    [Theory]
+    [InlineData("GPU Unknown", true)]
+    [InlineData("GPU 未検出", true)]
+    [InlineData("GPU 12% / 4096 MB", false)]
+    public void IsGpuUsageUnknown_ReflectsStatusBarGpuSummary(string summary, bool expected)
+    {
+        var viewModel = CreateViewModel();
+        SetPrivateField(
+            viewModel,
+            "_statusBarInfo",
+            new StatusBarInfo("空き容量 100 GB", "MEM 100 MB", "CPU 0%", summary));
+
+        Assert.Equal(expected, viewModel.IsGpuUsageUnknown);
+    }
+
     [Fact]
     public void DetailPanelCommands_OpenAndCloseWidePanel()
     {

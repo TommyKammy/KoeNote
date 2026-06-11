@@ -214,6 +214,30 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         Assert.True(viewModel.RunReadablePolishingCommand.CanExecute(null));
     }
 
+    [Theory]
+    [InlineData(nameof(MainWindowViewModel.RunPostReviewCommand), PostProcessMode.ReviewOnly)]
+    [InlineData(nameof(MainWindowViewModel.RunPostSummaryCommand), PostProcessMode.SummaryOnly)]
+    [InlineData(nameof(MainWindowViewModel.RunPostReviewAndSummaryCommand), PostProcessMode.ReviewAndSummary)]
+    public void PostProcessCommands_RecordRequestedMode(string commandName, PostProcessMode expectedMode)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var command = (ICommand)typeof(MainWindowViewModel).GetProperty(commandName)!.GetValue(viewModel)!;
+
+        Assert.True(command.CanExecute(null));
+
+        command.Execute(null);
+
+        Assert.Equal(expectedMode, viewModel.LastRequestedPostProcessMode);
+    }
+
     [Fact]
     public void ReadablePolishingState_ShowsRunningActionAndDisablesReadableExports()
     {
