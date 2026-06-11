@@ -18,7 +18,7 @@ public sealed class TranscriptReadRepository(AppPaths paths)
                 s.segment_id,
                 s.start_seconds,
                 s.end_seconds,
-                COALESCE(a.display_name, s.speaker_name, s.speaker_id, ''),
+                COALESCE(NULLIF(TRIM(a.display_name), ''), NULLIF(TRIM(s.speaker_name), ''), NULLIF(TRIM(s.speaker_id), ''), ''),
                 COALESCE(s.final_text, s.normalized_text, s.raw_text),
                 s.review_state,
                 COALESCE(s.speaker_id, ''),
