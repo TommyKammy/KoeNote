@@ -613,10 +613,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         Assert.NotNull(fixture.ViewModel.SelectedJob);
         var jobId = fixture.ViewModel.SelectedJob.JobId;
         new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
-            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "はい"),
-            new TranscriptSegment("segment-002", jobId, 12, 16.5, "Speaker_0", "meeting agenda and project context"),
-            new TranscriptSegment("segment-003", jobId, 24, 27, "Speaker_0", "raw text"),
-            new TranscriptSegment("segment-004", jobId, 30, 31, "Speaker_0", "raw text")
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
         ]);
         InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
         var segment = Assert.Single(fixture.ViewModel.Segments);
@@ -639,7 +636,10 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         Assert.NotNull(fixture.ViewModel.SelectedJob);
         var jobId = fixture.ViewModel.SelectedJob.JobId;
         new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
-            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "short"),
+            new TranscriptSegment("segment-002", jobId, 12, 16.5, "Speaker_0", "meeting agenda and project context"),
+            new TranscriptSegment("segment-003", jobId, 24, 27, "Speaker_0", "raw text"),
+            new TranscriptSegment("segment-004", jobId, 30, 31, "Speaker_0", "raw text")
         ]);
         SpeakerNameConfirmationRequest? request = null;
         fixture.ViewModel.ConfirmSpeakerNamesDialog = dialogRequest =>
