@@ -108,6 +108,7 @@ internal sealed class SpeakerNameConfirmationDialogViewModel : INotifyPropertyCh
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
 }
 
 internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
@@ -123,9 +124,12 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
             ? item.SpeakerId
             : $"{item.EffectiveDisplayName} / {item.SpeakerId}";
         SegmentCountText = $"{item.SegmentCount}件の発話";
-        PreviewText = item.PreviewTexts.Count == 0
+        AssistanceText = string.Equals(item.EffectiveDisplayName, item.SpeakerId, StringComparison.OrdinalIgnoreCase)
+            ? $"Speaker ID: {item.SpeakerId}"
+            : item.EffectiveDisplayName;
+        PreviewText = item.PreviewSamples.Count == 0
             ? "代表発話はありません。"
-            : string.Join(Environment.NewLine, item.PreviewTexts.Take(3));
+            : string.Join(Environment.NewLine, item.PreviewSamples.Take(3).Select(FormatPreviewLine));
         RefreshValidation();
     }
 
@@ -136,6 +140,10 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
     public string OriginalLabel { get; }
 
     public string SegmentCountText { get; }
+
+    public string AssistanceText { get; }
+
+    public bool HasAssistanceText => !string.IsNullOrWhiteSpace(AssistanceText);
 
     public string PreviewText { get; }
 
@@ -185,5 +193,29 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static string FormatPreviewLine(SpeakerNameConfirmationPreview preview)
+    {
+        var text = preview.Text.Trim();
+        if (text.Length > 120)
+        {
+            text = string.Concat(text.AsSpan(0, 120), "...");
+        }
+
+        return $"[{FormatTimestamp(preview.StartSeconds)} - {FormatTimestamp(preview.EndSeconds)}] {text}";
+    }
+
+    private static string FormatTimestamp(double seconds)
+    {
+        if (seconds < 0 || double.IsNaN(seconds) || double.IsInfinity(seconds))
+        {
+            seconds = 0;
+        }
+
+        var time = TimeSpan.FromSeconds(seconds);
+        return time.TotalHours >= 1
+            ? time.ToString(@"h\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)
+            : time.ToString(@"mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
     }
 }

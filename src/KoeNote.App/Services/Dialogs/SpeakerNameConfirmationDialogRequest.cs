@@ -8,12 +8,19 @@ public sealed record SpeakerNameConfirmationItem(
     string SpeakerId,
     string DisplayName,
     int SegmentCount,
-    IReadOnlyList<string> PreviewTexts)
+    IReadOnlyList<SpeakerNameConfirmationPreview> PreviewSamples)
 {
     public string EffectiveDisplayName => string.IsNullOrWhiteSpace(DisplayName)
         ? SpeakerId
         : DisplayName.Trim();
+
+    public IReadOnlyList<string> PreviewTexts => PreviewSamples.Select(static sample => sample.Text).ToList();
 }
+
+public sealed record SpeakerNameConfirmationPreview(
+    double StartSeconds,
+    double EndSeconds,
+    string Text);
 
 public sealed record SpeakerNameConfirmationResult(IReadOnlyDictionary<string, string> DisplayNames)
 {
