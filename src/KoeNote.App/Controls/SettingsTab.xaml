@@ -55,6 +55,18 @@
                                   IsChecked="{Binding EnableReviewStage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Margin="0,0,0,10" />
 
+                        <TextBlock Text="整文前の話者名確認" Style="{StaticResource SettingsFieldLabel}" />
+                        <ComboBox ItemsSource="{Binding SpeakerNameConfirmationModeOptions}"
+                                  SelectedItem="{Binding SelectedSpeakerNameConfirmationMode, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayName"
+                                  MinHeight="32"
+                                  Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding SpeakerNameConfirmationModeDescription}"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,8" />
+
                         <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
                                   SelectedItem="{Binding SelectedSettingsReviewModel, Mode=TwoWay}"

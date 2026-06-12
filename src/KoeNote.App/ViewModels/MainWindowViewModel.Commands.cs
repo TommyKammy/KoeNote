@@ -18,7 +18,10 @@ public sealed partial class MainWindowViewModel
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
         RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
-        RunReadablePolishingCommand = new RelayCommand(RunReadablePolishingAsync, () => CanRunReadablePolishing);
+        RunReadablePolishingCommand = new RelayCommand(() => RunReadablePolishingAsync(), () => CanRunReadablePolishing);
+        ConfirmSpeakerNamesAndRunReadablePolishingCommand = new RelayCommand(
+            () => RunReadablePolishingAsync(forceSpeakerConfirmation: true),
+            () => CanRunReadablePolishing);
         CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
         ShowReadableTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReadableTranscriptTabIndex));
         ShowRawTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(RawTranscriptTabIndex));

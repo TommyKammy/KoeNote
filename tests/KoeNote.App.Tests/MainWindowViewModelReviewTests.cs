@@ -692,6 +692,63 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task RunReadablePolishingAsync_SkipsSpeakerConfirmationWhenOnlyAssignedSpeakersAndSettingAllows()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] 田中: readable text"));
+        Assert.NotNull(fixture.ViewModel.SelectedJob);
+        var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(jobId, "Speaker_0", "田中");
+        InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
+        fixture.ViewModel.SelectedSpeakerNameConfirmationMode =
+            fixture.ViewModel.SpeakerNameConfirmationModeOptions.Single(static option =>
+                option.Mode == SpeakerNameConfirmationModes.UnassignedOnly);
+        var confirmationCalled = false;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = _ =>
+        {
+            confirmationCalled = true;
+            return null;
+        };
+
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+
+        Assert.False(confirmationCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains("田中", fixture.PolishingRuntime.SeenSpeakerNames, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunReadablePolishingAsync_ForcesSpeakerConfirmationWhenRequested()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] 田中: readable text"));
+        Assert.NotNull(fixture.ViewModel.SelectedJob);
+        var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(jobId, "Speaker_0", "田中");
+        InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
+        fixture.ViewModel.SelectedSpeakerNameConfirmationMode =
+            fixture.ViewModel.SpeakerNameConfirmationModeOptions.Single(static option =>
+                option.Mode == SpeakerNameConfirmationModes.UnassignedOnly);
+        var confirmationCalled = false;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = request =>
+        {
+            confirmationCalled = true;
+            return new SpeakerNameConfirmationResult(
+                request.Speakers.ToDictionary(
+                    static speaker => speaker.SpeakerId,
+                    static speaker => speaker.DisplayName,
+                    StringComparer.OrdinalIgnoreCase));
+        };
+
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync", true);
+
+        Assert.True(confirmationCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+    }
+
+    [Fact]
     public void RunSelectedJobCommand_RequiresReviewAssetsWhenReviewStageIsEnabled()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
