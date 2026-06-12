@@ -386,8 +386,13 @@
                                         Padding="12,8"
                                         Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding SetupNextActionText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
-                                        <TextBlock Text="&#xE72A;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" Margin="6,0,0,0" />
+                                        <TextBlock Text="{Binding SetupNextActionText}"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="&#xE72A;"
+                                                   Style="{StaticResource IconText}"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                   Margin="6,0,0,0" />
                                     </StackPanel>
                                 </Button>
                                 <Button Command="{Binding SetupCancelInstallCommand}"
@@ -406,8 +411,12 @@
                                         Padding="13,8"
                                         Margin="8,0,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE73E;" Style="{StaticResource IconText}" Foreground="{StaticResource AccentBrush}" />
-                                        <TextBlock Text="{Binding SetupCompleteActionText}" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                                        <TextBlock Text="&#xE73E;"
+                                                   Style="{StaticResource IconText}"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        <TextBlock Text="{Binding SetupCompleteActionText}"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                   FontWeight="SemiBold" />
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
