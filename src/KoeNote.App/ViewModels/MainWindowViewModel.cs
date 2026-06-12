@@ -246,6 +246,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _llmSettingsSeedService = services.LlmSettingsSeedService;
         _llmSettingsDisplayService = services.LlmSettingsDisplayService;
         _readablePolishingPromptSettingsRepository = services.ReadablePolishingPromptSettingsRepository;
+        _speakerNameConfirmationSettingsRepository = services.SpeakerNameConfirmationSettingsRepository;
         _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
         _mainContentZoomState = new MainContentZoomState(paths);
         var currentApplication = System.Windows.Application.Current;
@@ -311,6 +312,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         InitializeCommands();
 
         InitializeReadablePolishingPromptSettings();
+        InitializeSpeakerNameConfirmationSettings();
         MarkInterruptedModelDownloads();
         RegisterDiscoveredManagedModels();
         RefreshModelCatalog();
@@ -661,6 +663,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RunPostSummaryCommand { get; private set; } = null!;
 
     public ICommand RunReadablePolishingCommand { get; private set; } = null!;
+
+    public ICommand ConfirmSpeakerNamesAndRunReadablePolishingCommand { get; private set; } = null!;
 
     public ICommand CopyReadablePolishedContentCommand { get; private set; } = null!;
 

@@ -107,7 +107,7 @@ public sealed partial class MainWindowViewModel
         return _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished) is not null;
     }
 
-    private async Task RunReadablePolishingAsync()
+    private async Task RunReadablePolishingAsync(bool forceSpeakerConfirmation = false)
     {
         if (SelectedJob is null || IsRunInProgress || IsPostProcessInProgress)
         {
@@ -139,7 +139,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!ConfirmSpeakerNamesBeforeReadablePolishing(job))
+        if (!ConfirmSpeakerNamesBeforeReadablePolishing(job, forceSpeakerConfirmation))
         {
             return;
         }
@@ -237,6 +237,11 @@ public sealed partial class MainWindowViewModel
         if (RunReadablePolishingCommand is RelayCommand polishingCommand)
         {
             polishingCommand.RaiseCanExecuteChanged();
+        }
+
+        if (ConfirmSpeakerNamesAndRunReadablePolishingCommand is RelayCommand confirmSpeakersAndPolishCommand)
+        {
+            confirmSpeakersAndPolishCommand.RaiseCanExecuteChanged();
         }
 
         if (RunPostReviewAndSummaryCommand is RelayCommand bothCommand)

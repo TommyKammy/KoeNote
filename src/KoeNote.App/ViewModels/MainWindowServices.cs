@@ -51,7 +51,8 @@ public sealed record MainWindowServices(
     DomainPresetImportService DomainPresetImportService,
     LlmSettingsSeedService LlmSettingsSeedService,
     LlmSettingsDisplayService LlmSettingsDisplayService,
-    ReadablePolishingPromptSettingsRepository ReadablePolishingPromptSettingsRepository)
+    ReadablePolishingPromptSettingsRepository ReadablePolishingPromptSettingsRepository,
+    SpeakerNameConfirmationSettingsRepository SpeakerNameConfirmationSettingsRepository)
 {
     public static MainWindowServices Create(AppPaths paths)
     {
@@ -72,6 +73,7 @@ public sealed record MainWindowServices(
         var review = MainWindowReviewComposition.Create(paths);
         var setupWizardService = MainWindowSetupComposition.Create(paths, runtime, model);
         var readablePolishingPromptSettingsRepository = new ReadablePolishingPromptSettingsRepository(paths);
+        var speakerNameConfirmationSettingsRepository = new SpeakerNameConfirmationSettingsRepository(paths);
         var workers = MainWindowWorkerComposition.Create(
             paths,
             runtime.ProcessRunner,
@@ -132,6 +134,7 @@ public sealed record MainWindowServices(
             new DomainPresetImportService(paths, repositories.AsrSettingsRepository),
             llmSettingsSeedService,
             new LlmSettingsDisplayService(llmSettingsRepository),
-            readablePolishingPromptSettingsRepository);
+            readablePolishingPromptSettingsRepository,
+            speakerNameConfirmationSettingsRepository);
     }
 }

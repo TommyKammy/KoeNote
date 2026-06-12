@@ -71,6 +71,7 @@
                 <Button Command="{Binding ShowReviewCandidateTranscriptTabCommand}"
                         Padding="10,6"
                         MinWidth="0"
+                        Margin="0,0,6,0"
                         ToolTip="最終整文前のレビュー候補を確認します"
                         Style="{StaticResource ToolbarButton}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -79,6 +80,21 @@
                                    FontSize="12"
                                    Margin="0,0,6,0" />
                         <TextBlock Text="レビュー候補"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ConfirmSpeakerNamesAndRunReadablePolishingCommand}"
+                        Padding="10,6"
+                        MinWidth="0"
+                        ToolTip="話者名を確認してから整文を再実行します"
+                        Style="{StaticResource ToolbarButton}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8D4;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   Margin="0,0,6,0" />
+                        <TextBlock Text="話者確認して再整文"
                                    FontSize="12"
                                    FontWeight="SemiBold" />
                     </StackPanel>

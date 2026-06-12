@@ -172,7 +172,7 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job)
+    private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job, bool forceSpeakerConfirmation = false)
     {
         var speakerSummaries = new TranscriptReadRepository(Paths).ReadForJob(job.JobId)
             .Where(static segment => !string.IsNullOrWhiteSpace(segment.SpeakerId))
@@ -188,6 +188,13 @@ public sealed partial class MainWindowViewModel
             .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (speakerSummaries.Count == 0)
+        {
+            return true;
+        }
+
+        if (!forceSpeakerConfirmation &&
+            string.Equals(SelectedSpeakerNameConfirmationModeValue, SpeakerNameConfirmationModes.UnassignedOnly, StringComparison.OrdinalIgnoreCase) &&
+            !speakerSummaries.Any(IsUnassignedSpeakerName))
         {
             return true;
         }
@@ -227,6 +234,12 @@ public sealed partial class MainWindowViewModel
 
         LatestLog = "話者名確認のため、整文を開始しませんでした。";
         return false;
+    }
+
+    private static bool IsUnassignedSpeakerName(SpeakerNameConfirmationItem speaker)
+    {
+        return string.Equals(speaker.DisplayName, speaker.SpeakerId, StringComparison.OrdinalIgnoreCase) ||
+            speaker.DisplayName.StartsWith("Speaker_", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<SpeakerNameConfirmationPreview> BuildSpeakerConfirmationPreviews(

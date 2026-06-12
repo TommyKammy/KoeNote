@@ -24,7 +24,8 @@ internal static class KoeNoteDatabaseMigrations
         new(16, "summary stage toggle", ApplySummaryStageToggle),
         new(17, "LLM profile task settings", ApplyLlmProfileTaskSettingsSchema),
         new(18, "readable polishing prompt settings", ApplyReadablePolishingPromptSettingsSchema),
-        new(19, "ASR execution profile settings", ApplyAsrExecutionProfileSettingsSchema)
+        new(19, "ASR execution profile settings", ApplyAsrExecutionProfileSettingsSchema),
+        new(20, "speaker name confirmation settings", ApplySpeakerNameConfirmationSettingsSchema)
     ];
 
     private static void ApplyInitialSchema(DatabaseMigrationContext migration)
@@ -656,6 +657,18 @@ internal static class KoeNoteDatabaseMigrations
             "asr_settings",
             "enable_chunked_gpu_asr",
             "INTEGER NOT NULL DEFAULT 1");
+    }
+
+    private static void ApplySpeakerNameConfirmationSettingsSchema(DatabaseMigrationContext migration)
+    {
+        migration.Execute("""
+            CREATE TABLE IF NOT EXISTS speaker_name_confirmation_settings (
+                settings_id INTEGER NOT NULL PRIMARY KEY CHECK (settings_id = 1),
+                mode TEXT NOT NULL DEFAULT 'always',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """);
     }
 
 }
