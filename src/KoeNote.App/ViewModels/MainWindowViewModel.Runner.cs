@@ -201,6 +201,7 @@ public sealed partial class MainWindowViewModel
         var result = ConfirmSpeakerNamesDialog(new SpeakerNameConfirmationRequest(job.Title, speakerSummaries));
         if (result is not null)
         {
+            var speakerDisplayChanged = false;
             foreach (var speaker in speakerSummaries)
             {
                 if (!result.DisplayNames.TryGetValue(speaker.SpeakerId, out var displayName) ||
@@ -210,7 +211,21 @@ public sealed partial class MainWindowViewModel
                     continue;
                 }
 
-                _transcriptEditService.ApplySpeakerAlias(job.JobId, speaker.SpeakerId, displayName.Trim());
+                var normalizedDisplayName = displayName.Trim();
+                _transcriptEditService.ApplySpeakerAlias(job.JobId, speaker.SpeakerId, normalizedDisplayName);
+                var matchingSegment = Segments.FirstOrDefault(segment =>
+                    string.Equals(segment.SpeakerId, speaker.SpeakerId, StringComparison.OrdinalIgnoreCase));
+                if (matchingSegment is not null)
+                {
+                    ReplaceEditedSpeakerPreview(matchingSegment, normalizedDisplayName);
+                    speakerDisplayChanged = true;
+                }
+            }
+
+            if (speakerDisplayChanged)
+            {
+                RefreshSpeakerFilters();
+                FilteredSegments.Refresh();
             }
 
             return true;

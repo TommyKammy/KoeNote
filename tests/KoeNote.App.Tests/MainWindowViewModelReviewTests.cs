@@ -666,6 +666,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
             new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
         ]);
+        InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
         fixture.ViewModel.ConfirmSpeakerNamesDialog = request => new SpeakerNameConfirmationResult(
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -675,6 +676,9 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
 
         Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.All(fixture.ViewModel.Segments, segment => Assert.Equal(fixture.PolishingRuntime.SeenSpeakerNames.Single(), segment.Speaker));
+        Assert.Contains(fixture.PolishingRuntime.SeenSpeakerNames.Single(), fixture.ViewModel.SpeakerFilters, StringComparer.Ordinal);
+        Assert.DoesNotContain("Speaker_0", fixture.ViewModel.SpeakerFilters, StringComparer.Ordinal);
         Assert.Contains("田中", fixture.PolishingRuntime.SeenSpeakerNames, StringComparer.Ordinal);
     }
 
