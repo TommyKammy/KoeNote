@@ -80,6 +80,7 @@
                   Target="[INSTALLFOLDER]KoeNoteCleanup.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <util:RemoveFolderEx Id="RemoveGeneratedInstallFiles" On="uninstall" Property="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
         <RemoveFolder Id="RemoveLocalProgramsFolder" Directory="LocalProgramsFolder" On="uninstall" />
         <RegistryValue Root="HKCU"

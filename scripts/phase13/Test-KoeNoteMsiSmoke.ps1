@@ -215,6 +215,11 @@ if (-not $SkipInstall) {
         throw "MSI uninstall failed with exit code $($uninstall.ExitCode). Log: $uninstallLog"
     }
 
+    $installLocation = if ($app.InstallLocation) { $app.InstallLocation } else { $metadataEntry.InstallLocation }
+    if ($installLocation -and (Test-Path -LiteralPath $installLocation)) {
+        throw "$DisplayName uninstall left the application install directory behind: $installLocation"
+    }
+
     if ($cleanupSeed) {
         Test-KoeNoteIsolatedCleanupSmokeDataRemoved -Seed $cleanupSeed
         Remove-Item -LiteralPath $cleanupSeed.Root -Recurse -Force -ErrorAction SilentlyContinue
