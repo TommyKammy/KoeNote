@@ -182,7 +182,14 @@ public sealed partial class MainWindowViewModel
                 var displayName = group
                     .Select(static segment => segment.Speaker)
                     .FirstOrDefault(static speaker => !string.IsNullOrWhiteSpace(speaker)) ?? group.Key;
-                return new SpeakerConfirmationSummary(group.Key, displayName.Trim(), group.Count());
+                var previews = group
+                    .Select(static segment => segment.FinalText ?? segment.NormalizedText ?? segment.RawText ?? segment.Text)
+                    .Where(static text => !string.IsNullOrWhiteSpace(text))
+                    .Select(static text => text.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .Take(3)
+                    .ToList();
+                return new SpeakerNameConfirmationItem(group.Key, displayName.Trim(), group.Count(), previews);
             })
             .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -191,46 +198,27 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
-        var displayedSpeakers = string.Join(
-            Environment.NewLine,
-            speakerSummaries
-                .Take(8)
-                .Select(static summary => FormatSpeakerConfirmationLine(summary)));
-        if (speakerSummaries.Count > 8)
+        var result = ConfirmSpeakerNamesDialog(new SpeakerNameConfirmationRequest(job.Title, speakerSummaries));
+        if (result is not null)
         {
-            displayedSpeakers += $"{Environment.NewLine}- 他 {speakerSummaries.Count - 8} 件";
-        }
+            foreach (var speaker in speakerSummaries)
+            {
+                if (!result.DisplayNames.TryGetValue(speaker.SpeakerId, out var displayName) ||
+                    string.IsNullOrWhiteSpace(displayName) ||
+                    string.Equals(displayName.Trim(), speaker.DisplayName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-        var request = new ConfirmationDialogRequest(
-            "話者名を確認",
-            "整文を開始する前に話者名を確認しますか？",
-            $"検出された話者:{Environment.NewLine}{displayedSpeakers}{Environment.NewLine}{Environment.NewLine}Speaker_0 などが残っている場合は、実名や役割名に直してから整文すると出力に反映しやすくなります。今は未設定のまま整文を開始することもできます。",
-            "確認して整文開始",
-            "あとで設定",
-            "\uE77B",
-            "#ECFDF5",
-            "#15803D",
-            "#16A34A",
-            "#16A34A",
-            "#FFFFFF");
+                _transcriptEditService.ApplySpeakerAlias(job.JobId, speaker.SpeakerId, displayName.Trim());
+            }
 
-        if (ConfirmDialog(request))
-        {
             return true;
         }
 
         LatestLog = "話者名確認のため、整文を開始しませんでした。";
         return false;
     }
-
-    private static string FormatSpeakerConfirmationLine(SpeakerConfirmationSummary summary)
-    {
-        return string.Equals(summary.DisplayName, summary.SpeakerId, StringComparison.OrdinalIgnoreCase)
-            ? $"- {summary.SpeakerId} ({summary.SegmentCount}件)"
-            : $"- {summary.DisplayName} ({summary.SpeakerId}, {summary.SegmentCount}件)";
-    }
-
-    private sealed record SpeakerConfirmationSummary(string SpeakerId, string DisplayName, int SegmentCount);
 
     private StageStatus GetStageStatus(JobRunStage stage)
     {

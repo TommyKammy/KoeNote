@@ -638,20 +638,44 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
             new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
         ]);
-        ConfirmationDialogRequest? request = null;
-        fixture.ViewModel.ConfirmDialog = dialogRequest =>
+        SpeakerNameConfirmationRequest? request = null;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = dialogRequest =>
         {
             request = dialogRequest;
-            return false;
+            return null;
         };
 
         await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
 
         Assert.False(fixture.PolishingRuntime.WasCalled);
         Assert.NotNull(request);
-        Assert.Equal("話者名を確認", request.Title);
-        Assert.Equal("あとで設定", request.CancelText);
-        Assert.Contains("Speaker_0", request.Message, StringComparison.Ordinal);
+        var speaker = Assert.Single(request.Speakers);
+        Assert.Equal("Speaker_0", speaker.SpeakerId);
+        Assert.Equal("Speaker_0", speaker.DisplayName);
+        Assert.Contains("raw text", speaker.PreviewTexts, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunReadablePolishingAsync_AppliesConfirmedSpeakerNamesBeforeStarting()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] 田中: readable text"));
+        Assert.NotNull(fixture.ViewModel.SelectedJob);
+        var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+        ]);
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = request => new SpeakerNameConfirmationResult(
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [request.Speakers.Single().SpeakerId] = "田中"
+            });
+
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains("田中", fixture.PolishingRuntime.SeenSpeakerNames, StringComparer.Ordinal);
     }
 
     [Fact]

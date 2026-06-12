@@ -879,11 +879,11 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
             new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
         var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
         new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(job.JobId, "Speaker_0", "佐藤");
-        ConfirmationDialogRequest? request = null;
-        fixture.ViewModel.ConfirmDialog = dialogRequest =>
+        SpeakerNameConfirmationRequest? request = null;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = dialogRequest =>
         {
             request = dialogRequest;
-            return false;
+            return null;
         };
 
         await fixture.ViewModel.RunSelectedJobAsync();
@@ -891,11 +891,9 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(fixture.ReviewStageRunner.RunWasCalled);
         Assert.False(fixture.PolishingRuntime.WasCalled);
         Assert.NotNull(request);
-        Assert.Equal("話者名を確認", request.Title);
-        Assert.Equal("確認して整文開始", request.ConfirmText);
-        Assert.Equal("あとで設定", request.CancelText);
-        Assert.Contains("佐藤", request.Message, StringComparison.Ordinal);
-        Assert.Contains("Speaker_0", request.Message, StringComparison.Ordinal);
+        var speaker = Assert.Single(request.Speakers);
+        Assert.Equal("佐藤", speaker.DisplayName);
+        Assert.Equal("Speaker_0", speaker.SpeakerId);
         Assert.False(fixture.ViewModel.HasReadablePolishedContent);
     }
 
@@ -925,7 +923,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
             "profile"));
         fixture.ViewModel.SelectedJob = null;
         fixture.ViewModel.SelectedJob = fixture.ViewModel.Jobs.Single(item => item.JobId == job.JobId);
-        fixture.ViewModel.ConfirmDialog = _ => false;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = _ => null;
 
         await fixture.ViewModel.RunSelectedJobAsync();
 

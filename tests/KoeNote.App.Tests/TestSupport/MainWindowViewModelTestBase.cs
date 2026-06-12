@@ -179,6 +179,8 @@ public abstract class MainWindowViewModelTestBase
 
         public List<string> SeenSegmentTexts { get; } = [];
 
+        public List<string> SeenSpeakerNames { get; } = [];
+
         public Task<TranscriptPolishingChunkResult> PolishChunkAsync(
             TranscriptPolishingOptions options,
             TranscriptPolishingChunk chunk,
@@ -186,6 +188,7 @@ public abstract class MainWindowViewModelTestBase
         {
             WasCalled = true;
             SeenSegmentTexts.AddRange(chunk.Segments.Select(static segment => segment.Text));
+            SeenSpeakerNames.AddRange(chunk.Segments.Select(static segment => segment.Speaker));
             if (exception is not null)
             {
                 throw exception;
