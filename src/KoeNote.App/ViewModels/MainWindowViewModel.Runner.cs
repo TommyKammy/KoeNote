@@ -182,13 +182,7 @@ public sealed partial class MainWindowViewModel
                 var displayName = group
                     .Select(static segment => segment.Speaker)
                     .FirstOrDefault(static speaker => !string.IsNullOrWhiteSpace(speaker)) ?? group.Key;
-                var previews = group
-                    .Select(static segment => segment.FinalText ?? segment.NormalizedText ?? segment.RawText ?? segment.Text)
-                    .Where(static text => !string.IsNullOrWhiteSpace(text))
-                    .Select(static text => text.Trim())
-                    .Distinct(StringComparer.Ordinal)
-                    .Take(3)
-                    .ToList();
+                var previews = BuildSpeakerConfirmationPreviews(group);
                 return new SpeakerNameConfirmationItem(group.Key, displayName.Trim(), group.Count(), previews);
             })
             .OrderBy(static summary => summary.SpeakerId, StringComparer.OrdinalIgnoreCase)
@@ -233,6 +227,30 @@ public sealed partial class MainWindowViewModel
 
         LatestLog = "話者名確認のため、整文を開始しませんでした。";
         return false;
+    }
+
+    private static IReadOnlyList<SpeakerNameConfirmationPreview> BuildSpeakerConfirmationPreviews(
+        IEnumerable<TranscriptReadModel> segments)
+    {
+        return segments
+            .Select(static segment => new
+            {
+                segment.StartSeconds,
+                segment.EndSeconds,
+                Text = (segment.FinalText ?? segment.NormalizedText ?? segment.RawText ?? segment.Text).Trim()
+            })
+            .Where(static sample => !string.IsNullOrWhiteSpace(sample.Text))
+            .GroupBy(static sample => sample.Text, StringComparer.Ordinal)
+            .Select(static group => group.OrderBy(static sample => sample.StartSeconds).First())
+            .OrderByDescending(static sample => sample.Text.Length)
+            .ThenBy(static sample => sample.StartSeconds)
+            .Take(3)
+            .OrderBy(static sample => sample.StartSeconds)
+            .Select(static sample => new SpeakerNameConfirmationPreview(
+                sample.StartSeconds,
+                sample.EndSeconds,
+                sample.Text))
+            .ToList();
     }
 
     private StageStatus GetStageStatus(JobRunStage stage)

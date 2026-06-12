@@ -122,6 +122,12 @@
                                                    Margin="0,5,0,0"
                                                    FontSize="11"
                                                    Foreground="{StaticResource MutedBrush}" />
+                                        <TextBlock Text="{Binding AssistanceText}"
+                                                   Margin="0,6,0,0"
+                                                   FontSize="11"
+                                                   Foreground="#0F766E"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding HasAssistanceText, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </StackPanel>
 
                                     <StackPanel Grid.Row="0"
