@@ -666,6 +666,40 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SpeakerNameConfirmation_UsesRunJobAudioWhenSelectionChanges()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var runJob = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", runJob.JobId, 0, 1, "Speaker_0", "raw text")
+        ]);
+        var otherAudioPath = Path.Combine(fixture.ViewModel.Paths.AppDataRoot, "other.wav");
+        Touch(otherAudioPath);
+        var otherJob = new JobSummary("job-other", "other", "other.wav", otherAudioPath, "registered", 0, 0, DateTimeOffset.Now);
+        fixture.ViewModel.Jobs.Add(otherJob);
+        fixture.ViewModel.SelectedJob = otherJob;
+        SpeakerNameConfirmationRequest? request = null;
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = dialogRequest =>
+        {
+            request = dialogRequest;
+            return null;
+        };
+
+        var confirmed = InvokePrivate<bool>(
+            fixture.ViewModel,
+            "ConfirmSpeakerNamesBeforeReadablePolishing",
+            runJob,
+            true);
+
+        Assert.False(confirmed);
+        Assert.NotNull(request);
+        Assert.Equal(runJob.SourceAudioPath, request.AudioPath);
+        Assert.NotEqual(otherAudioPath, request.AudioPath);
+    }
+
+    [Fact]
     public async Task RunReadablePolishingAsync_AppliesConfirmedSpeakerNamesBeforeStarting()
     {
         var fixture = CreateRunReadyViewModel(

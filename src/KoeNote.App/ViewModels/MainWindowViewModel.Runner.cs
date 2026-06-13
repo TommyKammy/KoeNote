@@ -201,7 +201,7 @@ public sealed partial class MainWindowViewModel
 
         var result = ConfirmSpeakerNamesDialog(new SpeakerNameConfirmationRequest(job.Title, speakerSummaries)
         {
-            AudioPath = ResolveSelectedJobPlaybackPath()
+            AudioPath = ResolveJobPlaybackPath(job)
         });
         if (result is not null)
         {
