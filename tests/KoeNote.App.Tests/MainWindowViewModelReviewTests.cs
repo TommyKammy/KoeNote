@@ -652,6 +652,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
 
         Assert.False(fixture.PolishingRuntime.WasCalled);
         Assert.NotNull(request);
+        Assert.Equal(fixture.ViewModel.SelectedJob.SourceAudioPath, request.AudioPath);
         var speaker = Assert.Single(request.Speakers);
         Assert.Equal("Speaker_0", speaker.SpeakerId);
         Assert.Equal("Speaker_0", speaker.DisplayName);

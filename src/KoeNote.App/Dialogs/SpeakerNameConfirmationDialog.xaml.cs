@@ -4,7 +4,10 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
+using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Dialogs;
+using KoeNote.App.ViewModels;
 
 namespace KoeNote.App.Dialogs;
 
@@ -13,9 +16,14 @@ public partial class SpeakerNameConfirmationDialog : Window
     private SpeakerNameConfirmationDialogViewModel ViewModel => (SpeakerNameConfirmationDialogViewModel)DataContext;
 
     public SpeakerNameConfirmationDialog(SpeakerNameConfirmationRequest request)
+        : this(request, new AudioPlaybackService())
+    {
+    }
+
+    public SpeakerNameConfirmationDialog(SpeakerNameConfirmationRequest request, IAudioPlaybackService audioPlaybackService)
     {
         InitializeComponent();
-        DataContext = new SpeakerNameConfirmationDialogViewModel(request);
+        DataContext = new SpeakerNameConfirmationDialogViewModel(request, audioPlaybackService);
     }
 
     public SpeakerNameConfirmationResult? Result { get; private set; }
@@ -23,6 +31,11 @@ public partial class SpeakerNameConfirmationDialog : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        ViewModel.StopPlayback();
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
@@ -64,17 +77,35 @@ public partial class SpeakerNameConfirmationDialog : Window
 
 internal sealed class SpeakerNameConfirmationDialogViewModel : INotifyPropertyChanged
 {
-    public SpeakerNameConfirmationDialogViewModel(SpeakerNameConfirmationRequest request)
+    private readonly SpeakerNameConfirmationPreviewPlaybackController _playbackController;
+    private readonly DispatcherTimer _playbackTimer;
+    private SpeakerNameConfirmationPreviewDialogItem? _activePreviewItem;
+
+    public SpeakerNameConfirmationDialogViewModel(
+        SpeakerNameConfirmationRequest request,
+        IAudioPlaybackService audioPlaybackService)
     {
+        AudioPath = request.AudioPath;
+        _playbackController = new SpeakerNameConfirmationPreviewPlaybackController(audioPlaybackService);
+        _playbackTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _playbackTimer.Tick += (_, _) => RefreshPlayback();
+
         LeadText = $"{request.JobTitle} の話者名を確認してから整文を開始します。";
         Items = new ObservableCollection<SpeakerNameConfirmationDialogItem>(
-            request.Speakers.Select(speaker => new SpeakerNameConfirmationDialogItem(speaker)));
+            request.Speakers.Select(speaker => new SpeakerNameConfirmationDialogItem(speaker, this)));
         RefreshValidation();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public string LeadText { get; }
+
+    public string? AudioPath { get; }
+
+    public bool CanPlayPreview => _playbackController.CanPlay(AudioPath);
 
     public ObservableCollection<SpeakerNameConfirmationDialogItem> Items { get; }
 
@@ -104,11 +135,58 @@ internal sealed class SpeakerNameConfirmationDialogViewModel : INotifyPropertyCh
                 StringComparer.OrdinalIgnoreCase));
     }
 
+    public Task TogglePreviewAsync(SpeakerNameConfirmationPreviewDialogItem previewItem)
+    {
+        if (_activePreviewItem is not null && !ReferenceEquals(_activePreviewItem, previewItem))
+        {
+            _activePreviewItem.SetPlaybackState(false, 0);
+        }
+
+        var isPlaying = _playbackController.Toggle(AudioPath, previewItem.Preview);
+        _activePreviewItem = isPlaying ? previewItem : null;
+        previewItem.SetPlaybackState(isPlaying, _playbackController.ProgressPercent);
+
+        if (isPlaying)
+        {
+            _playbackTimer.Start();
+        }
+        else
+        {
+            _playbackTimer.Stop();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void StopPlayback()
+    {
+        _playbackTimer.Stop();
+        _playbackController.Stop();
+        _activePreviewItem?.SetPlaybackState(false, 0);
+        _activePreviewItem = null;
+    }
+
+    private void RefreshPlayback()
+    {
+        if (_activePreviewItem is null)
+        {
+            _playbackTimer.Stop();
+            return;
+        }
+
+        var stillPlaying = _playbackController.Refresh();
+        _activePreviewItem.SetPlaybackState(stillPlaying, _playbackController.ProgressPercent);
+        if (!stillPlaying)
+        {
+            _activePreviewItem = null;
+            _playbackTimer.Stop();
+        }
+    }
+
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
-
 }
 
 internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
@@ -116,7 +194,9 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
     private string _displayName;
     private string _errorText = string.Empty;
 
-    public SpeakerNameConfirmationDialogItem(SpeakerNameConfirmationItem item)
+    public SpeakerNameConfirmationDialogItem(
+        SpeakerNameConfirmationItem item,
+        SpeakerNameConfirmationDialogViewModel owner)
     {
         SpeakerId = item.SpeakerId;
         _displayName = item.EffectiveDisplayName;
@@ -127,9 +207,8 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
         AssistanceText = string.Equals(item.EffectiveDisplayName, item.SpeakerId, StringComparison.OrdinalIgnoreCase)
             ? $"Speaker ID: {item.SpeakerId}"
             : item.EffectiveDisplayName;
-        PreviewText = item.PreviewSamples.Count == 0
-            ? "代表発話はありません。"
-            : string.Join(Environment.NewLine, item.PreviewSamples.Take(3).Select(FormatPreviewLine));
+        PreviewItems = new ObservableCollection<SpeakerNameConfirmationPreviewDialogItem>(
+            item.PreviewSamples.Take(3).Select(preview => new SpeakerNameConfirmationPreviewDialogItem(preview, owner)));
         RefreshValidation();
     }
 
@@ -145,7 +224,9 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
 
     public bool HasAssistanceText => !string.IsNullOrWhiteSpace(AssistanceText);
 
-    public string PreviewText { get; }
+    public ObservableCollection<SpeakerNameConfirmationPreviewDialogItem> PreviewItems { get; }
+
+    public bool HasPreviewItems => PreviewItems.Count > 0;
 
     public string DisplayName
     {
@@ -194,16 +275,85 @@ internal sealed class SpeakerNameConfirmationDialogItem : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+}
 
-    private static string FormatPreviewLine(SpeakerNameConfirmationPreview preview)
+internal sealed class SpeakerNameConfirmationPreviewDialogItem : INotifyPropertyChanged
+{
+    private bool _isPlaying;
+    private double _playbackProgressPercent;
+
+    public SpeakerNameConfirmationPreviewDialogItem(
+        SpeakerNameConfirmationPreview preview,
+        SpeakerNameConfirmationDialogViewModel owner)
     {
-        var text = preview.Text.Trim();
-        if (text.Length > 120)
+        Preview = preview;
+        TimestampText = $"[{FormatTimestamp(preview.StartSeconds)} - {FormatTimestamp(preview.EndSeconds)}]";
+        Text = preview.Text.Trim();
+        if (Text.Length > 120)
         {
-            text = string.Concat(text.AsSpan(0, 120), "...");
+            Text = string.Concat(Text.AsSpan(0, 120), "...");
         }
 
-        return $"[{FormatTimestamp(preview.StartSeconds)} - {FormatTimestamp(preview.EndSeconds)}] {text}";
+        PlayCommand = new RelayCommand(
+            () => owner.TogglePreviewAsync(this),
+            () => owner.CanPlayPreview);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public SpeakerNameConfirmationPreview Preview { get; }
+
+    public string TimestampText { get; }
+
+    public string Text { get; }
+
+    public ICommand PlayCommand { get; }
+
+    public bool IsPlaying
+    {
+        get => _isPlaying;
+        private set
+        {
+            if (_isPlaying == value)
+            {
+                return;
+            }
+
+            _isPlaying = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PlayIcon));
+            OnPropertyChanged(nameof(PlaybackStatusText));
+        }
+    }
+
+    public string PlayIcon => IsPlaying ? "\uE769" : "\uE768";
+
+    public string PlaybackStatusText => IsPlaying ? "再生中" : string.Empty;
+
+    public double PlaybackProgressPercent
+    {
+        get => _playbackProgressPercent;
+        private set
+        {
+            if (Math.Abs(_playbackProgressPercent - value) < 0.01)
+            {
+                return;
+            }
+
+            _playbackProgressPercent = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public void SetPlaybackState(bool isPlaying, double playbackProgressPercent)
+    {
+        IsPlaying = isPlaying;
+        PlaybackProgressPercent = isPlaying ? playbackProgressPercent : 0;
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     private static string FormatTimestamp(double seconds)

@@ -199,7 +199,10 @@ public sealed partial class MainWindowViewModel
             return true;
         }
 
-        var result = ConfirmSpeakerNamesDialog(new SpeakerNameConfirmationRequest(job.Title, speakerSummaries));
+        var result = ConfirmSpeakerNamesDialog(new SpeakerNameConfirmationRequest(job.Title, speakerSummaries)
+        {
+            AudioPath = ResolveSelectedJobPlaybackPath()
+        });
         if (result is not null)
         {
             var speakerDisplayChanged = false;
