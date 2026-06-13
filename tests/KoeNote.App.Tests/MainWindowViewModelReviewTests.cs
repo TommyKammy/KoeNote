@@ -622,7 +622,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         fixture.ViewModel.SelectedSegmentEditText = "edited source text";
         fixture.ViewModel.SaveSegmentInlineEditCommand.Execute(null);
 
-        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync", false);
 
         Assert.Contains("edited source text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
     }
@@ -648,7 +648,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
             return null;
         };
 
-        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync", false);
 
         Assert.False(fixture.PolishingRuntime.WasCalled);
         Assert.NotNull(request);
@@ -717,7 +717,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
                 [request.Speakers.Single().SpeakerId] = "田中"
             });
 
-        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync", false);
 
         Assert.True(fixture.PolishingRuntime.WasCalled);
         Assert.All(fixture.ViewModel.Segments, segment => Assert.Equal(fixture.PolishingRuntime.SeenSpeakerNames.Single(), segment.Speaker));
@@ -734,6 +734,9 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
             new FakeTranscriptPolishingRuntime("[00:00 - 00:01] 田中: readable text"));
         Assert.NotNull(fixture.ViewModel.SelectedJob);
         var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+        ]);
         new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(jobId, "Speaker_0", "田中");
         InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
         fixture.ViewModel.SelectedSpeakerNameConfirmationMode =
@@ -746,7 +749,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
             return null;
         };
 
-        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync");
+        await InvokePrivate<Task>(fixture.ViewModel, "RunReadablePolishingAsync", false);
 
         Assert.False(confirmationCalled);
         Assert.True(fixture.PolishingRuntime.WasCalled);
@@ -761,6 +764,9 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
             new FakeTranscriptPolishingRuntime("[00:00 - 00:01] 田中: readable text"));
         Assert.NotNull(fixture.ViewModel.SelectedJob);
         var jobId = fixture.ViewModel.SelectedJob.JobId;
+        new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
+            new TranscriptSegment("segment-001", jobId, 0, 1, "Speaker_0", "raw text")
+        ]);
         new TranscriptEditService(fixture.ViewModel.Paths).ApplySpeakerAlias(jobId, "Speaker_0", "田中");
         InvokePrivate(fixture.ViewModel, "ReloadSegmentsForSelectedJob", "segment-001");
         fixture.ViewModel.SelectedSpeakerNameConfirmationMode =
