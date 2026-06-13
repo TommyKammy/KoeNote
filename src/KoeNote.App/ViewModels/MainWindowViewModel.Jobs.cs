@@ -380,12 +380,17 @@ public sealed partial class MainWindowViewModel
             return null;
         }
 
-        if (!string.IsNullOrWhiteSpace(SelectedJob.NormalizedAudioPath) && File.Exists(SelectedJob.NormalizedAudioPath))
+        return ResolveJobPlaybackPath(SelectedJob);
+    }
+
+    private static string? ResolveJobPlaybackPath(JobSummary job)
+    {
+        if (!string.IsNullOrWhiteSpace(job.NormalizedAudioPath) && File.Exists(job.NormalizedAudioPath))
         {
-            return SelectedJob.NormalizedAudioPath;
+            return job.NormalizedAudioPath;
         }
 
-        return File.Exists(SelectedJob.SourceAudioPath) ? SelectedJob.SourceAudioPath : null;
+        return File.Exists(job.SourceAudioPath) ? job.SourceAudioPath : null;
     }
 
     private void SeekPlaybackToSelectedSegment(TranscriptSegmentPreview segment)

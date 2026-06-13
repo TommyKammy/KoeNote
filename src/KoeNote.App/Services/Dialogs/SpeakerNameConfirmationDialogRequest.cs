@@ -2,7 +2,10 @@ namespace KoeNote.App.Services.Dialogs;
 
 public sealed record SpeakerNameConfirmationRequest(
     string JobTitle,
-    IReadOnlyList<SpeakerNameConfirmationItem> Speakers);
+    IReadOnlyList<SpeakerNameConfirmationItem> Speakers)
+{
+    public string? AudioPath { get; init; }
+}
 
 public sealed record SpeakerNameConfirmationItem(
     string SpeakerId,
