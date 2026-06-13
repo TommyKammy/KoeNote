@@ -675,7 +675,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         new TranscriptSegmentRepository(fixture.ViewModel.Paths).SaveSegments([
             new TranscriptSegment("segment-001", runJob.JobId, 0, 1, "Speaker_0", "raw text")
         ]);
-        var otherAudioPath = Path.Combine(fixture.ViewModel.Paths.AppDataRoot, "other.wav");
+        var otherAudioPath = Path.Combine(fixture.ViewModel.Paths.Root, "other.wav");
         Touch(otherAudioPath);
         var otherJob = new JobSummary("job-other", "other", "other.wav", otherAudioPath, "registered", 0, 0, DateTimeOffset.Now);
         fixture.ViewModel.Jobs.Add(otherJob);
