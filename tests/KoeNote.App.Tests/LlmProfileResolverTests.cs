@@ -160,6 +160,7 @@ public sealed class LlmProfileResolverTests
     public void Resolve_UsesLegacyReviewModelPathWhenLegacyModelIsSelected()
     {
         var paths = TestDatabase.CreateReadyPaths();
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.ReviewModelPath)!);
         File.WriteAllText(paths.ReviewModelPath, "model");
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
