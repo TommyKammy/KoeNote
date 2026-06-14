@@ -6,6 +6,7 @@ public sealed class LlmPresetCatalogTests
 {
     [Theory]
     [InlineData("gemma-4-e4b-it-q4-k-m", "gemma", "gemma:balanced", 8192, 999)]
+    [InlineData("gemma-4-12b-it-qat-q4-0", "gemma", "gemma:balanced", 8192, 999)]
     [InlineData("bonsai-8b-q1-0", "bonsai", "bonsai:conservative", 8192, 999)]
     [InlineData("llm-jp-4-8b-thinking-q4-k-m", "llm-jp", "llm-jp:balanced", 8192, 999)]
     [InlineData("unknown-q4", null, "fallback:balanced", 8192, 999)]
@@ -39,6 +40,7 @@ public sealed class LlmPresetCatalogTests
 
     [Theory]
     [InlineData("gemma-4-e4b-it-q4-k-m", "gemma", "gemma-structured", "markdown_summary_sections")]
+    [InlineData("gemma-4-12b-it-qat-q4-0", "gemma", "gemma-structured", "markdown_summary_sections")]
     [InlineData("bonsai-8b-q1-0", "bonsai", "bonsai-compact", "markdown_summary_sections")]
     [InlineData("llm-jp-4-8b-thinking-q4-k-m", "llm-jp", "llm-jp-structured", "markdown_summary_sections")]
     public void ResolveTaskSettings_ReturnsModelSpecificSummaryPromptAndValidation(
@@ -55,6 +57,7 @@ public sealed class LlmPresetCatalogTests
 
     [Theory]
     [InlineData("gemma-4-e4b-it-q4-k-m", "gemma", "gemma-polishing-blocks", 40, 4096, null)]
+    [InlineData("gemma-4-12b-it-qat-q4-0", "gemma", "gemma-polishing-blocks", 40, 4096, null)]
     [InlineData("bonsai-8b-q1-0", "bonsai", "bonsai-polishing-compact", 8, 1024, 1.15)]
     [InlineData("llm-jp-4-8b-thinking-q4-k-m", "llm-jp", "llm-jp-polishing-ja", 20, 2048, null)]
     public void ResolveTaskSettings_ReturnsModelSpecificPolishingPromptAndLimits(
