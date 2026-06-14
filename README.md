@@ -60,6 +60,7 @@ KoeNote は、PC 性能に応じて ASR モデルと Review 用 LLM の組み合
 - GPU なしでも、RAM 12GB 以上かつ CPU 6 コア以上であれば「軽量」をおすすめします。
 - 必要 runtime は Setup Wizard の一括導入でまとめて導入します。NVIDIA GPU 向け runtime が必要な構成では、導入状態を確認しながら再試行できます。
 - モデルや runtime は後から追加導入・変更できます。
+- Review 用モデルとして Gemma 4 12B it QAT Q4_0 も選択できます。現時点では experimental 扱いのため、標準の推奨構成では Gemma 4 E4B it Q4_K_M を使います。
 - 表のモデル名は `src/KoeNote.App/catalog/model-catalog.json` のプリセット定義に基づきます。
 
 ## 精度改善の考え方
