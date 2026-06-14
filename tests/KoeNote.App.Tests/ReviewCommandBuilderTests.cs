@@ -58,6 +58,8 @@ public sealed class ReviewCommandBuilderTests
         Assert.Contains("--no-conversation", arguments);
         Assert.DoesNotContain("--single-turn", arguments);
         Assert.Contains("--no-display-prompt", arguments);
+        Assert.Contains("--reasoning", arguments);
+        Assert.Contains("off", arguments);
         Assert.Contains("--json-schema-file", arguments);
         Assert.Contains(@"C:\out\review.schema.json", arguments);
     }

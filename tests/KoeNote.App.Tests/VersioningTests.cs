@@ -290,6 +290,39 @@ public sealed class VersioningTests
         Assert.Contains("-p:CleanupQuietAllCommand=\"$CleanupQuietAllCommand\"", buildScript);
     }
 
+    [Fact]
+    public void Gemma4ReviewSmokeScript_RecordsExperimentalOnlyReleaseDecision()
+    {
+        var repoRoot = FindRepoRoot();
+        var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "development", "Test-Gemma4ReviewSmoke.ps1"));
+
+        Assert.Contains("gemma-4-12b-it-qat-q4-0", script);
+        Assert.Contains("gemma-4-12b-it-qat-q4_0.gguf", script);
+        Assert.Contains("gemma-4-e4b-it-q4-k-m", script);
+        Assert.Contains("default promotion guard", script);
+        Assert.Contains("nonExperimental12bPresets", script);
+        Assert.Contains("Only the experimental preset selects Gemma 4 12B", script);
+        Assert.Contains("recommended and high_accuracy remain on Gemma 4 E4B", script);
+        Assert.Contains("experimental_only", script);
+        Assert.Contains("RunLocalRuntimeSmoke", script);
+        Assert.Contains("X-Linked-Size", script);
+        Assert.Contains("X-Xet-Hash", script);
+        Assert.Contains("Get-OutputDirectory", script);
+        Assert.Contains("taskkill.exe", script);
+        Assert.Contains("<\\|channel\\>thought", script);
+        Assert.Contains("System.Net.WebException", script);
+        Assert.Contains("New-ReviewSmokePrompt", script);
+        Assert.Contains("New-ReviewSmokeSchema", script);
+        Assert.Contains("Test-ReviewSmokeJson", script);
+        Assert.Contains("\"minItems\": 1", script);
+        Assert.Contains("\"required\": [\"segment_id\", \"issue_type\", \"original_text\", \"suggested_text\", \"reason\", \"confidence\"]", script);
+        Assert.Contains("stdout contains Review-shaped JSON draft items", script);
+        Assert.Contains("stdout JSON root is not an array", script);
+        Assert.Contains("response_uri = $Uri", script);
+        Assert.Contains("\"--reasoning\", \"off\"", script);
+        Assert.DoesNotContain("Start-Job", script);
+    }
+
     private static string FindRepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

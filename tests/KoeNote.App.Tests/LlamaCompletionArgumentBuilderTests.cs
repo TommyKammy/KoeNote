@@ -20,7 +20,8 @@ public sealed class LlamaCompletionArgumentBuilderTests
             TopP: 0.9,
             TopK: 40,
             RepeatPenalty: 1.1,
-            JsonSchemaFilePath: @"C:\out\schema.json"));
+            JsonSchemaFilePath: @"C:\out\schema.json",
+            ReasoningMode: "off"));
 
         Assert.Equal("--model", arguments[0]);
         Assert.Equal(@"C:\models\model.gguf", arguments[1]);
@@ -44,6 +45,8 @@ public sealed class LlamaCompletionArgumentBuilderTests
         Assert.Contains("4", arguments);
         Assert.Contains("--no-conversation", arguments);
         Assert.Contains("--no-display-prompt", arguments);
+        Assert.Contains("--reasoning", arguments);
+        Assert.Contains("off", arguments);
         Assert.Contains("--json-schema-file", arguments);
         Assert.Contains(@"C:\out\schema.json", arguments);
     }
@@ -67,6 +70,7 @@ public sealed class LlamaCompletionArgumentBuilderTests
         Assert.DoesNotContain("--threads", arguments);
         Assert.DoesNotContain("--threads-batch", arguments);
         Assert.DoesNotContain("--json-schema-file", arguments);
+        Assert.DoesNotContain("--reasoning", arguments);
         Assert.Contains("--no-display-prompt", arguments);
     }
 }

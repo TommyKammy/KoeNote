@@ -13,7 +13,8 @@ public sealed record LlamaCompletionArgumentOptions(
     double? TopP = null,
     int? TopK = null,
     double? RepeatPenalty = null,
-    string? JsonSchemaFilePath = null);
+    string? JsonSchemaFilePath = null,
+    string? ReasoningMode = null);
 
 public static class LlamaCompletionArgumentBuilder
 {
@@ -43,6 +44,12 @@ public static class LlamaCompletionArgumentBuilder
         }
 
         arguments.Add("--no-display-prompt");
+
+        if (!string.IsNullOrWhiteSpace(options.ReasoningMode))
+        {
+            arguments.Add("--reasoning");
+            arguments.Add(options.ReasoningMode);
+        }
 
         if (options.TopP is { } topP)
         {
