@@ -369,6 +369,15 @@ def release_gpu_memory() -> None:
         pass
 
 
+def is_ctranslate2_cuda_available() -> bool:
+    try:
+        import ctranslate2
+
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
+
+
 def should_use_explicit_chunks(audio_path: str, chunk_seconds: int | None) -> bool:
     if chunk_seconds is None or chunk_seconds <= 0:
         return False
@@ -583,8 +592,16 @@ def write_result_payload(
     }, ensure_ascii=True), flush=True)
 
 
-def should_bypass_cuda_teardown_after_success(args: argparse.Namespace) -> bool:
-    return str(args.device).lower() == "cuda"
+def should_bypass_cuda_teardown_after_success(args: argparse.Namespace, model: object | None = None) -> bool:
+    requested_device = str(args.device).lower()
+    execution_profile = str(args.execution_profile).lower()
+    model_device = str(getattr(model, "device", "") or getattr(model, "_device", "")).lower() if model is not None else ""
+    return (
+        requested_device == "cuda" or
+        "cuda" in execution_profile or
+        "cuda" in model_device or
+        (requested_device == "auto" and is_ctranslate2_cuda_available())
+    )
 
 
 def main() -> int:
@@ -639,6 +656,7 @@ def main() -> int:
         model_device=str(getattr(model, "device", "unknown")),
         model_compute_type=str(getattr(model, "compute_type", "unknown")),
     )
+    bypass_cuda_teardown = should_bypass_cuda_teardown_after_success(args, model)
     write_gpu_memory_snapshot("after_model_load", args)
     write_gpu_memory_snapshot("before_transcribe", args)
 
@@ -665,6 +683,20 @@ def main() -> int:
             if args.diarization == "pyannote":
                 print("Diarization skipped: missing HF_TOKEN/HUGGINGFACE_TOKEN.", file=sys.stderr)
         else:
+            if bypass_cuda_teardown:
+                write_result_payload(
+                    args.output_json,
+                    detected_language,
+                    "skipped: diarization_not_completed",
+                    diarization_turns,
+                    segment_items,
+                )
+                write_diagnostic("model_release_before_diarization_start")
+                model_to_release = model
+                model = None
+                del model_to_release
+                release_gpu_memory()
+                write_gpu_memory_snapshot("after_model_release_before_diarization", args)
             try:
                 diarization_turns = run_pyannote_diarization(args.audio, args.diarization_model, token)
             except ImportError as exc:
@@ -688,13 +720,14 @@ def main() -> int:
         segment_items,
     )
 
-    if should_bypass_cuda_teardown_after_success(args):
+    if bypass_cuda_teardown:
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(0)
 
-    del model
-    release_gpu_memory()
+    if model is not None:
+        del model
+        release_gpu_memory()
     return 0
 
 

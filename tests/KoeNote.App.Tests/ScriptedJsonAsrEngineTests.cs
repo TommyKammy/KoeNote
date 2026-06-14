@@ -23,12 +23,42 @@ public sealed class ScriptedJsonAsrEngineTests
     {
         var scriptPath = FindRepositoryFasterWhisperScriptPath();
         var script = File.ReadAllText(scriptPath);
-        var writeIndex = script.IndexOf("write_result_payload(", StringComparison.Ordinal);
-        var bypassIndex = script.IndexOf("should_bypass_cuda_teardown_after_success", StringComparison.Ordinal);
+        var mainIndex = script.IndexOf("def main() -> int:", StringComparison.Ordinal);
+        var writeIndex = script.LastIndexOf("write_result_payload(", StringComparison.Ordinal);
+        var bypassIndex = script.LastIndexOf("if bypass_cuda_teardown:", StringComparison.Ordinal);
 
-        Assert.True(writeIndex >= 0);
+        Assert.True(mainIndex >= 0);
+        Assert.True(writeIndex > mainIndex);
         Assert.True(bypassIndex > writeIndex);
         Assert.Contains("os._exit(0)", script);
+    }
+
+    [Fact]
+    public void FasterWhisperWorker_BypassesAutoCudaTeardownWhenCudaIsAvailable()
+    {
+        var scriptPath = FindRepositoryFasterWhisperScriptPath();
+        var script = File.ReadAllText(scriptPath);
+        var predicateIndex = script.IndexOf("def should_bypass_cuda_teardown_after_success", StringComparison.Ordinal);
+
+        Assert.True(predicateIndex >= 0);
+        Assert.Contains("requested_device == \"auto\" and is_ctranslate2_cuda_available()", script);
+        Assert.Contains("\"cuda\" in model_device", script);
+    }
+
+    [Fact]
+    public void FasterWhisperWorker_ReleasesCudaModelBeforePyannoteDiarizationAfterPersistingAsrOutput()
+    {
+        var scriptPath = FindRepositoryFasterWhisperScriptPath();
+        var script = File.ReadAllText(scriptPath);
+        var mainIndex = script.IndexOf("def main() -> int:", StringComparison.Ordinal);
+        var pendingWriteIndex = script.IndexOf("\"skipped: diarization_not_completed\"", mainIndex, StringComparison.Ordinal);
+        var releaseIndex = script.IndexOf("del model_to_release", mainIndex, StringComparison.Ordinal);
+        var diarizationIndex = script.IndexOf("run_pyannote_diarization(", mainIndex, StringComparison.Ordinal);
+
+        Assert.True(mainIndex >= 0);
+        Assert.True(pendingWriteIndex > mainIndex);
+        Assert.True(releaseIndex > pendingWriteIndex);
+        Assert.True(diarizationIndex > releaseIndex);
     }
 
     [Fact]

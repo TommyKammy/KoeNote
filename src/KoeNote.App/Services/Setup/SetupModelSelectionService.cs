@@ -7,7 +7,8 @@ namespace KoeNote.App.Services.Setup;
 internal sealed class SetupModelSelectionService(
     AppPaths paths,
     SetupStateService stateService,
-    ModelCatalogService modelCatalogService)
+    ModelCatalogService modelCatalogService,
+    InstalledModelRepository installedModelRepository)
 {
     public IReadOnlyList<ModelCatalogEntry> GetSelectableModels(string role)
     {
@@ -91,9 +92,26 @@ internal sealed class SetupModelSelectionService(
     {
         var catalogItem = ResolveSelectableCatalogItem(role, modelId);
         var state = stateService.Load();
+        var isReady = IsInstalledModelReady(catalogItem);
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
-            ? state with { SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
-            : state with { SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
+            ? state with
+            {
+                IsCompleted = isReady && state.IsCompleted,
+                LastSmokeSucceeded = isReady && state.LastSmokeSucceeded,
+                CurrentStep = isReady ? state.CurrentStep : SetupStep.AsrModel,
+                SetupMode = "custom",
+                SelectedModelPresetId = null,
+                SelectedAsrModelId = catalogItem.ModelId
+            }
+            : state with
+            {
+                IsCompleted = isReady && state.IsCompleted,
+                LastSmokeSucceeded = isReady && state.LastSmokeSucceeded,
+                CurrentStep = isReady ? state.CurrentStep : SetupStep.ReviewModel,
+                SetupMode = "custom",
+                SelectedModelPresetId = null,
+                SelectedReviewModelId = catalogItem.ModelId
+            };
         return stateService.Save(state);
     }
 
@@ -237,6 +255,15 @@ internal sealed class SetupModelSelectionService(
         }
 
         return catalogItem;
+    }
+
+    private bool IsInstalledModelReady(ModelCatalogItem catalogItem)
+    {
+        var installed = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
+        return installed is not null &&
+            installed.Role.Equals(catalogItem.Role, StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)
