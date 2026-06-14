@@ -1218,7 +1218,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         Touch(paths.LlamaCompletionPath);
         Touch(paths.FasterWhisperScriptPath);
         CreateFasterWhisperRuntime(paths);
-        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         RegisterVerifiedModel(
             paths,

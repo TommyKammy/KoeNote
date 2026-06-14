@@ -35,7 +35,7 @@ public abstract class MainWindowViewModelTestBase
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         CreateFasterWhisperRuntime(paths);
-        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
         RegisterVerifiedModel(
             paths,
@@ -299,6 +299,12 @@ public abstract class MainWindowViewModelTestBase
         File.WriteAllText(path, string.Empty);
     }
 
+    protected static void CreateMinimalModelDirectory(string path)
+    {
+        Directory.CreateDirectory(path);
+        Touch(Path.Combine(path, "model.bin"));
+    }
+
     protected static void RegisterVerifiedModel(
         AppPaths paths,
         string modelId,
@@ -306,6 +312,13 @@ public abstract class MainWindowViewModelTestBase
         string engineId,
         string filePath)
     {
+        var verification = new ModelVerificationService().VerifyPath(filePath, expectedSha256: null);
+        if (!verification.IsVerified)
+        {
+            throw new InvalidOperationException(
+                $"Cannot register unverified test model '{modelId}': {verification.Message}");
+        }
+
         new InstalledModelRepository(paths).UpsertInstalledModel(new InstalledModel(
             modelId,
             role,
@@ -316,7 +329,7 @@ public abstract class MainWindowViewModelTestBase
             filePath,
             ManifestPath: null,
             SizeBytes: 0,
-            Sha256: null,
+            Sha256: verification.Sha256,
             Verified: true,
             LicenseName: "test",
             SourceType: "test",
