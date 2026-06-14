@@ -161,7 +161,8 @@ The script verifies:
 - a one-byte range request succeeds, proving the artifact is reachable without
   downloading the full 6.5 GiB file
 - `tools\review\llama-completion.exe` exposes the required HF, JSON schema,
-  no-conversation, reasoning, and chat-template options
+  no-conversation, and chat-template options, plus the reasoning diagnostic
+  option used when investigating Gemma-family output behavior
 
 Observed on 2026-06-14:
 

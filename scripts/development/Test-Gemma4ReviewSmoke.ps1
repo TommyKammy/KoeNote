@@ -32,6 +32,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $modelId = "gemma-4-12b-it-qat-q4-0"
 $modelFile = "gemma-4-12b-it-qat-q4_0.gguf"
 $modelUrl = "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/$modelFile"
+$defaultReviewModelId = "gemma-4-e4b-it-q4-k-m"
 $expectedSize = 6975877728L
 $expectedXetHash = "0edf41aec84b20e4d1dffc587493dbd68bc1a74ceea3bdf8b6691a6c9d165234"
 
@@ -200,11 +201,21 @@ else {
     Add-Check "experimental preset" "fail" "Experimental preset does not select Gemma 4 12B."
 }
 
-if ($recommendedPreset.review_model_id -ne $modelId -and $highAccuracyPreset.review_model_id -ne $modelId) {
-    Add-Check "default promotion guard" "pass" "Recommended and high_accuracy presets do not select Gemma 4 12B."
+if ($recommendedPreset -ne $null -and
+    $highAccuracyPreset -ne $null -and
+    $recommendedPreset.review_model_id -eq $defaultReviewModelId -and
+    $highAccuracyPreset.review_model_id -eq $defaultReviewModelId) {
+    Add-Check "default promotion guard" "pass" "Recommended and high_accuracy presets remain on Gemma 4 E4B." @{
+        recommended_review_model_id = $recommendedPreset.review_model_id
+        high_accuracy_review_model_id = $highAccuracyPreset.review_model_id
+    }
 }
 else {
-    Add-Check "default promotion guard" "fail" "Gemma 4 12B has been promoted outside experimental."
+    Add-Check "default promotion guard" "fail" "Recommended and high_accuracy presets must remain on Gemma 4 E4B." @{
+        expected_review_model_id = $defaultReviewModelId
+        recommended_review_model_id = if ($recommendedPreset -eq $null) { $null } else { $recommendedPreset.review_model_id }
+        high_accuracy_review_model_id = if ($highAccuracyPreset -eq $null) { $null } else { $highAccuracyPreset.review_model_id }
+    }
 }
 
 if ($SkipNetwork) {
@@ -289,27 +300,36 @@ if ($RunLocalRuntimeSmoke) {
             "--n-gpu-layers", "999",
             "--n-predict", "256",
             "--temp", "0.1",
-            "--reasoning", "off",
             "--no-conversation",
             "--no-display-prompt",
             "--json-schema-file", $schemaPath
         )
-        $result = Invoke-ProcessWithTimeout $RuntimePath $arguments $repoRoot $RuntimeTimeoutSeconds
-        $combined = "$($result.stdout)`n$($result.stderr)"
-        $hasThinking = $combined -match "<think|</think>|reasoning_content"
-        if ($result.exit_code -eq 0 -and -not $hasThinking) {
-            Add-Check "local runtime smoke" "pass" "Local Gemma 4 12B runtime smoke completed without visible thinking output." @{
-                exit_code = $result.exit_code
-                stdout = $result.stdout.Trim()
-                stderr_tail = ($result.stderr -split "`r?`n" | Select-Object -Last 20) -join "`n"
+
+        try {
+            $result = Invoke-ProcessWithTimeout $RuntimePath $arguments $repoRoot $RuntimeTimeoutSeconds
+            $combined = "$($result.stdout)`n$($result.stderr)"
+            $hasThinking = $combined -match "<think|</think>|reasoning_content"
+            if ($result.exit_code -eq 0 -and -not $hasThinking) {
+                Add-Check "local runtime smoke" "pass" "Local Gemma 4 12B runtime smoke completed without visible thinking output." @{
+                    exit_code = $result.exit_code
+                    stdout = $result.stdout.Trim()
+                    stderr_tail = ($result.stderr -split "`r?`n" | Select-Object -Last 20) -join "`n"
+                }
+            }
+            else {
+                Add-Check "local runtime smoke" "fail" "Local Gemma 4 12B runtime smoke failed or emitted thinking output." @{
+                    exit_code = $result.exit_code
+                    stdout = $result.stdout
+                    stderr = $result.stderr
+                    has_thinking = $hasThinking
+                }
             }
         }
-        else {
-            Add-Check "local runtime smoke" "fail" "Local Gemma 4 12B runtime smoke failed or emitted thinking output." @{
-                exit_code = $result.exit_code
-                stdout = $result.stdout
-                stderr = $result.stderr
-                has_thinking = $hasThinking
+        catch {
+            Add-Check "local runtime smoke" "fail" "Local Gemma 4 12B runtime smoke could not complete: $($_.Exception.Message)" @{
+                exception_type = $_.Exception.GetType().FullName
+                timeout_seconds = $RuntimeTimeoutSeconds
+                model_path = $ModelPath
             }
         }
     }
