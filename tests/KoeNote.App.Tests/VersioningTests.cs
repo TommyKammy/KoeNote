@@ -311,7 +311,15 @@ public sealed class VersioningTests
         Assert.Contains("taskkill.exe", script);
         Assert.Contains("<\\|channel\\>thought", script);
         Assert.Contains("System.Net.WebException", script);
-        Assert.DoesNotContain("\"--reasoning\", \"off\"", script);
+        Assert.Contains("New-ReviewSmokePrompt", script);
+        Assert.Contains("New-ReviewSmokeSchema", script);
+        Assert.Contains("Test-ReviewSmokeJson", script);
+        Assert.Contains("\"minItems\": 1", script);
+        Assert.Contains("\"required\": [\"segment_id\", \"issue_type\", \"original_text\", \"suggested_text\", \"reason\", \"confidence\"]", script);
+        Assert.Contains("stdout contains Review-shaped JSON draft items", script);
+        Assert.Contains("stdout JSON root is not an array", script);
+        Assert.Contains("response_uri = $Uri", script);
+        Assert.Contains("\"--reasoning\", \"off\"", script);
         Assert.DoesNotContain("Start-Job", script);
     }
 

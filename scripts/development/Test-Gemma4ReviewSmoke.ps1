@@ -81,7 +81,12 @@ function Invoke-HeadRequest {
     }
     catch [System.Net.WebException] {
         if ($_.Exception.Response -eq $null) {
-            throw
+            return [pscustomobject]@{
+                status_code = 0
+                response_uri = $Uri
+                headers = [ordered]@{}
+                error = $_.Exception.Message
+            }
         }
 
         $response = $_.Exception.Response
@@ -170,6 +175,100 @@ function Stop-ProcessTree {
     param([int]$ProcessId)
 
     & taskkill.exe /PID $ProcessId /T /F | Out-Null
+}
+
+function New-ReviewSmokePrompt {
+    return @"
+You are reviewing Japanese ASR transcript segments for KoeNote.
+Return only a JSON array. Do not include explanations, markdown, or code fences.
+Each item must use these keys: segment_id, issue_type, original_text, suggested_text, reason, confidence.
+If there is no likely correction, return [].
+
+Transcript segments:
+- segment_id: 000001
+  speaker: Speaker_0
+  text: KoeNote smoke test says migiwa should be corrected to migigawa in this transcript.
+
+For this smoke test, return one correction draft for segment_id 000001.
+"@
+}
+
+function New-ReviewSmokeSchema {
+    return @'
+{
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "properties": {
+      "segment_id": { "type": "string" },
+      "issue_type": { "type": "string" },
+      "original_text": { "type": "string" },
+      "suggested_text": { "type": "string" },
+      "reason": { "type": "string" },
+      "confidence": { "type": "number" }
+    },
+    "required": ["segment_id", "issue_type", "original_text", "suggested_text", "reason", "confidence"],
+    "additionalProperties": false
+  }
+}
+'@
+}
+
+function Test-ReviewSmokeJson {
+    param([string]$Output)
+
+    $trimmedOutput = if ($null -eq $Output) { "" } else { $Output.Trim() }
+    if (-not ($trimmedOutput.StartsWith("[") -and $trimmedOutput.EndsWith("]"))) {
+        return [pscustomobject]@{
+            is_valid = $false
+            reason = "stdout JSON root is not an array."
+        }
+    }
+
+    try {
+        $parsed = $trimmedOutput | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return [pscustomobject]@{
+            is_valid = $false
+            reason = "stdout is not valid JSON: $($_.Exception.Message)"
+        }
+    }
+
+    $items = @($parsed)
+    if ($items.Count -eq 0) {
+        return [pscustomobject]@{
+            is_valid = $false
+            reason = "stdout JSON array did not contain any review draft items."
+        }
+    }
+
+    $requiredProperties = @("segment_id", "issue_type", "original_text", "suggested_text", "reason", "confidence")
+    foreach ($item in $items) {
+        foreach ($propertyName in $requiredProperties) {
+            if ($null -eq $item.PSObject.Properties[$propertyName] -or
+                [string]::IsNullOrWhiteSpace([string]$item.$propertyName)) {
+                return [pscustomobject]@{
+                    is_valid = $false
+                    reason = "stdout JSON item is missing required review property: $propertyName"
+                }
+            }
+        }
+
+        if ($item.segment_id -ne "000001") {
+            return [pscustomobject]@{
+                is_valid = $false
+                reason = "stdout JSON item references an unexpected segment_id: $($item.segment_id)"
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        is_valid = $true
+        reason = "stdout contains Review-shaped JSON draft items."
+        item_count = $items.Count
+    }
 }
 
 function Invoke-ProcessWithTimeout {
@@ -337,8 +436,8 @@ if ($RunLocalRuntimeSmoke) {
         New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
         $promptPath = Join-Path $smokeRoot "gemma4-12b-review-smoke.prompt.txt"
         $schemaPath = Join-Path $smokeRoot "gemma4-12b-review-smoke.schema.json"
-        Set-Content -LiteralPath $promptPath -Encoding UTF8 -Value "Return [] only for this short transcript fragment: [00:00] Speaker 1: This is a KoeNote smoke test."
-        Set-Content -LiteralPath $schemaPath -Encoding UTF8 -Value '{"type":"array","items":{"type":"object"}}'
+        Set-Content -LiteralPath $promptPath -Encoding UTF8 -Value (New-ReviewSmokePrompt)
+        Set-Content -LiteralPath $schemaPath -Encoding UTF8 -Value (New-ReviewSmokeSchema)
 
         $arguments = @(
             "--model", $ModelPath,
@@ -349,6 +448,7 @@ if ($RunLocalRuntimeSmoke) {
             "--temp", "0.1",
             "--no-conversation",
             "--no-display-prompt",
+            "--reasoning", "off",
             "--json-schema-file", $schemaPath
         )
 
@@ -356,19 +456,22 @@ if ($RunLocalRuntimeSmoke) {
             $result = Invoke-ProcessWithTimeout $RuntimePath $arguments $repoRoot $RuntimeTimeoutSeconds
             $combined = "$($result.stdout)`n$($result.stderr)"
             $hasThinking = $combined -match "<think|</think>|reasoning_content|<\|channel\>thought|<channel\|>"
-            if ($result.exit_code -eq 0 -and -not $hasThinking) {
-                Add-Check "local runtime smoke" "pass" "Local Gemma 4 12B runtime smoke completed without visible thinking output." @{
+            $jsonCheck = Test-ReviewSmokeJson $result.stdout
+            if ($result.exit_code -eq 0 -and -not $hasThinking -and $jsonCheck.is_valid) {
+                Add-Check "local runtime smoke" "pass" "Local Gemma 4 12B runtime smoke completed with Review-shaped JSON and without visible thinking output." @{
                     exit_code = $result.exit_code
                     stdout = $result.stdout.Trim()
                     stderr_tail = ($result.stderr -split "`r?`n" | Select-Object -Last 20) -join "`n"
+                    json_item_count = $jsonCheck.item_count
                 }
             }
             else {
-                Add-Check "local runtime smoke" "fail" "Local Gemma 4 12B runtime smoke failed or emitted thinking output." @{
+                Add-Check "local runtime smoke" "fail" "Local Gemma 4 12B runtime smoke failed, emitted thinking output, or did not produce Review-shaped JSON." @{
                     exit_code = $result.exit_code
                     stdout = $result.stdout
                     stderr = $result.stderr
                     has_thinking = $hasThinking
+                    json_check = $jsonCheck
                 }
             }
         }

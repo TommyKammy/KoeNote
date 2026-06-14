@@ -25,4 +25,5 @@ public sealed record ReviewRunOptions(
     int? ThreadsBatch = null,
     bool UseJsonSchema = true,
     bool EnableRepair = true,
+    string ReasoningMode = "off",
     string PromptProfile = "default");

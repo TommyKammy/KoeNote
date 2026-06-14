@@ -24,7 +24,8 @@ public sealed class ReviewCommandBuilder
             options.TopP,
             options.TopK,
             options.RepeatPenalty,
-            jsonSchemaFilePath));
+            JsonSchemaFilePath: jsonSchemaFilePath,
+            ReasoningMode: options.ReasoningMode));
     }
 
     private static string QuoteForDisplay(string value)
