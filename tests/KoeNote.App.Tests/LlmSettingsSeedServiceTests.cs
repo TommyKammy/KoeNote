@@ -222,6 +222,23 @@ public sealed class LlmSettingsSeedServiceTests
         Assert.Equal("gemma-4-e4b-it-q4-k-m", repository.FindActiveProfile()?.Profile.ModelId);
     }
 
+    [Fact]
+    public void EnsureActiveProfileFromSetup_DoesNotFallbackUnknownReviewModelToExperimentalPreset()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        new SetupStateService(paths).Save(SetupState.Default(paths.DefaultModelStorageRoot) with
+        {
+            SelectedModelPresetId = "experimental",
+            SelectedReviewModelId = "unsupported-model"
+        });
+        var repository = new LlmSettingsRepository(paths);
+        var service = CreateService(paths, repository);
+
+        service.EnsureActiveProfileFromSetup();
+
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", repository.FindActiveProfile()?.Profile.ModelId);
+    }
+
     private static LlmSettingsSeedService CreateService(AppPaths paths, LlmSettingsRepository repository)
     {
         return new LlmSettingsSeedService(

@@ -406,6 +406,31 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_LoadState_RepairsUnknownReviewSelectionToDefaultReviewModel()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            CurrentStep = SetupStep.Complete,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "removed-review-model"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.LoadState();
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void SetupWizard_LoadState_PreservesSupportedBonsaiLightweightReviewModel()
     {
         var paths = CreatePaths();

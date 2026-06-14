@@ -1,4 +1,5 @@
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Llm;
 
 namespace KoeNote.App.Services.Setup;
 
@@ -37,7 +38,7 @@ internal sealed class SetupPresetRecommendationService(
             presetId,
             "Model presets are not available.",
             "faster-whisper-large-v3-turbo",
-            "llm-jp-4-8b-thinking-q4-k-m",
+            ReviewModelSelectionResolver.DefaultReviewModelId,
             [],
             []);
     }
