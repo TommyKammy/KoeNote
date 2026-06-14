@@ -48,7 +48,7 @@
       "display_name": "実験的",
       "description": "標準ASRに実験的な軽量Reviewを組み合わせ、整文品質とJSON安定性を検証する構成です。",
       "asr_model_id": "faster-whisper-large-v3-turbo",
-      "review_model_id": "llm-jp-4-8b-thinking-q4-k-m",
+      "review_model_id": "gemma-4-12b-it-qat-q4-0",
       "badges": ["実験的", "Review検証用"],
       "recommended_for": ["experimental_review", "review_quality_eval"]
     }
@@ -261,6 +261,37 @@
       "requirements": {
         "gpu_required": false,
         "recommended_vram_gb": 6,
+        "python_required": false
+      },
+      "status": "available",
+      "output_sanitizer_profile": "markdownSectionOnly"
+    },
+    {
+      "model_id": "gemma-4-12b-it-qat-q4-0",
+      "family": "gemma",
+      "role": "review",
+      "engine_id": "llama-cpp",
+      "display_name": "Gemma 4 12B it QAT Q4_0",
+      "language": ["ja", "multi"],
+      "recommended_for": ["experimental_review", "review_quality_eval"],
+      "quality_labels": ["実験的", "高精度"],
+      "runtime": {
+        "type": "llama-cpp",
+        "package_id": "runtime-llama-cpp"
+      },
+      "size_bytes": 6975877728,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf",
+        "sha256": null
+      },
+      "license": {
+        "name": "Apache-2.0",
+        "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf"
+      },
+      "requirements": {
+        "gpu_required": false,
+        "recommended_vram_gb": 12,
         "python_required": false
       },
       "status": "available",

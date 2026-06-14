@@ -26,6 +26,14 @@ public sealed class ModelCatalogServiceTests
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported && entry.CatalogItem.Status == "available");
         Assert.Contains(entries, entry => entry.ModelId == "gemma-4-e4b-it-q4-k-m" && entry.Role == "review" && entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
+        Assert.Contains(entries, entry =>
+            entry.ModelId == "gemma-4-12b-it-qat-q4-0" &&
+            entry.Role == "review" &&
+            entry.IsDirectDownloadSupported &&
+            entry.CatalogItem.Family == "gemma" &&
+            entry.CatalogItem.Runtime.PackageId == "runtime-llama-cpp" &&
+            entry.CatalogItem.SizeBytes == 6975877728 &&
+            entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
         Assert.DoesNotContain(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         Assert.Contains(catalog.Models, model => model.ModelId == "ternary-bonsai-8b-q2-0" && model.Status == "hidden");
@@ -66,7 +74,7 @@ public sealed class ModelCatalogServiceTests
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
         Assert.Equal("実験的", experimental.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", experimental.AsrModelId);
-        Assert.Equal("llm-jp-4-8b-thinking-q4-k-m", experimental.ReviewModelId);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", experimental.ReviewModelId);
     }
 
     [Fact]
