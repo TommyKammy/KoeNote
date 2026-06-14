@@ -42,6 +42,7 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("memory_free_mb", script);
         Assert.Contains("KOENOTE_ASR_TOOLS_DIR", script);
         Assert.Contains("KOENOTE_CTRANSLATE2_CUDA_DIR", script);
+        Assert.Contains("has_nvidia_runtime_files", script);
         Assert.Contains("ctranslate2*.dll", script);
         Assert.Contains("_ext*.pyd", script);
         Assert.Contains("nvidia-smi", script);
@@ -71,7 +72,9 @@ public sealed class ScriptedJsonAsrEngineTests
         var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
         Directory.CreateDirectory(asrToolsDirectory);
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
-        Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda"));
+        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        Directory.CreateDirectory(ctranslate2CudaDirectory);
+        DeleteLegacyNvidiaDlls(ctranslate2CudaDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
         Directory.CreateDirectory(modelPath);
         File.WriteAllText(scriptPath, "print('ok')");
@@ -92,7 +95,6 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.NotNull(runner.Environment);
         Assert.True(runner.Environment.TryGetValue("PATH", out var path));
         var pathEntries = path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
         Assert.DoesNotContain(asrToolsDirectory, pathEntries, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(
             ctranslate2CudaDirectory,
@@ -140,6 +142,7 @@ public sealed class ScriptedJsonAsrEngineTests
         Directory.CreateDirectory(asrToolsDirectory);
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
         Directory.CreateDirectory(ctranslate2CudaDirectory);
+        DeleteLegacyNvidiaDlls(ctranslate2CudaDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
         Directory.CreateDirectory(modelPath);
         File.WriteAllText(scriptPath, "print('ok')");
@@ -184,6 +187,60 @@ public sealed class ScriptedJsonAsrEngineTests
             StringComparison.OrdinalIgnoreCase);
 
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_DoesNotAddLegacyAsrToolsPathWhenDedicatedCudaRuntimeIsComplete()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "scripts", "asr", "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
+        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        Directory.CreateDirectory(asrToolsDirectory);
+        DeleteLegacyNvidiaDlls(asrToolsDirectory);
+        Directory.CreateDirectory(ctranslate2CudaDirectory);
+        DeleteLegacyNvidiaDlls(ctranslate2CudaDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+        Directory.CreateDirectory(modelPath);
+        File.WriteAllText(scriptPath, "print('ok')");
+        File.WriteAllText(audioPath, "");
+        WriteNvidiaDllSet(asrToolsDirectory);
+        WriteNvidiaDllSet(ctranslate2CudaDirectory);
+        var runner = new CapturingAsrProcessRunner();
+        var engine = CreateEngine(paths, runner);
+
+        await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "model",
+                scriptPath),
+            new AsrOptions());
+
+        Assert.NotNull(runner.Environment);
+        Assert.True(runner.Environment.TryGetValue("PATH", out var path));
+        var pathEntries = path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains(
+            ctranslate2CudaDirectory,
+            pathEntries,
+            StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            asrToolsDirectory,
+            pathEntries,
+            StringComparer.OrdinalIgnoreCase);
+        Assert.StartsWith(
+            ctranslate2CudaDirectory,
+            path,
+            StringComparison.OrdinalIgnoreCase);
+
+        DeleteLegacyNvidiaDlls(asrToolsDirectory);
+        DeleteLegacyNvidiaDlls(ctranslate2CudaDirectory);
     }
 
     [Fact]
@@ -666,6 +723,21 @@ public sealed class ScriptedJsonAsrEngineTests
             {
                 File.Delete(path);
             }
+        }
+    }
+
+    private static void WriteNvidiaDllSet(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        foreach (var fileName in new[]
+        {
+            "cublas64_12.dll",
+            "cublasLt64_12.dll",
+            "cudart64_12.dll",
+            "cudnn64_9.dll"
+        })
+        {
+            File.WriteAllText(Path.Combine(directory, fileName), "");
         }
     }
 
