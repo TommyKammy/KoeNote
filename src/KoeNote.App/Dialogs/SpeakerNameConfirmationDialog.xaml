@@ -262,7 +262,7 @@
                                                                              Margin="0,7,0,0"
                                                                              Minimum="0"
                                                                              Maximum="100"
-                                                                             Value="{Binding PlaybackProgressPercent}"
+                                                                             Value="{Binding PlaybackProgressPercent, Mode=OneWay}"
                                                                              Visibility="{Binding IsPlaying, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                                             </Grid>
                                                         </Border>
