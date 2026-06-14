@@ -37,6 +37,18 @@ public abstract class MainWindowViewModelTestBase
         CreateFasterWhisperRuntime(paths);
         Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "llm-jp-4-8b-thinking-q4-k-m",
+            "review",
+            "llama-cpp",
+            paths.ReviewModelPath);
 
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
@@ -285,6 +297,32 @@ public abstract class MainWindowViewModelTestBase
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, string.Empty);
+    }
+
+    protected static void RegisterVerifiedModel(
+        AppPaths paths,
+        string modelId,
+        string role,
+        string engineId,
+        string filePath)
+    {
+        new InstalledModelRepository(paths).UpsertInstalledModel(new InstalledModel(
+            modelId,
+            role,
+            engineId,
+            modelId,
+            Family: null,
+            Version: null,
+            filePath,
+            ManifestPath: null,
+            SizeBytes: 0,
+            Sha256: null,
+            Verified: true,
+            LicenseName: "test",
+            SourceType: "test",
+            InstalledAt: DateTimeOffset.Now,
+            LastVerifiedAt: DateTimeOffset.Now,
+            Status: "installed"));
     }
 
     protected static void CreateFasterWhisperRuntime(AppPaths paths)
