@@ -179,6 +179,9 @@ $catalogModel = @($catalog.models | Where-Object { $_.model_id -eq $modelId }) |
 $experimentalPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "experimental" }) | Select-Object -First 1
 $recommendedPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "recommended" }) | Select-Object -First 1
 $highAccuracyPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "high_accuracy" }) | Select-Object -First 1
+$nonExperimental12bPresets = @($catalog.presets | Where-Object {
+        $_.preset_id -ne "experimental" -and $_.review_model_id -eq $modelId
+    })
 
 if ($catalogModel -eq $null) {
     Add-Check "catalog model" "fail" "The Gemma 4 12B model is missing from the catalog."
@@ -203,18 +206,21 @@ else {
 
 if ($recommendedPreset -ne $null -and
     $highAccuracyPreset -ne $null -and
+    $nonExperimental12bPresets.Count -eq 0 -and
     $recommendedPreset.review_model_id -eq $defaultReviewModelId -and
     $highAccuracyPreset.review_model_id -eq $defaultReviewModelId) {
-    Add-Check "default promotion guard" "pass" "Recommended and high_accuracy presets remain on Gemma 4 E4B." @{
+    Add-Check "default promotion guard" "pass" "Only the experimental preset selects Gemma 4 12B; recommended and high_accuracy remain on Gemma 4 E4B." @{
         recommended_review_model_id = $recommendedPreset.review_model_id
         high_accuracy_review_model_id = $highAccuracyPreset.review_model_id
+        non_experimental_12b_preset_ids = @()
     }
 }
 else {
-    Add-Check "default promotion guard" "fail" "Recommended and high_accuracy presets must remain on Gemma 4 E4B." @{
+    Add-Check "default promotion guard" "fail" "Only experimental may select Gemma 4 12B, and recommended/high_accuracy must remain on Gemma 4 E4B." @{
         expected_review_model_id = $defaultReviewModelId
         recommended_review_model_id = if ($recommendedPreset -eq $null) { $null } else { $recommendedPreset.review_model_id }
         high_accuracy_review_model_id = if ($highAccuracyPreset -eq $null) { $null } else { $highAccuracyPreset.review_model_id }
+        non_experimental_12b_preset_ids = @($nonExperimental12bPresets | ForEach-Object { $_.preset_id })
     }
 }
 
