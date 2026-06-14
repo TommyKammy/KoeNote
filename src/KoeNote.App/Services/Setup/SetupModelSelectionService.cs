@@ -1,13 +1,16 @@
 using System.IO;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Setup;
 
 internal sealed class SetupModelSelectionService(
     AppPaths paths,
     SetupStateService stateService,
-    ModelCatalogService modelCatalogService)
+    ModelCatalogService modelCatalogService,
+    InstalledModelRepository installedModelRepository)
 {
     public IReadOnlyList<ModelCatalogEntry> GetSelectableModels(string role)
     {
@@ -78,23 +81,39 @@ internal sealed class SetupModelSelectionService(
 
     public SetupState SelectModel(string role, string modelId)
     {
-        var catalogItem = modelCatalogService.LoadBuiltInCatalog().Models
-            .FirstOrDefault(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
-                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
-        if (catalogItem is null)
-        {
-            throw new InvalidOperationException($"Model is not in the catalog: {modelId}");
-        }
-
-        if (!ModelCatalogCompatibility.IsSelectable(catalogItem))
-        {
-            throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
-        }
+        var catalogItem = ResolveSelectableCatalogItem(role, modelId);
 
         var state = stateService.Load();
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
             ? state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.AsrModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
             : state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.ReviewModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
+        return stateService.Save(state);
+    }
+
+    public SetupState SelectModelWithoutInvalidatingCompletion(string role, string modelId)
+    {
+        var catalogItem = ResolveSelectableCatalogItem(role, modelId);
+        var state = stateService.Load();
+        var canPreserveCompletion = state.IsCompleted && IsSelectionReadyForCompletion(catalogItem);
+        state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? state with
+            {
+                IsCompleted = canPreserveCompletion,
+                LastSmokeSucceeded = canPreserveCompletion && state.LastSmokeSucceeded,
+                CurrentStep = canPreserveCompletion ? state.CurrentStep : SetupStep.AsrModel,
+                SetupMode = "custom",
+                SelectedModelPresetId = null,
+                SelectedAsrModelId = catalogItem.ModelId
+            }
+            : state with
+            {
+                IsCompleted = canPreserveCompletion,
+                LastSmokeSucceeded = canPreserveCompletion && state.LastSmokeSucceeded,
+                CurrentStep = canPreserveCompletion ? state.CurrentStep : SetupStep.ReviewModel,
+                SetupMode = "custom",
+                SelectedModelPresetId = null,
+                SelectedReviewModelId = catalogItem.ModelId
+            };
         return stateService.Save(state);
     }
 
@@ -220,6 +239,79 @@ internal sealed class SetupModelSelectionService(
             : catalog.Models.FirstOrDefault(model =>
                 model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ModelCatalogItem ResolveSelectableCatalogItem(string role, string modelId)
+    {
+        var catalogItem = modelCatalogService.LoadBuiltInCatalog().Models
+            .FirstOrDefault(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (catalogItem is null)
+        {
+            throw new InvalidOperationException($"Model is not in the catalog: {modelId}");
+        }
+
+        if (!ModelCatalogCompatibility.IsSelectable(catalogItem))
+        {
+            throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
+        }
+
+        return catalogItem;
+    }
+
+    private bool IsSelectionReadyForCompletion(ModelCatalogItem catalogItem)
+    {
+        var installed = GetReadyInstalledModel(catalogItem);
+        if (installed is null)
+        {
+            return false;
+        }
+
+        return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
+            ? IsReviewRuntimeReady(catalogItem.ModelId) && IsReviewRuntimePathBridgeReady(installed)
+            : FasterWhisperRuntimeLayout.HasPackage(paths);
+    }
+
+    private bool IsInstalledModelReady(ModelCatalogItem catalogItem)
+    {
+        return GetReadyInstalledModel(catalogItem) is not null;
+    }
+
+    private InstalledModel? GetReadyInstalledModel(ModelCatalogItem catalogItem)
+    {
+        var installed = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
+        return installed is not null &&
+            installed.Role.Equals(catalogItem.Role, StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath))
+            ? installed
+            : null;
+    }
+
+    private bool IsReviewRuntimeReady(string modelId)
+    {
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
+        return File.Exists(runtimePath);
+    }
+
+    private static bool IsReviewRuntimePathBridgeReady(InstalledModel installed)
+    {
+        try
+        {
+            using var bridge = LlamaRuntimePathBridge.Create(installed.FilePath);
+            return IsAscii(bridge.ModelPath);
+        }
+        catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception)
+            || exception is DirectoryNotFoundException or FileNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAscii(string value)
+    {
+        return value.All(static character => character <= 0x7f);
     }
 
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)

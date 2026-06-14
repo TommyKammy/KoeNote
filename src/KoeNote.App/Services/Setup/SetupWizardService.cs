@@ -46,7 +46,7 @@ public sealed class SetupWizardService
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
         _stateService = stateService;
-        _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService);
+        _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService, installedModelRepository);
         var resourceProbe = hostResourceProbe ?? new WindowsSetupHostResourceProbe();
         _presetRecommendationService = new SetupPresetRecommendationService(
             modelCatalogService,
@@ -169,6 +169,11 @@ public sealed class SetupWizardService
     public SetupState SelectModel(string role, string modelId)
     {
         return _selectionService.SelectModel(role, modelId);
+    }
+
+    public SetupState SelectSettingsModel(string role, string modelId)
+    {
+        return _selectionService.SelectModelWithoutInvalidatingCompletion(role, modelId);
     }
 
     public SetupState CommitSelectionDraft(SetupState draft)
