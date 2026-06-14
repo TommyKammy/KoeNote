@@ -290,6 +290,21 @@ public sealed class VersioningTests
         Assert.Contains("-p:CleanupQuietAllCommand=\"$CleanupQuietAllCommand\"", buildScript);
     }
 
+    [Fact]
+    public void Gemma4ReviewSmokeScript_RecordsExperimentalOnlyReleaseDecision()
+    {
+        var repoRoot = FindRepoRoot();
+        var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "development", "Test-Gemma4ReviewSmoke.ps1"));
+
+        Assert.Contains("gemma-4-12b-it-qat-q4-0", script);
+        Assert.Contains("gemma-4-12b-it-qat-q4_0.gguf", script);
+        Assert.Contains("default promotion guard", script);
+        Assert.Contains("experimental_only", script);
+        Assert.Contains("RunLocalRuntimeSmoke", script);
+        Assert.Contains("X-Linked-Size", script);
+        Assert.Contains("X-Xet-Hash", script);
+    }
+
     private static string FindRepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

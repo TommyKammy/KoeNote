@@ -143,13 +143,77 @@ Do not rely on a `--chat-template gemma` / `--single-turn` probe as the only
 compatibility signal unless #62 or a later runtime change moves KoeNote's Review
 path to chat-template mode.
 
-## Catalog follow-up
+## Catalog-era validation
 
-The catalog implementation should be handled in issue #62. Recommended guardrails:
+Issue #64 records the post-catalog release decision. Use the repository smoke
+script for repeatable checks:
 
-- Add a new model id, `gemma-4-12b-it-qat-q4-0`.
-- Do not overwrite `llm-jp-4-8b-thinking-q4-k-m`.
-- Point only the `experimental` preset at the new 12B model first.
-- Keep `recommended` and `high_accuracy` on `gemma-4-e4b-it-q4-k-m` until the
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\development\Test-Gemma4ReviewSmoke.ps1
+```
+
+The script verifies:
+
+- the built-in catalog contains `gemma-4-12b-it-qat-q4-0`
+- only the `experimental` preset selects the 12B model
+- `recommended` and `high_accuracy` remain on the safer E4B model
+- the Hugging Face `resolve/main` URL returns the expected HEAD metadata
+- a one-byte range request succeeds, proving the artifact is reachable without
+  downloading the full 6.5 GiB file
+- `tools\review\llama-completion.exe` exposes the required HF, JSON schema,
+  no-conversation, reasoning, and chat-template options
+
+Observed on 2026-06-14:
+
+```text
+repo_commit: f6e7774e6148da3b7f201e42ba37cf084c1db35f
+linked_size: 6975877728
+linked_etag: "faff1a63667fac17ac5e777f47114688fcefea96e220e211aaa8d62c2c4561f1"
+xet_hash: 0edf41aec84b20e4d1dffc587493dbd68bc1a74ceea3bdf8b6691a6c9d165234
+content_length: 6975877728
+etag: 0edf41aec84b20e4d1dffc587493dbd68bc1a74ceea3bdf8b6691a6c9d165234
+range_status: 206
+```
+
+The script writes a JSON report under
+`artifacts\smoke\gemma4-12b-review-smoke.json`. `artifacts\` is ignored by git,
+so attach or paste the report into the relevant issue/PR when a release
+candidate needs audit evidence.
+
+After downloading the full GGUF, run the local load/generation smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\development\Test-Gemma4ReviewSmoke.ps1 `
+  -RunLocalRuntimeSmoke `
+  -ModelPath "<KoeNote model storage root>\review\gemma-4-12b-it-qat-q4-0\gemma-4-12b-it-qat-q4_0.gguf"
+```
+
+The local smoke is intentionally opt-in because the model is large. It should be
+run on release candidate hardware before considering any promotion beyond the
+experimental preset.
+
+## Release decision
+
+Ship Gemma 4 12B QAT GGUF as `experimental` only.
+
+Do not promote it to `recommended` or `high_accuracy` until full local
+load/generation smoke and field data show that its memory use and initial load
+time are acceptable compared with `gemma-4-e4b-it-q4-k-m`.
+
+On this host, `tools\review\llama-completion.exe` and CUDA backend discovery are
+available, but the full `gemma-4-12b-it-qat-q4_0.gguf` file was not present in
+the standard KoeNote model storage roots. The issue #64 release judgement is
+therefore: keep the model cataloged and selectable through `experimental`, but
+do not make it a default.
+
+## Catalog implementation record
+
+The catalog implementation was handled in issue #62 with these guardrails:
+
+- A new model id, `gemma-4-12b-it-qat-q4-0`, was added.
+- `llm-jp-4-8b-thinking-q4-k-m` remains available for compatibility.
+- Only the `experimental` preset points at the 12B model.
+- `recommended` and `high_accuracy` stay on `gemma-4-e4b-it-q4-k-m` until the
   heavier 12B model has enough field validation.
-- Keep fallback and existing install migration work separate under issue #63.
+- Fallback and existing install migration were kept separate under issue #63.
