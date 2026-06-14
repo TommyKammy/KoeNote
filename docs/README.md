@@ -10,6 +10,7 @@ This directory keeps current product/developer documentation near the top level 
 - [Development overview](development/README.md)
 - [Core packaging](development/core-packaging.md)
 - [Core UI smoke checklist](development/core-ui-smoke.md)
+- [Gemma 4 12B review model compatibility](development/gemma-4-12b-review-compatibility.md)
 - [Images](images/)
 
 ## Archive
