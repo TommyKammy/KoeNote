@@ -22,7 +22,8 @@ public sealed class LlmProfileResolverTests
         Assert.Equal("Gemma 4 E4B it Q4_K_M", profile.DisplayName);
         Assert.Equal("llama-cpp", profile.RuntimeKind);
         Assert.Equal("runtime-llama-cpp", profile.RuntimePackageId);
-        Assert.Equal(paths.ReviewModelPath, profile.ModelPath);
+        var catalogItem = catalog.Models.First(model => model.ModelId == "gemma-4-e4b-it-q4-k-m");
+        Assert.Equal(CreateInstallService(paths).GetDefaultInstallPath(catalogItem), profile.ModelPath);
         Assert.Equal(paths.LlamaCompletionPath, profile.LlamaCompletionPath);
         Assert.Equal("cpu", profile.AccelerationMode);
         Assert.Equal(8192, profile.ContextSize);
@@ -122,10 +123,10 @@ public sealed class LlmProfileResolverTests
     }
 
     [Fact]
-    public void Resolve_FallsBackToInstalledDefaultReviewModelPathWhenSelectedModelIsMissing()
+    public void Resolve_FallsBackToInstalledDefaultGemmaPathWhenSelectedGemmaModelIsMissing()
     {
         var paths = TestDatabase.CreateReadyPaths();
-        var fallbackPath = Path.Combine(paths.Root, "models", "llm-jp.gguf");
+        var fallbackPath = Path.Combine(paths.Root, "models", "gemma-e4b.gguf");
         Directory.CreateDirectory(Path.GetDirectoryName(fallbackPath)!);
         File.WriteAllText(fallbackPath, "model");
         var repository = new InstalledModelRepository(paths);
@@ -133,8 +134,8 @@ public sealed class LlmProfileResolverTests
             LlmProfileResolver.FallbackReviewModelId,
             "review",
             "llama-cpp",
-            "llm-jp 4",
-            "llm-jp",
+            "Gemma 4 E4B",
+            "gemma",
             null,
             fallbackPath,
             null,
@@ -149,9 +150,37 @@ public sealed class LlmProfileResolverTests
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var resolver = new LlmProfileResolver(paths, repository);
 
-        var profile = resolver.Resolve(catalog, "gemma-4-e4b-it-q4-k-m");
+        var profile = resolver.Resolve(catalog, "gemma-4-12b-it-qat-q4-0");
 
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", profile.ModelId);
         Assert.Equal(fallbackPath, profile.ModelPath);
+    }
+
+    [Fact]
+    public void Resolve_UsesLegacyReviewModelPathWhenLegacyModelIsSelected()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        File.WriteAllText(paths.ReviewModelPath, "model");
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
+
+        var profile = resolver.Resolve(catalog, LlmProfileResolver.LegacyReviewModelId);
+
+        Assert.Equal(LlmProfileResolver.LegacyReviewModelId, profile.ModelId);
+        Assert.Equal(paths.ReviewModelPath, profile.ModelPath);
+    }
+
+    [Fact]
+    public void Resolve_UsesDefaultReviewModelForUnknownModelId()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var resolver = new LlmProfileResolver(paths, new InstalledModelRepository(paths));
+
+        var profile = resolver.Resolve(catalog, "unknown-review-model");
+
+        Assert.Equal(LlmProfileResolver.FallbackReviewModelId, profile.ModelId);
+        Assert.Equal("gemma", profile.ModelFamily);
     }
 
     [Fact]
@@ -168,5 +197,13 @@ public sealed class LlmProfileResolverTests
         Assert.Equal(8192, profile.ContextSize);
         Assert.Equal(999, profile.GpuLayers);
         Assert.Equal(TimeSpan.FromHours(2), profile.Timeout);
+    }
+
+    private static ModelInstallService CreateInstallService(AppPaths paths)
+    {
+        return new ModelInstallService(
+            paths,
+            new InstalledModelRepository(paths),
+            new ModelVerificationService());
     }
 }

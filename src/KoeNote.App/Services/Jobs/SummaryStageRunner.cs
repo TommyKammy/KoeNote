@@ -171,29 +171,8 @@ public sealed class SummaryStageRunner(
     private string ResolveReviewModelId()
     {
         var state = setupStateService.Load();
-        var selectedReviewModelId = state.SelectedReviewModelId;
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        if (IsSelectableReviewModel(catalog, selectedReviewModelId))
-        {
-            return selectedReviewModelId!;
-        }
-
-        var presetReviewModelId = (catalog.Presets ?? [])
-            .FirstOrDefault(preset => !string.IsNullOrWhiteSpace(state.SelectedModelPresetId) &&
-                preset.PresetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase))
-            ?.ReviewModelId;
-        return IsSelectableReviewModel(catalog, presetReviewModelId)
-            ? presetReviewModelId!
-            : "llm-jp-4-8b-thinking-q4-k-m";
-    }
-
-    private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
-    {
-        return !string.IsNullOrWhiteSpace(modelId) &&
-            catalog.Models.Any(model =>
-                model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
-                ModelCatalogCompatibility.IsSelectable(model));
+        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
     }
 
     private static int ResolveSummaryMaxAttempts(string modelId, string? modelFamily)

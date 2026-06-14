@@ -50,26 +50,6 @@ public sealed class LlmSettingsSeedService(
 
     private static string ResolveReviewModelId(ModelCatalog catalog, SetupState state)
     {
-        if (IsSelectableReviewModel(catalog, state.SelectedReviewModelId))
-        {
-            return state.SelectedReviewModelId!;
-        }
-
-        var presetReviewModelId = (catalog.Presets ?? [])
-            .FirstOrDefault(preset => !string.IsNullOrWhiteSpace(state.SelectedModelPresetId) &&
-                preset.PresetId.Equals(state.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase))
-            ?.ReviewModelId;
-        return IsSelectableReviewModel(catalog, presetReviewModelId)
-            ? presetReviewModelId!
-            : LlmProfileResolver.FallbackReviewModelId;
-    }
-
-    private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
-    {
-        return !string.IsNullOrWhiteSpace(modelId) &&
-            catalog.Models.Any(model =>
-                model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
-                ModelCatalogCompatibility.IsSelectable(model));
+        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
     }
 }

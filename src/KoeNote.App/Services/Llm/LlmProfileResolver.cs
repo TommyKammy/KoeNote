@@ -9,7 +9,8 @@ public sealed class LlmProfileResolver(
     AppPaths paths,
     InstalledModelRepository installedModelRepository)
 {
-    public const string FallbackReviewModelId = "llm-jp-4-8b-thinking-q4-k-m";
+    public const string FallbackReviewModelId = ReviewModelSelectionResolver.DefaultReviewModelId;
+    public const string LegacyReviewModelId = ReviewModelSelectionResolver.LegacyReviewModelId;
 
     public LlmRuntimeProfile Resolve(ModelCatalog catalog, string modelId)
     {
@@ -21,6 +22,13 @@ public sealed class LlmProfileResolver(
 
         var catalogItem = catalog.Models.FirstOrDefault(model =>
             model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (catalogItem is null)
+        {
+            modelId = ReviewModelSelectionResolver.Resolve(catalog, modelId, selectedPresetId: null);
+            catalogItem = catalog.Models.FirstOrDefault(model =>
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        }
+
         var preset = LlmPresetCatalog.ResolveRuntimePreset(modelId, catalogItem?.Family);
         var catalogSanitizerProfile = catalogItem?.OutputSanitizerProfile;
 
@@ -32,7 +40,7 @@ public sealed class LlmProfileResolver(
             DisplayName: catalogItem?.DisplayName ?? modelId,
             RuntimeKind: catalogItem?.Runtime.Type ?? "llama-cpp",
             RuntimePackageId: runtimePackageId,
-            ModelPath: ResolveModelPath(modelId),
+            ModelPath: ResolveModelPath(catalogItem, modelId),
             LlamaCompletionPath: ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId),
             ContextSize: preset.ContextSize,
             GpuLayers: preset.GpuLayers,
@@ -47,20 +55,43 @@ public sealed class LlmProfileResolver(
         return profile;
     }
 
-    private string ResolveModelPath(string modelId)
+    private string ResolveModelPath(ModelCatalogItem? catalogItem, string modelId)
     {
         if (FindUsableInstalledReviewModel(modelId) is { } selectedPath)
         {
             return selectedPath;
         }
 
-        if (!modelId.Equals(FallbackReviewModelId, StringComparison.OrdinalIgnoreCase) &&
+        if (ShouldUseDefaultModelAsFallback(catalogItem, modelId) &&
             FindUsableInstalledReviewModel(FallbackReviewModelId) is { } fallbackPath)
         {
             return fallbackPath;
         }
 
-        return paths.ReviewModelPath;
+        if (modelId.Equals(LegacyReviewModelId, StringComparison.OrdinalIgnoreCase) &&
+            LegacyReviewModelPathExists())
+        {
+            return paths.ReviewModelPath;
+        }
+
+        if (catalogItem?.Role.Equals("review", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return Path.Combine(
+                paths.DefaultModelStorageRoot,
+                catalogItem.Role,
+                catalogItem.ModelId,
+                ResolveDownloadFileName(catalogItem));
+        }
+
+        return modelId.Equals(LegacyReviewModelId, StringComparison.OrdinalIgnoreCase)
+            ? paths.ReviewModelPath
+            : Path.Combine(paths.DefaultModelStorageRoot, "review", modelId, $"{modelId}.gguf");
+    }
+
+    private static bool ShouldUseDefaultModelAsFallback(ModelCatalogItem? catalogItem, string modelId)
+    {
+        return !modelId.Equals(FallbackReviewModelId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(catalogItem?.Family, "gemma", StringComparison.OrdinalIgnoreCase);
     }
 
     private string? FindUsableInstalledReviewModel(string modelId)
@@ -68,12 +99,33 @@ public sealed class LlmProfileResolver(
         var installed = installedModelRepository.FindInstalledModel(modelId);
         if (installed is not null &&
             installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
         {
             return installed.FilePath;
         }
 
         return null;
+    }
+
+    private bool LegacyReviewModelPathExists()
+    {
+        return File.Exists(paths.ReviewModelPath) || Directory.Exists(paths.ReviewModelPath);
+    }
+
+    private static string ResolveDownloadFileName(ModelCatalogItem catalogItem)
+    {
+        if (catalogItem.Download.Url is { Length: > 0 } url &&
+            Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var fileName = Path.GetFileName(uri.LocalPath);
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                return fileName;
+            }
+        }
+
+        return $"{catalogItem.ModelId}.gguf";
     }
 
     private string ResolveAccelerationMode(string runtimePackageId, int gpuLayers)

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net.Http;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 
@@ -35,7 +36,7 @@ public sealed partial class MainWindowViewModel
     private Task RegisterPreinstalledModelsAsync()
     {
         var catalog = _modelCatalogService.LoadBuiltInCatalog();
-        RegisterIfPresent(catalog, "llm-jp-4-8b-thinking-q4-k-m", Paths.ReviewModelPath, "preinstalled");
+        RegisterIfPresent(catalog, ReviewModelSelectionResolver.LegacyReviewModelId, Paths.ReviewModelPath, "preinstalled");
         RefreshModelCatalog();
         LatestLog = "Preinstalled model scan completed.";
         return Task.CompletedTask;
@@ -456,7 +457,7 @@ public sealed partial class MainWindowViewModel
     {
         var modelId = ResolveEffectiveReviewModelId();
 
-        if (modelId.Equals("llm-jp-4-8b-thinking-q4-k-m", StringComparison.OrdinalIgnoreCase))
+        if (modelId.Equals(ReviewModelSelectionResolver.LegacyReviewModelId, StringComparison.OrdinalIgnoreCase))
         {
             return ModelPathExists(modelId, Paths.ReviewModelPath);
         }
@@ -483,30 +484,7 @@ public sealed partial class MainWindowViewModel
     private string ResolveEffectiveReviewModelId(ModelCatalog? catalog = null)
     {
         catalog ??= _modelCatalogService.LoadBuiltInCatalog();
-
-        if (IsSelectableReviewModel(catalog, _setupState.SelectedReviewModelId))
-        {
-            return _setupState.SelectedReviewModelId!;
-        }
-
-        var presetReviewModelId = (catalog.Presets ?? [])
-            .FirstOrDefault(preset =>
-                !string.IsNullOrWhiteSpace(_setupState.SelectedModelPresetId) &&
-                preset.PresetId.Equals(_setupState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase))
-            ?.ReviewModelId;
-
-        return IsSelectableReviewModel(catalog, presetReviewModelId)
-            ? presetReviewModelId!
-            : "llm-jp-4-8b-thinking-q4-k-m";
-    }
-
-    private static bool IsSelectableReviewModel(ModelCatalog catalog, string? modelId)
-    {
-        return !string.IsNullOrWhiteSpace(modelId) &&
-            catalog.Models.Any(model =>
-                model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
-                ModelCatalogCompatibility.IsSelectable(model));
+        return ReviewModelSelectionResolver.Resolve(catalog, _setupState.SelectedReviewModelId, _setupState.SelectedModelPresetId);
     }
 
     private bool ModelPathExists(string modelId, string fallbackPath)

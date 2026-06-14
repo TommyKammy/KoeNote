@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 
 namespace KoeNote.App.Services.Setup;
@@ -143,7 +144,7 @@ internal sealed class SetupModelSelectionService(
     {
         var recommendedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
             ? "faster-whisper-large-v3-turbo"
-            : "gemma-4-e4b-it-q4-k-m";
+            : ReviewModelSelectionResolver.DefaultReviewModelId;
         var selectableModels = GetSelectableModels(role);
         return selectableModels.FirstOrDefault(entry =>
             entry.ModelId.Equals(recommendedModelId, StringComparison.OrdinalIgnoreCase)) ??
@@ -170,7 +171,18 @@ internal sealed class SetupModelSelectionService(
 
         if (!string.IsNullOrWhiteSpace(selectedModelId) && selectedModel is null)
         {
-            return state;
+            return role.Equals("review", StringComparison.OrdinalIgnoreCase)
+                ? state with
+                {
+                    IsCompleted = false,
+                    LastSmokeSucceeded = false,
+                    CurrentStep = SetupStep.ReviewModel,
+                    SelectedReviewModelId = ReviewModelSelectionResolver.Resolve(
+                        catalog,
+                        selectedModelId,
+                        selectedPresetId: preset?.PresetId)
+                }
+                : state;
         }
 
         var presetModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
