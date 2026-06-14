@@ -543,7 +543,6 @@ public sealed class ScriptedJsonAsrEngine(
             ctranslate2PathEntries.Add(appCTranslate2Cuda);
         }
 
-        var pathEntries = new List<string>(ctranslate2PathEntries);
         if (Directory.Exists(appAsrTools))
         {
             asrToolEntries.Add(appAsrTools);
@@ -556,7 +555,6 @@ public sealed class ScriptedJsonAsrEngine(
             if (Directory.Exists(siblingCTranslate2Cuda))
             {
                 ctranslate2PathEntries.Add(siblingCTranslate2Cuda);
-                pathEntries.Add(siblingCTranslate2Cuda);
             }
 
             var siblingAsrTools = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr"));
@@ -564,6 +562,13 @@ public sealed class ScriptedJsonAsrEngine(
             {
                 asrToolEntries.Add(siblingAsrTools);
             }
+        }
+
+        var ctranslate2Entries = ctranslate2PathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var pathEntries = new List<string>(ctranslate2Entries);
+        if (!ctranslate2Entries.Any(AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles))
+        {
+            pathEntries.AddRange(asrToolEntries.Where(AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles));
         }
 
         var addedPathEntries = pathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -583,7 +588,6 @@ public sealed class ScriptedJsonAsrEngine(
             environment["PATH"] = string.Join(Path.PathSeparator, pathEntries.Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
-        var ctranslate2Entries = ctranslate2PathEntries.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (ctranslate2Entries.Length > 0)
         {
             environment["KOENOTE_CTRANSLATE2_CUDA_DIR"] = ctranslate2Entries[0];

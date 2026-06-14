@@ -16,6 +16,12 @@ from pathlib import Path
 
 NVIDIA_SMI_GPU_QUERY = "index,name,driver_version,memory.total,memory.free"
 NVIDIA_SMI_COMPUTE_CAP_QUERY = "index,compute_cap"
+NVIDIA_RUNTIME_DLL_PATTERNS = (
+    "cublas64_*.dll",
+    "cublasLt64_*.dll",
+    "cudart64_*.dll",
+    "cudnn*.dll",
+)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -24,19 +30,42 @@ except AttributeError:
     pass
 
 
+def has_nvidia_runtime_files(directory: str) -> bool:
+    root = Path(directory)
+    if not root.is_dir():
+        return False
+
+    return all(any(root.glob(pattern)) for pattern in NVIDIA_RUNTIME_DLL_PATTERNS)
+
+
 def add_windows_dll_directories() -> None:
     if os.name != "nt" or not hasattr(os, "add_dll_directory"):
         return
 
-    candidates = []
+    ctranslate2_candidates = []
+    legacy_candidates = []
     ctranslate2_configured = os.environ.get("KOENOTE_CTRANSLATE2_CUDA_DIR")
     if ctranslate2_configured:
-        candidates.append(ctranslate2_configured)
+        ctranslate2_candidates.append(ctranslate2_configured)
+
+    asr_tools_configured = os.environ.get("KOENOTE_ASR_TOOLS_DIR")
+    if asr_tools_configured:
+        legacy_candidates.append(asr_tools_configured)
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr-ctranslate2-cuda")))
+    ctranslate2_candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr-ctranslate2-cuda")))
+    legacy_candidates.append(os.path.abspath(os.path.join(script_directory, "..", "..", "tools", "asr")))
 
+    candidates = list(ctranslate2_candidates)
+    if not any(has_nvidia_runtime_files(candidate) for candidate in ctranslate2_candidates):
+        candidates.extend(legacy_candidates)
+
+    seen = set()
     for candidate in candidates:
+        normalized = os.path.normcase(os.path.abspath(candidate))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
         if not os.path.isdir(candidate):
             continue
 

@@ -189,6 +189,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="92" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="ASR GPU"
                                    Foreground="#64748B"
@@ -201,12 +202,20 @@
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"
                                    ToolTip="{Binding SetupAsrCudaRuntimeSummary}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupInstallAsrCudaRuntimeCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="導入" FontSize="12" FontWeight="SemiBold" />
+                        </Button>
                     </Grid>
 
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="92" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="GPU高速化"
                                    Foreground="#64748B"
@@ -219,6 +228,13 @@
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"
                                    ToolTip="{Binding SetupCudaReviewRuntimeSummary}" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SetupInstallCudaReviewRuntimeCommand}"
+                                Padding="10,7"
+                                MinWidth="92"
+                                Margin="10,0,0,0">
+                            <TextBlock Text="導入" FontSize="12" FontWeight="SemiBold" />
+                        </Button>
                     </Grid>
 
                     <Grid Margin="0,0,0,12">
