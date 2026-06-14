@@ -19,6 +19,6 @@ public sealed class ReviewCandidateConfirmationDialogService
             Owner = owner
         };
         dialog.ShowDialog();
-        return dialog.Result;
+        return dialog.Result ?? dialog.CreateCancelResult();
     }
 }

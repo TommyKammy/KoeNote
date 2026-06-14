@@ -33,17 +33,21 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
 
         Assert.Equal(1, viewModel.AcceptedCount);
         Assert.Equal(2, viewModel.PendingCount);
-        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Null(viewModel.SelectedItem);
         Assert.Equal(["accept:draft-001"], operations.Decisions);
 
+        viewModel.SelectNext();
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         viewModel.ManualEditText = " manual two ";
         viewModel.ApplyManualEdit();
 
         Assert.Equal(1, viewModel.EditedCount);
         Assert.Equal(1, viewModel.PendingCount);
-        Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
+        Assert.Null(viewModel.SelectedItem);
         Assert.Equal(" manual two ", operations.ManualTextByDraft["draft-002"]);
 
+        viewModel.SelectNext();
+        Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
         viewModel.RejectSelected();
 
         Assert.Equal(1, viewModel.RejectedCount);
@@ -62,7 +66,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
     }
 
     [Fact]
-    public void DecisionCooldown_BlocksRepeatedActionAgainstAutoSelectedCandidate()
+    public void Decision_DoesNotAutoSelectNextCandidate()
     {
         var operations = new FakeReviewCandidateOperations();
         var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
@@ -74,13 +78,58 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
             operations));
 
         Assert.True(viewModel.AcceptSelected());
-        viewModel.BeginDecisionInputCooldown();
 
         Assert.False(viewModel.AcceptSelected());
         Assert.Equal(1, viewModel.AcceptedCount);
         Assert.Equal(1, viewModel.PendingCount);
-        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Null(viewModel.SelectedItem);
         Assert.Equal(["accept:draft-001"], operations.Decisions);
+
+        viewModel.SelectNext();
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.True(viewModel.AcceptSelected());
+        Assert.Equal(2, viewModel.AcceptedCount);
+    }
+
+    [Fact]
+    public void PostCommitRecordDecisionFailure_DoesNotLeaveCommittedDraftPending()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            operations)
+        {
+            RecordDecision = (_, _, _) => throw new InvalidOperationException("memory unavailable")
+        });
+
+        Assert.True(viewModel.AcceptSelected());
+
+        Assert.Equal(1, viewModel.AcceptedCount);
+        Assert.Equal(0, viewModel.PendingCount);
+        Assert.True(viewModel.CanContinue);
+        Assert.Contains("補正メモリの更新に失敗しました", viewModel.OperationErrorText, StringComparison.Ordinal);
+        Assert.Equal(["accept:draft-001"], operations.Decisions);
+    }
+
+    [Fact]
+    public void SameSegmentRemainingCandidate_UsesFinalTextFromPreviousDecision()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-001", "raw two", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.SelectNext();
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("accepted text", viewModel.SelectedItem?.CurrentText);
     }
 
     private static ReviewCandidateConfirmationItem CreateCandidate(
