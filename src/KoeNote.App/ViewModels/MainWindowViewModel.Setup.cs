@@ -803,7 +803,7 @@ public sealed partial class MainWindowViewModel
         try
         {
             _setupSelectionDraft = null;
-            _setupState = _setupWizardService.SelectModel("review", modelId);
+            _setupState = _setupWizardService.SelectSettingsModel("review", modelId);
             RefreshSetupWizard();
             RefreshLlmSettingsDisplay(synchronizeFromSetup: true);
             _ = SelectActiveReadablePolishingPromptModelFamily();

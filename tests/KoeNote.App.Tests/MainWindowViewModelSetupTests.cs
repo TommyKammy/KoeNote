@@ -1253,6 +1253,68 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SettingsReviewModelSelection_KeepsCompletedSetupAndRunCommandEnabledForInstalledModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "llm-jp-4-8b-thinking-q4-k-m",
+            "review",
+            "llama-cpp",
+            paths.ReviewModelPath);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var bonsaiItem = catalog.Models.Single(model => model.ModelId == "bonsai-8b-q1-0");
+        var bonsaiPath = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService())
+            .GetDefaultInstallPath(bonsaiItem);
+        Touch(bonsaiPath);
+        RegisterVerifiedModel(
+            paths,
+            "bonsai-8b-q1-0",
+            "review",
+            "llama-cpp",
+            bonsaiPath);
+        var audioPath = Path.Combine(root, "meeting.wav");
+        Touch(audioPath);
+        new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", true));
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.Jobs.Add(new JobSummary("job-001", "meeting", "meeting.wav", audioPath, "registered", 0, 0, DateTimeOffset.Now));
+        viewModel.SelectedJob = viewModel.Jobs[0];
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSettingsReviewModel = bonsai;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.True(state.IsCompleted);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+        Assert.True(viewModel.IsSetupComplete);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null), viewModel.RunPreflightDetail);
+    }
+
+    [Fact]
     public void ReadablePolishingPromptSettings_LoadsSettingsForRuntimeModelFamily()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

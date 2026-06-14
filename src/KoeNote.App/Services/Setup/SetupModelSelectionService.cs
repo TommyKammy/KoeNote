@@ -78,23 +78,22 @@ internal sealed class SetupModelSelectionService(
 
     public SetupState SelectModel(string role, string modelId)
     {
-        var catalogItem = modelCatalogService.LoadBuiltInCatalog().Models
-            .FirstOrDefault(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
-                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
-        if (catalogItem is null)
-        {
-            throw new InvalidOperationException($"Model is not in the catalog: {modelId}");
-        }
-
-        if (!ModelCatalogCompatibility.IsSelectable(catalogItem))
-        {
-            throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
-        }
+        var catalogItem = ResolveSelectableCatalogItem(role, modelId);
 
         var state = stateService.Load();
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
             ? state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.AsrModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
             : state with { IsCompleted = false, LastSmokeSucceeded = false, CurrentStep = SetupStep.ReviewModel, SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
+        return stateService.Save(state);
+    }
+
+    public SetupState SelectModelWithoutInvalidatingCompletion(string role, string modelId)
+    {
+        var catalogItem = ResolveSelectableCatalogItem(role, modelId);
+        var state = stateService.Load();
+        state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            ? state with { SetupMode = "custom", SelectedModelPresetId = null, SelectedAsrModelId = catalogItem.ModelId }
+            : state with { SetupMode = "custom", SelectedModelPresetId = null, SelectedReviewModelId = catalogItem.ModelId };
         return stateService.Save(state);
     }
 
@@ -220,6 +219,24 @@ internal sealed class SetupModelSelectionService(
             : catalog.Models.FirstOrDefault(model =>
                 model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ModelCatalogItem ResolveSelectableCatalogItem(string role, string modelId)
+    {
+        var catalogItem = modelCatalogService.LoadBuiltInCatalog().Models
+            .FirstOrDefault(model => model.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (catalogItem is null)
+        {
+            throw new InvalidOperationException($"Model is not in the catalog: {modelId}");
+        }
+
+        if (!ModelCatalogCompatibility.IsSelectable(catalogItem))
+        {
+            throw new InvalidOperationException($"Model is not selectable in setup: {modelId}");
+        }
+
+        return catalogItem;
     }
 
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)

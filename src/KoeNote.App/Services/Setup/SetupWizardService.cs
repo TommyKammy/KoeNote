@@ -171,6 +171,11 @@ public sealed class SetupWizardService
         return _selectionService.SelectModel(role, modelId);
     }
 
+    public SetupState SelectSettingsModel(string role, string modelId)
+    {
+        return _selectionService.SelectModelWithoutInvalidatingCompletion(role, modelId);
+    }
+
     public SetupState CommitSelectionDraft(SetupState draft)
     {
         var current = _stateService.Load();

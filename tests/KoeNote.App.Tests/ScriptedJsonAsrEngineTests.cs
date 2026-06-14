@@ -19,6 +19,19 @@ public sealed class ScriptedJsonAsrEngineTests
     }
 
     [Fact]
+    public void FasterWhisperWorker_WritesOutputBeforeBypassingCudaTeardown()
+    {
+        var scriptPath = FindRepositoryFasterWhisperScriptPath();
+        var script = File.ReadAllText(scriptPath);
+        var writeIndex = script.IndexOf("write_result_payload(", StringComparison.Ordinal);
+        var bypassIndex = script.IndexOf("should_bypass_cuda_teardown_after_success", StringComparison.Ordinal);
+
+        Assert.True(writeIndex >= 0);
+        Assert.True(bypassIndex > writeIndex);
+        Assert.Contains("os._exit(0)", script);
+    }
+
+    [Fact]
     public void FasterWhisperWorker_EmitsRuntimeDiagnostics()
     {
         var scriptPath = FindRepositoryFasterWhisperScriptPath();
@@ -440,6 +453,42 @@ public sealed class ScriptedJsonAsrEngineTests
     }
 
     [Fact]
+    public async Task TranscribeAsync_ChunkedGpuAsr_UsesChunkJsonWhenWorkerCrashesAfterWritingOutput()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "worker.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
+        Directory.CreateDirectory(modelPath);
+        var runner = new ChunkedAsrProcessRunner(nativeCrashAfterJsonAtChunk: 2);
+        var engine = CreateEngine(paths, runner);
+
+        var result = await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "faster-whisper-large-v3-turbo",
+                scriptPath),
+            new AsrOptions(
+                Device: "cuda",
+                ComputeType: "float16",
+                ExecutionProfileId: AsrExecutionProfiles.CudaFloat16,
+                ChunkSeconds: 1));
+
+        Assert.Equal(3, result.Segments.Count);
+        Assert.Contains(result.Segments, segment => segment.RawText == "chunk 2");
+        Assert.Equal("succeeded", ReadSingleRunStatus(paths));
+        var chunkLog = File.ReadAllText(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*-chunk-002.log").Single());
+        Assert.Contains("STATUS_STACK_BUFFER_OVERRUN", chunkLog);
+    }
+
+    [Fact]
     public async Task TranscribeAsync_LogsForcedFasterWhisperArguments()
     {
         var paths = CreatePaths();
@@ -772,7 +821,7 @@ public sealed class ScriptedJsonAsrEngineTests
         }
     }
 
-    private sealed class ChunkedAsrProcessRunner(int? failAtChunk = null) : ExternalProcessRunner
+    private sealed class ChunkedAsrProcessRunner(int? failAtChunk = null, int? nativeCrashAfterJsonAtChunk = null) : ExternalProcessRunner
     {
         public List<IReadOnlyList<string>> Arguments { get; } = [];
 
@@ -803,6 +852,15 @@ public sealed class ScriptedJsonAsrEngineTests
                   ]
                 }
                 """);
+            if (nativeCrashAfterJsonAtChunk == chunkNumber)
+            {
+                return Task.FromResult(new ProcessRunResult(
+                    -1073740791,
+                    TimeSpan.FromSeconds(1),
+                    string.Empty,
+                    $"chunk {chunkNumber} exited after JSON write"));
+            }
+
             return Task.FromResult(new ProcessRunResult(0, TimeSpan.FromSeconds(1), $"chunk {chunkNumber}", string.Empty));
         }
     }
