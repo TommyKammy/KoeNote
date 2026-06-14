@@ -1,6 +1,8 @@
 using System.IO;
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Setup;
 
@@ -92,22 +94,22 @@ internal sealed class SetupModelSelectionService(
     {
         var catalogItem = ResolveSelectableCatalogItem(role, modelId);
         var state = stateService.Load();
-        var isReady = IsInstalledModelReady(catalogItem);
+        var canPreserveCompletion = state.IsCompleted && IsSelectionReadyForCompletion(catalogItem);
         state = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
             ? state with
             {
-                IsCompleted = isReady && state.IsCompleted,
-                LastSmokeSucceeded = isReady && state.LastSmokeSucceeded,
-                CurrentStep = isReady ? state.CurrentStep : SetupStep.AsrModel,
+                IsCompleted = canPreserveCompletion,
+                LastSmokeSucceeded = canPreserveCompletion && state.LastSmokeSucceeded,
+                CurrentStep = canPreserveCompletion ? state.CurrentStep : SetupStep.AsrModel,
                 SetupMode = "custom",
                 SelectedModelPresetId = null,
                 SelectedAsrModelId = catalogItem.ModelId
             }
             : state with
             {
-                IsCompleted = isReady && state.IsCompleted,
-                LastSmokeSucceeded = isReady && state.LastSmokeSucceeded,
-                CurrentStep = isReady ? state.CurrentStep : SetupStep.ReviewModel,
+                IsCompleted = canPreserveCompletion,
+                LastSmokeSucceeded = canPreserveCompletion && state.LastSmokeSucceeded,
+                CurrentStep = canPreserveCompletion ? state.CurrentStep : SetupStep.ReviewModel,
                 SetupMode = "custom",
                 SelectedModelPresetId = null,
                 SelectedReviewModelId = catalogItem.ModelId
@@ -257,6 +259,18 @@ internal sealed class SetupModelSelectionService(
         return catalogItem;
     }
 
+    private bool IsSelectionReadyForCompletion(ModelCatalogItem catalogItem)
+    {
+        if (!IsInstalledModelReady(catalogItem))
+        {
+            return false;
+        }
+
+        return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
+            ? IsReviewRuntimeReady(catalogItem.ModelId)
+            : FasterWhisperRuntimeLayout.HasPackage(paths);
+    }
+
     private bool IsInstalledModelReady(ModelCatalogItem catalogItem)
     {
         var installed = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
@@ -264,6 +278,13 @@ internal sealed class SetupModelSelectionService(
             installed.Role.Equals(catalogItem.Role, StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+    }
+
+    private bool IsReviewRuntimeReady(string modelId)
+    {
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
+        return File.Exists(runtimePath);
     }
 
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)

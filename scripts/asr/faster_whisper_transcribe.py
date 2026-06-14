@@ -683,14 +683,15 @@ def main() -> int:
             if args.diarization == "pyannote":
                 print("Diarization skipped: missing HF_TOKEN/HUGGINGFACE_TOKEN.", file=sys.stderr)
         else:
-            if bypass_cuda_teardown:
-                write_result_payload(
-                    args.output_json,
-                    detected_language,
-                    "skipped: diarization_not_completed",
-                    diarization_turns,
-                    segment_items,
-                )
+            if model is not None:
+                if bypass_cuda_teardown:
+                    write_result_payload(
+                        args.output_json,
+                        detected_language,
+                        "skipped: diarization_not_completed",
+                        diarization_turns,
+                        segment_items,
+                    )
                 write_diagnostic("model_release_before_diarization_start")
                 model_to_release = model
                 model = None

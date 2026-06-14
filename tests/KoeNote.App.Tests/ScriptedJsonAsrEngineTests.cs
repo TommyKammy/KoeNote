@@ -51,12 +51,16 @@ public sealed class ScriptedJsonAsrEngineTests
         var scriptPath = FindRepositoryFasterWhisperScriptPath();
         var script = File.ReadAllText(scriptPath);
         var mainIndex = script.IndexOf("def main() -> int:", StringComparison.Ordinal);
+        var modelReleaseGuardIndex = script.IndexOf("if model is not None:", mainIndex, StringComparison.Ordinal);
+        var cudaPrewriteGuardIndex = script.IndexOf("if bypass_cuda_teardown:", modelReleaseGuardIndex, StringComparison.Ordinal);
         var pendingWriteIndex = script.IndexOf("\"skipped: diarization_not_completed\"", mainIndex, StringComparison.Ordinal);
         var releaseIndex = script.IndexOf("del model_to_release", mainIndex, StringComparison.Ordinal);
         var diarizationIndex = script.IndexOf("run_pyannote_diarization(", mainIndex, StringComparison.Ordinal);
 
         Assert.True(mainIndex >= 0);
-        Assert.True(pendingWriteIndex > mainIndex);
+        Assert.True(modelReleaseGuardIndex > mainIndex);
+        Assert.True(cudaPrewriteGuardIndex > modelReleaseGuardIndex);
+        Assert.True(pendingWriteIndex > cudaPrewriteGuardIndex);
         Assert.True(releaseIndex > pendingWriteIndex);
         Assert.True(diarizationIndex > releaseIndex);
     }

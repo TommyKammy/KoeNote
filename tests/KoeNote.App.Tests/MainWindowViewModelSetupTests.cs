@@ -1367,6 +1367,118 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SettingsReviewModelSelection_ResetsSmokeForIncompleteSetupEvenWhenInstalledModelIsReady()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "llm-jp-4-8b-thinking-q4-k-m",
+            "review",
+            "llama-cpp",
+            paths.ReviewModelPath);
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var bonsaiItem = catalog.Models.Single(model => model.ModelId == "bonsai-8b-q1-0");
+        var bonsaiPath = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService())
+            .GetDefaultInstallPath(bonsaiItem);
+        Touch(bonsaiPath);
+        RegisterVerifiedModel(
+            paths,
+            "bonsai-8b-q1-0",
+            "review",
+            "llama-cpp",
+            bonsaiPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = false,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSettingsReviewModel = bonsai;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SettingsReviewModelSelection_InvalidatesCompletedSetupWhenNewReviewRuntimeIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Touch(paths.FfmpegPath);
+        Touch(paths.TernaryLlamaCompletionPath);
+        Touch(paths.FasterWhisperScriptPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        var ternaryModelPath = Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0", "Ternary-Bonsai-8B-Q2_0.gguf");
+        var bonsaiModelPath = Path.Combine(paths.UserModels, "review", "bonsai-8b-q1-0", "Bonsai-8B-Q1_0.gguf");
+        Touch(ternaryModelPath);
+        Touch(bonsaiModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "ternary-bonsai-8b-q2-0",
+            "review",
+            "ternary-bonsai",
+            ternaryModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "bonsai-8b-q1-0",
+            "review",
+            "llama-cpp",
+            bonsaiModelPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "ternary-bonsai-8b-q2-0"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+        var bonsai = viewModel.SetupReviewModelChoices.Single(entry => entry.ModelId == "bonsai-8b-q1-0");
+
+        viewModel.SelectedSettingsReviewModel = bonsai;
+
+        var state = new SetupStateService(paths).Load();
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void ReadablePolishingPromptSettings_LoadsSettingsForRuntimeModelFamily()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
