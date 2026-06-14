@@ -547,6 +547,10 @@ public sealed class ScriptedJsonAsrEngine(
         if (Directory.Exists(appAsrTools))
         {
             asrToolEntries.Add(appAsrTools);
+            if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(appAsrTools))
+            {
+                pathEntries.Add(appAsrTools);
+            }
         }
 
         var workerDirectory = Path.GetDirectoryName(config.WorkerPath);
@@ -563,6 +567,10 @@ public sealed class ScriptedJsonAsrEngine(
             if (Directory.Exists(siblingAsrTools))
             {
                 asrToolEntries.Add(siblingAsrTools);
+                if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(siblingAsrTools))
+                {
+                    pathEntries.Add(siblingAsrTools);
+                }
             }
         }
 
