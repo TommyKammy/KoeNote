@@ -35,8 +35,20 @@ public abstract class MainWindowViewModelTestBase
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         CreateFasterWhisperRuntime(paths);
-        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "llm-jp-4-8b-thinking-q4-k-m",
+            "review",
+            "llama-cpp",
+            paths.ReviewModelPath);
 
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
@@ -285,6 +297,45 @@ public abstract class MainWindowViewModelTestBase
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, string.Empty);
+    }
+
+    protected static void CreateMinimalModelDirectory(string path)
+    {
+        Directory.CreateDirectory(path);
+        Touch(Path.Combine(path, "model.bin"));
+    }
+
+    protected static void RegisterVerifiedModel(
+        AppPaths paths,
+        string modelId,
+        string role,
+        string engineId,
+        string filePath)
+    {
+        var verification = new ModelVerificationService().VerifyPath(filePath, expectedSha256: null);
+        if (!verification.IsVerified)
+        {
+            throw new InvalidOperationException(
+                $"Cannot register unverified test model '{modelId}': {verification.Message}");
+        }
+
+        new InstalledModelRepository(paths).UpsertInstalledModel(new InstalledModel(
+            modelId,
+            role,
+            engineId,
+            modelId,
+            Family: null,
+            Version: null,
+            filePath,
+            ManifestPath: null,
+            SizeBytes: 0,
+            Sha256: verification.Sha256,
+            Verified: true,
+            LicenseName: "test",
+            SourceType: "test",
+            InstalledAt: DateTimeOffset.Now,
+            LastVerifiedAt: DateTimeOffset.Now,
+            Status: "installed"));
     }
 
     protected static void CreateFasterWhisperRuntime(AppPaths paths)

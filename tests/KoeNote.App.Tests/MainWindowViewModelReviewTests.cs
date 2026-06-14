@@ -825,13 +825,19 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
     public void RunSelectedJobCommand_DoesNotRequireReviewModelWhenReviewStageIsDisabled()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.FasterWhisperScriptPath);
         CreateFasterWhisperRuntime(paths);
-        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
@@ -839,7 +845,8 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         {
             IsCompleted = true,
             LastSmokeSucceeded = true,
-            LicenseAccepted = true
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster"
         });
 
         var viewModel = new MainWindowViewModel(paths);
@@ -848,7 +855,8 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
 
         Assert.False(viewModel.EnableReviewStage);
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
-        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+        Assert.False(viewModel.ReviewStageAssetsReady);
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null), viewModel.RunPreflightDetail);
     }
 
     [Fact]

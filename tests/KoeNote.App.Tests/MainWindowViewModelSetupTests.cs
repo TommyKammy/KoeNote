@@ -1211,15 +1211,27 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     public void RunSelectedJobCommand_IsEnabledWhenJobAndRuntimeAssetsAreReady()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var paths = new AppPaths(root, root, Path.Combine(root, "app"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
         Touch(paths.FasterWhisperScriptPath);
         CreateFasterWhisperRuntime(paths);
-        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
         Touch(paths.ReviewModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "llm-jp-4-8b-thinking-q4-k-m",
+            "review",
+            "llama-cpp",
+            paths.ReviewModelPath);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", true));
@@ -1237,7 +1249,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         viewModel.SelectedJob = viewModel.Jobs[0];
 
         Assert.True(viewModel.RequiredRuntimeAssetsReady);
-        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null));
+        Assert.True(viewModel.RunSelectedJobCommand.CanExecute(null), viewModel.RunPreflightDetail);
     }
 
     [Fact]
