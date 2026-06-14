@@ -307,7 +307,12 @@ public sealed class VersioningTests
         Assert.Contains("RunLocalRuntimeSmoke", script);
         Assert.Contains("X-Linked-Size", script);
         Assert.Contains("X-Xet-Hash", script);
+        Assert.Contains("Get-OutputDirectory", script);
+        Assert.Contains("taskkill.exe", script);
+        Assert.Contains("<\\|channel\\>thought", script);
+        Assert.Contains("System.Net.WebException", script);
         Assert.DoesNotContain("\"--reasoning\", \"off\"", script);
+        Assert.DoesNotContain("Start-Job", script);
     }
 
     private static string FindRepoRoot()

@@ -108,7 +108,23 @@ function Invoke-RangeProbe {
     $request.UserAgent = "KoeNote-Gemma4ReviewSmoke"
     $request.AddRange(0, 0)
 
-    $response = $request.GetResponse()
+    try {
+        $response = $request.GetResponse()
+    }
+    catch [System.Net.WebException] {
+        if ($_.Exception.Response -eq $null) {
+            return [pscustomobject]@{
+                status_code = 0
+                response_uri = $Uri
+                bytes_read = 0
+                headers = [ordered]@{}
+                error = $_.Exception.Message
+            }
+        }
+
+        $response = $_.Exception.Response
+    }
+
     try {
         $stream = $response.GetResponseStream()
         $buffer = New-Object byte[] 1
@@ -125,6 +141,37 @@ function Invoke-RangeProbe {
     }
 }
 
+function Get-OutputDirectory {
+    param([string]$Path)
+
+    $parent = Split-Path -Parent $Path
+    if ([string]::IsNullOrWhiteSpace($parent)) {
+        return "."
+    }
+
+    return $parent
+}
+
+function ConvertTo-CommandLineArgument {
+    param([string]$Argument)
+
+    if ($null -eq $Argument) {
+        return '""'
+    }
+
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    return '"' + ($Argument -replace '"', '\"') + '"'
+}
+
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    & taskkill.exe /PID $ProcessId /T /F | Out-Null
+}
+
 function Invoke-ProcessWithTimeout {
     param(
         [string]$FilePath,
@@ -133,44 +180,38 @@ function Invoke-ProcessWithTimeout {
         [int]$TimeoutSeconds
     )
 
-    $job = Start-Job -ScriptBlock {
-        param(
-            [string]$JobFilePath,
-            [string[]]$JobArguments,
-            [string]$JobWorkingDirectory
-        )
-
-        Set-Location -LiteralPath $JobWorkingDirectory
-        $output = & $JobFilePath @JobArguments 2>&1
-        $exitCode = $LASTEXITCODE
-        $output
-        "__KOENOTE_EXIT_CODE__=$exitCode"
-    } -ArgumentList $FilePath, $Arguments, $WorkingDirectory
-
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+    $argumentLine = ($Arguments | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " "
+    $process = $null
     try {
-        if ((Wait-Job -Job $job -Timeout $TimeoutSeconds) -eq $null) {
-            Stop-Job -Job $job -ErrorAction SilentlyContinue
+        $process = Start-Process `
+            -FilePath $FilePath `
+            -ArgumentList $argumentLine `
+            -WorkingDirectory $WorkingDirectory `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
+            -WindowStyle Hidden `
+            -PassThru
+
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            Stop-ProcessTree $process.Id
+            $process.WaitForExit()
             throw "Process timed out after $TimeoutSeconds seconds."
         }
 
-        $lines = @(Receive-Job -Job $job)
-        $exitLine = @($lines | Where-Object { $_ -is [string] -and $_.StartsWith("__KOENOTE_EXIT_CODE__=") } | Select-Object -Last 1)
-        $exitCode = if ($exitLine.Count -gt 0) {
-            [int]($exitLine[0] -replace "^__KOENOTE_EXIT_CODE__=", "")
-        }
-        else {
-            1
-        }
-        $output = @($lines | Where-Object { -not ($_ -is [string] -and $_.StartsWith("__KOENOTE_EXIT_CODE__=")) }) -join "`n"
-
         return [pscustomobject]@{
-            exit_code = $exitCode
-            stdout = $output
-            stderr = ""
+            exit_code = $process.ExitCode
+            stdout = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+            stderr = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
         }
     }
     finally {
-        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        if ($process -ne $null) {
+            $process.Dispose()
+        }
+
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
     }
 }
 
@@ -292,7 +333,7 @@ if ($RunLocalRuntimeSmoke) {
         Add-Check "local runtime smoke" "fail" "RunLocalRuntimeSmoke was requested, but ModelPath does not point to a local GGUF file."
     }
     else {
-        $smokeRoot = Split-Path -Parent $OutputPath
+        $smokeRoot = Get-OutputDirectory $OutputPath
         New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
         $promptPath = Join-Path $smokeRoot "gemma4-12b-review-smoke.prompt.txt"
         $schemaPath = Join-Path $smokeRoot "gemma4-12b-review-smoke.schema.json"
@@ -314,7 +355,7 @@ if ($RunLocalRuntimeSmoke) {
         try {
             $result = Invoke-ProcessWithTimeout $RuntimePath $arguments $repoRoot $RuntimeTimeoutSeconds
             $combined = "$($result.stdout)`n$($result.stderr)"
-            $hasThinking = $combined -match "<think|</think>|reasoning_content"
+            $hasThinking = $combined -match "<think|</think>|reasoning_content|<\|channel\>thought|<channel\|>"
             if ($result.exit_code -eq 0 -and -not $hasThinking) {
                 Add-Check "local runtime smoke" "pass" "Local Gemma 4 12B runtime smoke completed without visible thinking output." @{
                     exit_code = $result.exit_code
@@ -354,7 +395,7 @@ $report = [pscustomobject]@{
     checks = $checks
 }
 
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OutputPath) | Out-Null
+New-Item -ItemType Directory -Force -Path (Get-OutputDirectory $OutputPath) | Out-Null
 $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 
 $failed = @($checks | Where-Object { $_.status -eq "fail" })
