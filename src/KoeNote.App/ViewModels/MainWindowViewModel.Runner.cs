@@ -175,6 +175,7 @@ public sealed partial class MainWindowViewModel
 
     private bool ConfirmReviewCandidatesBeforeReadablePolishing(JobSummary job)
     {
+        LoadReviewQueue();
         var drafts = _correctionDraftRepository.ReadPendingForJob(job.JobId);
         if (drafts.Count == 0)
         {
@@ -202,11 +203,14 @@ public sealed partial class MainWindowViewModel
             candidates,
             new ReviewCandidateConfirmationOperationAdapter(_reviewOperationService))
         {
-            RecordDecision = UpdateCorrectionMemory
+            RecordDecision = (draft, result, selectedText) =>
+                ApplyReviewOperationResult(draft.DraftId, result, selectedText)
         });
 
+        var preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? SelectedSegment?.SegmentId;
         LoadReviewQueue();
-        ReloadSegmentsForSelectedJob();
+        preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? preferredSegmentId;
+        ReloadSegmentsForSelectedJob(preferredSegmentId);
         RefreshJobViews();
 
         if (result?.Outcome == ReviewCandidateConfirmationOutcome.Continue && result.RemainingPendingCount == 0)

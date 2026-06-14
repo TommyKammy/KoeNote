@@ -979,6 +979,43 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task RunSelectedJobAsync_PartialReviewCandidateDecisionKeepsJobAndQueueInSync()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "reviewed text", "候補", 0.8),
+            new CorrectionDraft("draft-002", job.JobId, "segment-001", "wording", "reviewed text", "reviewed text final", "候補", 0.7)
+        ]);
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = request =>
+        {
+            var candidate = request.Candidates.First();
+            var result = request.Operations.AcceptDraft(candidate.Draft.DraftId);
+            request.RecordDecision?.Invoke(candidate.Draft, result, candidate.Draft.SuggestedText);
+            return new ReviewCandidateConfirmationResult(
+                ReviewCandidateConfirmationOutcome.Defer,
+                request.Candidates.Count,
+                1,
+                0,
+                0,
+                1);
+        };
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = SpeakerNameConfirmationResult.FromRequest;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.Equal(1, fixture.ViewModel.SelectedJobUnreviewedDrafts);
+        var pendingDraft = Assert.Single(fixture.ViewModel.ReviewQueue);
+        Assert.Equal("draft-002", pendingDraft.DraftId);
+        Assert.Equal("draft-002", fixture.ViewModel.SelectedCorrectionDraftId);
+        Assert.Equal("segment-001", fixture.ViewModel.SelectedSegment?.SegmentId);
+        Assert.Contains("保留", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunSelectedJobAsync_ReloadsStaleReadablePolishedContentWhenSpeakerConfirmationIsCanceled()
     {
         var fixture = CreateRunReadyViewModel(
