@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Review;
 
@@ -11,6 +12,8 @@ namespace KoeNote.App.Dialogs;
 
 public partial class ReviewCandidateConfirmationDialog : Window
 {
+    private readonly DispatcherTimer _decisionCooldownTimer;
+
     private ReviewCandidateConfirmationDialogViewModel ViewModel =>
         (ReviewCandidateConfirmationDialogViewModel)DataContext;
 
@@ -18,6 +21,15 @@ public partial class ReviewCandidateConfirmationDialog : Window
     {
         InitializeComponent();
         DataContext = new ReviewCandidateConfirmationDialogViewModel(request);
+        _decisionCooldownTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(350)
+        };
+        _decisionCooldownTimer.Tick += (_, _) =>
+        {
+            _decisionCooldownTimer.Stop();
+            ViewModel.EndDecisionInputCooldown();
+        };
     }
 
     public ReviewCandidateConfirmationResult? Result { get; private set; }
@@ -39,17 +51,17 @@ public partial class ReviewCandidateConfirmationDialog : Window
 
     private void OnAcceptClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.AcceptSelected();
+        RunDecision(ViewModel.AcceptSelected);
     }
 
     private void OnRejectClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.RejectSelected();
+        RunDecision(ViewModel.RejectSelected);
     }
 
     private void OnApplyManualEditClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.ApplyManualEdit();
+        RunDecision(ViewModel.ApplyManualEdit);
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
@@ -88,6 +100,18 @@ public partial class ReviewCandidateConfirmationDialog : Window
             e.Handled = true;
         }
     }
+
+    private void RunDecision(Func<bool> decision)
+    {
+        if (!decision())
+        {
+            return;
+        }
+
+        ViewModel.BeginDecisionInputCooldown();
+        _decisionCooldownTimer.Stop();
+        _decisionCooldownTimer.Start();
+    }
 }
 
 public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyPropertyChanged
@@ -96,6 +120,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     private ReviewCandidateConfirmationDialogItem? _selectedItem;
     private string _manualEditText = string.Empty;
     private string _operationErrorText = string.Empty;
+    private bool _isDecisionInputBlocked;
 
     public ReviewCandidateConfirmationDialogViewModel(ReviewCandidateConfirmationRequest request)
     {
@@ -173,6 +198,22 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     public bool HasOperationError => !string.IsNullOrWhiteSpace(OperationErrorText);
 
+    public bool IsDecisionInputBlocked
+    {
+        get => _isDecisionInputBlocked;
+        private set
+        {
+            if (_isDecisionInputBlocked == value)
+            {
+                return;
+            }
+
+            _isDecisionInputBlocked = value;
+            OnPropertyChanged();
+            RefreshStateProperties();
+        }
+    }
+
     public int PendingCount => Items.Count;
 
     public string CandidateListTitle => $"候補一覧 ({PendingCount}/{TotalCount})";
@@ -209,7 +250,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         ? "すべての整文候補を確認済みです。次に話者名確認へ進めます。"
         : "未処理の整文候補があります。採用、却下、または手修正を選んでください。";
 
-    public bool CanOperate => SelectedItem is not null;
+    public bool CanOperate => SelectedItem is not null && !IsDecisionInputBlocked;
 
     public bool CanApplyManualEdit => CanOperate && !string.IsNullOrWhiteSpace(ManualEditText);
 
@@ -251,28 +292,38 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         }
     }
 
-    public void AcceptSelected()
+    public bool AcceptSelected()
     {
-        ApplyDecision(static (operations, draftId, _) => operations.AcceptDraft(draftId), manualText: null, accepted: true);
+        return ApplyDecision(static (operations, draftId, _) => operations.AcceptDraft(draftId), manualText: null, accepted: true);
     }
 
-    public void RejectSelected()
+    public bool RejectSelected()
     {
-        ApplyDecision(static (operations, draftId, _) => operations.RejectDraft(draftId), manualText: null, rejected: true);
+        return ApplyDecision(static (operations, draftId, _) => operations.RejectDraft(draftId), manualText: null, rejected: true);
     }
 
-    public void ApplyManualEdit()
+    public bool ApplyManualEdit()
     {
         if (!CanApplyManualEdit)
         {
-            return;
+            return false;
         }
 
-        ApplyDecision(
+        return ApplyDecision(
             static (operations, draftId, manualText) =>
                 operations.ApplyManualEdit(draftId, manualText ?? string.Empty, "整文候補確認"),
-            ManualEditText.Trim(),
+            ManualEditText,
             edited: true);
+    }
+
+    public void BeginDecisionInputCooldown()
+    {
+        IsDecisionInputBlocked = true;
+    }
+
+    public void EndDecisionInputCooldown()
+    {
+        IsDecisionInputBlocked = false;
     }
 
     public ReviewCandidateConfirmationResult CreateResult(ReviewCandidateConfirmationOutcome outcome)
@@ -286,24 +337,26 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
             PendingCount);
     }
 
-    private void ApplyDecision(
+    private bool ApplyDecision(
         Func<IReviewCandidateConfirmationOperations, string, string?, ReviewOperationResult> operation,
         string? manualText,
         bool accepted = false,
         bool rejected = false,
         bool edited = false)
     {
-        if (SelectedItem is null)
+        if (!CanOperate)
         {
-            return;
+            return false;
         }
 
-        var selected = SelectedItem;
+        var selected = SelectedItem!;
         var selectedIndex = Items.IndexOf(selected);
         try
         {
             OperationErrorText = string.Empty;
-            operation(_request.Operations, selected.DraftId, manualText);
+            var result = operation(_request.Operations, selected.DraftId, manualText);
+            var selectedSuggestionText = manualText ?? selected.SuggestedText;
+            RecordDecision(selected, result, selectedSuggestionText);
             if (accepted)
             {
                 AcceptedCount++;
@@ -322,15 +375,26 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
                 ? null
                 : Items[Math.Clamp(selectedIndex, 0, Items.Count - 1)];
             RefreshStateProperties();
+            return true;
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
             OperationErrorText = $"整文候補の保存に失敗しました: {exception.Message}";
+            return false;
         }
         catch (Exception exception)
         {
             OperationErrorText = $"整文候補の保存中に予期しないエラーが発生しました: {exception.Message}";
+            return false;
         }
+    }
+
+    private void RecordDecision(
+        ReviewCandidateConfirmationDialogItem selected,
+        ReviewOperationResult result,
+        string selectedSuggestionText)
+    {
+        _request.RecordDecision?.Invoke(selected.Draft, result, selectedSuggestionText);
     }
 
     private void RefreshStateProperties()
@@ -360,6 +424,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
 public sealed class ReviewCandidateConfirmationDialogItem(ReviewCandidateConfirmationItem item)
 {
+    public KoeNote.App.Models.CorrectionDraft Draft => item.Draft;
+
     public string DraftId => item.Draft.DraftId;
 
     public string IssueType => item.Draft.IssueType;

@@ -11,6 +11,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
     public void Decisions_UpdateCountsAndAllowContinueAfterAllCandidatesAreResolved()
     {
         var operations = new FakeReviewCandidateOperations();
+        var recordedDecisions = new List<string>();
         var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
             "meeting.wav",
             [
@@ -18,7 +19,11 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
                 CreateCandidate("draft-002", "segment-002", "raw two", "fixed two"),
                 CreateCandidate("draft-003", "segment-003", "raw three", "fixed three")
             ],
-            operations));
+            operations)
+        {
+            RecordDecision = (draft, result, selectedText) =>
+                recordedDecisions.Add($"{draft.DraftId}:{result.Action}:{selectedText}")
+        });
 
         Assert.Equal(3, viewModel.PendingCount);
         Assert.False(viewModel.CanContinue);
@@ -31,13 +36,13 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.Equal(["accept:draft-001"], operations.Decisions);
 
-        viewModel.ManualEditText = "manual two";
+        viewModel.ManualEditText = " manual two ";
         viewModel.ApplyManualEdit();
 
         Assert.Equal(1, viewModel.EditedCount);
         Assert.Equal(1, viewModel.PendingCount);
         Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
-        Assert.Equal("manual two", operations.ManualTextByDraft["draft-002"]);
+        Assert.Equal(" manual two ", operations.ManualTextByDraft["draft-002"]);
 
         viewModel.RejectSelected();
 
@@ -47,6 +52,35 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Null(viewModel.SelectedItem);
         Assert.Equal(ReviewCandidateConfirmationOutcome.Continue, viewModel.CreateResult(
             ReviewCandidateConfirmationOutcome.Continue).Outcome);
+        Assert.Equal(
+            [
+                "draft-001:accepted:fixed one",
+                "draft-002:manual_edit: manual two ",
+                "draft-003:rejected:fixed three"
+            ],
+            recordedDecisions);
+    }
+
+    [Fact]
+    public void DecisionCooldown_BlocksRepeatedActionAgainstAutoSelectedCandidate()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.BeginDecisionInputCooldown();
+
+        Assert.False(viewModel.AcceptSelected());
+        Assert.Equal(1, viewModel.AcceptedCount);
+        Assert.Equal(1, viewModel.PendingCount);
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Equal(["accept:draft-001"], operations.Decisions);
     }
 
     private static ReviewCandidateConfirmationItem CreateCandidate(

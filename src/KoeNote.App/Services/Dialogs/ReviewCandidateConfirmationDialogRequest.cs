@@ -6,7 +6,10 @@ namespace KoeNote.App.Services.Dialogs;
 public sealed record ReviewCandidateConfirmationRequest(
     string JobTitle,
     IReadOnlyList<ReviewCandidateConfirmationItem> Candidates,
-    IReviewCandidateConfirmationOperations Operations);
+    IReviewCandidateConfirmationOperations Operations)
+{
+    public Action<CorrectionDraft, ReviewOperationResult, string>? RecordDecision { get; init; }
+}
 
 public sealed record ReviewCandidateConfirmationItem(
     CorrectionDraft Draft,
