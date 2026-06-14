@@ -1321,6 +1321,41 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_SelectSettingsModel_InvalidatesCompletedSetupWhenReviewBridgeCannotBePrepared()
+    {
+        var paths = CreatePaths();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        var invalidReviewModelPath = Path.Combine(paths.UserModels, "review", "bonsai-8b-q1-0");
+        Directory.CreateDirectory(invalidReviewModelPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        UpsertVerified(installedModels, "bonsai-8b-q1-0", "review", "llama-cpp", invalidReviewModelPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.SelectSettingsModel("review", "bonsai-8b-q1-0");
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("bonsai-8b-q1-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void SetupWizard_RegisterSelectedLocalModel_RecordsChecksumManifestAndLicense()
     {
         var paths = CreatePaths();

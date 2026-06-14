@@ -261,23 +261,31 @@ internal sealed class SetupModelSelectionService(
 
     private bool IsSelectionReadyForCompletion(ModelCatalogItem catalogItem)
     {
-        if (!IsInstalledModelReady(catalogItem))
+        var installed = GetReadyInstalledModel(catalogItem);
+        if (installed is null)
         {
             return false;
         }
 
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
-            ? IsReviewRuntimeReady(catalogItem.ModelId)
+            ? IsReviewRuntimeReady(catalogItem.ModelId) && IsReviewRuntimePathBridgeReady(installed)
             : FasterWhisperRuntimeLayout.HasPackage(paths);
     }
 
     private bool IsInstalledModelReady(ModelCatalogItem catalogItem)
     {
+        return GetReadyInstalledModel(catalogItem) is not null;
+    }
+
+    private InstalledModel? GetReadyInstalledModel(ModelCatalogItem catalogItem)
+    {
         var installed = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
         return installed is not null &&
             installed.Role.Equals(catalogItem.Role, StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath))
+            ? installed
+            : null;
     }
 
     private bool IsReviewRuntimeReady(string modelId)
@@ -285,6 +293,25 @@ internal sealed class SetupModelSelectionService(
         var catalog = modelCatalogService.LoadBuiltInCatalog();
         var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
         return File.Exists(runtimePath);
+    }
+
+    private static bool IsReviewRuntimePathBridgeReady(InstalledModel installed)
+    {
+        try
+        {
+            using var bridge = LlamaRuntimePathBridge.Create(installed.FilePath);
+            return IsAscii(bridge.ModelPath);
+        }
+        catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception)
+            || exception is DirectoryNotFoundException or FileNotFoundException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAscii(string value)
+    {
+        return value.All(static character => character <= 0x7f);
     }
 
     private static void EnsurePresetModelExists(ModelCatalog catalog, string modelId, string role)
