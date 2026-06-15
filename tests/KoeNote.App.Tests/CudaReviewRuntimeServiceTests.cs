@@ -254,6 +254,48 @@ public sealed class CudaReviewRuntimeServiceTests
         Assert.Equal(CudaReviewRuntimeService.FailureCategoryConfigurationMissing, result.FailureCategory);
     }
 
+    [Fact]
+    public async Task InstallAsync_RefreshesPersistentGpuBridgeWhenAlreadyInstalled()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithCpuRuntime(root);
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "new bridge");
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"), "old bridge");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "cudart");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"), "cublas");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"), "cublasLt");
+        File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, "test");
+        var service = new CudaReviewRuntimeService(paths, new HttpClient(new FailingHandler()));
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.Equal("new bridge", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+    }
+
+    [Fact]
+    public async Task InstallAsync_ReturnsFailureWhenGpuBridgeRefreshCannotCopy()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithCpuRuntime(root);
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "new bridge");
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        var persistentBridgePath = Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll");
+        File.WriteAllText(persistentBridgePath, "old bridge");
+        await using var lockedBridge = new FileStream(
+            persistentBridgePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.None);
+        var service = new CudaReviewRuntimeService(paths, new HttpClient(new FailingHandler()));
+
+        var result = await service.InstallAsync();
+
+        Assert.False(result.IsSucceeded);
+        Assert.Equal(CudaReviewRuntimeService.FailureCategoryInstallFailed, result.FailureCategory);
+    }
+
     private static AppPaths CreatePathsWithCpuRuntime(string root)
     {
         var paths = new AppPaths(root, root, Path.Combine(root, "app"));

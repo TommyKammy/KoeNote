@@ -40,6 +40,11 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         IProgress<RuntimeInstallProgress>? progress = null)
     {
         Report(progress, "確認中", "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
+        if (TryRefreshBundledCudaBridge() is { } refreshFailure)
+        {
+            return refreshFailure;
+        }
+
         if (IsInstalled())
         {
             return CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.CudaReviewRuntimeDirectory);
@@ -57,7 +62,10 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         {
             if (HasCudaBridge(paths.ReviewRuntimeDirectory))
             {
-                CopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]);
+                if (TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]) is { } copyFailure)
+                {
+                    return copyFailure;
+                }
             }
             else if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
             {
@@ -88,7 +96,11 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 
         if (HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory))
         {
-            CopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns);
+            if (TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns) is { } copyFailure)
+            {
+                return copyFailure;
+            }
+
             var localMarker = "nvidia-redist:migrated-from-tools-review";
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, localMarker);
             return IsInstalled()
@@ -305,6 +317,39 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
     {
         return Directory.Exists(directory) &&
             Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
+    }
+
+    private CudaReviewRuntimeInstallResult? TryRefreshBundledCudaBridge()
+    {
+        if (!HasCudaBridge(paths.ReviewRuntimeDirectory))
+        {
+            return null;
+        }
+
+        return TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]);
+    }
+
+    private CudaReviewRuntimeInstallResult? TryCopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
+    {
+        try
+        {
+            CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns);
+            return null;
+        }
+        catch (IOException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime migration failed: {exception.Message}",
+                destinationDirectory,
+                FailureCategoryInstallFailed);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime migration failed: {exception.Message}",
+                destinationDirectory,
+                FailureCategoryInstallFailed);
+        }
     }
 
     private static void CopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
