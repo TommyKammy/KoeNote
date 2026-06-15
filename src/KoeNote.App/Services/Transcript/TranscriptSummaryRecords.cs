@@ -24,7 +24,8 @@ public sealed record TranscriptSummaryOptions(
     string PromptTemplateId = "default",
     string ValidationMode = "markdown_non_empty",
     int MaxAttempts = 2,
-    int Attempt = 1);
+    int Attempt = 1,
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
 
 public sealed record TranscriptSummaryChunk(
     int ChunkIndex,

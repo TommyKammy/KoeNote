@@ -33,6 +33,41 @@ public sealed class LlamaRuntimePathBridgeTests
     }
 
     [Fact]
+    public void RuntimeEnvironment_AddsPersistentCudaReviewRuntimeDirectoryToPath()
+    {
+        var paths = CreateUnicodeReadyPaths();
+        Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+        File.WriteAllText(paths.LlamaCompletionPath, "llama");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "bridge");
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"), "cublas");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"), "cublasLt");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "cudart");
+        File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, "test");
+
+        var environment = LlamaRuntimeEnvironment.Build(paths);
+
+        Assert.NotNull(environment);
+        Assert.Equal(
+            paths.CudaReviewRuntimeDirectory,
+            environment[LlamaRuntimeEnvironment.CudaReviewRuntimeDirectoryVariable]);
+        Assert.True(environment.TryGetValue("PATH", out var path));
+        Assert.StartsWith(paths.CudaReviewRuntimeDirectory, path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RuntimeEnvironment_SkipsIncompleteCudaReviewRuntimeDirectory()
+    {
+        var paths = CreateUnicodeReadyPaths();
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "partial");
+
+        var environment = LlamaRuntimeEnvironment.Build(paths);
+
+        Assert.Null(environment);
+    }
+
+    [Fact]
     public async Task ReviewWorker_UsesAsciiSafeRuntimePathsForUnicodeModelPromptAndSchemaPaths()
     {
         var paths = CreateUnicodeReadyPaths();
@@ -111,7 +146,8 @@ public sealed class LlamaRuntimePathBridgeTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "roaming");
         var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "local");
-        var paths = new AppPaths(root, local);
+        var appBase = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "app");
+        var paths = new AppPaths(root, local, appBase);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         return paths;

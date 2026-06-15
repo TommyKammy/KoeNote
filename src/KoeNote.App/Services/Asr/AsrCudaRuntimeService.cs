@@ -79,6 +79,39 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
                     marker);
         }
 
+        var legacyCTranslate2RuntimeDirectory = Path.Combine(paths.RuntimeTools, "asr-ctranslate2-cuda");
+        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(legacyCTranslate2RuntimeDirectory))
+        {
+            try
+            {
+                MirrorNvidiaFilesToCTranslate2Runtime(legacyCTranslate2RuntimeDirectory, paths.AsrCTranslate2RuntimeDirectory);
+            }
+            catch (IOException exception)
+            {
+                return AsrCudaRuntimeInstallResult.Failed(
+                    $"CUDA ASR runtime migration failed: {exception.Message}",
+                    paths.AsrCTranslate2RuntimeDirectory,
+                    FailureCategoryInstallFailed);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return AsrCudaRuntimeInstallResult.Failed(
+                    $"CUDA ASR runtime migration failed: {exception.Message}",
+                    paths.AsrCTranslate2RuntimeDirectory,
+                    FailureCategoryInstallFailed);
+            }
+
+            var marker = "nvidia-redist:migrated-from-tools-asr-ctranslate2-cuda";
+            File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
+            return IsInstalled()
+                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime migrated from legacy CTranslate2 CUDA directory.", paths.AsrCTranslate2RuntimeDirectory, marker)
+                : AsrCudaRuntimeInstallResult.Failed(
+                    "CUDA ASR runtime files were present in the legacy CTranslate2 CUDA directory, but migration failed.",
+                    paths.AsrCTranslate2RuntimeDirectory,
+                    FailureCategoryInstallFailed,
+                    marker);
+        }
+
         if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrRuntimeDirectory))
         {
             try
@@ -138,7 +171,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             Directory.CreateDirectory(paths.AsrRuntimeDirectory);
             Directory.CreateDirectory(paths.AsrCTranslate2RuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            Report(progress, "インストール中", "CUDA ASR runtime の NVIDIA DLL を tools\\asr-ctranslate2-cuda に配置しています...");
+            Report(progress, "インストール中", $"CUDA ASR runtime の NVIDIA DLL を {paths.AsrCTranslate2RuntimeDirectory} に配置しています...");
             NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.AsrCTranslate2RuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
 
             Report(progress, "検証中", "CUDA ASR runtime の導入結果を検証しています...");

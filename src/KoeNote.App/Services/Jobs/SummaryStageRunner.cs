@@ -60,7 +60,8 @@ public sealed class SummaryStageRunner(
                 ThreadsBatch: profile.ThreadsBatch,
                 PromptTemplateId: taskSettings.PromptTemplateId,
                 ValidationMode: taskSettings.ValidationMode,
-                MaxAttempts: ResolveSummaryMaxAttempts(profile.ModelId, profile.ModelFamily)),
+                MaxAttempts: ResolveSummaryMaxAttempts(profile.ModelId, profile.ModelFamily),
+                RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;

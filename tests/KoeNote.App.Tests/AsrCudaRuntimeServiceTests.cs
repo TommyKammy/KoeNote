@@ -184,6 +184,27 @@ public sealed class AsrCudaRuntimeServiceTests
     }
 
     [Fact]
+    public async Task InstallAsync_MigratesExistingLegacyCTranslate2CudaDirectory()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithBundledAsrRuntime(root);
+        var legacyCTranslate2Directory = Path.Combine(paths.RuntimeTools, "asr-ctranslate2-cuda");
+        Directory.CreateDirectory(legacyCTranslate2Directory);
+        File.WriteAllText(Path.Combine(legacyCTranslate2Directory, "cudart64_12.dll"), "old cudart");
+        File.WriteAllText(Path.Combine(legacyCTranslate2Directory, "cublas64_12.dll"), "old cublas");
+        File.WriteAllText(Path.Combine(legacyCTranslate2Directory, "cublasLt64_12.dll"), "old cublasLt");
+        File.WriteAllText(Path.Combine(legacyCTranslate2Directory, "cudnn64_9.dll"), "old cudnn");
+        var service = new AsrCudaRuntimeService(paths, new HttpClient(new FailingHandler()), CreateOptions());
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.True(AsrCudaRuntimeLayout.HasPackage(paths));
+        Assert.Equal("old cudnn", File.ReadAllText(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll")));
+        Assert.Equal("nvidia-redist:migrated-from-tools-asr-ctranslate2-cuda", File.ReadAllText(paths.AsrCudaRuntimeMarkerPath));
+    }
+
+    [Fact]
     public async Task InstallAsync_KeepsLegacyAllInOneZipAsExplicitFallback()
     {
         var root = CreateRoot();

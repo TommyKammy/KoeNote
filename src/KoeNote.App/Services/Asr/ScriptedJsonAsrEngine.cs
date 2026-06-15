@@ -14,7 +14,8 @@ public sealed class ScriptedJsonAsrEngine(
     AsrResultStore resultStore,
     TranscriptSegmentRepository transcriptSegmentRepository,
     AsrRunRepository asrRunRepository,
-    JobLogRepository jobLogRepository) : IAsrEngine
+    JobLogRepository jobLogRepository,
+    AppPaths paths) : IAsrEngine
 {
     public string EngineId => engineId;
 
@@ -57,7 +58,7 @@ public sealed class ScriptedJsonAsrEngine(
         {
             ValidateInputs(input, config);
             Directory.CreateDirectory(config.OutputDirectory);
-            var processEnvironment = BuildProcessEnvironment(config);
+            var processEnvironment = BuildProcessEnvironment(config, paths);
             var chunks = new WavAudioChunker().SplitLongWav(
                 input.NormalizedAudioPath,
                 Path.Combine(config.OutputDirectory, "chunks"),
@@ -532,15 +533,14 @@ public sealed class ScriptedJsonAsrEngine(
         return exitCode < 0;
     }
 
-    private static AsrProcessEnvironment BuildProcessEnvironment(AsrEngineConfig config)
+    private static AsrProcessEnvironment BuildProcessEnvironment(AsrEngineConfig config, AppPaths paths)
     {
         var ctranslate2PathEntries = new List<string>();
         var asrToolEntries = new List<string>();
-        var appAsrTools = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
-        var appCTranslate2Cuda = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
-        if (Directory.Exists(appCTranslate2Cuda))
+        var appAsrTools = paths.AsrRuntimeDirectory;
+        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory))
         {
-            ctranslate2PathEntries.Add(appCTranslate2Cuda);
+            ctranslate2PathEntries.Add(paths.AsrCTranslate2RuntimeDirectory);
         }
 
         if (Directory.Exists(appAsrTools))
@@ -552,7 +552,7 @@ public sealed class ScriptedJsonAsrEngine(
         if (!string.IsNullOrWhiteSpace(workerDirectory))
         {
             var siblingCTranslate2Cuda = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr-ctranslate2-cuda"));
-            if (Directory.Exists(siblingCTranslate2Cuda))
+            if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(siblingCTranslate2Cuda))
             {
                 ctranslate2PathEntries.Add(siblingCTranslate2Cuda);
             }

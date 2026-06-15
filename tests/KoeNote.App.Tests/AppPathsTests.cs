@@ -33,7 +33,32 @@ public sealed class AppPathsTests
         Assert.True(Directory.Exists(paths.UserModels));
         Assert.True(Directory.Exists(paths.UpdateDownloads));
         Assert.True(Directory.Exists(paths.UpdateBackups));
+        Assert.True(Directory.Exists(paths.GpuRuntimes));
         Assert.False(Directory.Exists(paths.MachineModels));
+    }
+
+    [Fact]
+    public void GpuRuntimePaths_UseLocalAppDataPersistentStorage()
+    {
+        var root = CreateTempRoot();
+        var localRoot = Path.Combine(root, "local");
+        var appBaseDirectory = Path.Combine(root, "app");
+        var paths = new AppPaths(new AppPathOptions(
+            AppDataRoot: root,
+            LocalAppDataRoot: localRoot,
+            AppBaseDirectory: appBaseDirectory));
+
+        paths.EnsureCreated();
+
+        var expectedGpuRoot = Path.Combine(localRoot, "KoeNote", "runtimes", "gpu");
+        Assert.Equal(expectedGpuRoot, paths.GpuRuntimes);
+        Assert.Equal(Path.Combine(expectedGpuRoot, "asr-ctranslate2-cuda"), paths.AsrCTranslate2RuntimeDirectory);
+        Assert.Equal(Path.Combine(expectedGpuRoot, "review-cuda"), paths.CudaReviewRuntimeDirectory);
+        Assert.Equal(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, ".koenote-cuda-asr-runtime"), paths.AsrCudaRuntimeMarkerPath);
+        Assert.Equal(Path.Combine(paths.CudaReviewRuntimeDirectory, ".koenote-cuda-review-runtime"), paths.CudaReviewRuntimeMarkerPath);
+        Assert.DoesNotContain(appBaseDirectory, paths.AsrCTranslate2RuntimeDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(appBaseDirectory, paths.CudaReviewRuntimeDirectory, StringComparison.OrdinalIgnoreCase);
+        Assert.True(Directory.Exists(paths.GpuRuntimes));
     }
 
     [Fact]

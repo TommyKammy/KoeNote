@@ -290,9 +290,9 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         CreateFasterWhisperRuntime(paths);
         Touch(paths.LlamaCompletionPath);
         Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(paths.CudaReviewRuntimeMarkerPath);
         CreateDiarizationRuntime(paths);
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
@@ -719,9 +719,9 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
 
         Touch(viewModel.Paths.LlamaCompletionPath);
         Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(viewModel.Paths.CudaReviewRuntimeMarkerPath);
 
         Assert.False(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
@@ -1148,9 +1148,9 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
         Touch(paths.AsrCudaRuntimeMarkerPath);
         Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(paths.CudaReviewRuntimeMarkerPath);
         Directory.CreateDirectory(paths.UserModels);
 

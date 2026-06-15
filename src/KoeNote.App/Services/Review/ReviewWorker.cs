@@ -128,7 +128,12 @@ public sealed class ReviewWorker(
             var safePromptPath = pathBridge.AddInputFile(promptFilePath);
             var safeSchemaPath = schemaPath is null ? null : pathBridge.AddInputFile(schemaPath);
             var arguments = commandBuilder.BuildArgumentList(safeOptions, safePromptPath, safeSchemaPath);
-            processResult = await processRunner.RunAsync(options.LlamaCompletionPath, arguments, timeout, cancellationToken);
+            processResult = await processRunner.RunAsync(
+                options.LlamaCompletionPath,
+                arguments,
+                timeout,
+                cancellationToken,
+                options.RuntimeEnvironment);
         }
         catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
         {

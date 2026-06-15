@@ -109,7 +109,8 @@ public sealed class LlamaTranscriptSummaryRuntime(
                 options.LlamaCompletionPath,
                 BuildArguments(safeOptions, safePromptPath),
                 options.Timeout ?? TimeSpan.FromHours(2),
-                cancellationToken);
+                cancellationToken,
+                options.RuntimeEnvironment);
         }
         catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
         {

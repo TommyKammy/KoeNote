@@ -1532,7 +1532,7 @@ public sealed class SetupWizardServiceTests
     [Fact]
     public async Task SetupWizard_InstallCudaReviewRuntime_DelegatesToRuntimeInstaller()
     {
-        var paths = CreatePaths();
+        var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.LlamaCompletionPath);
         var archive = CreateCudaRuntimeArchive();
         var cudaService = new CudaReviewRuntimeService(
@@ -1548,7 +1548,8 @@ public sealed class SetupWizardServiceTests
 
         Assert.True(result.IsSucceeded);
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
-        Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
     }
 
     private static SetupWizardService CreateWizard(
@@ -1721,10 +1722,11 @@ public sealed class SetupWizardServiceTests
 
     private static void CreateCudaReviewRuntime(AppPaths paths)
     {
+        Touch(paths.LlamaCompletionPath);
         Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(paths.CudaReviewRuntimeMarkerPath);
     }
 
