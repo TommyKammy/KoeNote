@@ -8,7 +8,7 @@ namespace KoeNote.App.UiIntegrationTests;
 public sealed class ReviewCandidateConfirmationDialogViewModelTests
 {
     [Fact]
-    public void Decisions_UpdateCountsAndAllowContinueAfterAllCandidatesAreResolved()
+    public void Decisions_UpdateCountsHistoryAndAllowContinueAfterAllCandidatesAreResolved()
     {
         var operations = new FakeReviewCandidateOperations();
         var recordedDecisions = new List<string>();
@@ -26,32 +26,37 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         });
 
         Assert.Equal(3, viewModel.PendingCount);
+        Assert.Equal(0, viewModel.DecidedCount);
         Assert.False(viewModel.CanContinue);
         Assert.Equal("fixed one", viewModel.ManualEditText);
 
-        viewModel.AcceptSelected();
+        Assert.True(viewModel.AcceptSelected());
 
         Assert.Equal(1, viewModel.AcceptedCount);
         Assert.Equal(2, viewModel.PendingCount);
-        Assert.Null(viewModel.SelectedItem);
-        Assert.Equal(["accept:draft-001"], operations.Decisions);
-
-        viewModel.SelectNext();
+        Assert.Equal(1, viewModel.DecidedCount);
         Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.CanOperate);
+        Assert.Equal(["accept:draft-001"], operations.Decisions);
+        Assert.Equal("採用済み", viewModel.DecidedItems[0].DecisionStatusText);
+        Assert.Equal("accepted text", viewModel.DecidedItems[0].FinalText);
+
+        viewModel.EndDecisionInputCooldown();
         viewModel.ManualEditText = " manual two ";
-        viewModel.ApplyManualEdit();
+        Assert.True(viewModel.ApplyManualEdit());
 
         Assert.Equal(1, viewModel.EditedCount);
         Assert.Equal(1, viewModel.PendingCount);
-        Assert.Null(viewModel.SelectedItem);
+        Assert.Equal(2, viewModel.DecidedCount);
+        Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
         Assert.Equal(" manual two ", operations.ManualTextByDraft["draft-002"]);
 
-        viewModel.SelectNext();
-        Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
-        viewModel.RejectSelected();
+        viewModel.EndDecisionInputCooldown();
+        Assert.True(viewModel.RejectSelected());
 
         Assert.Equal(1, viewModel.RejectedCount);
         Assert.Equal(0, viewModel.PendingCount);
+        Assert.Equal(3, viewModel.DecidedCount);
         Assert.True(viewModel.CanContinue);
         Assert.Null(viewModel.SelectedItem);
         Assert.Equal(ReviewCandidateConfirmationOutcome.Continue, viewModel.CreateResult(
@@ -63,10 +68,17 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
                 "draft-003:rejected:fixed three"
             ],
             recordedDecisions);
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal(3, viewModel.DisplayItems.Count);
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("採用済み", viewModel.SelectedItem?.DecisionStatusText);
+        Assert.Equal("accepted text", viewModel.SelectedItem?.FinalText);
     }
 
     [Fact]
-    public void Decision_DoesNotAutoSelectNextCandidate()
+    public void Decision_AutoSelectsNextCandidateAndBlocksImmediateRepeat()
     {
         var operations = new FakeReviewCandidateOperations();
         var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
@@ -79,17 +91,43 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
 
         Assert.True(viewModel.AcceptSelected());
 
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.False(viewModel.AcceptSelected());
         Assert.Equal(1, viewModel.AcceptedCount);
         Assert.Equal(1, viewModel.PendingCount);
-        Assert.Null(viewModel.SelectedItem);
         Assert.Equal(["accept:draft-001"], operations.Decisions);
 
-        viewModel.SelectNext();
+        viewModel.EndDecisionInputCooldown();
 
-        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.True(viewModel.AcceptSelected());
         Assert.Equal(2, viewModel.AcceptedCount);
+    }
+
+    [Fact]
+    public void Filter_CanShowPendingDecidedAndAllCandidates()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Pending);
+        Assert.Single(viewModel.DisplayItems);
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+        Assert.Single(viewModel.DisplayItems);
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.CanOperate);
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.All);
+        Assert.Equal(2, viewModel.DisplayItems.Count);
     }
 
     [Fact]
@@ -108,6 +146,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
 
         Assert.Equal(1, viewModel.AcceptedCount);
         Assert.Equal(0, viewModel.PendingCount);
+        Assert.Equal(1, viewModel.DecidedCount);
         Assert.True(viewModel.CanContinue);
         Assert.Contains("補正メモリの更新に失敗しました", viewModel.OperationErrorText, StringComparison.Ordinal);
         Assert.Equal(["accept:draft-001"], operations.Decisions);
@@ -126,7 +165,6 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
             operations));
 
         Assert.True(viewModel.AcceptSelected());
-        viewModel.SelectNext();
 
         Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.Equal("accepted text", viewModel.SelectedItem?.CurrentText);
