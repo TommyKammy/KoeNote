@@ -198,7 +198,11 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
             }
 
             _selectedItem = value;
-            ManualEditText = value?.SuggestedText ?? string.Empty;
+            ManualEditText = value is null
+                ? string.Empty
+                : value.HasDecision && !string.IsNullOrWhiteSpace(value.FinalText)
+                    ? value.FinalText
+                    : value.SuggestedText;
             OperationErrorText = string.Empty;
             RefreshStateProperties();
             OnPropertyChanged();
@@ -217,6 +221,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
             _manualEditText = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(CanAcceptSelected));
+            OnPropertyChanged(nameof(CanRejectSelected));
             OnPropertyChanged(nameof(CanApplyManualEdit));
         }
     }
@@ -305,7 +311,11 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         }
     }
 
-    public bool CanOperate => SelectedItem is { IsPending: true } && !IsDecisionInputBlocked;
+    public bool CanOperate => SelectedItem is not null && !IsDecisionInputBlocked;
+
+    public bool CanAcceptSelected => CanOperate && SelectedItem?.DecisionKind != ReviewCandidateDecisionKind.Accepted;
+
+    public bool CanRejectSelected => CanOperate && SelectedItem?.DecisionKind != ReviewCandidateDecisionKind.Rejected;
 
     public bool CanApplyManualEdit => CanOperate && !string.IsNullOrWhiteSpace(ManualEditText);
 
@@ -383,12 +393,30 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     public bool AcceptSelected()
     {
-        return ApplyDecision(static (operations, draftId, _) => operations.AcceptDraft(draftId), manualText: null, ReviewCandidateDecisionKind.Accepted);
+        if (!CanAcceptSelected)
+        {
+            return false;
+        }
+
+        return ApplyDecision(
+            static (operations, draftId, _) => operations.AcceptDraft(draftId),
+            static (operations, draftId, _) => operations.ChangeToAccepted(draftId),
+            manualText: null,
+            ReviewCandidateDecisionKind.Accepted);
     }
 
     public bool RejectSelected()
     {
-        return ApplyDecision(static (operations, draftId, _) => operations.RejectDraft(draftId), manualText: null, ReviewCandidateDecisionKind.Rejected);
+        if (!CanRejectSelected)
+        {
+            return false;
+        }
+
+        return ApplyDecision(
+            static (operations, draftId, _) => operations.RejectDraft(draftId),
+            static (operations, draftId, _) => operations.ChangeToRejected(draftId),
+            manualText: null,
+            ReviewCandidateDecisionKind.Rejected);
     }
 
     public bool ApplyManualEdit()
@@ -401,6 +429,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         return ApplyDecision(
             static (operations, draftId, manualText) =>
                 operations.ApplyManualEdit(draftId, manualText ?? string.Empty, "整文候補確認"),
+            static (operations, draftId, manualText) =>
+                operations.ChangeToManualEdit(draftId, manualText ?? string.Empty, "整文候補確認"),
             ManualEditText,
             ReviewCandidateDecisionKind.Edited);
     }
@@ -417,7 +447,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     }
 
     private bool ApplyDecision(
-        Func<IReviewCandidateConfirmationOperations, string, string?, ReviewOperationResult> operation,
+        Func<IReviewCandidateConfirmationOperations, string, string?, ReviewOperationResult> pendingOperation,
+        Func<IReviewCandidateConfirmationOperations, string, string?, ReviewOperationResult> decidedOperation,
         string? manualText,
         ReviewCandidateDecisionKind decisionKind)
     {
@@ -427,11 +458,15 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         }
 
         var selected = SelectedItem!;
+        var wasPending = selected.IsPending;
+        var previousDecisionKind = selected.DecisionKind;
         ReviewOperationResult result;
         try
         {
             OperationErrorText = string.Empty;
-            result = operation(_request.Operations, selected.DraftId, manualText);
+            result = wasPending
+                ? pendingOperation(_request.Operations, selected.DraftId, manualText)
+                : decidedOperation(_request.Operations, selected.DraftId, manualText);
         }
         catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
@@ -446,6 +481,42 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
         var selectedSuggestionText = manualText ?? selected.SuggestedText;
         var postCommitWarning = TryRecordDecision(selected, result, selectedSuggestionText);
+        ApplyDecisionCountDelta(previousDecisionKind, decisionKind);
+
+        var selectedIndex = Items.IndexOf(selected);
+        RefreshRemainingSegmentText(selected, result);
+        selected.MarkDecided(decisionKind, result.FinalText ?? (decisionKind == ReviewCandidateDecisionKind.Rejected
+            ? selected.CurrentText
+            : selectedSuggestionText));
+        if (wasPending)
+        {
+            Items.Remove(selected);
+            DecidedItems.Add(selected);
+            var nextPending = selectedIndex >= 0 && selectedIndex < Items.Count
+                ? Items[selectedIndex]
+                : Items.LastOrDefault();
+            RefreshDisplayItems(nextPending);
+            IsDecisionInputBlocked = nextPending is not null;
+        }
+        else
+        {
+            RefreshDisplayItems(selected);
+            IsDecisionInputBlocked = false;
+        }
+
+        OperationErrorText = postCommitWarning ?? string.Empty;
+        RefreshStateProperties();
+        return true;
+    }
+
+    private void ApplyDecisionCountDelta(ReviewCandidateDecisionKind previousDecisionKind, ReviewCandidateDecisionKind nextDecisionKind)
+    {
+        DecrementDecisionCount(previousDecisionKind);
+        IncrementDecisionCount(nextDecisionKind);
+    }
+
+    private void IncrementDecisionCount(ReviewCandidateDecisionKind decisionKind)
+    {
         switch (decisionKind)
         {
             case ReviewCandidateDecisionKind.Accepted:
@@ -458,22 +529,22 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
                 EditedCount++;
                 break;
         }
+    }
 
-        var selectedIndex = Items.IndexOf(selected);
-        RefreshRemainingSegmentText(selected, result);
-        Items.Remove(selected);
-        selected.MarkDecided(decisionKind, result.FinalText ?? (decisionKind == ReviewCandidateDecisionKind.Rejected
-            ? selected.CurrentText
-            : selectedSuggestionText));
-        DecidedItems.Add(selected);
-        var nextPending = selectedIndex >= 0 && selectedIndex < Items.Count
-            ? Items[selectedIndex]
-            : Items.LastOrDefault();
-        RefreshDisplayItems(nextPending);
-        IsDecisionInputBlocked = nextPending is not null;
-        OperationErrorText = postCommitWarning ?? string.Empty;
-        RefreshStateProperties();
-        return true;
+    private void DecrementDecisionCount(ReviewCandidateDecisionKind decisionKind)
+    {
+        switch (decisionKind)
+        {
+            case ReviewCandidateDecisionKind.Accepted:
+                AcceptedCount--;
+                break;
+            case ReviewCandidateDecisionKind.Rejected:
+                RejectedCount--;
+                break;
+            case ReviewCandidateDecisionKind.Edited:
+                EditedCount--;
+                break;
+        }
     }
 
     private string? TryRecordDecision(
@@ -554,6 +625,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         OnPropertyChanged(nameof(CurrentPositionText));
         OnPropertyChanged(nameof(FooterText));
         OnPropertyChanged(nameof(CanOperate));
+        OnPropertyChanged(nameof(CanAcceptSelected));
+        OnPropertyChanged(nameof(CanRejectSelected));
         OnPropertyChanged(nameof(CanApplyManualEdit));
         OnPropertyChanged(nameof(CanGoPrevious));
         OnPropertyChanged(nameof(CanGoNext));
@@ -615,6 +688,8 @@ public sealed class ReviewCandidateConfirmationDialogItem(ReviewCandidateConfirm
 
     public bool HasDecision => !IsPending;
 
+    public ReviewCandidateDecisionKind DecisionKind => _decisionKind;
+
     public string DecisionStatusText => _decisionKind switch
     {
         ReviewCandidateDecisionKind.Accepted => "採用済み",
@@ -644,6 +719,7 @@ public sealed class ReviewCandidateConfirmationDialogItem(ReviewCandidateConfirm
         _finalText = finalText;
         OnPropertyChanged(nameof(IsPending));
         OnPropertyChanged(nameof(HasDecision));
+        OnPropertyChanged(nameof(DecisionKind));
         OnPropertyChanged(nameof(DecisionStatusText));
         OnPropertyChanged(nameof(FinalText));
     }
