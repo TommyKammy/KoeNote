@@ -404,6 +404,84 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.False(withoutRange.CanPlaySelectedPreview);
     }
 
+    [Fact]
+    public async Task Playback_CanPlayDecidedCandidateAfterReturningToHistory()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two", 4, 6)
+            ],
+            operations)
+        {
+            AudioPath = audioPath
+        }, playback);
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.True(viewModel.CanPlaySelectedPreview);
+
+        await viewModel.TogglePreviewAsync();
+
+        Assert.True(viewModel.IsPreviewPlaying);
+        Assert.Equal(TimeSpan.FromSeconds(1), playback.SeekPosition);
+    }
+
+    [Fact]
+    public async Task Playback_StopsWhenFilterChangeSelectsAnotherCandidate()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two", 4, 6)
+            ],
+            operations)
+        {
+            AudioPath = audioPath
+        }, playback);
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.EndDecisionInputCooldown();
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+
+        await viewModel.TogglePreviewAsync();
+        Assert.True(viewModel.IsPreviewPlaying);
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.IsPreviewPlaying);
+        Assert.False(playback.IsPlaying);
+        Assert.True(playback.StopCount >= 1);
+    }
+
+    [Fact]
+    public void Playback_CommandIsDisabledWhenAudioFileIsMissing()
+    {
+        var missingPath = Path.Combine(Path.GetTempPath(), "KoeNote.UiIntegrationTests", Guid.NewGuid().ToString("N"), "missing.wav");
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            new FakeReviewCandidateOperations())
+        {
+            AudioPath = missingPath
+        }, new FakeAudioPlaybackService());
+
+        Assert.False(viewModel.CanPlaySelectedPreview);
+        Assert.False(viewModel.TogglePreviewCommand.CanExecute(null));
+    }
+
     private static ReviewCandidateConfirmationItem CreateCandidate(
         string draftId,
         string segmentId,
