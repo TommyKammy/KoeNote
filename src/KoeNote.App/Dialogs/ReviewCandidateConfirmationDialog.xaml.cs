@@ -5,8 +5,10 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Review;
+using KoeNote.App.ViewModels;
 
 namespace KoeNote.App.Dialogs;
 
@@ -18,9 +20,16 @@ public partial class ReviewCandidateConfirmationDialog : Window
         (ReviewCandidateConfirmationDialogViewModel)DataContext;
 
     public ReviewCandidateConfirmationDialog(ReviewCandidateConfirmationRequest request)
+        : this(request, new AudioPlaybackService())
+    {
+    }
+
+    public ReviewCandidateConfirmationDialog(
+        ReviewCandidateConfirmationRequest request,
+        IAudioPlaybackService audioPlaybackService)
     {
         InitializeComponent();
-        DataContext = new ReviewCandidateConfirmationDialogViewModel(request);
+        DataContext = new ReviewCandidateConfirmationDialogViewModel(request, audioPlaybackService);
         _decisionCooldownTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(350)
@@ -42,6 +51,11 @@ public partial class ReviewCandidateConfirmationDialog : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        ViewModel.StopPlayback();
     }
 
     private void OnPreviousClick(object sender, RoutedEventArgs e)
@@ -151,6 +165,8 @@ public enum ReviewCandidateDecisionKind
 public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyPropertyChanged
 {
     private readonly ReviewCandidateConfirmationRequest _request;
+    private readonly AudioPreviewPlaybackController _playbackController;
+    private readonly DispatcherTimer _playbackTimer;
     private ReviewCandidateConfirmationDialogItem? _selectedItem;
     private string _manualEditText = string.Empty;
     private string _operationErrorText = string.Empty;
@@ -158,8 +174,22 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     private ReviewCandidateConfirmationFilter _filter = ReviewCandidateConfirmationFilter.Pending;
 
     public ReviewCandidateConfirmationDialogViewModel(ReviewCandidateConfirmationRequest request)
+        : this(request, new ReviewCandidateConfirmationNoOpAudioPlaybackService())
+    {
+    }
+
+    public ReviewCandidateConfirmationDialogViewModel(
+        ReviewCandidateConfirmationRequest request,
+        IAudioPlaybackService audioPlaybackService)
     {
         _request = request;
+        _playbackController = new AudioPreviewPlaybackController(audioPlaybackService);
+        _playbackTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _playbackTimer.Tick += (_, _) => RefreshPlayback();
+        TogglePreviewCommand = new RelayCommand(TogglePreviewAsync, () => CanPlaySelectedPreview);
         TotalCount = request.Candidates.Count;
         LeadText = $"{request.JobTitle} の整文候補を確認してから、話者名確認へ進みます。";
         Items = new ObservableCollection<ReviewCandidateConfirmationDialogItem>(
@@ -172,6 +202,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public string LeadText { get; }
+
+    public string? AudioPath => _request.AudioPath;
 
     public int TotalCount { get; }
 
@@ -187,6 +219,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     public ObservableCollection<ReviewCandidateConfirmationDialogItem> DisplayItems { get; }
 
+    public ICommand TogglePreviewCommand { get; }
+
     public ReviewCandidateConfirmationDialogItem? SelectedItem
     {
         get => _selectedItem;
@@ -200,6 +234,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
             _selectedItem = value;
             RefreshManualEditText(value);
             OperationErrorText = string.Empty;
+            StopPlayback();
             RefreshStateProperties();
             OnPropertyChanged();
         }
@@ -315,6 +350,19 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     public bool CanApplyManualEdit => CanOperate && !string.IsNullOrWhiteSpace(ManualEditText);
 
+    public bool CanPlaySelectedPreview =>
+        SelectedItem?.PlaybackPreview is not null && _playbackController.CanPlay(AudioPath);
+
+    public bool IsPreviewPlaying => _playbackController.IsPlaying;
+
+    public string PlayIcon => IsPreviewPlaying ? "\uE769" : "\uE768";
+
+    public string PreviewPlaybackStatusText => CanPlaySelectedPreview
+        ? IsPreviewPlaying ? "再生中" : "音声確認"
+        : "音声なし";
+
+    public double PreviewPlaybackProgressPercent => _playbackController.ProgressPercent;
+
     public bool CanGoPrevious
     {
         get
@@ -357,6 +405,35 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     public void EndDecisionInputCooldown()
     {
         IsDecisionInputBlocked = false;
+    }
+
+    public Task TogglePreviewAsync()
+    {
+        if (SelectedItem?.PlaybackPreview is not { } preview)
+        {
+            StopPlayback();
+            return Task.CompletedTask;
+        }
+
+        var isPlaying = _playbackController.Toggle(AudioPath, preview);
+        if (isPlaying)
+        {
+            _playbackTimer.Start();
+        }
+        else
+        {
+            _playbackTimer.Stop();
+        }
+
+        RefreshPlaybackStateProperties();
+        return Task.CompletedTask;
+    }
+
+    public void StopPlayback()
+    {
+        _playbackTimer.Stop();
+        _playbackController.Stop();
+        RefreshPlaybackStateProperties();
     }
 
     public void SelectPrevious()
@@ -477,6 +554,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
         var selectedSuggestionText = manualText ?? selected.SuggestedText;
         var postCommitWarning = TryRecordDecision(selected, result, selectedSuggestionText);
+        StopPlayback();
         ApplyDecisionCountDelta(previousDecisionKind, decisionKind);
 
         var selectedIndex = Items.IndexOf(selected);
@@ -505,6 +583,17 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         OperationErrorText = postCommitWarning ?? string.Empty;
         RefreshStateProperties();
         return true;
+    }
+
+    private void RefreshPlayback()
+    {
+        var isPlaying = _playbackController.Refresh();
+        if (!isPlaying)
+        {
+            _playbackTimer.Stop();
+        }
+
+        RefreshPlaybackStateProperties();
     }
 
     private void ApplyDecisionCountDelta(ReviewCandidateDecisionKind previousDecisionKind, ReviewCandidateDecisionKind nextDecisionKind)
@@ -630,9 +719,23 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         OnPropertyChanged(nameof(CanAcceptSelected));
         OnPropertyChanged(nameof(CanRejectSelected));
         OnPropertyChanged(nameof(CanApplyManualEdit));
+        RefreshPlaybackStateProperties();
         OnPropertyChanged(nameof(CanGoPrevious));
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(CanContinue));
+    }
+
+    private void RefreshPlaybackStateProperties()
+    {
+        OnPropertyChanged(nameof(CanPlaySelectedPreview));
+        OnPropertyChanged(nameof(IsPreviewPlaying));
+        OnPropertyChanged(nameof(PlayIcon));
+        OnPropertyChanged(nameof(PreviewPlaybackStatusText));
+        OnPropertyChanged(nameof(PreviewPlaybackProgressPercent));
+        if (TogglePreviewCommand is RelayCommand command)
+        {
+            command.RaiseCanExecuteChanged();
+        }
     }
 
     private void RefreshFilterStateProperties()
@@ -645,6 +748,46 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+
+internal sealed class ReviewCandidateConfirmationNoOpAudioPlaybackService : IAudioPlaybackService
+{
+    public event EventHandler? PlaybackStateChanged;
+
+    public bool IsPlaying => false;
+
+    public string? CurrentPath => null;
+
+    public TimeSpan Position => TimeSpan.Zero;
+
+    public TimeSpan Duration => TimeSpan.Zero;
+
+    public bool Toggle(string audioPath)
+    {
+        return false;
+    }
+
+    public bool Open(string audioPath)
+    {
+        return false;
+    }
+
+    public void Seek(TimeSpan position)
+    {
+    }
+
+    public void SetPlaybackRate(double rate)
+    {
+    }
+
+    public void SetVolume(double volume)
+    {
+    }
+
+    public void Stop()
+    {
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 }
 
@@ -713,6 +856,12 @@ public sealed class ReviewCandidateConfirmationDialogItem(ReviewCandidateConfirm
         (double start, double end) => $"{FormatTimestamp(start)} - {FormatTimestamp(end)}",
         (double start, null) => FormatTimestamp(start),
         _ => $"Segment {item.Draft.SegmentId}"
+    };
+
+    public AudioPreviewRange? PlaybackPreview => (item.StartSeconds, item.EndSeconds) switch
+    {
+        (double start, double end) => new AudioPreviewRange(start, end, item.Draft.DraftId),
+        _ => null
     };
 
     public void MarkDecided(ReviewCandidateDecisionKind decisionKind, string finalText)

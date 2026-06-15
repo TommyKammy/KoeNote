@@ -14,6 +14,7 @@
         AllowsTransparency="True"
         FontFamily="Meiryo UI"
         Loaded="OnLoaded"
+        Closed="OnClosed"
         PreviewKeyDown="OnPreviewKeyDown">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -71,6 +72,46 @@
                                 <Setter TargetName="Root" Property="Background" Value="#DBEAFE" />
                                 <Setter TargetName="Root" Property="BorderBrush" Value="#2563EB" />
                                 <Setter Property="Foreground" Value="#1D4ED8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PreviewPlayButton" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#ECFDF5" />
+            <Setter Property="BorderBrush" Value="#BBF7D0" />
+            <Setter Property="Foreground" Value="#15803D" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="ToolTip" Value="該当箇所を再生/停止" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#DCFCE7" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#86EFAC" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#BBF7D0" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#4ADE80" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -351,10 +392,30 @@
                                            FontSize="15"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource TextBrush}" />
-                                <TextBlock Text="{Binding DetailSubtitle}"
-                                           Margin="0,5,0,0"
-                                           FontSize="12"
-                                           Foreground="{StaticResource MutedBrush}" />
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,5,0,0">
+                                    <TextBlock Text="{Binding DetailSubtitle}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               VerticalAlignment="Center" />
+                                    <Button Style="{StaticResource PreviewPlayButton}"
+                                            Content="{Binding PlayIcon}"
+                                            Command="{Binding TogglePreviewCommand}"
+                                            IsEnabled="{Binding CanPlaySelectedPreview}"
+                                            Margin="10,0,0,0" />
+                                    <TextBlock Text="{Binding PreviewPlaybackStatusText}"
+                                               Margin="6,0,0,0"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#15803D"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                                <ProgressBar Height="3"
+                                             Margin="0,7,80,0"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding PreviewPlaybackProgressPercent, Mode=OneWay}"
+                                             Visibility="{Binding IsPreviewPlaying, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </StackPanel>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding CurrentPositionText}"
