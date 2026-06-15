@@ -14,19 +14,27 @@ public static class LlamaRuntimeBackendDiagnostics
     [
         "load_backend: loaded cuda",
         "loaded cuda backend",
+        "ggml_cuda_init: found",
+        "cuda0:",
+        "cuda devices found",
         "found cuda",
         "cuda backend initialized",
         "cuda backend loaded"
     ];
 
-    private static readonly string[] CudaMissingSignals =
+    private static readonly string[] ExplicitCudaMissingSignals =
     [
         "failed to load cuda",
         "cuda backend not found",
         "no cuda backend",
         "no cuda devices",
         "could not load cuda",
-        "ggml_cuda_init: failed",
+        "ggml_cuda_init: failed"
+    ];
+
+    private static readonly string[] CudaDependencySignals =
+    [
+        "ggml-cuda",
         "cublas",
         "cudart",
         "cublaslt"
@@ -39,8 +47,7 @@ public static class LlamaRuntimeBackendDiagnostics
         "not found",
         "could not",
         "cannot",
-        "unable",
-        "no "
+        "unable"
     ];
 
     public static LlamaRuntimeBackendDiagnostic Analyze(
@@ -79,18 +86,32 @@ public static class LlamaRuntimeBackendDiagnostics
 
     private static bool ContainsCudaMissingSignal(string text)
     {
-        var normalized = text.ToLowerInvariant();
-        if (!ContainsAny(normalized, CudaMissingSignals))
+        foreach (var line in EnumerateLines(text))
         {
-            return false;
+            var normalized = line.ToLowerInvariant();
+            if (ContainsAny(normalized, ExplicitCudaMissingSignals))
+            {
+                return true;
+            }
+
+            if (ContainsAny(normalized, CudaDependencySignals) &&
+                ContainsAny(normalized, MissingQualifiers))
+            {
+                return true;
+            }
         }
 
-        return MissingQualifiers.Any(normalized.Contains);
+        return false;
     }
 
     private static bool ContainsAny(string text, IReadOnlyCollection<string> signals)
     {
         return signals.Any(signal => text.Contains(signal, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> EnumerateLines(string text)
+    {
+        return text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static string BuildSummary(

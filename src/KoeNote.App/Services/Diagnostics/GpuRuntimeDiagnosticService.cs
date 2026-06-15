@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Llm;
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
 
@@ -24,7 +25,7 @@ public sealed class GpuRuntimeDiagnosticService(
     public GpuRuntimeDiagnosticSnapshot BuildSnapshot()
     {
         var resources = _hostResourceProbe.GetResources();
-        var llamaEnvironment = LlamaRuntimeEnvironment.Build(paths);
+        var resolverDiagnostic = BuildResolverDiagnostic();
         return new GpuRuntimeDiagnosticSnapshot(
             DateTimeOffset.Now,
             resources,
@@ -48,12 +49,7 @@ public sealed class GpuRuntimeDiagnosticService(
                 CudaReviewRuntimeLayout.HasLegacyNvidiaRuntimeFiles(paths),
                 CudaReviewRuntimeLayout.HasPackage(paths),
                 CudaReviewRuntimeLayout.GetMissingPackageItems(paths)),
-            new LlmRuntimeResolverDiagnostic(
-                CudaReviewRuntimeLayout.HasPackage(paths) ? "cuda" : "cpu",
-                llamaEnvironment is not null,
-                llamaEnvironment is null
-                    ? null
-                    : llamaEnvironment.GetValueOrDefault(LlamaRuntimeEnvironment.CudaReviewRuntimeDirectoryVariable)));
+            resolverDiagnostic);
     }
 
     public string BuildJson()
@@ -94,10 +90,35 @@ public sealed class GpuRuntimeDiagnosticService(
 
         builder.AppendLine();
         builder.AppendLine("### Runtime Resolver");
+        AppendKeyValue(builder, "SelectedReviewModelId", snapshot.Resolver.SelectedReviewModelId);
+        AppendKeyValue(builder, "ReviewRuntimePackageId", snapshot.Resolver.ReviewRuntimePackageId);
         AppendKeyValue(builder, "ReviewBackendMode", snapshot.Resolver.ReviewBackendMode);
+        AppendKeyValue(builder, "ReviewLlamaCompletionPath", snapshot.Resolver.ReviewLlamaCompletionPath);
         AppendKeyValue(builder, "LlamaRuntimeEnvironmentReady", snapshot.Resolver.LlamaRuntimeEnvironmentReady.ToString());
         AppendKeyValue(builder, "CudaReviewRuntimeDirectory", snapshot.Resolver.CudaReviewRuntimeDirectory ?? "(none)");
         return builder.ToString();
+    }
+
+    private LlmRuntimeResolverDiagnostic BuildResolverDiagnostic()
+    {
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var setupState = new SetupStateService(paths).Load();
+        var selectedReviewModelId = ReviewModelSelectionResolver.Resolve(
+            catalog,
+            setupState.SelectedReviewModelId,
+            setupState.SelectedModelPresetId);
+        var profile = new LlmProfileResolver(paths, new InstalledModelRepository(paths))
+            .Resolve(catalog, selectedReviewModelId);
+        var llamaEnvironment = LlamaRuntimeEnvironment.Build(paths);
+        return new LlmRuntimeResolverDiagnostic(
+            selectedReviewModelId,
+            profile.RuntimePackageId,
+            profile.AccelerationMode,
+            profile.LlamaCompletionPath,
+            llamaEnvironment is not null,
+            llamaEnvironment is null
+                ? null
+                : llamaEnvironment.GetValueOrDefault(LlamaRuntimeEnvironment.CudaReviewRuntimeDirectoryVariable));
     }
 
     private static void AppendMissingItems(StringBuilder builder, IReadOnlyList<string> missingItems)
@@ -151,6 +172,9 @@ public sealed record ReviewGpuRuntimeDiagnostic(
     IReadOnlyList<string> MissingItems);
 
 public sealed record LlmRuntimeResolverDiagnostic(
+    string SelectedReviewModelId,
+    string ReviewRuntimePackageId,
     string ReviewBackendMode,
+    string ReviewLlamaCompletionPath,
     bool LlamaRuntimeEnvironmentReady,
     string? CudaReviewRuntimeDirectory);

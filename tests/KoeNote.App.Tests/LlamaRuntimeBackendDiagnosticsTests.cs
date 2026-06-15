@@ -57,6 +57,38 @@ public sealed class LlamaRuntimeBackendDiagnosticsTests
     }
 
     [Fact]
+    public void Analyze_DoesNotTreatNormalCublasSettingAsMissing()
+    {
+        var diagnostic = LlamaRuntimeBackendDiagnostics.Analyze(
+            999,
+            CreateCudaEnvironment(),
+            """
+            ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
+            ggml_cuda_init: found 1 CUDA devices:
+            CUDA0: NVIDIA GeForce RTX 3060 Ti
+            """);
+
+        Assert.True(diagnostic.CudaBackendLoaded);
+        Assert.False(diagnostic.CudaBackendMissing);
+        Assert.Contains("cuda-backend-loaded", diagnostic.Summary);
+    }
+
+    [Fact]
+    public void Analyze_RecognizesCudaDeviceDiscoveryAsLoaded()
+    {
+        var diagnostic = LlamaRuntimeBackendDiagnostics.Analyze(
+            999,
+            CreateCudaEnvironment(),
+            """
+            ggml_cuda_init: found 1 CUDA devices:
+            CUDA0: NVIDIA GeForce RTX 3060 Ti
+            """);
+
+        Assert.True(diagnostic.CudaBackendLoaded);
+        Assert.False(diagnostic.CudaBackendMissing);
+    }
+
+    [Fact]
     public void Analyze_IgnoresCudaBackendFailureWhenGpuLayersAreDisabled()
     {
         var diagnostic = LlamaRuntimeBackendDiagnostics.Analyze(
