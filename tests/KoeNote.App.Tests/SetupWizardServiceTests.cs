@@ -1532,7 +1532,7 @@ public sealed class SetupWizardServiceTests
     [Fact]
     public async Task SetupWizard_InstallCudaReviewRuntime_DelegatesToRuntimeInstaller()
     {
-        var paths = CreatePaths();
+        var paths = CreatePathsWithoutTernaryRuntime();
         Touch(paths.LlamaCompletionPath);
         var archive = CreateCudaRuntimeArchive();
         var cudaService = new CudaReviewRuntimeService(
@@ -1548,7 +1548,7 @@ public sealed class SetupWizardServiceTests
 
         Assert.True(result.IsSucceeded);
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
-        Assert.False(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
         Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
     }
 
