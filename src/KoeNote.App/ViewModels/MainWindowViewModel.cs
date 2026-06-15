@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows.Threading;
@@ -85,6 +86,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly LlmSettingsSeedService _llmSettingsSeedService;
     private readonly LlmSettingsDisplayService _llmSettingsDisplayService;
     private readonly ReadablePolishingPromptSettingsRepository _readablePolishingPromptSettingsRepository;
+    private readonly UiPreferencesService _uiPreferencesService;
     private readonly MainContentZoomState _mainContentZoomState;
     private readonly ModelCatalogPresenter _modelCatalogPresenter = new();
     private readonly ModelDownloadProgressPresenter _modelDownloadProgressPresenter = new();
@@ -160,6 +162,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _jobSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private DiagnosticLogScopeOption? _selectedDiagnosticLogScope;
+    private MainLayoutMode _mainLayoutMode = MainLayoutMode.Standard;
     private int _selectedTranscriptTabIndex;
     private int _selectedLogPanelTabIndex;
     private int _selectedDetailPanelTabIndex;
@@ -248,7 +251,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _readablePolishingPromptSettingsRepository = services.ReadablePolishingPromptSettingsRepository;
         _speakerNameConfirmationSettingsRepository = services.SpeakerNameConfirmationSettingsRepository;
         _transcriptDerivativeRepository = services.TranscriptDerivativeRepository;
-        _mainContentZoomState = new MainContentZoomState(paths);
+        _uiPreferencesService = new UiPreferencesService(paths);
+        var uiPreferences = _uiPreferencesService.Load();
+        _mainLayoutMode = UiPreferencesService.NormalizeMainLayoutMode(uiPreferences.MainLayoutMode);
+        _mainContentZoomState = new MainContentZoomState(_uiPreferencesService);
         var currentApplication = System.Windows.Application.Current;
         _shutdownApplication = currentApplication is null ? (() => { }) : currentApplication.Shutdown;
         _statusBarInfo = _statusBarInfoService.GetStatusBarInfo();
@@ -713,6 +719,10 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand OpenSelectedDetailPanelCommand { get; private set; } = null!;
 
     public ICommand CloseDetailPanelCommand { get; private set; } = null!;
+
+    public ICommand UseStandardLayoutCommand { get; private set; } = null!;
+
+    public ICommand UseDetailLayoutCommand { get; private set; } = null!;
 
     public ICommand SetupBackCommand { get; private set; } = null!;
 

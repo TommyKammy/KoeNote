@@ -59,7 +59,7 @@ internal sealed class MainContentZoomState
         }
 
         _scale = normalized;
-        _preferencesService.Save(new UiPreferences(_scale));
+        _preferencesService.SaveMainContentZoomScale(_scale);
         return true;
     }
 

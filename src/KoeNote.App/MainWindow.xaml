@@ -32,14 +32,18 @@
                       Margin="0"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-            <Grid Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
+            <Grid x:Name="MainWorkspaceGrid"
+                  Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="4*" MinWidth="176" />
+                    <ColumnDefinition Width="{Binding DataContext.JobListColumnWidth, ElementName=MainWorkspaceGrid}"
+                                      MinWidth="{Binding DataContext.JobListColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="15*" MinWidth="540" />
+                    <ColumnDefinition Width="{Binding DataContext.TranscriptColumnWidth, ElementName=MainWorkspaceGrid}"
+                                      MinWidth="540" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="6*" MinWidth="300" />
+                    <ColumnDefinition Width="{Binding DataContext.ReviewColumnWidth, ElementName=MainWorkspaceGrid}"
+                                      MinWidth="{Binding DataContext.ReviewColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="420" />
