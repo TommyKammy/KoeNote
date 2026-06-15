@@ -58,7 +58,10 @@ public sealed class JobLogExportServiceTests
         var reviewLogPath = Path.Combine(paths.Jobs, job.JobId, "logs", "review.log");
         Directory.CreateDirectory(Path.GetDirectoryName(asrLogPath)!);
         File.WriteAllText(asrLogPath, "koenote_asr_diagnostic: device=cuda compute_type=float16");
-        File.WriteAllText(reviewLogPath, "Review runtime backend: requested_gpu_layers=999; status=cuda-backend-loaded");
+        File.WriteAllLines(reviewLogPath, [
+            "Review runtime backend: requested_gpu_layers=999; status=cuda-backend-loaded",
+            "cuda appeared in user transcript text and must not be copied"
+        ]);
 
         var report = service.BuildDiagnosticReport(job);
 
@@ -69,6 +72,7 @@ public sealed class JobLogExportServiceTests
         Assert.Contains("## Runtime Backend Signals", report);
         Assert.Contains("job-logs/asr-001.log: koenote_asr_diagnostic", report);
         Assert.Contains("job-logs/review.log: Review runtime backend", report);
+        Assert.DoesNotContain("user transcript text", report);
     }
 
     [Fact]

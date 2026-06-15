@@ -198,24 +198,28 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
         foreach (var file in Directory.EnumerateFiles(jobLogDirectory, "*.log", SearchOption.AllDirectories)
                      .Order(StringComparer.OrdinalIgnoreCase))
         {
-            foreach (var line in File.ReadLines(file).Where(IsRuntimeBackendSignal).TakeLast(20))
+            var safeSignals = File.ReadLines(file)
+                .Select(ExtractRuntimeBackendSignal)
+                .Where(static line => line is not null)
+                .Cast<string>()
+                .TakeLast(20);
+            foreach (var line in safeSignals)
             {
                 yield return $"{CreateZipEntryName("job-logs", Path.GetRelativePath(jobLogDirectory, file))}: {line}";
             }
         }
     }
 
-    private static bool IsRuntimeBackendSignal(string line)
+    private static string? ExtractRuntimeBackendSignal(string line)
     {
-        return line.Contains("koenote_asr_diagnostic", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("ctranslate2", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("cuda", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("cublas", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("cudnn", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("ggml", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("backend", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("n-gpu-layers", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("acceleration=", StringComparison.OrdinalIgnoreCase);
+        var trimmed = line.Trim();
+        if (trimmed.StartsWith("koenote_asr_diagnostic", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Review runtime backend:", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return null;
     }
 
     private static void AddTextEntry(ZipArchive archive, string entryName, string content)

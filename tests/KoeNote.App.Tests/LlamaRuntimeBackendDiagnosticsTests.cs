@@ -44,6 +44,19 @@ public sealed class LlamaRuntimeBackendDiagnosticsTests
     }
 
     [Fact]
+    public void Analyze_DoesNotTreatFailedCudaInitAsLoaded()
+    {
+        var diagnostic = LlamaRuntimeBackendDiagnostics.Analyze(
+            999,
+            CreateCudaEnvironment(),
+            "ggml_cuda_init: failed: no CUDA devices found");
+
+        Assert.False(diagnostic.CudaBackendLoaded);
+        Assert.True(diagnostic.CudaBackendMissing);
+        Assert.Contains("cuda-backend-missing", diagnostic.Summary);
+    }
+
+    [Fact]
     public void Analyze_IgnoresCudaBackendFailureWhenGpuLayersAreDisabled()
     {
         var diagnostic = LlamaRuntimeBackendDiagnostics.Analyze(

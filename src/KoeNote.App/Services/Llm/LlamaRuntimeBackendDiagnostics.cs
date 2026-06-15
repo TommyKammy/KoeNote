@@ -14,7 +14,6 @@ public static class LlamaRuntimeBackendDiagnostics
     [
         "load_backend: loaded cuda",
         "loaded cuda backend",
-        "ggml_cuda_init",
         "found cuda",
         "cuda backend initialized",
         "cuda backend loaded"
@@ -52,11 +51,10 @@ public static class LlamaRuntimeBackendDiagnostics
         var cudaRuntimeDirectory = TryGetCudaRuntimeDirectory(environment);
         var cudaRuntimeEnvironmentPresent = !string.IsNullOrWhiteSpace(cudaRuntimeDirectory);
         var stderr = standardError ?? string.Empty;
-        var cudaBackendLoaded = ContainsAny(stderr, CudaLoadedSignals);
         var cudaBackendMissing = requestedGpuLayers > 0 &&
             cudaRuntimeEnvironmentPresent &&
-            !cudaBackendLoaded &&
             ContainsCudaMissingSignal(stderr);
+        var cudaBackendLoaded = !cudaBackendMissing && ContainsAny(stderr, CudaLoadedSignals);
 
         return new LlamaRuntimeBackendDiagnostic(
             requestedGpuLayers,
