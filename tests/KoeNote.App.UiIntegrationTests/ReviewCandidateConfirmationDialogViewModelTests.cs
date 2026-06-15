@@ -174,6 +174,31 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
     }
 
     [Fact]
+    public void Filter_ReassertsActiveStateWhenCurrentFilterIsSelectedAgain()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            operations));
+        var propertyNames = new List<string>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+            {
+                propertyNames.Add(args.PropertyName);
+            }
+        };
+
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Pending);
+
+        Assert.True(viewModel.IsPendingFilterActive);
+        Assert.Contains(nameof(viewModel.IsPendingFilterActive), propertyNames);
+        Assert.Contains(nameof(viewModel.IsDecidedFilterActive), propertyNames);
+        Assert.Contains(nameof(viewModel.IsAllFilterActive), propertyNames);
+    }
+
+    [Fact]
     public void PostCommitRecordDecisionFailure_DoesNotLeaveCommittedDraftPending()
     {
         var operations = new FakeReviewCandidateOperations();

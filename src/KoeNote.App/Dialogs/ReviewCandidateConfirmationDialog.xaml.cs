@@ -338,14 +338,13 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     {
         if (_filter == filter)
         {
+            RefreshFilterStateProperties();
             return;
         }
 
         _filter = filter;
         RefreshDisplayItems(SelectedItem);
-        OnPropertyChanged(nameof(IsPendingFilterActive));
-        OnPropertyChanged(nameof(IsDecidedFilterActive));
-        OnPropertyChanged(nameof(IsAllFilterActive));
+        RefreshFilterStateProperties();
         RefreshStateProperties();
     }
 
@@ -559,6 +558,13 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         OnPropertyChanged(nameof(CanGoPrevious));
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(CanContinue));
+    }
+
+    private void RefreshFilterStateProperties()
+    {
+        OnPropertyChanged(nameof(IsPendingFilterActive));
+        OnPropertyChanged(nameof(IsDecidedFilterActive));
+        OnPropertyChanged(nameof(IsAllFilterActive));
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
