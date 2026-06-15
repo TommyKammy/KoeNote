@@ -25,6 +25,12 @@ public interface IReviewCandidateConfirmationOperations
     ReviewOperationResult RejectDraft(string draftId);
 
     ReviewOperationResult ApplyManualEdit(string draftId, string finalText, string? manualNote = null);
+
+    ReviewOperationResult ChangeToAccepted(string draftId);
+
+    ReviewOperationResult ChangeToRejected(string draftId);
+
+    ReviewOperationResult ChangeToManualEdit(string draftId, string finalText, string? manualNote = null);
 }
 
 public sealed class ReviewCandidateConfirmationOperationAdapter(ReviewOperationService reviewOperationService)
@@ -43,6 +49,21 @@ public sealed class ReviewCandidateConfirmationOperationAdapter(ReviewOperationS
     public ReviewOperationResult ApplyManualEdit(string draftId, string finalText, string? manualNote = null)
     {
         return reviewOperationService.ApplyManualEdit(draftId, finalText, manualNote);
+    }
+
+    public ReviewOperationResult ChangeToAccepted(string draftId)
+    {
+        return reviewOperationService.ChangeToAccepted(draftId);
+    }
+
+    public ReviewOperationResult ChangeToRejected(string draftId)
+    {
+        return reviewOperationService.ChangeToRejected(draftId);
+    }
+
+    public ReviewOperationResult ChangeToManualEdit(string draftId, string finalText, string? manualNote = null)
+    {
+        return reviewOperationService.ChangeToManualEdit(draftId, finalText, manualNote);
     }
 }
 

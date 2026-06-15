@@ -1,6 +1,7 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.ViewModels;
 
@@ -208,14 +209,23 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private void ApplyReviewOperationResult(string decidedDraftId, ReviewOperationResult result, string selectedSuggestionText)
+    private void ApplyReviewOperationResult(
+        string decidedDraftId,
+        ReviewOperationResult result,
+        string selectedSuggestionText,
+        CorrectionDraft? decidedDraftFallback = null)
     {
         var decidedIndex = ReviewQueue.ToList().FindIndex(item => item.DraftId == decidedDraftId);
-        var decidedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
+        var queuedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
+        var decidedDraft = queuedDraft ?? decidedDraftFallback;
         var correctionMemoryError = string.Empty;
+        if (queuedDraft is not null)
+        {
+            ReviewQueue.Remove(queuedDraft);
+        }
+
         if (decidedDraft is not null)
         {
-            ReviewQueue.Remove(decidedDraft);
             try
             {
                 UpdateCorrectionMemory(decidedDraft, result, selectedSuggestionText);
@@ -303,7 +313,7 @@ public sealed partial class MainWindowViewModel
             }
 
             var hasPendingDraft = ReviewQueue.Any(item => item.SegmentId == result.SegmentId);
-            var nextText = result.FinalText ?? Segments[i].Text;
+            var nextText = result.FinalText ?? ReadSegmentDisplayText(result.JobId, result.SegmentId) ?? Segments[i].Text;
             Segments[i] = Segments[i] with
             {
                 Text = nextText,
@@ -313,6 +323,14 @@ public sealed partial class MainWindowViewModel
         }
 
         FilteredSegments.Refresh();
+    }
+
+    private string? ReadSegmentDisplayText(string jobId, string segmentId)
+    {
+        return new TranscriptReadRepository(Paths)
+            .ReadForJob(jobId)
+            .FirstOrDefault(segment => string.Equals(segment.SegmentId, segmentId, StringComparison.Ordinal))
+            ?.Text;
     }
 
     private bool CanOperateOnSelectedDraft()

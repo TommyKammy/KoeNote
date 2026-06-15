@@ -172,6 +172,77 @@ public sealed class ReviewOperationServiceTests
     }
 
     [Fact]
+    public void ChangeToManualEdit_ReplacesAcceptedDecision()
+    {
+        var paths = CreatePaths();
+        ArrangeDraft(paths, "draft-001", originalText: "raw", suggestedText: "suggested");
+        var service = new ReviewOperationService(paths);
+        service.AcceptDraft("draft-001");
+
+        var result = service.ChangeToManualEdit("draft-001", "manual", "changed in dialog");
+
+        Assert.Equal("manual_edit", result.Action);
+        Assert.Equal("manual", result.FinalText);
+        Assert.Equal(0, result.PendingDraftCount);
+        AssertLatestDraftDecision(paths, "draft-001", "edited", "manual_edit", "manual", "changed in dialog");
+        Assert.Equal(2, CountReviewDecisions(paths, "draft-001"));
+        AssertSegment(paths, finalText: "manual", reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
+    public void ChangeToRejected_RestoresBaselineFromAcceptedDecision()
+    {
+        var paths = CreatePaths();
+        ArrangeDraft(paths, "draft-001", originalText: "raw", suggestedText: "suggested");
+        var service = new ReviewOperationService(paths);
+        service.AcceptDraft("draft-001");
+
+        var result = service.ChangeToRejected("draft-001");
+
+        Assert.Equal("rejected", result.Action);
+        Assert.Null(result.FinalText);
+        AssertLatestDraftDecision(paths, "draft-001", "rejected", "rejected", null, null);
+        AssertSegment(paths, finalText: null, reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
+    public void ChangeToAccepted_ReplacesRejectedDecision()
+    {
+        var paths = CreatePaths();
+        ArrangeDraft(paths, "draft-001", originalText: "raw", suggestedText: "suggested");
+        var service = new ReviewOperationService(paths);
+        service.RejectDraft("draft-001");
+
+        var result = service.ChangeToAccepted("draft-001");
+
+        Assert.Equal("accepted", result.Action);
+        Assert.Equal("suggested", result.FinalText);
+        AssertLatestDraftDecision(paths, "draft-001", "accepted", "accepted", "suggested", null);
+        AssertSegment(paths, finalText: "suggested", reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
+    public void ChangeDecision_RejectsOlderSameSegmentDecisionAfterNewerSegmentOperation()
+    {
+        var paths = CreatePaths();
+        ArrangeSameSegmentDrafts(paths);
+        var service = new ReviewOperationService(paths);
+        service.AcceptDraft("draft-001");
+        service.AcceptDraft("draft-002");
+
+        Assert.Throws<InvalidOperationException>(() => service.ChangeToRejected("draft-001"));
+
+        AssertSegment(paths, finalText: "A B", reviewState: "reviewed", pendingDraftCount: 0);
+        AssertLatestDraftDecision(paths, "draft-001", "accepted", "accepted", "A beta", null);
+
+        var result = service.ChangeToRejected("draft-002");
+
+        Assert.Equal("A beta", result.FinalText);
+        AssertLatestDraftDecision(paths, "draft-002", "rejected", "rejected", "A beta", null);
+        AssertSegment(paths, finalText: "A beta", reviewState: "reviewed", pendingDraftCount: 0);
+    }
+
+    [Fact]
     public void AcceptDraft_RollsBackWhenSegmentIsMissing()
     {
         var paths = CreatePaths();
@@ -219,6 +290,20 @@ public sealed class ReviewOperationServiceTests
         ]);
     }
 
+    private static void ArrangeSameSegmentDrafts(AppPaths paths)
+    {
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "alpha beta")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "alpha", "A", "suggestion", 0.75),
+            new CorrectionDraft("draft-002", "job-001", "segment-001", "wording", "beta", "B", "suggestion", 0.75)
+        ]);
+    }
+
     private static void AssertDraftDecision(
         AppPaths paths,
         string draftId,
@@ -257,6 +342,57 @@ public sealed class ReviewOperationServiceTests
         {
             Assert.Equal(expectedNote, reader.GetString(3));
         }
+    }
+
+    private static void AssertLatestDraftDecision(
+        AppPaths paths,
+        string draftId,
+        string expectedDraftStatus,
+        string expectedAction,
+        string? expectedFinalText,
+        string? expectedNote)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT d.status, r.action, r.final_text, r.manual_note
+            FROM correction_drafts d
+            JOIN review_decisions r ON r.draft_id = d.draft_id
+            WHERE d.draft_id = $draft_id
+            ORDER BY r.decided_at DESC, r.rowid DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$draft_id", draftId);
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(expectedDraftStatus, reader.GetString(0));
+        Assert.Equal(expectedAction, reader.GetString(1));
+        if (expectedFinalText is null)
+        {
+            Assert.True(reader.IsDBNull(2));
+        }
+        else
+        {
+            Assert.Equal(expectedFinalText, reader.GetString(2));
+        }
+        if (expectedNote is null)
+        {
+            Assert.True(reader.IsDBNull(3));
+        }
+        else
+        {
+            Assert.Equal(expectedNote, reader.GetString(3));
+        }
+    }
+
+    private static int CountReviewDecisions(AppPaths paths, string draftId)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM review_decisions WHERE draft_id = $draft_id;";
+        command.Parameters.AddWithValue("$draft_id", draftId);
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 
     private static void AssertSegment(

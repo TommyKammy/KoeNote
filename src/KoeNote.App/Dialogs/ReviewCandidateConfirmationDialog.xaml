@@ -458,14 +458,14 @@
                                 <Button Content="却下"
                                         Width="76"
                                         Padding="0,7"
-                                        IsEnabled="{Binding CanOperate}"
+                                        IsEnabled="{Binding CanRejectSelected}"
                                         Click="OnRejectClick" />
                                 <Button Content="採用"
                                         Width="76"
                                         Padding="0,7"
                                         Margin="8,0,0,0"
                                         Style="{StaticResource SuccessActionButton}"
-                                        IsEnabled="{Binding CanOperate}"
+                                        IsEnabled="{Binding CanAcceptSelected}"
                                         Click="OnAcceptClick" />
                                 <Button Content="手修正を適用"
                                         Width="116"

@@ -167,10 +167,92 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
         Assert.Single(viewModel.DisplayItems);
         Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
-        Assert.False(viewModel.CanOperate);
+        viewModel.EndDecisionInputCooldown();
+        Assert.True(viewModel.CanOperate);
 
         viewModel.SetFilter(ReviewCandidateConfirmationFilter.All);
         Assert.Equal(2, viewModel.DisplayItems.Count);
+    }
+
+    [Fact]
+    public void DecidedCandidate_CanChangeDecisionToManualEdit()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("accepted text", viewModel.ManualEditText);
+        viewModel.ManualEditText = "changed one";
+        Assert.True(viewModel.ApplyManualEdit());
+
+        Assert.Equal(0, viewModel.AcceptedCount);
+        Assert.Equal(0, viewModel.RejectedCount);
+        Assert.Equal(1, viewModel.EditedCount);
+        Assert.Equal(1, viewModel.PendingCount);
+        Assert.Equal(1, viewModel.DecidedCount);
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("手修正済み", viewModel.SelectedItem?.DecisionStatusText);
+        Assert.Equal("changed one", viewModel.SelectedItem?.FinalText);
+        Assert.Equal("changed one", viewModel.ManualEditText);
+        Assert.False(viewModel.ApplyManualEdit());
+        viewModel.EndDecisionInputCooldown();
+        Assert.True(viewModel.CanApplyManualEdit);
+        Assert.Equal(["accept:draft-001", "change-manual:draft-001"], operations.Decisions);
+    }
+
+    [Fact]
+    public void DecidedCandidate_RejectionRefreshesPendingSameSegmentCurrentText()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw segment", "fixed one"),
+                CreateCandidate("draft-002", "segment-001", "raw segment", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        Assert.Equal("accepted text", viewModel.SelectedItem?.CurrentText);
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.True(viewModel.RejectSelected());
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Pending);
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("raw segment", viewModel.SelectedItem?.CurrentText);
+    }
+
+    [Fact]
+    public void DecidedCandidate_RejectionRefreshesManualEditText()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal("accepted text", viewModel.ManualEditText);
+        Assert.True(viewModel.RejectSelected());
+
+        Assert.Equal("raw one", viewModel.SelectedItem?.FinalText);
+        Assert.Equal("raw one", viewModel.ManualEditText);
+        Assert.False(viewModel.AcceptSelected());
     }
 
     [Fact]
@@ -281,6 +363,25 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         public ReviewOperationResult ApplyManualEdit(string draftId, string finalText, string? manualNote = null)
         {
             Decisions.Add($"manual:{draftId}");
+            ManualTextByDraft[draftId] = finalText;
+            return CreateResult(draftId, "manual_edit", finalText);
+        }
+
+        public ReviewOperationResult ChangeToAccepted(string draftId)
+        {
+            Decisions.Add($"change-accept:{draftId}");
+            return CreateResult(draftId, "accepted", "changed accepted text");
+        }
+
+        public ReviewOperationResult ChangeToRejected(string draftId)
+        {
+            Decisions.Add($"change-reject:{draftId}");
+            return CreateResult(draftId, "rejected", null);
+        }
+
+        public ReviewOperationResult ChangeToManualEdit(string draftId, string finalText, string? manualNote = null)
+        {
+            Decisions.Add($"change-manual:{draftId}");
             ManualTextByDraft[draftId] = finalText;
             return CreateResult(draftId, "manual_edit", finalText);
         }
