@@ -67,6 +67,11 @@ public sealed class ReviewStageRunner(
                 RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
                 cancellationToken);
 
+            foreach (var runtimeDiagnostic in result.RuntimeDiagnostics ?? [])
+            {
+                jobLogRepository.AddEvent(job.JobId, "review", "info", "Review runtime backend: " + runtimeDiagnostic);
+            }
+
             var finishedAt = DateTimeOffset.Now;
             report(new JobRunUpdate(JobRunStage.Review, JobRunStageState.Succeeded, JobRunProgressPlan.ReviewSucceeded, result.Duration));
             stageProgressRepository.Upsert(

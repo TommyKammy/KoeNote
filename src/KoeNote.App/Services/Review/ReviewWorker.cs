@@ -25,6 +25,7 @@ public sealed class ReviewWorker(
         var chunks = ChunkSegments(options.Segments, options.ChunkSegmentCount).ToArray();
         var allDrafts = new List<CorrectionDraft>();
         var rawOutputs = new List<ReviewChunkRawOutput>();
+        var runtimeDiagnostics = new List<string>();
         var totalDuration = TimeSpan.Zero;
         var chunkIndex = 1;
 
@@ -45,6 +46,7 @@ public sealed class ReviewWorker(
                 chunk.Last().SegmentId,
                 chunkResult.RawOutputPath,
                 chunkResult.RawOutput));
+            runtimeDiagnostics.AddRange(chunkResult.RuntimeDiagnostics);
             totalDuration += chunkResult.Duration;
             chunkIndex++;
         }
@@ -59,7 +61,8 @@ public sealed class ReviewWorker(
             rawOutputPath,
             normalizedDraftsPath,
             drafts,
-            totalDuration);
+            totalDuration,
+            runtimeDiagnostics);
     }
 
     private async Task<ReviewChunkResult> RunChunkAsync(
@@ -75,6 +78,7 @@ public sealed class ReviewWorker(
         var prompt = promptBuilder.Build(segments, options.PromptProfile);
         var promptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.prompt.txt", prompt);
         var processResult = await RunRuntimeAsync(options, promptPath, schemaPath, timeout, cancellationToken);
+        var runtimeDiagnostics = new List<string> { processResult.RuntimeDiagnostic.Summary };
         var sanitizedOutput = LlmOutputSanitizer.SanitizeJsonCandidate(processResult.StandardOutput, options.OutputSanitizerProfile);
         var rawOutput = AsrOutputExtractor.ExtractJson(sanitizedOutput, processResult.StandardError);
         var rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.raw.json");
@@ -88,12 +92,13 @@ public sealed class ReviewWorker(
             if (!options.EnableRepair)
             {
                 drafts = [];
-                return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration);
+                return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration, runtimeDiagnostics);
             }
 
             var repairPrompt = promptBuilder.BuildRepairPrompt(rawOutput);
             var repairPromptPath = WritePrompt(options.OutputDirectory, $"review{suffix}.repair.prompt.txt", repairPrompt);
             var repairResult = await RunRuntimeAsync(options, repairPromptPath, schemaPath, timeout, cancellationToken);
+            runtimeDiagnostics.Add(repairResult.RuntimeDiagnostic.Summary);
             sanitizedOutput = LlmOutputSanitizer.SanitizeJsonCandidate(repairResult.StandardOutput, options.OutputSanitizerProfile);
             rawOutput = AsrOutputExtractor.ExtractJson(sanitizedOutput, repairResult.StandardError);
             rawOutputPath = resultStore.SaveRawOutput(options.OutputDirectory, rawOutput, $"review{suffix}.repair.raw.json");
@@ -106,13 +111,13 @@ public sealed class ReviewWorker(
                 drafts = [];
             }
 
-            return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, repairResult.Duration);
+            return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, repairResult.Duration, runtimeDiagnostics);
         }
 
-        return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration);
+        return new ReviewChunkResult(rawOutput, rawOutputPath, drafts, processResult.Duration, runtimeDiagnostics);
     }
 
-    private async Task<ProcessRunResult> RunRuntimeAsync(
+    private async Task<ReviewRuntimeProcessResult> RunRuntimeAsync(
         ReviewRunOptions options,
         string promptFilePath,
         string jsonSchemaFilePath,
@@ -143,6 +148,17 @@ public sealed class ReviewWorker(
                 exception);
         }
 
+        var runtimeDiagnostic = LlamaRuntimeBackendDiagnostics.Analyze(
+            options.GpuLayers,
+            options.RuntimeEnvironment,
+            processResult.StandardError);
+        if (runtimeDiagnostic.CudaBackendMissing)
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.MissingRuntime,
+                $"Review CUDA backend was not loaded even though GPU layers were requested: {runtimeDiagnostic.Summary}");
+        }
+
         if (processResult.ExitCode != 0)
         {
             throw new ReviewWorkerException(
@@ -150,7 +166,7 @@ public sealed class ReviewWorker(
                 $"Review runtime exited with code {processResult.ExitCode}: {processResult.StandardError}");
         }
 
-        return processResult;
+        return new ReviewRuntimeProcessResult(processResult, runtimeDiagnostic);
     }
 
     private static string WritePrompt(string outputDirectory, string fileName, string prompt)
@@ -268,7 +284,21 @@ public sealed class ReviewWorker(
         string RawOutput,
         string RawOutputPath,
         IReadOnlyList<CorrectionDraft> Drafts,
-        TimeSpan Duration);
+        TimeSpan Duration,
+        IReadOnlyList<string> RuntimeDiagnostics);
+
+    private sealed record ReviewRuntimeProcessResult(
+        ProcessRunResult ProcessResult,
+        LlamaRuntimeBackendDiagnostic RuntimeDiagnostic)
+    {
+        public int ExitCode => ProcessResult.ExitCode;
+
+        public TimeSpan Duration => ProcessResult.Duration;
+
+        public string StandardOutput => ProcessResult.StandardOutput;
+
+        public string StandardError => ProcessResult.StandardError;
+    }
 
     private sealed record ReviewChunkRawOutput(
         int ChunkIndex,

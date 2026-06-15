@@ -13,6 +13,7 @@ namespace KoeNote.App.Services.Export;
 public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogRepository)
 {
     private readonly CrashLogService _crashLogService = new(paths);
+    private readonly GpuRuntimeDiagnosticService _gpuRuntimeDiagnosticService = new(paths);
 
     public void ExportDiagnosticReport(JobSummary job, string outputPath, DiagnosticLogScope scope = DiagnosticLogScope.SelectedJob)
     {
@@ -44,6 +45,7 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
 
         using var archive = ZipFile.Open(outputPath, ZipArchiveMode.Create);
         AddTextEntry(archive, "diagnostic-report.txt", BuildDiagnosticReport(job, scope));
+        AddTextEntry(archive, "gpu-runtime-diagnostics.json", _gpuRuntimeDiagnosticService.BuildJson());
 
         foreach (var file in EnumeratePackageFiles(job.JobId))
         {
@@ -71,6 +73,9 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
         AppendKeyValue(builder, "DataRoot", paths.Root);
         AppendKeyValue(builder, "LocalLogs", paths.Logs);
         AppendKeyValue(builder, "LogScope", FormatScope(scope));
+
+        AppendHeader(builder, "GPU Runtime Diagnostics");
+        builder.AppendLine(GpuRuntimeDiagnosticService.FormatText(_gpuRuntimeDiagnosticService.BuildSnapshot()).TrimEnd());
 
         AppendHeader(builder, "Selected Job");
         AppendKeyValue(builder, "JobId", job.JobId);
@@ -104,6 +109,20 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
                     .Append(entry.Stage)
                     .Append('\t')
                     .AppendLine(entry.Message);
+            }
+        }
+
+        AppendHeader(builder, "Runtime Backend Signals");
+        var backendSignals = EnumerateRuntimeBackendSignals(job.JobId).ToArray();
+        if (backendSignals.Length == 0)
+        {
+            builder.AppendLine("(no ASR/Review backend signals found in packaged logs)");
+        }
+        else
+        {
+            foreach (var signal in backendSignals)
+            {
+                builder.AppendLine(signal);
             }
         }
 
@@ -166,6 +185,37 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
                     CreateZipEntryName("crash-logs", Path.GetFileName(file)));
             }
         }
+    }
+
+    private IEnumerable<string> EnumerateRuntimeBackendSignals(string jobId)
+    {
+        var jobLogDirectory = Path.Combine(paths.Jobs, jobId, "logs");
+        if (!Directory.Exists(jobLogDirectory))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(jobLogDirectory, "*.log", SearchOption.AllDirectories)
+                     .Order(StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var line in File.ReadLines(file).Where(IsRuntimeBackendSignal).TakeLast(20))
+            {
+                yield return $"{CreateZipEntryName("job-logs", Path.GetRelativePath(jobLogDirectory, file))}: {line}";
+            }
+        }
+    }
+
+    private static bool IsRuntimeBackendSignal(string line)
+    {
+        return line.Contains("koenote_asr_diagnostic", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("ctranslate2", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("cuda", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("cublas", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("cudnn", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("ggml", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("backend", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("n-gpu-layers", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("acceleration=", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddTextEntry(ZipArchive archive, string entryName, string content)
