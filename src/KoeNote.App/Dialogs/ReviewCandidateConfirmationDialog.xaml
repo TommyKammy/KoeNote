@@ -42,6 +42,88 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
         </Style>
+
+        <Style x:Key="FilterToggleButton" TargetType="{x:Type ToggleButton}">
+            <Setter Property="MinWidth" Value="70" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#CBD5E1" />
+            <Setter Property="Foreground" Value="#334155" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#DBEAFE" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#2563EB" />
+                                <Setter Property="Foreground" Value="#1D4ED8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SolidActionButton" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="BorderBrush" Value="#1D4ED8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.92" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Cursor" Value="Arrow" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter TargetName="Root" Property="Background" Value="#94A3B8" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#94A3B8" />
+                                <Setter TargetName="Root" Property="Opacity" Value="0.66" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SuccessActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource SolidActionButton}">
+            <Setter Property="Background" Value="#15803D" />
+            <Setter Property="BorderBrush" Value="#166534" />
+        </Style>
+
+        <Style x:Key="EditActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource SolidActionButton}">
+            <Setter Property="Background" Value="#4F46E5" />
+            <Setter Property="BorderBrush" Value="#4338CA" />
+        </Style>
     </Window.Resources>
 
     <Border Background="#FFFFFF"
@@ -108,6 +190,12 @@
                                Foreground="#1D4ED8" />
                 </Border>
                 <Border Style="{StaticResource CountPill}">
+                    <TextBlock Text="{Binding DecidedCountText}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="#0F766E" />
+                </Border>
+                <Border Style="{StaticResource CountPill}">
                     <TextBlock Text="{Binding AcceptedCountText}"
                                FontSize="12"
                                FontWeight="SemiBold"
@@ -141,13 +229,29 @@
                         CornerRadius="7"
                         Padding="8">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top"
-                                   Text="{Binding CandidateListTitle}"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   Margin="4,2,4,8" />
-                        <ListBox ItemsSource="{Binding Items}"
+                        <StackPanel DockPanel.Dock="Top"
+                                    Margin="4,2,4,8">
+                            <TextBlock Text="{Binding CandidateListTitle}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <ToggleButton Content="未処理"
+                                              Style="{StaticResource FilterToggleButton}"
+                                              IsChecked="{Binding IsPendingFilterActive, Mode=OneWay}"
+                                              Click="OnShowPendingClick" />
+                                <ToggleButton Content="処理済み"
+                                              Style="{StaticResource FilterToggleButton}"
+                                              IsChecked="{Binding IsDecidedFilterActive, Mode=OneWay}"
+                                              Click="OnShowDecidedClick" />
+                                <ToggleButton Content="すべて"
+                                              Style="{StaticResource FilterToggleButton}"
+                                              IsChecked="{Binding IsAllFilterActive, Mode=OneWay}"
+                                              Click="OnShowAllClick" />
+                            </StackPanel>
+                        </StackPanel>
+                        <ListBox ItemsSource="{Binding DisplayItems}"
                                  SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                                  BorderThickness="0"
                                  Background="Transparent"
@@ -181,10 +285,26 @@
                                                            FontSize="11"
                                                            Foreground="#475569" />
                                             </Grid>
-                                            <TextBlock Text="{Binding SpeakerText}"
-                                                       Margin="0,6,0,0"
-                                                       FontSize="12"
-                                                       Foreground="{StaticResource TextBrush}" />
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding SpeakerText}"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource TextBrush}" />
+                                                <Border Grid.Column="1"
+                                                        Padding="6,2"
+                                                        Background="#EEF2FF"
+                                                        BorderBrush="#C7D2FE"
+                                                        BorderThickness="1"
+                                                        CornerRadius="4">
+                                                    <TextBlock Text="{Binding DecisionStatusText}"
+                                                               FontSize="10"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="#3730A3" />
+                                                </Border>
+                                            </Grid>
                                             <TextBlock Text="{Binding IssueType}"
                                                        Margin="0,4,0,0"
                                                        FontSize="11"
@@ -267,6 +387,20 @@
                                                Foreground="#1E3A8A" />
                                 </Border>
 
+                                <StackPanel Visibility="{Binding SelectedItem.HasDecision, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="反映結果"
+                                               Style="{StaticResource DetailLabel}" />
+                                    <Border Style="{StaticResource DetailBox}"
+                                            Background="#F0FDF4"
+                                            BorderBrush="#BBF7D0">
+                                        <TextBlock Text="{Binding SelectedItem.FinalText}"
+                                                   FontSize="13"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="20"
+                                                   Foreground="#14532D" />
+                                    </Border>
+                                </StackPanel>
+
                                 <TextBlock Text="候補理由"
                                            Style="{StaticResource DetailLabel}" />
                                 <Border Style="{StaticResource DetailBox}">
@@ -330,20 +464,14 @@
                                         Width="76"
                                         Padding="0,7"
                                         Margin="8,0,0,0"
-                                        Background="#16A34A"
-                                        BorderBrush="#16A34A"
-                                        Foreground="#FFFFFF"
-                                        FontWeight="SemiBold"
+                                        Style="{StaticResource SuccessActionButton}"
                                         IsEnabled="{Binding CanOperate}"
                                         Click="OnAcceptClick" />
                                 <Button Content="手修正を適用"
                                         Width="116"
                                         Padding="0,7"
                                         Margin="8,0,0,0"
-                                        Background="#4F46E5"
-                                        BorderBrush="#4F46E5"
-                                        Foreground="#FFFFFF"
-                                        FontWeight="SemiBold"
+                                        Style="{StaticResource EditActionButton}"
                                         IsEnabled="{Binding CanApplyManualEdit}"
                                         Click="OnApplyManualEditClick" />
                             </StackPanel>
@@ -381,10 +509,7 @@
                             Width="132"
                             Padding="0,8"
                             Margin="8,0,0,0"
-                            Background="#2563EB"
-                            BorderBrush="#2563EB"
-                            Foreground="#FFFFFF"
-                            FontWeight="SemiBold"
+                            Style="{StaticResource SolidActionButton}"
                             IsEnabled="{Binding CanContinue}"
                             Click="OnContinueClick" />
                 </StackPanel>
