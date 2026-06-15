@@ -69,6 +69,7 @@ public sealed class GpuRuntimeUpdateDetectionTests
     public async Task ReviewStageRunner_FailsBeforeCpuFallbackWhenNvidiaGpuRuntimeIsMissing()
     {
         var paths = TestDatabase.CreateReadyPaths();
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.LlamaCompletionPath)!);
         File.WriteAllText(paths.LlamaCompletionPath, "runtime");
         var job = CreateReviewReadyJob(paths, "job-review-runtime-missing");
         var segments = SaveSegments(paths, job.JobId);
