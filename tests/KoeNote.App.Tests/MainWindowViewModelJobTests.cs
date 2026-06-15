@@ -939,6 +939,11 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.False(fixture.PolishingRuntime.WasCalled);
         Assert.False(fixture.ViewModel.HasReadablePolishedContent);
         Assert.Contains("保留", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains(
+            new JobLogRepository(fixture.ViewModel.Paths).ReadForJob(job.JobId),
+            entry => entry.Stage == "review_confirmation" &&
+                entry.Message.Contains("outcome=Defer", StringComparison.Ordinal) &&
+                entry.Message.Contains("remaining=1", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -976,6 +981,99 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Contains("reviewed text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
         Assert.Empty(fixture.ViewModel.ReviewQueue);
         Assert.True(fixture.ViewModel.HasReadablePolishedContent);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_CanceledReviewCandidateConfirmationSkipsReadablePolishing()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "reviewed text", "候補", 0.8)
+        ]);
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = request => new ReviewCandidateConfirmationResult(
+            ReviewCandidateConfirmationOutcome.Cancel,
+            request.Candidates.Count,
+            0,
+            0,
+            0,
+            request.Candidates.Count);
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = SpeakerNameConfirmationResult.FromRequest;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains("キャンセル", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+        Assert.Contains(
+            new JobLogRepository(fixture.ViewModel.Paths).ReadForJob(job.JobId),
+            entry => entry.Stage == "review_confirmation" &&
+                entry.Message.Contains("outcome=Cancel", StringComparison.Ordinal) &&
+                entry.Message.Contains("remaining=1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_SkipsReviewCandidateConfirmationWhenNoPendingDrafts()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        var speakerConfirmationWasCalled = false;
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = _ => throw new InvalidOperationException("Review candidate dialog should not be shown.");
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = request =>
+        {
+            speakerConfirmationWasCalled = true;
+            return SpeakerNameConfirmationResult.FromRequest(request);
+        };
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(speakerConfirmationWasCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains(
+            new JobLogRepository(fixture.ViewModel.Paths).ReadForJob(job.JobId),
+            entry => entry.Stage == "review_confirmation" &&
+                entry.Message.Contains("skipped: no pending candidates", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_RejectedReviewCandidateIsNotUsedForReadablePolishing()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "rejected text", "候補", 0.8)
+        ]);
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = request =>
+        {
+            var candidate = request.Candidates.Single();
+            var result = request.Operations.RejectDraft(candidate.Draft.DraftId);
+            request.RecordDecision?.Invoke(candidate.Draft, result, candidate.Draft.SuggestedText);
+            return new ReviewCandidateConfirmationResult(
+                ReviewCandidateConfirmationOutcome.Continue,
+                request.Candidates.Count,
+                0,
+                1,
+                0,
+                0);
+        };
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = SpeakerNameConfirmationResult.FromRequest;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains("raw text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
+        Assert.DoesNotContain("rejected text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
+        Assert.Contains(
+            new JobLogRepository(fixture.ViewModel.Paths).ReadForJob(job.JobId),
+            entry => entry.Stage == "review_confirmation" &&
+                entry.Message.Contains("outcome=Continue", StringComparison.Ordinal) &&
+                entry.Message.Contains("rejected=1", StringComparison.Ordinal) &&
+                entry.Message.Contains("remaining=0", StringComparison.Ordinal));
     }
 
     [Fact]
