@@ -179,6 +179,12 @@ public sealed partial class MainWindowViewModel
         var drafts = _correctionDraftRepository.ReadPendingForJob(job.JobId);
         if (drafts.Count == 0)
         {
+            _jobLogRepository.AddEvent(
+                job.JobId,
+                "review_confirmation",
+                "info",
+                "Review candidate confirmation skipped: no pending candidates.");
+            RefreshLogs();
             return true;
         }
 
@@ -197,6 +203,11 @@ public sealed partial class MainWindowViewModel
                     segment?.Text);
             })
             .ToList();
+        _jobLogRepository.AddEvent(
+            job.JobId,
+            "review_confirmation",
+            "info",
+            $"Review candidate confirmation opened: pending={candidates.Count}.");
 
         var result = ConfirmReviewCandidatesDialog(new ReviewCandidateConfirmationRequest(
             job.Title,
@@ -212,17 +223,42 @@ public sealed partial class MainWindowViewModel
         preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? preferredSegmentId;
         ReloadSegmentsForSelectedJob(preferredSegmentId);
         RefreshJobViews();
+        LogReviewCandidateConfirmationResult(job.JobId, result, drafts.Count);
 
         if (result?.Outcome == ReviewCandidateConfirmationOutcome.Continue && result.RemainingPendingCount == 0)
         {
-            LatestLog = "整文候補を確認しました。話者名確認へ進みます。";
+            LatestLog = $"整文候補を確認しました（処理済み {GetResolvedReviewCandidateCount(result)} 件 / 未処理 0 件）。話者名確認へ進みます。";
             return true;
         }
 
+        var remainingCount = result?.RemainingPendingCount ?? _correctionDraftRepository.ReadPendingForJob(job.JobId).Count;
         LatestLog = result?.Outcome == ReviewCandidateConfirmationOutcome.Defer
-            ? "整文候補の確認が保留されたため、整文を開始しませんでした。"
-            : "整文候補確認のため、整文を開始しませんでした。";
+            ? $"整文候補の確認が保留されたため、整文を開始しませんでした（未処理 {remainingCount} 件）。"
+            : $"整文候補確認がキャンセルされたため、整文を開始しませんでした（未処理 {remainingCount} 件）。";
         return false;
+    }
+
+    private void LogReviewCandidateConfirmationResult(
+        string jobId,
+        ReviewCandidateConfirmationResult? result,
+        int initialPendingCount)
+    {
+        var outcome = result?.Outcome.ToString() ?? ReviewCandidateConfirmationOutcome.Cancel.ToString();
+        var accepted = result?.AcceptedCount ?? 0;
+        var rejected = result?.RejectedCount ?? 0;
+        var edited = result?.EditedCount ?? 0;
+        var remaining = result?.RemainingPendingCount ?? _correctionDraftRepository.ReadPendingForJob(jobId).Count;
+        _jobLogRepository.AddEvent(
+            jobId,
+            "review_confirmation",
+            "info",
+            $"Review candidate confirmation completed: outcome={outcome}, initial={initialPendingCount}, accepted={accepted}, rejected={rejected}, edited={edited}, remaining={remaining}.");
+        RefreshLogs();
+    }
+
+    private static int GetResolvedReviewCandidateCount(ReviewCandidateConfirmationResult result)
+    {
+        return result.AcceptedCount + result.RejectedCount + result.EditedCount;
     }
 
     private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job, bool forceSpeakerConfirmation = false)
