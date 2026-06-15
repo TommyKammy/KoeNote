@@ -9,6 +9,8 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
 {
     private const double FallbackPreviewSeconds = 3.0;
 
+    public string? ActiveAudioPath { get; private set; }
+
     public AudioPreviewRange? ActivePreview { get; private set; }
 
     public bool IsPlaying => ActivePreview is not null && audioPlaybackService.IsPlaying;
@@ -28,7 +30,10 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
             return false;
         }
 
-        if (ActivePreview == preview && audioPlaybackService.IsPlaying)
+        var fullPath = Path.GetFullPath(audioPath!);
+        if (ActivePreview == preview &&
+            string.Equals(ActiveAudioPath, fullPath, StringComparison.OrdinalIgnoreCase) &&
+            audioPlaybackService.IsPlaying)
         {
             Stop();
             return false;
@@ -42,11 +47,11 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
 
         audioPlaybackService.Seek(TimeSpan.FromSeconds(SanitizeSeconds(preview.StartSeconds)));
         ActivePreview = preview;
+        ActiveAudioPath = fullPath;
         var isPlaying = audioPlaybackService.Toggle(audioPath!);
         if (!isPlaying)
         {
-            ActivePreview = null;
-            ProgressPercent = 0;
+            ClearState();
             return false;
         }
 
@@ -57,8 +62,7 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
     public void Stop()
     {
         audioPlaybackService.Stop();
-        ActivePreview = null;
-        ProgressPercent = 0;
+        ClearState();
     }
 
     public bool Refresh()
@@ -78,9 +82,15 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
             return false;
         }
 
+        if (!audioPlaybackService.IsPlaying)
+        {
+            ClearState();
+            return false;
+        }
+
         var durationSeconds = Math.Max(0.1, endSeconds - startSeconds);
         ProgressPercent = Math.Clamp((positionSeconds - startSeconds) / durationSeconds * 100, 0, 100);
-        return audioPlaybackService.IsPlaying;
+        return true;
     }
 
     private static double GetPreviewEndSeconds(AudioPreviewRange preview)
@@ -93,5 +103,12 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
     private static double SanitizeSeconds(double seconds)
     {
         return seconds < 0 || double.IsNaN(seconds) || double.IsInfinity(seconds) ? 0 : seconds;
+    }
+
+    private void ClearState()
+    {
+        ActiveAudioPath = null;
+        ActivePreview = null;
+        ProgressPercent = 0;
     }
 }

@@ -76,6 +76,47 @@ public sealed class AudioPreviewPlaybackControllerTests
     }
 
     [Fact]
+    public void Toggle_OpensDifferentAudioWhenSamePreviewIsPlayingForAnotherFile()
+    {
+        var audioPath = CreateAudioFile();
+        var otherAudioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var controller = new AudioPreviewPlaybackController(playback);
+        var preview = new AudioPreviewRange(5, 7, "segment-1");
+
+        Assert.True(controller.Toggle(audioPath, preview));
+
+        var isPlaying = controller.Toggle(otherAudioPath, preview);
+
+        Assert.True(isPlaying);
+        Assert.Equal(preview, controller.ActivePreview);
+        Assert.Equal(Path.GetFullPath(otherAudioPath), controller.ActiveAudioPath);
+        Assert.Equal(otherAudioPath, playback.OpenedPath);
+        Assert.True(playback.IsPlaying);
+    }
+
+    [Fact]
+    public void Refresh_ClearsStateWhenPlaybackStopsBeforePreviewEnd()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var controller = new AudioPreviewPlaybackController(playback);
+        var preview = new AudioPreviewRange(5, 10, "segment-1");
+
+        controller.Toggle(audioPath, preview);
+        playback.Position = TimeSpan.FromSeconds(6);
+        Assert.True(controller.Refresh());
+        Assert.True(controller.ProgressPercent > 0);
+
+        playback.Stop();
+
+        Assert.False(controller.Refresh());
+        Assert.Null(controller.ActivePreview);
+        Assert.Null(controller.ActiveAudioPath);
+        Assert.Equal(0, controller.ProgressPercent);
+    }
+
+    [Fact]
     public void Toggle_SanitizesInvalidStartSeconds()
     {
         var audioPath = CreateAudioFile();
