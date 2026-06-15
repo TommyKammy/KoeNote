@@ -89,7 +89,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 
         if (HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory))
         {
-            if (TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns) is { } copyFailure)
+            if (TryMigrateMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns) is { } copyFailure)
             {
                 return copyFailure;
             }
@@ -372,7 +372,34 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
     }
 
-    private static void CopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
+    private CudaReviewRuntimeInstallResult? TryMigrateMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
+    {
+        try
+        {
+            CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns, deleteSourceFiles: true);
+            return null;
+        }
+        catch (IOException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime migration failed: {exception.Message}",
+                destinationDirectory,
+                FailureCategoryInstallFailed);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime migration failed: {exception.Message}",
+                destinationDirectory,
+                FailureCategoryInstallFailed);
+        }
+    }
+
+    private static void CopyMatchingFiles(
+        string sourceDirectory,
+        string destinationDirectory,
+        IReadOnlyCollection<string> patterns,
+        bool deleteSourceFiles = false)
     {
         if (!Directory.Exists(sourceDirectory))
         {
@@ -384,6 +411,10 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                      .Where(file => patterns.Any(pattern => MatchesPattern(Path.GetFileName(file), pattern))))
         {
             File.Copy(sourcePath, Path.Combine(destinationDirectory, Path.GetFileName(sourcePath)), overwrite: true);
+            if (deleteSourceFiles)
+            {
+                File.Delete(sourcePath);
+            }
         }
     }
 
