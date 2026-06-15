@@ -216,6 +216,7 @@ public sealed class CudaReviewRuntimeServiceTests
         File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"), "old cudart");
         File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"), "old cublas");
         File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"), "old cublasLt");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cufft64_11.dll"), "old cufft");
         var service = new CudaReviewRuntimeService(
             paths,
             new HttpClient(new FailingHandler()),
@@ -229,8 +230,41 @@ public sealed class CudaReviewRuntimeServiceTests
         Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
         Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll")));
         Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cufft64_11.dll")));
         Assert.Equal("old cudart", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.Equal("old cufft", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cufft64_11.dll")));
         Assert.Equal("nvidia-redist:migrated-from-tools-review", File.ReadAllText(paths.CudaReviewRuntimeMarkerPath));
+    }
+
+    [Fact]
+    public async Task InstallAsync_RemovesOldAppLocalNvidiaDllsWhenPersistentRuntimeAlreadyExists()
+    {
+        var root = CreateRoot();
+        var paths = CreatePathsWithCpuRuntime(root);
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "koenote bridge");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"), "old cudart");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"), "old cublas");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"), "old cublasLt");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "curand64_10.dll"), "old curand");
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "persistent cudart");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"), "persistent cublas");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"), "persistent cublasLt");
+        File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, "test");
+        var service = new CudaReviewRuntimeService(paths, new HttpClient(new FailingHandler()));
+
+        Assert.False(CudaReviewRuntimeLayout.HasPackage(paths));
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded);
+        Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
+        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "curand64_10.dll")));
+        Assert.Equal("persistent cudart", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.Equal("nvidia-redist:existing", File.ReadAllText(paths.CudaReviewRuntimeMarkerPath));
     }
 
     [Fact]

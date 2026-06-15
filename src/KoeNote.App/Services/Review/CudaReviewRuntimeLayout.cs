@@ -26,6 +26,12 @@ public static class CudaReviewRuntimeLayout
         "cusparse*.dll"
     ];
 
+    public static readonly string[] NvidiaFilePatterns =
+    [
+        .. RequiredNvidiaFilePatterns,
+        .. OptionalNvidiaFilePatterns
+    ];
+
     public static bool HasPackage(AppPaths paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -34,6 +40,7 @@ public static class CudaReviewRuntimeLayout
             File.Exists(paths.CudaReviewRuntimeMarkerPath) &&
             Directory.Exists(paths.CudaReviewRuntimeDirectory) &&
             HasCudaBridge(paths) &&
+            !HasNvidiaDependencies(paths.ReviewRuntimeDirectory) &&
             RequiredNvidiaFilePatterns.All(pattern =>
                 Directory.EnumerateFiles(paths.CudaReviewRuntimeDirectory, pattern, SearchOption.TopDirectoryOnly).Any());
     }
@@ -47,5 +54,12 @@ public static class CudaReviewRuntimeLayout
     {
         return Directory.Exists(directory) &&
             Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
+    }
+
+    private static bool HasNvidiaDependencies(string directory)
+    {
+        return Directory.Exists(directory) &&
+            NvidiaFilePatterns.Any(pattern =>
+                Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
     }
 }

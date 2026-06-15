@@ -146,7 +146,8 @@ public sealed class LlamaRuntimePathBridgeTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "roaming");
         var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "local");
-        var paths = new AppPaths(root, local);
+        var appBase = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "app");
+        var paths = new AppPaths(root, local, appBase);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         return paths;

@@ -73,33 +73,36 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             }
         }
 
+        var migratedFromAppLocalReviewRuntime = false;
+        if (HasNvidiaDependencies(paths.ReviewRuntimeDirectory))
+        {
+            migratedFromAppLocalReviewRuntime = HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory) &&
+                !HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory);
+            var cleanupResult = migratedFromAppLocalReviewRuntime
+                ? TryMigrateMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns)
+                : TryDeleteMatchingFiles(paths.ReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns);
+            if (cleanupResult is not null)
+            {
+                return cleanupResult;
+            }
+        }
+
         if (HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory))
         {
-            var localMarker = "nvidia-redist:existing";
+            var localMarker = migratedFromAppLocalReviewRuntime
+                ? "nvidia-redist:migrated-from-tools-review"
+                : "nvidia-redist:existing";
             Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, localMarker);
             return IsInstalled()
-                ? CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.CudaReviewRuntimeDirectory, localMarker)
+                ? CudaReviewRuntimeInstallResult.Succeeded(
+                    migratedFromAppLocalReviewRuntime
+                        ? "CUDA review runtime migrated to persistent runtime storage."
+                        : "CUDA review runtime is already installed.",
+                    paths.CudaReviewRuntimeDirectory,
+                    localMarker)
                 : CudaReviewRuntimeInstallResult.Failed(
                     "CUDA review runtime files were present, but installation verification failed.",
-                    paths.CudaReviewRuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    localMarker);
-        }
-
-        if (HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory))
-        {
-            if (TryMigrateMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns) is { } copyFailure)
-            {
-                return copyFailure;
-            }
-
-            var localMarker = "nvidia-redist:migrated-from-tools-review";
-            File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, localMarker);
-            return IsInstalled()
-                ? CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime migrated to persistent runtime storage.", paths.CudaReviewRuntimeDirectory, localMarker)
-                : CudaReviewRuntimeInstallResult.Failed(
-                    "CUDA review runtime files were present, but migration to persistent runtime storage failed.",
                     paths.CudaReviewRuntimeDirectory,
                     FailureCategoryInstallFailed,
                     localMarker);
@@ -349,25 +352,25 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
     }
 
-    private CudaReviewRuntimeInstallResult? TryCopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
+    private CudaReviewRuntimeInstallResult? TryDeleteMatchingFiles(string sourceDirectory, IReadOnlyCollection<string> patterns)
     {
         try
         {
-            CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns);
+            DeleteMatchingFiles(sourceDirectory, patterns);
             return null;
         }
         catch (IOException exception)
         {
             return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime migration failed: {exception.Message}",
-                destinationDirectory,
+                $"CUDA review runtime cleanup failed: {exception.Message}",
+                paths.CudaReviewRuntimeDirectory,
                 FailureCategoryInstallFailed);
         }
         catch (UnauthorizedAccessException exception)
         {
             return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime migration failed: {exception.Message}",
-                destinationDirectory,
+                $"CUDA review runtime cleanup failed: {exception.Message}",
+                paths.CudaReviewRuntimeDirectory,
                 FailureCategoryInstallFailed);
         }
     }
@@ -418,10 +421,31 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
     }
 
+    private static void DeleteMatchingFiles(string sourceDirectory, IReadOnlyCollection<string> patterns)
+    {
+        if (!Directory.Exists(sourceDirectory))
+        {
+            return;
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
+                     .Where(file => patterns.Any(pattern => MatchesPattern(Path.GetFileName(file), pattern))))
+        {
+            File.Delete(sourcePath);
+        }
+    }
+
     private static bool HasRequiredNvidiaDependencies(string directory)
     {
         return Directory.Exists(directory) &&
             CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns.All(pattern =>
+                Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
+    }
+
+    private static bool HasNvidiaDependencies(string directory)
+    {
+        return Directory.Exists(directory) &&
+            CudaReviewRuntimeLayout.NvidiaFilePatterns.Any(pattern =>
                 Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
     }
 
