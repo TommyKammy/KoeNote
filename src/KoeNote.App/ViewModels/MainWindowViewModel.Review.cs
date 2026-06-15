@@ -209,14 +209,23 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private void ApplyReviewOperationResult(string decidedDraftId, ReviewOperationResult result, string selectedSuggestionText)
+    private void ApplyReviewOperationResult(
+        string decidedDraftId,
+        ReviewOperationResult result,
+        string selectedSuggestionText,
+        CorrectionDraft? decidedDraftFallback = null)
     {
         var decidedIndex = ReviewQueue.ToList().FindIndex(item => item.DraftId == decidedDraftId);
-        var decidedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
+        var queuedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
+        var decidedDraft = queuedDraft ?? decidedDraftFallback;
         var correctionMemoryError = string.Empty;
+        if (queuedDraft is not null)
+        {
+            ReviewQueue.Remove(queuedDraft);
+        }
+
         if (decidedDraft is not null)
         {
-            ReviewQueue.Remove(decidedDraft);
             try
             {
                 UpdateCorrectionMemory(decidedDraft, result, selectedSuggestionText);

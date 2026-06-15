@@ -215,7 +215,7 @@ public sealed partial class MainWindowViewModel
             new ReviewCandidateConfirmationOperationAdapter(_reviewOperationService))
         {
             RecordDecision = (draft, result, selectedText) =>
-                ApplyReviewOperationResult(draft.DraftId, result, selectedText)
+                ApplyReviewOperationResult(draft.DraftId, result, selectedText, draft)
         });
 
         var preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? SelectedSegment?.SegmentId;

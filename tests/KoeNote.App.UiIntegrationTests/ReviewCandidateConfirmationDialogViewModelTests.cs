@@ -203,7 +203,56 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
         Assert.Equal("手修正済み", viewModel.SelectedItem?.DecisionStatusText);
         Assert.Equal("changed one", viewModel.SelectedItem?.FinalText);
+        Assert.Equal("changed one", viewModel.ManualEditText);
+        Assert.False(viewModel.ApplyManualEdit());
+        viewModel.EndDecisionInputCooldown();
+        Assert.True(viewModel.CanApplyManualEdit);
         Assert.Equal(["accept:draft-001", "change-manual:draft-001"], operations.Decisions);
+    }
+
+    [Fact]
+    public void DecidedCandidate_RejectionRefreshesPendingSameSegmentCurrentText()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw segment", "fixed one"),
+                CreateCandidate("draft-002", "segment-001", "raw segment", "fixed two")
+            ],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        Assert.Equal("accepted text", viewModel.SelectedItem?.CurrentText);
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.True(viewModel.RejectSelected());
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Pending);
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.Equal("raw segment", viewModel.SelectedItem?.CurrentText);
+    }
+
+    [Fact]
+    public void DecidedCandidate_RejectionRefreshesManualEditText()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            operations));
+
+        Assert.True(viewModel.AcceptSelected());
+        viewModel.EndDecisionInputCooldown();
+        viewModel.SetFilter(ReviewCandidateConfirmationFilter.Decided);
+
+        Assert.Equal("accepted text", viewModel.ManualEditText);
+        Assert.True(viewModel.RejectSelected());
+
+        Assert.Equal("raw one", viewModel.SelectedItem?.FinalText);
+        Assert.Equal("raw one", viewModel.ManualEditText);
+        Assert.False(viewModel.AcceptSelected());
     }
 
     [Fact]

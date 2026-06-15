@@ -198,11 +198,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
             }
 
             _selectedItem = value;
-            ManualEditText = value is null
-                ? string.Empty
-                : value.HasDecision && !string.IsNullOrWhiteSpace(value.FinalText)
-                    ? value.FinalText
-                    : value.SuggestedText;
+            RefreshManualEditText(value);
             OperationErrorText = string.Empty;
             RefreshStateProperties();
             OnPropertyChanged();
@@ -484,10 +480,12 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         ApplyDecisionCountDelta(previousDecisionKind, decisionKind);
 
         var selectedIndex = Items.IndexOf(selected);
-        RefreshRemainingSegmentText(selected, result);
+        var displayFinalText = result.FinalText ?? selected.CurrentText;
+        RefreshRemainingSegmentText(selected, displayFinalText);
         selected.MarkDecided(decisionKind, result.FinalText ?? (decisionKind == ReviewCandidateDecisionKind.Rejected
             ? selected.CurrentText
             : selectedSuggestionText));
+        RefreshManualEditText(selected);
         if (wasPending)
         {
             Items.Remove(selected);
@@ -501,7 +499,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         else
         {
             RefreshDisplayItems(selected);
-            IsDecisionInputBlocked = false;
+            IsDecisionInputBlocked = true;
         }
 
         OperationErrorText = postCommitWarning ?? string.Empty;
@@ -568,19 +566,23 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         }
     }
 
-    private void RefreshRemainingSegmentText(ReviewCandidateConfirmationDialogItem selected, ReviewOperationResult result)
+    private void RefreshManualEditText(ReviewCandidateConfirmationDialogItem? item)
     {
-        if (result.FinalText is null)
-        {
-            return;
-        }
+        ManualEditText = item is null
+            ? string.Empty
+            : item.HasDecision
+                ? !string.IsNullOrWhiteSpace(item.FinalText) ? item.FinalText : item.CurrentText
+                : item.SuggestedText;
+    }
 
+    private void RefreshRemainingSegmentText(ReviewCandidateConfirmationDialogItem selected, string finalText)
+    {
         foreach (var item in Items)
         {
             if (!ReferenceEquals(item, selected) &&
-                string.Equals(item.SegmentId, result.SegmentId, StringComparison.Ordinal))
+                string.Equals(item.SegmentId, selected.SegmentId, StringComparison.Ordinal))
             {
-                item.CurrentText = result.FinalText;
+                item.CurrentText = finalText;
             }
         }
     }
