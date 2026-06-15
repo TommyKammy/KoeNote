@@ -196,7 +196,8 @@ public sealed class AsrStageRunner(
         var profiles = ShouldUseExplicitFasterWhisperProfile(config.ModelId)
             ? AsrExecutionProfiles.BuildNativeCrashRetryLadder(settings.ExecutionProfileId)
             : [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
-        if (profiles[0].IsGpu && !AsrCudaRuntimeLayout.HasPackage(paths))
+        if (!AsrCudaRuntimeLayout.HasPackage(paths) &&
+            ShouldRequireAsrCudaRuntime(config, profiles))
         {
             if (hostResourceProbe?.GetResources().NvidiaGpuDetected == true)
             {
@@ -205,7 +206,10 @@ public sealed class AsrStageRunner(
                     $"NVIDIA GPU was detected, but ASR GPU runtime is not ready. Open Setup Wizard and reinstall ASR GPU runtime. Missing: {string.Join("; ", AsrCudaRuntimeLayout.GetMissingPackageItems(paths))}");
             }
 
-            profiles = [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
+            if (profiles[0].IsGpu)
+            {
+                profiles = [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
+            }
         }
 
         AsrWorkerException? lastException = null;
@@ -272,6 +276,15 @@ public sealed class AsrStageRunner(
             modelId.Equals("faster-whisper-large-v3", StringComparison.OrdinalIgnoreCase) ||
             modelId.Equals("whisper-base", StringComparison.OrdinalIgnoreCase) ||
             modelId.Equals("whisper-small", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool ShouldRequireAsrCudaRuntime(AsrEngineConfig config, IReadOnlyList<AsrExecutionProfile> profiles)
+    {
+        return string.Equals(config.WorkerPath, paths.FasterWhisperScriptPath, StringComparison.OrdinalIgnoreCase) &&
+            profiles.Any(static profile =>
+                profile.IsGpu ||
+                profile.ProfileId.Equals(AsrExecutionProfiles.Auto, StringComparison.OrdinalIgnoreCase) ||
+                profile.Device.Equals("auto", StringComparison.OrdinalIgnoreCase));
     }
 
     private AsrEngineConfig CreateAsrConfig(string engineId, string outputDirectory)

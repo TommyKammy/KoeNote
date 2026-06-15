@@ -15,11 +15,26 @@ public sealed class GpuRuntimeUpdateDetectionTests
     [Fact]
     public async Task AsrStageRunner_FailsBeforeAutoFallbackWhenNvidiaGpuRuntimeIsMissing()
     {
+        await AssertAsrStageStopsBeforeTranscribeAsync(
+            "faster-whisper-large-v3-turbo",
+            AsrExecutionProfiles.CudaFloat16);
+    }
+
+    [Theory]
+    [InlineData("faster-whisper-large-v3-turbo")]
+    [InlineData("kotoba-whisper-v2.2-faster")]
+    public async Task AsrStageRunner_FailsBeforeAutoDeviceWorkerWhenNvidiaGpuRuntimeIsMissing(string engineId)
+    {
+        await AssertAsrStageStopsBeforeTranscribeAsync(engineId, AsrExecutionProfiles.Auto);
+    }
+
+    private static async Task AssertAsrStageStopsBeforeTranscribeAsync(string engineId, string executionProfileId)
+    {
         var paths = TestDatabase.CreateReadyPaths();
         var audioPath = Path.Combine(paths.Root, "meeting.wav");
         File.WriteAllText(audioPath, string.Empty);
         var job = new JobRepository(paths).CreateFromAudio(audioPath);
-        var engine = new CapturingAsrEngine("faster-whisper-large-v3-turbo");
+        var engine = new CapturingAsrEngine(engineId);
         var runner = new AsrStageRunner(
             paths,
             new JobRepository(paths),
@@ -37,8 +52,8 @@ public sealed class GpuRuntimeUpdateDetectionTests
             new AsrSettings(
                 string.Empty,
                 string.Empty,
-                "faster-whisper-large-v3-turbo",
-                ExecutionProfileId: AsrExecutionProfiles.CudaFloat16),
+                engineId,
+                ExecutionProfileId: executionProfileId),
             _ => { },
             CancellationToken.None);
 
