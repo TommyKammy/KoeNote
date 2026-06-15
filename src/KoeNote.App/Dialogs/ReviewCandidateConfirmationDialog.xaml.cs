@@ -460,13 +460,16 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
                 break;
         }
 
+        var selectedIndex = Items.IndexOf(selected);
         RefreshRemainingSegmentText(selected, result);
         Items.Remove(selected);
         selected.MarkDecided(decisionKind, result.FinalText ?? (decisionKind == ReviewCandidateDecisionKind.Rejected
             ? selected.CurrentText
             : selectedSuggestionText));
         DecidedItems.Add(selected);
-        var nextPending = Items.FirstOrDefault();
+        var nextPending = selectedIndex >= 0 && selectedIndex < Items.Count
+            ? Items[selectedIndex]
+            : Items.LastOrDefault();
         RefreshDisplayItems(nextPending);
         IsDecisionInputBlocked = nextPending is not null;
         OperationErrorText = postCommitWarning ?? string.Empty;

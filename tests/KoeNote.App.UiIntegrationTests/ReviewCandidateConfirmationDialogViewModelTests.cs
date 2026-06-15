@@ -104,6 +104,49 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
     }
 
     [Fact]
+    public void Decision_AutoSelectsFromCurrentPendingPosition()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two"),
+                CreateCandidate("draft-003", "segment-003", "raw three", "fixed three")
+            ],
+            operations));
+
+        viewModel.SelectNext();
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.True(viewModel.AcceptSelected());
+
+        Assert.Equal("draft-003", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.CanOperate);
+    }
+
+    [Fact]
+    public void Decision_SelectsPreviousPendingCandidateWhenLastItemIsResolved()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            operations));
+
+        viewModel.SelectNext();
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.True(viewModel.AcceptSelected());
+
+        Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.CanOperate);
+    }
+
+    [Fact]
     public void Filter_CanShowPendingDecidedAndAllCandidates()
     {
         var operations = new FakeReviewCandidateOperations();
