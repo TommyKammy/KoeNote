@@ -212,10 +212,18 @@ public sealed partial class MainWindowViewModel
     {
         var decidedIndex = ReviewQueue.ToList().FindIndex(item => item.DraftId == decidedDraftId);
         var decidedDraft = ReviewQueue.FirstOrDefault(item => item.DraftId == decidedDraftId);
+        var correctionMemoryError = string.Empty;
         if (decidedDraft is not null)
         {
             ReviewQueue.Remove(decidedDraft);
-            UpdateCorrectionMemory(decidedDraft, result, selectedSuggestionText);
+            try
+            {
+                UpdateCorrectionMemory(decidedDraft, result, selectedSuggestionText);
+            }
+            catch (Exception exception)
+            {
+                correctionMemoryError = $" / 補正メモリ更新失敗: {exception.Message}";
+            }
         }
 
         UpdateSegmentAfterDecision(result);
@@ -244,7 +252,7 @@ public sealed partial class MainWindowViewModel
         }
 
         RefreshJobViews();
-        LatestLog = $"Review decision saved: {result.Action} ({result.PendingDraftCount} pending)";
+        LatestLog = $"Review decision saved: {result.Action} ({result.PendingDraftCount} pending){correctionMemoryError}";
 
         if (ReviewQueue.Count == 0)
         {

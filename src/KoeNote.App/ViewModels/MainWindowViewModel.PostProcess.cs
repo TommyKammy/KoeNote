@@ -139,7 +139,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!ConfirmSpeakerNamesBeforeReadablePolishing(job, forceSpeakerConfirmation))
+        if (!ConfirmReviewCandidatesBeforeReadablePolishing(job) ||
+            !ConfirmSpeakerNamesBeforeReadablePolishing(job, forceSpeakerConfirmation))
         {
             return;
         }

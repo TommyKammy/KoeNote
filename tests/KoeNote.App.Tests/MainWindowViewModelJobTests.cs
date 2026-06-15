@@ -898,6 +898,124 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task RunSelectedJobAsync_ShowsReviewCandidateConfirmationBeforeSpeakerNames()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "reviewed text", "候補", 0.8)
+        ]);
+        ReviewCandidateConfirmationRequest? request = null;
+        var speakerConfirmationWasCalled = false;
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = dialogRequest =>
+        {
+            request = dialogRequest;
+            return new ReviewCandidateConfirmationResult(
+                ReviewCandidateConfirmationOutcome.Defer,
+                dialogRequest.Candidates.Count,
+                0,
+                0,
+                0,
+                dialogRequest.Candidates.Count);
+        };
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = dialogRequest =>
+        {
+            speakerConfirmationWasCalled = true;
+            return SpeakerNameConfirmationResult.FromRequest(dialogRequest);
+        };
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.NotNull(request);
+        var candidate = Assert.Single(request.Candidates);
+        Assert.Equal("draft-001", candidate.Draft.DraftId);
+        Assert.Equal("Speaker_0", candidate.SpeakerName);
+        Assert.Equal(0, candidate.StartSeconds);
+        Assert.Equal(1, candidate.EndSeconds);
+        Assert.False(speakerConfirmationWasCalled);
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.False(fixture.ViewModel.HasReadablePolishedContent);
+        Assert.Contains("保留", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_AppliesReviewCandidateBeforeReadablePolishing()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "reviewed text", "候補", 0.8)
+        ]);
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = request =>
+        {
+            foreach (var candidate in request.Candidates)
+            {
+                var result = request.Operations.AcceptDraft(candidate.Draft.DraftId);
+                request.RecordDecision?.Invoke(candidate.Draft, result, candidate.Draft.SuggestedText);
+            }
+
+            return new ReviewCandidateConfirmationResult(
+                ReviewCandidateConfirmationOutcome.Continue,
+                request.Candidates.Count,
+                request.Candidates.Count,
+                0,
+                0,
+                0);
+        };
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = SpeakerNameConfirmationResult.FromRequest;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.True(fixture.ReviewStageRunner.RunWasCalled);
+        Assert.True(fixture.PolishingRuntime.WasCalled);
+        Assert.Contains("reviewed text", fixture.PolishingRuntime.SeenSegmentTexts, StringComparer.Ordinal);
+        Assert.Empty(fixture.ViewModel.ReviewQueue);
+        Assert.True(fixture.ViewModel.HasReadablePolishedContent);
+    }
+
+    [Fact]
+    public async Task RunSelectedJobAsync_PartialReviewCandidateDecisionKeepsJobAndQueueInSync()
+    {
+        var fixture = CreateRunReadyViewModel(
+            enableReviewStage: true,
+            new FakeTranscriptPolishingRuntime("[00:00 - 00:01] Speaker_0: readable text"));
+        var job = fixture.ViewModel.SelectedJob ?? throw new InvalidOperationException("Selected job is required.");
+        new CorrectionDraftRepository(fixture.ViewModel.Paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "raw text", "reviewed text", "候補", 0.8),
+            new CorrectionDraft("draft-002", job.JobId, "segment-001", "wording", "reviewed text", "reviewed text final", "候補", 0.7)
+        ]);
+        fixture.ViewModel.ConfirmReviewCandidatesDialog = request =>
+        {
+            var candidate = request.Candidates.First();
+            var result = request.Operations.AcceptDraft(candidate.Draft.DraftId);
+            request.RecordDecision?.Invoke(candidate.Draft, result, candidate.Draft.SuggestedText);
+            return new ReviewCandidateConfirmationResult(
+                ReviewCandidateConfirmationOutcome.Defer,
+                request.Candidates.Count,
+                1,
+                0,
+                0,
+                1);
+        };
+        fixture.ViewModel.ConfirmSpeakerNamesDialog = SpeakerNameConfirmationResult.FromRequest;
+
+        await fixture.ViewModel.RunSelectedJobAsync();
+
+        Assert.False(fixture.PolishingRuntime.WasCalled);
+        Assert.Equal(1, fixture.ViewModel.SelectedJobUnreviewedDrafts);
+        var pendingDraft = Assert.Single(fixture.ViewModel.ReviewQueue);
+        Assert.Equal("draft-002", pendingDraft.DraftId);
+        Assert.Equal("draft-002", fixture.ViewModel.SelectedCorrectionDraftId);
+        Assert.Equal("segment-001", fixture.ViewModel.SelectedSegment?.SegmentId);
+        Assert.Contains("保留", fixture.ViewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunSelectedJobAsync_ReloadsStaleReadablePolishedContentWhenSpeakerConfirmationIsCanceled()
     {
         var fixture = CreateRunReadyViewModel(

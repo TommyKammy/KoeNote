@@ -54,7 +54,8 @@ public sealed partial class MainWindowViewModel
             if (runSucceeded && enableReviewForRun && !cancellation.IsCancellationRequested)
             {
                 readablePolishingAttempted = true;
-                if (ConfirmSpeakerNamesBeforeReadablePolishing(job))
+                if (ConfirmReviewCandidatesBeforeReadablePolishing(job) &&
+                    ConfirmSpeakerNamesBeforeReadablePolishing(job))
                 {
                     readablePolishingSucceeded = await RunReadablePolishingForJobAsync(job, cancellation.Token);
                 }
@@ -170,6 +171,58 @@ public sealed partial class MainWindowViewModel
         {
             LatestLog = "ASR native runtime crashed. Check the ASR worker log in the diagnostic package, then retry with a lighter ASR model or reinstall the ASR GPU runtime.";
         }
+    }
+
+    private bool ConfirmReviewCandidatesBeforeReadablePolishing(JobSummary job)
+    {
+        LoadReviewQueue();
+        var drafts = _correctionDraftRepository.ReadPendingForJob(job.JobId);
+        if (drafts.Count == 0)
+        {
+            return true;
+        }
+
+        var segments = new TranscriptReadRepository(Paths)
+            .ReadForJob(job.JobId)
+            .ToDictionary(static segment => segment.SegmentId, StringComparer.Ordinal);
+        var candidates = drafts
+            .Select(draft =>
+            {
+                segments.TryGetValue(draft.SegmentId, out var segment);
+                return new ReviewCandidateConfirmationItem(
+                    draft,
+                    segment?.StartSeconds,
+                    segment?.EndSeconds,
+                    segment?.Speaker,
+                    segment?.Text);
+            })
+            .ToList();
+
+        var result = ConfirmReviewCandidatesDialog(new ReviewCandidateConfirmationRequest(
+            job.Title,
+            candidates,
+            new ReviewCandidateConfirmationOperationAdapter(_reviewOperationService))
+        {
+            RecordDecision = (draft, result, selectedText) =>
+                ApplyReviewOperationResult(draft.DraftId, result, selectedText)
+        });
+
+        var preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? SelectedSegment?.SegmentId;
+        LoadReviewQueue();
+        preferredSegmentId = SelectedCorrectionDraft?.SegmentId ?? preferredSegmentId;
+        ReloadSegmentsForSelectedJob(preferredSegmentId);
+        RefreshJobViews();
+
+        if (result?.Outcome == ReviewCandidateConfirmationOutcome.Continue && result.RemainingPendingCount == 0)
+        {
+            LatestLog = "整文候補を確認しました。話者名確認へ進みます。";
+            return true;
+        }
+
+        LatestLog = result?.Outcome == ReviewCandidateConfirmationOutcome.Defer
+            ? "整文候補の確認が保留されたため、整文を開始しませんでした。"
+            : "整文候補確認のため、整文を開始しませんでした。";
+        return false;
     }
 
     private bool ConfirmSpeakerNamesBeforeReadablePolishing(JobSummary job, bool forceSpeakerConfirmation = false)

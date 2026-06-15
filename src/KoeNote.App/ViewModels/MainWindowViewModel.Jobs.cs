@@ -17,6 +17,9 @@ public sealed partial class MainWindowViewModel
     public Func<SpeakerNameConfirmationRequest, SpeakerNameConfirmationResult?> ConfirmSpeakerNamesDialog { get; set; } =
         ShowSpeakerNameConfirmation;
 
+    public Func<ReviewCandidateConfirmationRequest, ReviewCandidateConfirmationResult?> ConfirmReviewCandidatesDialog { get; set; } =
+        ShowReviewCandidateConfirmation;
+
     private Task AddAudioAsync()
     {
         var dialog = new OpenFileDialog
@@ -609,6 +612,13 @@ public sealed partial class MainWindowViewModel
     private static SpeakerNameConfirmationResult? ShowSpeakerNameConfirmation(SpeakerNameConfirmationRequest request)
     {
         return SpeakerNameConfirmationDialogService.Default.Confirm(
+            Application.Current?.MainWindow,
+            request);
+    }
+
+    private static ReviewCandidateConfirmationResult? ShowReviewCandidateConfirmation(ReviewCandidateConfirmationRequest request)
+    {
+        return ReviewCandidateConfirmationDialogService.Default.Confirm(
             Application.Current?.MainWindow,
             request);
     }
