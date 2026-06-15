@@ -15,7 +15,8 @@ public sealed class SummaryStageRunner(
     JobLogRepository jobLogRepository,
     InstalledModelRepository installedModelRepository,
     SetupStateService setupStateService,
-    TranscriptSummaryService summaryService) : ISummaryStageRunner
+    TranscriptSummaryService summaryService,
+    ISetupHostResourceProbe? hostResourceProbe = null) : ISummaryStageRunner
 {
     public async Task RunAsync(
         JobSummary job,
@@ -35,6 +36,7 @@ public sealed class SummaryStageRunner(
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId();
             var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Summary);
             jobLogRepository.AddEvent(job.JobId, "summary", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             var result = await summaryService.SummarizeAsync(new TranscriptSummaryOptions(

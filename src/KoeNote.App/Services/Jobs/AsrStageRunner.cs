@@ -4,6 +4,7 @@ using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.Services.Jobs;
 
@@ -15,7 +16,8 @@ public sealed class AsrStageRunner(
     AsrEngineRegistry asrEngineRegistry,
     InstalledModelRepository installedModelRepository,
     ScriptedDiarizationService diarizationService,
-    CorrectionMemoryService correctionMemoryService) : IAsrStageRunner
+    CorrectionMemoryService correctionMemoryService,
+    ISetupHostResourceProbe? hostResourceProbe = null) : IAsrStageRunner
 {
     public async Task<IReadOnlyList<TranscriptSegment>?> RunAsync(
         JobSummary job,
@@ -196,6 +198,13 @@ public sealed class AsrStageRunner(
             : [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
         if (profiles[0].IsGpu && !AsrCudaRuntimeLayout.HasPackage(paths))
         {
+            if (hostResourceProbe?.GetResources().NvidiaGpuDetected == true)
+            {
+                throw new AsrWorkerException(
+                    AsrFailureCategory.CudaRuntimeMissing,
+                    $"NVIDIA GPU was detected, but ASR GPU runtime is not ready. Open Setup Wizard and reinstall ASR GPU runtime. Missing: {string.Join("; ", AsrCudaRuntimeLayout.GetMissingPackageItems(paths))}");
+            }
+
             profiles = [AsrExecutionProfiles.Resolve(AsrExecutionProfiles.Auto)];
         }
 

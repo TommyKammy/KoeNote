@@ -16,7 +16,8 @@ public sealed class ReadablePolishingStageRunner(
     InstalledModelRepository installedModelRepository,
     SetupStateService setupStateService,
     TranscriptPolishingService polishingService,
-    ReadablePolishingPromptSettingsRepository promptSettingsRepository) : IReadablePolishingStageRunner
+    ReadablePolishingPromptSettingsRepository promptSettingsRepository,
+    ISetupHostResourceProbe? hostResourceProbe = null) : IReadablePolishingStageRunner
 {
     public async Task<ReadablePolishingStageResult> RunAsync(
         JobSummary job,
@@ -40,6 +41,7 @@ public sealed class ReadablePolishingStageRunner(
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId(catalog);
             var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Polishing);
             var promptSettings = ReadablePolishingPromptSettingsResolver.Resolve(profile, promptSettingsRepository);
 
