@@ -119,7 +119,7 @@ public sealed class ScriptedJsonAsrEngineTests
         var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
         Directory.CreateDirectory(asrToolsDirectory);
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
-        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        var ctranslate2CudaDirectory = paths.AsrCTranslate2RuntimeDirectory;
         Directory.CreateDirectory(ctranslate2CudaDirectory);
         DeleteLegacyNvidiaDlls(ctranslate2CudaDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
@@ -185,7 +185,7 @@ public sealed class ScriptedJsonAsrEngineTests
         var audioPath = Path.Combine(paths.Root, "audio.wav");
         var modelPath = Path.Combine(paths.Root, "model");
         var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
-        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        var ctranslate2CudaDirectory = paths.AsrCTranslate2RuntimeDirectory;
         Directory.CreateDirectory(asrToolsDirectory);
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
         Directory.CreateDirectory(ctranslate2CudaDirectory);
@@ -246,7 +246,7 @@ public sealed class ScriptedJsonAsrEngineTests
         var audioPath = Path.Combine(paths.Root, "audio.wav");
         var modelPath = Path.Combine(paths.Root, "model");
         var asrToolsDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr");
-        var ctranslate2CudaDirectory = Path.Combine(AppContext.BaseDirectory, "tools", "asr-ctranslate2-cuda");
+        var ctranslate2CudaDirectory = paths.AsrCTranslate2RuntimeDirectory;
         Directory.CreateDirectory(asrToolsDirectory);
         DeleteLegacyNvidiaDlls(asrToolsDirectory);
         Directory.CreateDirectory(ctranslate2CudaDirectory);
@@ -690,7 +690,8 @@ public sealed class ScriptedJsonAsrEngineTests
             new AsrResultStore(),
             new TranscriptSegmentRepository(paths),
             new AsrRunRepository(paths),
-            new JobLogRepository(paths));
+            new JobLogRepository(paths),
+            paths);
     }
 
     private static AppPaths CreatePaths()

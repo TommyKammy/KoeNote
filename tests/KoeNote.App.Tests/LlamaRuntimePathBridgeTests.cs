@@ -33,6 +33,22 @@ public sealed class LlamaRuntimePathBridgeTests
     }
 
     [Fact]
+    public void RuntimeEnvironment_AddsPersistentCudaReviewRuntimeDirectoryToPath()
+    {
+        var paths = CreateUnicodeReadyPaths();
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+
+        var environment = LlamaRuntimeEnvironment.Build(paths);
+
+        Assert.NotNull(environment);
+        Assert.Equal(
+            paths.CudaReviewRuntimeDirectory,
+            environment[LlamaRuntimeEnvironment.CudaReviewRuntimeDirectoryVariable]);
+        Assert.True(environment.TryGetValue("PATH", out var path));
+        Assert.StartsWith(paths.CudaReviewRuntimeDirectory, path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ReviewWorker_UsesAsciiSafeRuntimePathsForUnicodeModelPromptAndSchemaPaths()
     {
         var paths = CreateUnicodeReadyPaths();

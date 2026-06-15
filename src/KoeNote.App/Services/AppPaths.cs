@@ -57,12 +57,13 @@ public sealed class AppPaths
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         UpdateDownloads = Path.Combine(localAppData, "KoeNote", "updates");
         UpdateHistoryPath = Path.Combine(UpdateDownloads, "history.jsonl");
+        GpuRuntimes = Path.Combine(localAppData, "KoeNote", "runtimes", "gpu");
         UserDocumentsKoeNoteDirectory = Path.Combine(documents, "KoeNote");
         DomainPresetDirectory = Path.Combine(UserDocumentsKoeNoteDirectory, "dic_preset");
         RuntimeTools = Path.Combine(baseDirectory, "tools");
         BundledDomainPresetDirectory = Path.Combine(baseDirectory, "presets");
         AsrRuntimeDirectory = Path.Combine(RuntimeTools, "asr");
-        AsrCTranslate2RuntimeDirectory = Path.Combine(RuntimeTools, "asr-ctranslate2-cuda");
+        AsrCTranslate2RuntimeDirectory = Path.Combine(GpuRuntimes, "asr-ctranslate2-cuda");
         PythonPackages = Path.Combine(localAppData, "KoeNote", "python-packages");
         PythonEnvironments = Path.Combine(localAppData, "KoeNote", "python-envs");
         AsrPythonEnvironment = Path.Combine(PythonEnvironments, "asr");
@@ -78,9 +79,10 @@ public sealed class AppPaths
         ReazonSpeechK2ScriptPath = Path.Combine(baseDirectory, "scripts", "asr", "reazonspeech_k2_transcribe.py");
         DiarizeWorkerScriptPath = Path.Combine(baseDirectory, "scripts", "diarization", "diarize_worker.py");
         ReviewRuntimeDirectory = Path.Combine(RuntimeTools, "review");
+        CudaReviewRuntimeDirectory = Path.Combine(GpuRuntimes, "review-cuda");
         LlamaCompletionPath = Path.Combine(RuntimeTools, "review", "llama-completion.exe");
-        CudaReviewRuntimeMarkerPath = Path.Combine(ReviewRuntimeDirectory, ".koenote-cuda-review-runtime");
-        AsrCudaRuntimeMarkerPath = Path.Combine(AsrRuntimeDirectory, ".koenote-cuda-asr-runtime");
+        CudaReviewRuntimeMarkerPath = Path.Combine(CudaReviewRuntimeDirectory, ".koenote-cuda-review-runtime");
+        AsrCudaRuntimeMarkerPath = Path.Combine(AsrCTranslate2RuntimeDirectory, ".koenote-cuda-asr-runtime");
         TernaryLlamaCompletionPath = Path.Combine(RuntimeTools, "review-ternary", "llama-completion.exe");
         KotobaWhisperFasterModelPath = Path.Combine(Models, "asr", "kotoba-whisper-v2.2-faster");
         WhisperBaseModelPath = Path.Combine(Models, "asr", "whisper-base");
@@ -118,6 +120,8 @@ public sealed class AppPaths
     public string UpdateDownloads { get; }
 
     public string UpdateHistoryPath { get; }
+
+    public string GpuRuntimes { get; }
 
     public string UserDocumentsKoeNoteDirectory { get; }
 
@@ -161,6 +165,8 @@ public sealed class AppPaths
 
     public string ReviewRuntimeDirectory { get; }
 
+    public string CudaReviewRuntimeDirectory { get; }
+
     public string LlamaCompletionPath { get; }
 
     public string CudaReviewRuntimeMarkerPath { get; }
@@ -191,6 +197,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(UserModels);
         Directory.CreateDirectory(ModelDownloads);
         Directory.CreateDirectory(UpdateDownloads);
+        Directory.CreateDirectory(GpuRuntimes);
         Directory.CreateDirectory(PythonPackages);
         Directory.CreateDirectory(PythonEnvironments);
         Directory.CreateDirectory(UpdateBackups);

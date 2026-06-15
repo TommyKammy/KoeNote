@@ -1078,12 +1078,12 @@ public sealed partial class MainWindowViewModel
     {
         if (SetupCudaReviewRuntimeReady)
         {
-            SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {Paths.ReviewRuntimeDirectory}";
+            SetupCudaReviewRuntimeSummary = $"CUDA review runtime installed: {Paths.CudaReviewRuntimeDirectory}";
             return;
         }
 
         SetupCudaReviewRuntimeSummary = SetupCudaReviewRuntimeRecommended
-            ? $"NVIDIA GPU detected. KoeNote GPU bridge is bundled; Setup Wizard will download NVIDIA CUDA redist DLLs if needed: {Paths.ReviewRuntimeDirectory}"
+            ? $"NVIDIA GPU detected. KoeNote GPU bridge is bundled; Setup Wizard will download NVIDIA CUDA redist DLLs if needed: {Paths.CudaReviewRuntimeDirectory}"
             : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
     }
 

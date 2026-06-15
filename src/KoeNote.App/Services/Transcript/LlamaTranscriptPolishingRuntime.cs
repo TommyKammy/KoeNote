@@ -34,7 +34,8 @@ public sealed class LlamaTranscriptPolishingRuntime(
                 options.LlamaCompletionPath,
                 BuildArguments(safeOptions, safePromptPath),
                 timeout,
-                cancellationToken);
+                cancellationToken,
+                options.RuntimeEnvironment);
         }
         catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
         {

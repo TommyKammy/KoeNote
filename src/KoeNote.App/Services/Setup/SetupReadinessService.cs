@@ -254,7 +254,7 @@ internal sealed class SetupReadinessService(
         return new SetupSmokeCheck(
             "Review CUDA runtime",
             exists,
-            exists ? paths.ReviewRuntimeDirectory : $"Not installed: {paths.ReviewRuntimeDirectory}");
+            exists ? paths.CudaReviewRuntimeDirectory : $"Not installed: {paths.CudaReviewRuntimeDirectory}");
     }
 
     private SetupSmokeCheck CheckSelectedReviewRuntime(string? modelId)

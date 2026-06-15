@@ -32,8 +32,8 @@ public static class CudaReviewRuntimeLayout
 
         return File.Exists(paths.LlamaCompletionPath) &&
             File.Exists(paths.CudaReviewRuntimeMarkerPath) &&
-            Directory.Exists(paths.ReviewRuntimeDirectory) &&
+            Directory.Exists(paths.CudaReviewRuntimeDirectory) &&
             RequiredFilePatterns.All(pattern =>
-                Directory.EnumerateFiles(paths.ReviewRuntimeDirectory, pattern, SearchOption.TopDirectoryOnly).Any());
+                Directory.EnumerateFiles(paths.CudaReviewRuntimeDirectory, pattern, SearchOption.TopDirectoryOnly).Any());
     }
 }

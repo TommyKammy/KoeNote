@@ -42,40 +42,60 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         Report(progress, "確認中", "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
         if (IsInstalled())
         {
-            return CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.ReviewRuntimeDirectory);
+            return CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.CudaReviewRuntimeDirectory);
         }
 
         if (!File.Exists(paths.LlamaCompletionPath))
         {
             return CudaReviewRuntimeInstallResult.Failed(
                 "CPU review runtime must be installed before adding CUDA review runtime files.",
-                paths.ReviewRuntimeDirectory,
+                paths.CudaReviewRuntimeDirectory,
                 FailureCategoryCpuRuntimeMissing);
         }
 
-        if (!HasBundledCudaBridge(paths.ReviewRuntimeDirectory))
+        if (!HasCudaBridge(paths.CudaReviewRuntimeDirectory))
         {
-            if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
+            if (HasCudaBridge(paths.ReviewRuntimeDirectory))
+            {
+                CopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]);
+            }
+            else if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
             {
                 return CudaReviewRuntimeInstallResult.Failed(
                     "KoeNote GPU review bridge file ggml-cuda*.dll is not bundled. Ship it in tools\\review or configure the legacy runtime zip explicitly.",
-                    paths.ReviewRuntimeDirectory,
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryBundledRuntimeMissing);
             }
+            else
+            {
+                return await InstallLegacyRuntimeAsync(cancellationToken);
+            }
+        }
 
-            return await InstallLegacyRuntimeAsync(cancellationToken);
+        if (HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory))
+        {
+            var localMarker = "nvidia-redist:existing";
+            Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+            File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, localMarker);
+            return IsInstalled()
+                ? CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.CudaReviewRuntimeDirectory, localMarker)
+                : CudaReviewRuntimeInstallResult.Failed(
+                    "CUDA review runtime files were present, but installation verification failed.",
+                    paths.CudaReviewRuntimeDirectory,
+                    FailureCategoryInstallFailed,
+                    localMarker);
         }
 
         if (HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory))
         {
-            var localMarker = "nvidia-redist:existing";
-            Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+            CopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns);
+            var localMarker = "nvidia-redist:migrated-from-tools-review";
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, localMarker);
             return IsInstalled()
-                ? CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime is already installed.", paths.ReviewRuntimeDirectory, localMarker)
+                ? CudaReviewRuntimeInstallResult.Succeeded("CUDA review runtime migrated to persistent runtime storage.", paths.CudaReviewRuntimeDirectory, localMarker)
                 : CudaReviewRuntimeInstallResult.Failed(
-                    "CUDA review runtime files were present, but installation verification failed.",
-                    paths.ReviewRuntimeDirectory,
+                    "CUDA review runtime files were present, but migration to persistent runtime storage failed.",
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryInstallFailed,
                     localMarker);
         }
@@ -85,7 +105,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         {
             return CudaReviewRuntimeInstallResult.Failed(
                 $"NVIDIA redistributable source is not configured. Set {RedistManifestUrlEnvironmentVariable} and {RedistBaseUrlEnvironmentVariable} before installing.",
-                paths.ReviewRuntimeDirectory,
+                paths.CudaReviewRuntimeDirectory,
                 FailureCategoryConfigurationMissing);
         }
 
@@ -102,51 +122,51 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 stagedResult = await StageFromNvidiaRedistAsync(stagingRoot, cancellationToken, progress);
             }
 
-            Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+            Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            Report(progress, "インストール中", "CUDA review runtime の NVIDIA DLL を tools\\review に配置しています...");
-            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.ReviewRuntimeDirectory, backupRoot, copiedFiles, ["*.dll"]);
+            Report(progress, "インストール中", $"CUDA review runtime の NVIDIA DLL を {paths.CudaReviewRuntimeDirectory} に配置しています...");
+            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.CudaReviewRuntimeDirectory, backupRoot, copiedFiles, ["*.dll"]);
 
             Report(progress, "検証中", "CUDA review runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, marker);
             return IsInstalled()
-                ? CudaReviewRuntimeInstallResult.Succeeded($"CUDA review runtime installed: {paths.ReviewRuntimeDirectory}", paths.ReviewRuntimeDirectory, stagedResult.Sha256)
+                ? CudaReviewRuntimeInstallResult.Succeeded($"CUDA review runtime installed: {paths.CudaReviewRuntimeDirectory}", paths.CudaReviewRuntimeDirectory, stagedResult.Sha256)
                 : CudaReviewRuntimeInstallResult.Failed(
                     "CUDA review runtime files were copied, but installation verification failed.",
-                    paths.ReviewRuntimeDirectory,
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryInstallFailed,
                     stagedResult.Sha256);
         }
         catch (NvidiaRedistInstallException exception) when (exception.FailureCategory is FailureCategoryHashMismatch or FailureCategoryArchiveInvalid)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed(exception.Message, paths.ReviewRuntimeDirectory, exception.FailureCategory, exception.Sha256);
+            return CudaReviewRuntimeInstallResult.Failed(exception.Message, paths.CudaReviewRuntimeDirectory, exception.FailureCategory, exception.Sha256);
         }
         catch (HttpRequestException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable download failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryNetworkUnavailable);
+            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable download failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryNetworkUnavailable);
         }
         catch (InvalidDataException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable archive could not be read: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
+            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable archive could not be read: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
         }
         catch (JsonException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable manifest could not be read: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
+            return CudaReviewRuntimeInstallResult.Failed($"NVIDIA redistributable manifest could not be read: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
         }
         catch (IOException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryInstallFailed);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryInstallFailed);
         }
         catch (UnauthorizedAccessException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryInstallFailed);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryInstallFailed);
         }
         finally
         {
@@ -161,7 +181,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         {
             return CudaReviewRuntimeInstallResult.Failed(
                 $"CUDA review runtime URL is not configured. Set {RuntimeUrlEnvironmentVariable} only when using the legacy all-in-one runtime zip.",
-                paths.ReviewRuntimeDirectory,
+                paths.CudaReviewRuntimeDirectory,
                 FailureCategoryConfigurationMissing);
         }
 
@@ -179,7 +199,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             {
                 return CudaReviewRuntimeInstallResult.Failed(
                     $"CUDA review runtime SHA256 mismatch. Expected {_options.LegacyRuntimeSha256}, got {actualSha256}.",
-                    paths.ReviewRuntimeDirectory,
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryHashMismatch,
                     actualSha256);
             }
@@ -192,7 +212,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 {
                     return CudaReviewRuntimeInstallResult.Failed(
                         "CUDA review runtime archive did not contain CUDA runtime DLLs.",
-                        paths.ReviewRuntimeDirectory,
+                        paths.CudaReviewRuntimeDirectory,
                         FailureCategoryArchiveInvalid,
                         actualSha256);
                 }
@@ -200,46 +220,46 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 NvidiaRedistInstaller.ExtractEntries(cudaEntries, stagingRoot);
             }
 
-            if (!HasBundledCudaBridge(stagingRoot) || !HasRequiredNvidiaDependencies(stagingRoot))
+            if (!HasCudaBridge(stagingRoot) || !HasRequiredNvidiaDependencies(stagingRoot))
             {
                 return CudaReviewRuntimeInstallResult.Failed(
                     "CUDA review runtime archive did not contain the required KoeNote bridge and NVIDIA DLLs.",
-                    paths.ReviewRuntimeDirectory,
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryArchiveInvalid,
                     actualSha256);
             }
 
-            Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+            Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.ReviewRuntimeDirectory, backupRoot, copiedFiles, ["*.dll"]);
+            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.CudaReviewRuntimeDirectory, backupRoot, copiedFiles, ["*.dll"]);
 
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, actualSha256);
             return IsInstalled()
-                ? CudaReviewRuntimeInstallResult.Succeeded($"CUDA review runtime installed: {paths.ReviewRuntimeDirectory}", paths.ReviewRuntimeDirectory, actualSha256)
+                ? CudaReviewRuntimeInstallResult.Succeeded($"CUDA review runtime installed: {paths.CudaReviewRuntimeDirectory}", paths.CudaReviewRuntimeDirectory, actualSha256)
                 : CudaReviewRuntimeInstallResult.Failed(
                     "CUDA review runtime files were copied, but installation verification failed.",
-                    paths.ReviewRuntimeDirectory,
+                    paths.CudaReviewRuntimeDirectory,
                     FailureCategoryInstallFailed,
                     actualSha256);
         }
         catch (HttpRequestException exception)
         {
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime download failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryNetworkUnavailable);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime download failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryNetworkUnavailable);
         }
         catch (InvalidDataException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime archive could not be read: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime archive could not be read: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryArchiveInvalid);
         }
         catch (IOException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryInstallFailed);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryInstallFailed);
         }
         catch (UnauthorizedAccessException exception)
         {
             NvidiaRedistInstaller.RollBack(copiedFiles, backupRoot);
-            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.ReviewRuntimeDirectory, FailureCategoryInstallFailed);
+            return CudaReviewRuntimeInstallResult.Failed($"CUDA review runtime install failed: {exception.Message}", paths.CudaReviewRuntimeDirectory, FailureCategoryInstallFailed);
         }
         finally
         {
@@ -281,10 +301,25 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             patterns.Any(pattern => MatchesPattern(entry.Name, pattern)));
     }
 
-    private static bool HasBundledCudaBridge(string directory)
+    private static bool HasCudaBridge(string directory)
     {
         return Directory.Exists(directory) &&
             Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
+    }
+
+    private static void CopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
+    {
+        if (!Directory.Exists(sourceDirectory))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(destinationDirectory);
+        foreach (var sourcePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
+                     .Where(file => patterns.Any(pattern => MatchesPattern(Path.GetFileName(file), pattern))))
+        {
+            File.Copy(sourcePath, Path.Combine(destinationDirectory, Path.GetFileName(sourcePath)), overwrite: true);
+        }
     }
 
     private static bool HasRequiredNvidiaDependencies(string directory)

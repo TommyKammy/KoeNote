@@ -75,7 +75,7 @@ On NVIDIA GPU hosts, Setup Wizard may download or reuse NVIDIA redistributable D
 - `ダウンロード中`: NVIDIA redist manifests or package zips are being downloaded.
 - `検証中`: manifest/package hashes and final install layout are being verified.
 - `展開中`: required DLLs are being extracted from NVIDIA packages.
-- `インストール中`: verified DLLs are being copied into `tools\review` or `tools\asr`.
+- `インストール中`: verified DLLs are being copied into `%LOCALAPPDATA%\KoeNote\runtimes\gpu\review-cuda` or `%LOCALAPPDATA%\KoeNote\runtimes\gpu\asr-ctranslate2-cuda`.
 
 If this fails, check network/proxy access to `developer.download.nvidia.com`, ensure there is enough disk space, and retry Setup Wizard. Review can continue with the CPU runtime. ASR CPU fallback depends on the selected ASR model and installed Python packages.
 

@@ -61,7 +61,8 @@ public sealed class ReviewStageRunner(
                 ThreadsBatch: profile.ThreadsBatch,
                 UseJsonSchema: taskSettings.UseJsonSchema,
                 EnableRepair: taskSettings.EnableRepair,
-                PromptProfile: taskSettings.PromptTemplateId),
+                PromptProfile: taskSettings.PromptTemplateId,
+                RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;

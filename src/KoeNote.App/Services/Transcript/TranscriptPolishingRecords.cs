@@ -22,7 +22,8 @@ public sealed record TranscriptPolishingOptions(
     bool NoConversation = true,
     int? Threads = null,
     int? ThreadsBatch = null,
-    ReadablePolishingPromptSettings? PromptSettings = null);
+    ReadablePolishingPromptSettings? PromptSettings = null,
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
 
 public sealed record TranscriptPolishingChunk(
     int ChunkIndex,

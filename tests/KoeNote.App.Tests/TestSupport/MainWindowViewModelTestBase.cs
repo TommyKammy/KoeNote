@@ -367,10 +367,10 @@ public abstract class MainWindowViewModelTestBase
     protected static void CreateCudaReviewRuntime(AppPaths paths)
     {
         Touch(paths.LlamaCompletionPath);
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
         Touch(paths.CudaReviewRuntimeMarkerPath);
     }
 

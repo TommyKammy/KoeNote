@@ -69,7 +69,7 @@ See [Core UI smoke checklist](core-ui-smoke.md) for the manual clean-environment
 
 Setup Wizard shows runtime install stages as `確認中`, `ダウンロード中`, `検証中`, `展開中`, and `インストール中`.
 
-For NVIDIA GPU hosts, the wizard first checks whether the bundled KoeNote GPU files and local CUDA/cuDNN DLLs are already present. If they are not present, it downloads the NVIDIA redist package zips, verifies their SHA256 values from the manifest, extracts only the required DLLs, and copies them into `tools/review` or `tools/asr`. Failed installs roll back partial copies and keep CPU fallback available where supported.
+For NVIDIA GPU hosts, the wizard first checks whether the bundled KoeNote GPU files and local CUDA/cuDNN DLLs are already present. If they are not present, it downloads the NVIDIA redist package zips, verifies their SHA256 values from the manifest, extracts only the required DLLs, and copies them into `%LOCALAPPDATA%/KoeNote/runtimes/gpu/review-cuda` or `%LOCALAPPDATA%/KoeNote/runtimes/gpu/asr-ctranslate2-cuda`. Failed installs roll back partial copies and keep CPU fallback available where supported.
 
 ## Runtime policy
 

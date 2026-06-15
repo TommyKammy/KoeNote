@@ -26,4 +26,5 @@ public sealed record ReviewRunOptions(
     bool UseJsonSchema = true,
     bool EnableRepair = true,
     string ReasoningMode = "off",
-    string PromptProfile = "default");
+    string PromptProfile = "default",
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);

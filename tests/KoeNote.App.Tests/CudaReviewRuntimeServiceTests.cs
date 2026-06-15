@@ -67,10 +67,11 @@ public sealed class CudaReviewRuntimeServiceTests
         Assert.Contains(progress.Items, item => item.StageText == "インストール中");
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
         Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll")));
-        Assert.False(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "readme.txt")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll")));
+        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "readme.txt")));
         Assert.True(File.Exists(paths.CudaReviewRuntimeMarkerPath));
     }
 
@@ -97,7 +98,7 @@ public sealed class CudaReviewRuntimeServiceTests
 
         Assert.True(result.IsSucceeded);
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
-        Assert.Equal("local cudart", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.Equal("local cudart", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
     }
 
     [Fact]
@@ -135,9 +136,9 @@ public sealed class CudaReviewRuntimeServiceTests
 
         Assert.True(result.IsSucceeded);
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
-        Assert.Equal("redist cudart", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll")));
-        Assert.Equal("redist cublas", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll")));
-        Assert.Equal("redist cublasLt", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll")));
+        Assert.Equal("redist cudart", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
+        Assert.Equal("redist cublas", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll")));
+        Assert.Equal("redist cublasLt", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll")));
     }
 
     [Fact]

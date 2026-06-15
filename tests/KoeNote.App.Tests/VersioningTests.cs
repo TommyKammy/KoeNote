@@ -223,7 +223,7 @@ public sealed class VersioningTests
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\python')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review')", appProject);
         Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\review-ternary')", appProject);
-        Assert.Contains("'$(KoeNoteIncludeRuntimeToolsInProjectPublish)' == 'true' And Exists('..\\..\\tools\\asr-ctranslate2-cuda')", appProject);
+        Assert.DoesNotContain("tools\\asr-ctranslate2-cuda", appProject);
     }
 
     [Fact]

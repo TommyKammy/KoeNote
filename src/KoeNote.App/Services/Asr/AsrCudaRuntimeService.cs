@@ -138,7 +138,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             Directory.CreateDirectory(paths.AsrRuntimeDirectory);
             Directory.CreateDirectory(paths.AsrCTranslate2RuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            Report(progress, "インストール中", "CUDA ASR runtime の NVIDIA DLL を tools\\asr-ctranslate2-cuda に配置しています...");
+            Report(progress, "インストール中", $"CUDA ASR runtime の NVIDIA DLL を {paths.AsrCTranslate2RuntimeDirectory} に配置しています...");
             NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.AsrCTranslate2RuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
 
             Report(progress, "検証中", "CUDA ASR runtime の導入結果を検証しています...");

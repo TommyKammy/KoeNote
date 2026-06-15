@@ -42,7 +42,8 @@ KoeNote uses a GPU-ready MSI layout. KoeNote-specific GPU runtime files are bund
 NVIDIA redistributable DLLs are intentionally not bundled in the MSI. During Setup Wizard, KoeNote downloads or reuses the required NVIDIA CUDA/cuDNN DLLs:
 
 - Review: `cudart64_12.dll`, `cublas64_12.dll`, and `cublasLt64_12.dll` from the NVIDIA CUDA redistributable manifest.
-- ASR/faster-whisper: the same CUDA DLLs plus `cudnn*.dll` from the NVIDIA cuDNN redistributable manifest, installed under `tools/asr-ctranslate2-cuda/` so CTranslate2 does not resolve DLLs from the native ASR tools directory.
+- ASR/faster-whisper: the same CUDA DLLs plus `cudnn*.dll` from the NVIDIA cuDNN redistributable manifest, installed under `%LOCALAPPDATA%/KoeNote/runtimes/gpu/asr-ctranslate2-cuda/` so CTranslate2 does not resolve DLLs from the native ASR tools directory and app updates do not remove the downloaded runtime.
+- Review GPU acceleration: NVIDIA CUDA DLLs are installed under `%LOCALAPPDATA%/KoeNote/runtimes/gpu/review-cuda/`; the bundled `tools/review/ggml-cuda.dll` bridge is copied there during setup.
 
 If the required NVIDIA DLLs already exist in a local CUDA/cuDNN installation, Setup Wizard can reuse them. If the NVIDIA download or verification fails, KoeNote keeps the copied runtime state clean and continues to offer CPU fallback where supported.
 

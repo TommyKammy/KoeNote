@@ -74,7 +74,8 @@ public sealed class ReadablePolishingStageRunner(
                     NoConversation: profile.NoConversation,
                     Threads: profile.Threads,
                     ThreadsBatch: profile.ThreadsBatch,
-                    PromptSettings: promptSettings),
+                    PromptSettings: promptSettings,
+                    RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(result.Content))
