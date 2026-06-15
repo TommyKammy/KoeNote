@@ -7,4 +7,5 @@ public sealed record ReviewRunResult(
     string RawOutputPath,
     string NormalizedDraftsPath,
     IReadOnlyList<CorrectionDraft> Drafts,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    IReadOnlyList<string>? RuntimeDiagnostics = null);

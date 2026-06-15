@@ -27,6 +27,10 @@ public sealed class JobLogExportServiceTests
         var report = service.BuildDiagnosticReport(job);
 
         Assert.Contains("## KoeNote Diagnostic Log", report);
+        Assert.Contains("## GPU Runtime Diagnostics", report);
+        Assert.Contains("### ASR GPU Runtime", report);
+        Assert.Contains("### Review GPU Runtime", report);
+        Assert.Contains("ReviewBackendMode:", report);
         Assert.Contains("AppVersion:", report);
         Assert.Contains("OS:", report);
         Assert.Contains("JobId: job-001", report);
@@ -41,6 +45,34 @@ public sealed class JobLogExportServiceTests
         Assert.Contains(crashLog, report);
         Assert.Contains("crash details", report);
         Assert.Contains("Raw transcript, prompt, and worker-output contents are not embedded.", report);
+    }
+
+    [Fact]
+    public void BuildDiagnosticReport_IncludesGpuRuntimePathsAndBackendSignals()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        var repository = new JobLogRepository(paths);
+        var service = new JobLogExportService(paths, repository);
+        var job = CreateJob();
+        var asrLogPath = Path.Combine(paths.Jobs, job.JobId, "logs", "asr-001.log");
+        var reviewLogPath = Path.Combine(paths.Jobs, job.JobId, "logs", "review.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(asrLogPath)!);
+        File.WriteAllText(asrLogPath, "koenote_asr_diagnostic: device=cuda compute_type=float16");
+        File.WriteAllLines(reviewLogPath, [
+            "Review runtime backend: requested_gpu_layers=999; status=cuda-backend-loaded",
+            "cuda appeared in user transcript text and must not be copied"
+        ]);
+
+        var report = service.BuildDiagnosticReport(job);
+
+        Assert.Contains("NvidiaGpuDetected:", report);
+        Assert.Contains(paths.AsrRuntimeDirectory, report);
+        Assert.Contains(paths.AsrCTranslate2RuntimeDirectory, report);
+        Assert.Contains(paths.CudaReviewRuntimeDirectory, report);
+        Assert.Contains("## Runtime Backend Signals", report);
+        Assert.Contains("job-logs/asr-001.log: koenote_asr_diagnostic", report);
+        Assert.Contains("job-logs/review.log: Review runtime backend", report);
+        Assert.DoesNotContain("user transcript text", report);
     }
 
     [Fact]
@@ -108,6 +140,7 @@ public sealed class JobLogExportServiceTests
         using var archive = ZipFile.OpenRead(outputPath);
         var entries = archive.Entries.Select(static entry => entry.FullName).ToArray();
         Assert.Contains("diagnostic-report.txt", entries);
+        Assert.Contains("gpu-runtime-diagnostics.json", entries);
         Assert.Contains("job-logs/preprocess.log", entries);
         Assert.Contains("job-logs/asr-20260512145447000-abcdef.log", entries);
         Assert.Contains("crash-logs/crash-20260508-120000-000.log", entries);
