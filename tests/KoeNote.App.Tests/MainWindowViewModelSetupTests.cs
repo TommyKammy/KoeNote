@@ -289,7 +289,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         installService.RegisterLocalModel(reviewItem, reviewPath, "download");
         CreateFasterWhisperRuntime(paths);
         Touch(paths.LlamaCompletionPath);
-        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
@@ -718,7 +718,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         Assert.True(viewModel.SetupInstallCudaReviewRuntimeCommand.CanExecute(null));
 
         Touch(viewModel.Paths.LlamaCompletionPath);
-        Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(viewModel.Paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
         Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(viewModel.Paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));
@@ -1147,7 +1147,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
         Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
         Touch(paths.AsrCudaRuntimeMarkerPath);
-        Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"));
         Touch(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"));

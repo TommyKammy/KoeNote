@@ -36,7 +36,14 @@ public sealed class LlamaRuntimePathBridgeTests
     public void RuntimeEnvironment_AddsPersistentCudaReviewRuntimeDirectoryToPath()
     {
         var paths = CreateUnicodeReadyPaths();
+        Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
+        File.WriteAllText(paths.LlamaCompletionPath, "llama");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "bridge");
         Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"), "cublas");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"), "cublasLt");
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "cudart");
+        File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, "test");
 
         var environment = LlamaRuntimeEnvironment.Build(paths);
 
@@ -46,6 +53,18 @@ public sealed class LlamaRuntimePathBridgeTests
             environment[LlamaRuntimeEnvironment.CudaReviewRuntimeDirectoryVariable]);
         Assert.True(environment.TryGetValue("PATH", out var path));
         Assert.StartsWith(paths.CudaReviewRuntimeDirectory, path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RuntimeEnvironment_SkipsIncompleteCudaReviewRuntimeDirectory()
+    {
+        var paths = CreateUnicodeReadyPaths();
+        Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
+        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "partial");
+
+        var environment = LlamaRuntimeEnvironment.Build(paths);
+
+        Assert.Null(environment);
     }
 
     [Fact]

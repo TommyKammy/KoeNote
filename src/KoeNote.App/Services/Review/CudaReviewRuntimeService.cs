@@ -40,9 +40,9 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         IProgress<RuntimeInstallProgress>? progress = null)
     {
         Report(progress, "確認中", "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
-        if (TryRefreshBundledCudaBridge() is { } refreshFailure)
+        if (TryRemovePersistedCudaBridge() is { } cleanupFailure)
         {
-            return refreshFailure;
+            return cleanupFailure;
         }
 
         if (IsInstalled())
@@ -58,16 +58,9 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 FailureCategoryCpuRuntimeMissing);
         }
 
-        if (!HasCudaBridge(paths.CudaReviewRuntimeDirectory))
+        if (!HasCudaBridge(paths.ReviewRuntimeDirectory) && !HasCudaBridge(paths.CudaReviewRuntimeDirectory))
         {
-            if (HasCudaBridge(paths.ReviewRuntimeDirectory))
-            {
-                if (TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]) is { } copyFailure)
-                {
-                    return copyFailure;
-                }
-            }
-            else if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
+            if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
             {
                 return CudaReviewRuntimeInstallResult.Failed(
                     "KoeNote GPU review bridge file ggml-cuda*.dll is not bundled. Ship it in tools\\review or configure the legacy runtime zip explicitly.",
@@ -137,7 +130,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
             Report(progress, "インストール中", $"CUDA review runtime の NVIDIA DLL を {paths.CudaReviewRuntimeDirectory} に配置しています...");
-            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.CudaReviewRuntimeDirectory, backupRoot, copiedFiles, ["*.dll"]);
+            NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.CudaReviewRuntimeDirectory, backupRoot, copiedFiles, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns);
 
             Report(progress, "検証中", "CUDA review runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
@@ -319,14 +312,41 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
     }
 
-    private CudaReviewRuntimeInstallResult? TryRefreshBundledCudaBridge()
+    private CudaReviewRuntimeInstallResult? TryRemovePersistedCudaBridge()
     {
         if (!HasCudaBridge(paths.ReviewRuntimeDirectory))
         {
             return null;
         }
 
-        return TryCopyMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, ["ggml-cuda*.dll"]);
+        try
+        {
+            if (!Directory.Exists(paths.CudaReviewRuntimeDirectory))
+            {
+                return null;
+            }
+
+            foreach (var bridgePath in Directory.EnumerateFiles(paths.CudaReviewRuntimeDirectory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly))
+            {
+                File.Delete(bridgePath);
+            }
+
+            return null;
+        }
+        catch (IOException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime bridge cleanup failed: {exception.Message}",
+                paths.CudaReviewRuntimeDirectory,
+                FailureCategoryInstallFailed);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return CudaReviewRuntimeInstallResult.Failed(
+                $"CUDA review runtime bridge cleanup failed: {exception.Message}",
+                paths.CudaReviewRuntimeDirectory,
+                FailureCategoryInstallFailed);
+        }
     }
 
     private CudaReviewRuntimeInstallResult? TryCopyMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)

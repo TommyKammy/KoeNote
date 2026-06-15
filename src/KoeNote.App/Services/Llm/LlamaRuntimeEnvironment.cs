@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Llm;
 
@@ -10,15 +11,15 @@ public static class LlamaRuntimeEnvironment
     {
         ArgumentNullException.ThrowIfNull(paths);
 
-        var runtimeDirectories = new[]
-        {
-            paths.CudaReviewRuntimeDirectory
-        }.Where(Directory.Exists)
-            .ToArray();
-        if (runtimeDirectories.Length == 0)
+        if (!CudaReviewRuntimeLayout.HasPackage(paths))
         {
             return null;
         }
+
+        var runtimeDirectories = new[]
+        {
+            paths.CudaReviewRuntimeDirectory
+        };
 
         var existingPathEntries = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);

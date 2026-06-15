@@ -67,7 +67,7 @@ public sealed class CudaReviewRuntimeServiceTests
         Assert.Contains(progress.Items, item => item.StageText == "インストール中");
         Assert.True(CudaReviewRuntimeLayout.HasPackage(paths));
         Assert.True(File.Exists(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll")));
-        Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
         Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll")));
         Assert.True(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll")));
@@ -255,7 +255,7 @@ public sealed class CudaReviewRuntimeServiceTests
     }
 
     [Fact]
-    public async Task InstallAsync_RefreshesPersistentGpuBridgeWhenAlreadyInstalled()
+    public async Task InstallAsync_RemovesPersistedGpuBridgeWhenBundledBridgeIsAvailable()
     {
         var root = CreateRoot();
         var paths = CreatePathsWithCpuRuntime(root);
@@ -271,11 +271,12 @@ public sealed class CudaReviewRuntimeServiceTests
         var result = await service.InstallAsync();
 
         Assert.True(result.IsSucceeded);
-        Assert.Equal("new bridge", File.ReadAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.Equal("new bridge", File.ReadAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll")));
+        Assert.False(File.Exists(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll")));
     }
 
     [Fact]
-    public async Task InstallAsync_ReturnsFailureWhenGpuBridgeRefreshCannotCopy()
+    public async Task InstallAsync_ReturnsFailureWhenPersistedGpuBridgeCannotBeRemoved()
     {
         var root = CreateRoot();
         var paths = CreatePathsWithCpuRuntime(root);

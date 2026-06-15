@@ -538,7 +538,7 @@ public sealed class ScriptedJsonAsrEngine(
         var ctranslate2PathEntries = new List<string>();
         var asrToolEntries = new List<string>();
         var appAsrTools = paths.AsrRuntimeDirectory;
-        if (Directory.Exists(paths.AsrCTranslate2RuntimeDirectory))
+        if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory))
         {
             ctranslate2PathEntries.Add(paths.AsrCTranslate2RuntimeDirectory);
         }
@@ -552,7 +552,7 @@ public sealed class ScriptedJsonAsrEngine(
         if (!string.IsNullOrWhiteSpace(workerDirectory))
         {
             var siblingCTranslate2Cuda = Path.GetFullPath(Path.Combine(workerDirectory, "..", "..", "tools", "asr-ctranslate2-cuda"));
-            if (Directory.Exists(siblingCTranslate2Cuda))
+            if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(siblingCTranslate2Cuda))
             {
                 ctranslate2PathEntries.Add(siblingCTranslate2Cuda);
             }

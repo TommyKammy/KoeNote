@@ -60,8 +60,8 @@ public sealed class LlmProfileResolverTests
         var paths = CreateIsolatedPaths();
         Directory.CreateDirectory(paths.ReviewRuntimeDirectory);
         File.WriteAllText(paths.LlamaCompletionPath, "llama");
+        File.WriteAllText(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"), "cuda");
         Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
-        File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "ggml-cuda.dll"), "cuda");
         File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublas64_12.dll"), "cublas");
         File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cublasLt64_12.dll"), "cublasLt");
         File.WriteAllText(Path.Combine(paths.CudaReviewRuntimeDirectory, "cudart64_12.dll"), "cudart");

@@ -33,7 +33,19 @@ public static class CudaReviewRuntimeLayout
         return File.Exists(paths.LlamaCompletionPath) &&
             File.Exists(paths.CudaReviewRuntimeMarkerPath) &&
             Directory.Exists(paths.CudaReviewRuntimeDirectory) &&
-            RequiredFilePatterns.All(pattern =>
+            HasCudaBridge(paths) &&
+            RequiredNvidiaFilePatterns.All(pattern =>
                 Directory.EnumerateFiles(paths.CudaReviewRuntimeDirectory, pattern, SearchOption.TopDirectoryOnly).Any());
+    }
+
+    private static bool HasCudaBridge(AppPaths paths)
+    {
+        return HasCudaBridge(paths.ReviewRuntimeDirectory) || HasCudaBridge(paths.CudaReviewRuntimeDirectory);
+    }
+
+    private static bool HasCudaBridge(string directory)
+    {
+        return Directory.Exists(directory) &&
+            Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
     }
 }
