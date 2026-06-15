@@ -214,6 +214,7 @@ public sealed partial class MainWindowViewModel
             candidates,
             new ReviewCandidateConfirmationOperationAdapter(_reviewOperationService))
         {
+            AudioPath = ResolveJobPlaybackPath(job),
             RecordDecision = (draft, result, selectedText) =>
                 ApplyReviewOperationResult(draft.DraftId, result, selectedText, draft)
         });

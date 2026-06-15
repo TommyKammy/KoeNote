@@ -8,6 +8,8 @@ public sealed record ReviewCandidateConfirmationRequest(
     IReadOnlyList<ReviewCandidateConfirmationItem> Candidates,
     IReviewCandidateConfirmationOperations Operations)
 {
+    public string? AudioPath { get; init; }
+
     public Action<CorrectionDraft, ReviewOperationResult, string>? RecordDecision { get; init; }
 }
 

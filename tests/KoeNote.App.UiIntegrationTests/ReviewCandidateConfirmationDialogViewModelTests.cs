@@ -1,5 +1,6 @@
 using KoeNote.App.Dialogs;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Audio;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Review;
 
@@ -320,11 +321,96 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Equal("accepted text", viewModel.SelectedItem?.CurrentText);
     }
 
+    [Fact]
+    public async Task Playback_CanPlaySelectedCandidateAndStopsWhenSelectionChanges()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            new FakeReviewCandidateOperations())
+        {
+            AudioPath = audioPath
+        }, playback);
+
+        Assert.True(viewModel.CanPlaySelectedPreview);
+
+        await viewModel.TogglePreviewAsync();
+
+        Assert.True(viewModel.IsPreviewPlaying);
+        Assert.Equal(TimeSpan.FromSeconds(1), playback.SeekPosition);
+        Assert.Equal("再生中", viewModel.PreviewPlaybackStatusText);
+
+        viewModel.SelectNext();
+
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.IsPreviewPlaying);
+        Assert.False(playback.IsPlaying);
+        Assert.True(playback.StopCount >= 1);
+    }
+
+    [Fact]
+    public async Task Playback_StopsWhenCandidateDecisionIsApplied()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var operations = new FakeReviewCandidateOperations();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [
+                CreateCandidate("draft-001", "segment-001", "raw one", "fixed one"),
+                CreateCandidate("draft-002", "segment-002", "raw two", "fixed two")
+            ],
+            operations)
+        {
+            AudioPath = audioPath
+        }, playback);
+
+        await viewModel.TogglePreviewAsync();
+        Assert.True(viewModel.IsPreviewPlaying);
+
+        Assert.True(viewModel.AcceptSelected());
+
+        Assert.False(viewModel.IsPreviewPlaying);
+        Assert.False(playback.IsPlaying);
+        Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
+        Assert.False(viewModel.CanOperate);
+    }
+
+    [Fact]
+    public void Playback_IsDisabledWithoutAudioPathOrCandidateRange()
+    {
+        var operations = new FakeReviewCandidateOperations();
+        var withoutAudioPath = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            operations));
+
+        Assert.False(withoutAudioPath.CanPlaySelectedPreview);
+        Assert.Equal("音声なし", withoutAudioPath.PreviewPlaybackStatusText);
+
+        var withoutRange = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one", null, null)],
+            operations)
+        {
+            AudioPath = CreateAudioFile()
+        }, new FakeAudioPlaybackService());
+
+        Assert.False(withoutRange.CanPlaySelectedPreview);
+    }
+
     private static ReviewCandidateConfirmationItem CreateCandidate(
         string draftId,
         string segmentId,
         string originalText,
-        string suggestedText)
+        string suggestedText,
+        double? startSeconds = 1,
+        double? endSeconds = 2)
     {
         return new ReviewCandidateConfirmationItem(
             new CorrectionDraft(
@@ -336,10 +422,18 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
                 suggestedText,
                 "候補理由",
                 0.8),
-            StartSeconds: 1,
-            EndSeconds: 2,
+            StartSeconds: startSeconds,
+            EndSeconds: endSeconds,
             SpeakerName: "Speaker_0",
             CurrentText: originalText);
+    }
+
+    private static string CreateAudioFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "KoeNote.UiIntegrationTests", Guid.NewGuid().ToString("N"), "meeting.wav");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "audio");
+        return path;
     }
 
     private sealed class FakeReviewCandidateOperations : IReviewCandidateConfirmationOperations
@@ -389,6 +483,64 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         private static ReviewOperationResult CreateResult(string draftId, string action, string? finalText)
         {
             return new ReviewOperationResult("job-001", "segment-001", draftId, action, finalText, 0);
+        }
+    }
+
+    private sealed class FakeAudioPlaybackService : IAudioPlaybackService
+    {
+        public event EventHandler? PlaybackStateChanged;
+
+        public bool IsPlaying { get; private set; }
+
+        public string? CurrentPath { get; private set; }
+
+        public TimeSpan Position { get; set; }
+
+        public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(60);
+
+        public string? OpenedPath { get; private set; }
+
+        public TimeSpan SeekPosition { get; private set; }
+
+        public int StopCount { get; private set; }
+
+        public bool Toggle(string audioPath)
+        {
+            CurrentPath = audioPath;
+            IsPlaying = !IsPlaying;
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            return IsPlaying;
+        }
+
+        public bool Open(string audioPath)
+        {
+            OpenedPath = audioPath;
+            CurrentPath = audioPath;
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        public void Seek(TimeSpan position)
+        {
+            SeekPosition = position;
+            Position = position;
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void SetPlaybackRate(double rate)
+        {
+        }
+
+        public void SetVolume(double volume)
+        {
+        }
+
+        public void Stop()
+        {
+            StopCount++;
+            IsPlaying = false;
+            CurrentPath = null;
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
