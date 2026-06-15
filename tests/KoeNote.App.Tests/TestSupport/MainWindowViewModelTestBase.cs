@@ -351,6 +351,29 @@ public abstract class MainWindowViewModelTestBase
         Touch(Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages", "silero_vad", "data", "silero_vad.jit"));
     }
 
+    protected static void CreateAsrCudaRuntime(AppPaths paths)
+    {
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+    }
+
+    protected static void CreateCudaReviewRuntime(AppPaths paths)
+    {
+        Touch(paths.LlamaCompletionPath);
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.ReviewRuntimeDirectory, "cudart64_12.dll"));
+        Touch(paths.CudaReviewRuntimeMarkerPath);
+    }
+
     protected sealed class RecordingUpdateInstallerLauncher : IUpdateInstallerLauncher
     {
         public string? StartedInstallerPath { get; private set; }

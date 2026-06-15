@@ -76,7 +76,9 @@ public sealed class SetupWizardService
             state = _stateService.Save(state with { CurrentStep = SetupStep.SetupMode });
         }
 
-        if (state.IsCompleted && _readinessService.IsSelectedTernaryReviewRuntimeMissing(state))
+        if (state.IsCompleted &&
+            (_readinessService.IsSelectedTernaryReviewRuntimeMissing(state) ||
+                _readinessService.IsRequiredGpuRuntimeMissing()))
         {
             return _readinessService.CompleteIfReady();
         }

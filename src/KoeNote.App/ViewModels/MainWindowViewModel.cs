@@ -505,37 +505,41 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string SetupWizardModalTitle => _setupState.CurrentStep switch
-    {
-        SetupStep.Welcome => "KoeNoteへようこそ",
-        SetupStep.EnvironmentCheck => "動作環境を確認します",
-        SetupStep.SetupMode => "モデル構成を選びます",
-        SetupStep.AsrModel => "文字起こしモデルを選びます",
-        SetupStep.ReviewModel => "整文モデルを選びます",
-        SetupStep.Storage => "モデルの保存先を確認します",
-        SetupStep.License => "ライセンスを確認します",
-        SetupStep.InstallPlan => "導入内容を確認します",
-        SetupStep.Install => "必要なものを導入します",
-        SetupStep.SmokeTest => "最後に動作確認します",
-        SetupStep.Complete => "準備完了です",
-        _ => "初回セットアップ"
-    };
+    public string SetupWizardModalTitle => SetupGpuRuntimeRequiredButMissing
+        ? "GPU runtime の導入が必要です"
+        : _setupState.CurrentStep switch
+        {
+            SetupStep.Welcome => "KoeNoteへようこそ",
+            SetupStep.EnvironmentCheck => "動作環境を確認します",
+            SetupStep.SetupMode => "モデル構成を選びます",
+            SetupStep.AsrModel => "文字起こしモデルを選びます",
+            SetupStep.ReviewModel => "整文モデルを選びます",
+            SetupStep.Storage => "モデルの保存先を確認します",
+            SetupStep.License => "ライセンスを確認します",
+            SetupStep.InstallPlan => "導入内容を確認します",
+            SetupStep.Install => "必要なものを導入します",
+            SetupStep.SmokeTest => "最後に動作確認します",
+            SetupStep.Complete => "準備完了です",
+            _ => "初回セットアップ"
+        };
 
-    public string SetupWizardModalGuide => _setupState.CurrentStep switch
-    {
-        SetupStep.Welcome => "KoeNoteを使い始めるために必要な準備を順番に案内します。",
-        SetupStep.EnvironmentCheck => "不足があってもアプリ本体は利用できます。必要なものはこの後の手順で導入できます。",
-        SetupStep.SetupMode => "迷ったらおすすめ構成で進めてください。モデルは後から変更できます。",
-        SetupStep.AsrModel => "文字起こしに使うモデルを選びます。通常はおすすめのままで大丈夫です。",
-        SetupStep.ReviewModel => "整文や要約に使うモデルを選びます。通常はおすすめのままで大丈夫です。",
-        SetupStep.Storage => "モデルの保存先を確認します。通常は標準フォルダーを使います。",
-        SetupStep.License => "導入前に、選択したモデルのライセンスを確認します。",
-        SetupStep.InstallPlan => "これから導入する内容を確認します。問題なければ導入を開始してください。",
-        SetupStep.Install => "導入中です。完了までこのままお待ちください。",
-        SetupStep.SmokeTest => "最後に、KoeNoteを使う準備が整っているか確認します。",
-        SetupStep.Complete => "準備が完了しました。KoeNoteを開始できます。",
-        _ => "KoeNoteの初回利用に必要な準備を案内します。"
-    };
+    public string SetupWizardModalGuide => SetupGpuRuntimeRequiredButMissing
+        ? "NVIDIA GPU が検出されました。ASR失敗を防ぐため、ASR GPU Runtime と GPU高速化用 runtime を導入してください。"
+        : _setupState.CurrentStep switch
+        {
+            SetupStep.Welcome => "KoeNoteを使い始めるために必要な準備を順番に案内します。",
+            SetupStep.EnvironmentCheck => "不足があってもアプリ本体は利用できます。必要なものはこの後の手順で導入できます。",
+            SetupStep.SetupMode => "迷ったらおすすめ構成で進めてください。モデルは後から変更できます。",
+            SetupStep.AsrModel => "文字起こしに使うモデルを選びます。通常はおすすめのままで大丈夫です。",
+            SetupStep.ReviewModel => "整文や要約に使うモデルを選びます。通常はおすすめのままで大丈夫です。",
+            SetupStep.Storage => "モデルの保存先を確認します。通常は標準フォルダーを使います。",
+            SetupStep.License => "導入前に、選択したモデルのライセンスを確認します。",
+            SetupStep.InstallPlan => "これから導入する内容を確認します。問題なければ導入を開始してください。",
+            SetupStep.Install => "導入中です。完了までこのままお待ちください。",
+            SetupStep.SmokeTest => "最後に、KoeNoteを使う準備が整っているか確認します。",
+            SetupStep.Complete => "準備が完了しました。KoeNoteを開始できます。",
+            _ => "KoeNoteの初回利用に必要な準備を案内します。"
+        };
     public bool CanRunSelectedJob => !IsRunInProgress && !IsPostProcessInProgress && GetRunPreflightIssues().Count == 0;
 
     public bool CanRunPostReview => CanRunPostProcessSelectedJob;
@@ -1073,7 +1077,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupDiarizationRuntimeReady &&
         SetupTernaryReviewRuntimeReady;
 
+    public bool SetupGpuRuntimeRequiredButMissing =>
+        (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady) ||
+        (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady);
+
     public bool SetupConditionalRuntimeReady =>
+        (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady);
 
     public bool SelectedSetupConfigurationReady => SelectedSetupModelsReady &&
@@ -1335,6 +1344,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
                 OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
                 OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
+                OnPropertyChanged(nameof(SetupGpuRuntimeRequiredButMissing));
                 OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
                 OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
                 OnPropertyChanged(nameof(SetupPrimaryInstallActionText));

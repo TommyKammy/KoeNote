@@ -30,11 +30,14 @@ internal sealed class SetupReadinessService(
 
     public SetupStepReadiness GetStepReadiness(SetupState state)
     {
+        var resources = hostResourceProbe.GetResources();
         return new SetupStepReadiness(
             EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
             AsrModelReady: IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
             ReviewModelReady: IsSelectedModelReady(state.SelectedReviewModelId, "review"),
             ReviewRuntimeReady: IsSelectedReviewRuntimeReady(state.SelectedReviewModelId),
+            GpuRuntimeReady: !resources.NvidiaGpuDetected ||
+                (AsrCudaRuntimeLayout.HasPackage(paths) && CudaReviewRuntimeLayout.HasPackage(paths)),
             StorageReady: Directory.Exists(state.StorageRoot ?? paths.DefaultModelStorageRoot));
     }
 
@@ -119,6 +122,13 @@ internal sealed class SetupReadinessService(
         var runtimePath = GetSelectedReviewRuntimePath(state.SelectedReviewModelId);
         return string.Equals(runtimePath, paths.TernaryLlamaCompletionPath, StringComparison.OrdinalIgnoreCase) &&
             !File.Exists(runtimePath);
+    }
+
+    public bool IsRequiredGpuRuntimeMissing()
+    {
+        var resources = hostResourceProbe.GetResources();
+        return resources.NvidiaGpuDetected &&
+            (!AsrCudaRuntimeLayout.HasPackage(paths) || !CudaReviewRuntimeLayout.HasPackage(paths));
     }
 
     private bool IsCompleteStateReady(
