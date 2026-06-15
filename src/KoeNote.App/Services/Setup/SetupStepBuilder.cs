@@ -49,7 +49,10 @@ internal static class SetupStepBuilder
             SetupStep.SetupMode => SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.SetupMode) &&
                 !string.IsNullOrWhiteSpace(state.SelectedModelPresetId),
             SetupStep.InstallPlan => state.LicenseAccepted && SetupStepFlow.IsAfter(state.CurrentStep, SetupStep.InstallPlan),
-            SetupStep.Install => readiness.AsrModelReady && readiness.ReviewModelReady && readiness.ReviewRuntimeReady,
+            SetupStep.Install => readiness.AsrModelReady &&
+                readiness.ReviewModelReady &&
+                readiness.ReviewRuntimeReady &&
+                readiness.GpuRuntimeReady,
             SetupStep.SmokeTest => state.LastSmokeSucceeded,
             SetupStep.Complete => state.IsCompleted,
             _ => false
@@ -62,4 +65,5 @@ internal sealed record SetupStepReadiness(
     bool AsrModelReady,
     bool ReviewModelReady,
     bool ReviewRuntimeReady,
+    bool GpuRuntimeReady,
     bool StorageReady);

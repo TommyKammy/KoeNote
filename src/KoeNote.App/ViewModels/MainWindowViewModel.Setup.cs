@@ -322,8 +322,7 @@ public sealed partial class MainWindowViewModel
             if (!await InstallCudaRuntimeForPresetAsync(
                 CreateAsrCudaRuntimeInstallSpec(),
                 displayName,
-                cancellation.Token,
-                optionalFailureSuffix: " ASR GPU acceleration was not installed, but CPU ASR remains available. You can retry ASR GPU runtime installation later from Setup."))
+                cancellation.Token))
             {
                 return;
             }
@@ -889,6 +888,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
         OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
         OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
+        OnPropertyChanged(nameof(SetupGpuRuntimeRequiredButMissing));
         OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
@@ -975,6 +975,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupReviewRuntimeReady));
         OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
         OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
+        OnPropertyChanged(nameof(SetupGpuRuntimeRequiredButMissing));
         OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
         OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
         OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
@@ -1186,7 +1187,7 @@ public sealed partial class MainWindowViewModel
             items.Add(new(
                 "ASR GPU runtime",
                 "NVIDIA GPU向けのASR CUDA runtime",
-                SetupAsrCudaRuntimeReady ? "導入済み" : "任意"));
+                SetupAsrCudaRuntimeReady ? "導入済み" : "必須・未導入"));
         }
 
         if (SetupCudaReviewRuntimeRecommended)
@@ -1194,7 +1195,7 @@ public sealed partial class MainWindowViewModel
             items.Add(new(
                 "GPU高速化",
                 "検出されたNVIDIA GPU向けのReview runtime",
-                SetupCudaReviewRuntimeReady ? "導入済み" : "導入します"));
+                SetupCudaReviewRuntimeReady ? "導入済み" : "必須・未導入"));
         }
 
         if (!SetupTernaryReviewRuntimeReady)
@@ -1298,13 +1299,13 @@ public sealed partial class MainWindowViewModel
             AsrCudaRuntimeService.FailureCategoryConfigurationMissing =>
                 $"CUDA ASR runtime source is not configured. Configure NVIDIA CUDA/cuDNN redist sources, then retry. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryBundledRuntimeMissing =>
-                $"CUDA ASR runtime needs the bundled KoeNote ASR GPU files first. CPU ASR remains available where supported. Details: {message}",
+                $"CUDA ASR runtime needs the bundled KoeNote ASR GPU files first. Setup cannot continue until this runtime is installed. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryNetworkUnavailable =>
-                $"CUDA ASR runtime could not download NVIDIA CUDA/cuDNN redist files. Check the network connection or proxy settings, then retry. CPU ASR fallback remains available where supported. Details: {message}",
+                $"CUDA ASR runtime could not download NVIDIA CUDA/cuDNN redist files. Check the network connection or proxy settings, then retry. Setup cannot continue until this runtime is installed. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryHashMismatch =>
-                $"CUDA ASR runtime failed NVIDIA redist hash verification and was not installed. CPU ASR fallback remains available where supported. Details: {message}",
+                $"CUDA ASR runtime failed NVIDIA redist hash verification and was not installed. Setup cannot continue until this runtime is installed. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryArchiveInvalid =>
-                $"CUDA ASR runtime archive was not usable. Setup Wizard needs NVIDIA CUDA/cuDNN DLLs for faster-whisper/CTranslate2. CPU ASR fallback remains available where supported. Details: {message}",
+                $"CUDA ASR runtime archive was not usable. Setup Wizard needs NVIDIA CUDA/cuDNN DLLs for faster-whisper/CTranslate2. Setup cannot continue until this runtime is installed. Details: {message}",
             AsrCudaRuntimeService.FailureCategoryInstallFailed =>
                 $"CUDA ASR runtime could not be installed under tools\\asr. Details: {message}",
             _ => message

@@ -265,7 +265,7 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
-    public void SelectedSetupConfigurationReady_DoesNotRequireAsrCudaRuntimeWithDetectedGpu()
+    public void SelectedSetupConfigurationReady_RequiresAsrCudaRuntimeWithDetectedGpu()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var appBaseDirectory = Path.Combine(root, "app");
@@ -314,7 +314,10 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
 
         Assert.True(viewModel.SetupAsrCudaRuntimeRecommended);
         Assert.False(viewModel.SetupAsrCudaRuntimeReady);
-        Assert.True(viewModel.SelectedSetupConfigurationReady);
+        Assert.True(viewModel.SetupGpuRuntimeRequiredButMissing);
+        Assert.False(viewModel.SelectedSetupConfigurationReady);
+        Assert.Contains("ASR GPU runtime", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+        Assert.Contains("GPU runtime", viewModel.SetupWizardModalTitle, StringComparison.Ordinal);
         Assert.True(viewModel.SetupInstallAsrCudaRuntimeCommand.CanExecute(null));
     }
 
@@ -408,6 +411,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         CreateFasterWhisperRuntime(paths);
         Touch(paths.LlamaCompletionPath);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
 
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
@@ -548,6 +553,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         Touch(paths.LlamaCompletionPath);
         CreateFasterWhisperRuntime(paths);
         CreateDiarizationRuntime(paths);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
         var installedModels = new InstalledModelRepository(paths);
