@@ -174,10 +174,7 @@ internal sealed class SetupReadinessService(
 
         if (resources.NvidiaGpuDetected)
         {
-            checks.Add(new SetupSmokeCheck(
-                "ASR CUDA runtime",
-                AsrCudaRuntimeLayout.HasPackage(paths),
-                AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrCTranslate2RuntimeDirectory : $"Not installed: {paths.AsrCTranslate2RuntimeDirectory}"));
+            checks.Add(CheckAsrCudaRuntime());
             checks.Add(CheckCudaReviewRuntime());
         }
 
@@ -205,10 +202,7 @@ internal sealed class SetupReadinessService(
 
         if (resources.NvidiaGpuDetected)
         {
-            checks.Add(new SetupSmokeCheck(
-                "ASR CUDA runtime",
-                AsrCudaRuntimeLayout.HasPackage(paths),
-                AsrCudaRuntimeLayout.HasPackage(paths) ? paths.AsrCTranslate2RuntimeDirectory : $"Not installed: {paths.AsrCTranslate2RuntimeDirectory}"));
+            checks.Add(CheckAsrCudaRuntime());
             checks.Add(CheckCudaReviewRuntime());
         }
 
@@ -254,7 +248,38 @@ internal sealed class SetupReadinessService(
         return new SetupSmokeCheck(
             "Review CUDA runtime",
             exists,
-            exists ? paths.CudaReviewRuntimeDirectory : $"Not installed: {paths.CudaReviewRuntimeDirectory}");
+            exists ? paths.CudaReviewRuntimeDirectory : DescribeCudaReviewRuntimeMissing());
+    }
+
+    private SetupSmokeCheck CheckAsrCudaRuntime()
+    {
+        var exists = AsrCudaRuntimeLayout.HasPackage(paths);
+        return new SetupSmokeCheck(
+            "ASR CUDA runtime",
+            exists,
+            exists ? paths.AsrCTranslate2RuntimeDirectory : DescribeAsrCudaRuntimeMissing());
+    }
+
+    private string DescribeAsrCudaRuntimeMissing()
+    {
+        var prefix = AsrCudaRuntimeLayout.HasLegacyNvidiaRuntimeFiles(paths)
+            ? "アップデート後のASR GPU runtime移行が必要です。Setup Wizardで導入を実行すると旧保存先から永続保存先へ移行します。"
+            : "アップデート後にASR GPU runtimeの再導入が必要です。";
+        var missing = AsrCudaRuntimeLayout.GetMissingPackageItems(paths);
+        return missing.Count == 0
+            ? $"{prefix} Target: {paths.AsrCTranslate2RuntimeDirectory}"
+            : $"{prefix} Missing: {string.Join("; ", missing)}";
+    }
+
+    private string DescribeCudaReviewRuntimeMissing()
+    {
+        var prefix = CudaReviewRuntimeLayout.HasLegacyNvidiaRuntimeFiles(paths)
+            ? "アップデート後のReview GPU runtime移行が必要です。Setup Wizardで導入を実行すると旧保存先から永続保存先へ移行します。"
+            : "アップデート後にReview GPU runtimeの再導入が必要です。";
+        var missing = CudaReviewRuntimeLayout.GetMissingPackageItems(paths);
+        return missing.Count == 0
+            ? $"{prefix} Target: {paths.CudaReviewRuntimeDirectory}"
+            : $"{prefix} Missing: {string.Join("; ", missing)}";
     }
 
     private SetupSmokeCheck CheckSelectedReviewRuntime(string? modelId)

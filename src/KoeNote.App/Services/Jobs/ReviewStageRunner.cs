@@ -15,7 +15,8 @@ public sealed class ReviewStageRunner(
     JobLogRepository jobLogRepository,
     InstalledModelRepository installedModelRepository,
     SetupStateService setupStateService,
-    ReviewWorker reviewWorker) : IReviewStageRunner
+    ReviewWorker reviewWorker,
+    ISetupHostResourceProbe? hostResourceProbe = null) : IReviewStageRunner
 {
     public async Task<bool> RunAsync(
         JobSummary job,
@@ -36,6 +37,7 @@ public sealed class ReviewStageRunner(
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId();
             var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Review);
             jobLogRepository.AddEvent(job.JobId, "review", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             var result = await reviewWorker.RunAsync(new ReviewRunOptions(

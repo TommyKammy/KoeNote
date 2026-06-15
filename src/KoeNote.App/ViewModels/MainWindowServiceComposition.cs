@@ -317,7 +317,8 @@ internal static class MainWindowJobRunComposition
                 asrEngineRegistry,
                 model.InstalledModelRepository,
                 diarizationService,
-                review.CorrectionMemoryService),
+                review.CorrectionMemoryService,
+                new WindowsSetupHostResourceProbe()),
             new ReviewStageRunner(
                 paths,
                 repositories.JobRepository,
@@ -325,7 +326,8 @@ internal static class MainWindowJobRunComposition
                 repositories.JobLogRepository,
                 model.InstalledModelRepository,
                 new SetupStateService(paths),
-                workers.ReviewWorker),
+                workers.ReviewWorker,
+                new WindowsSetupHostResourceProbe()),
             new SummaryStageRunner(
                 paths,
                 repositories.JobRepository,
@@ -333,7 +335,8 @@ internal static class MainWindowJobRunComposition
                 repositories.JobLogRepository,
                 model.InstalledModelRepository,
                 new SetupStateService(paths),
-                review.TranscriptSummaryService));
+                review.TranscriptSummaryService,
+                new WindowsSetupHostResourceProbe()));
     }
 }
 
@@ -354,6 +357,7 @@ internal static class MainWindowReadablePolishingComposition
             model.InstalledModelRepository,
             new SetupStateService(paths),
             review.TranscriptPolishingService,
-            promptSettingsRepository);
+            promptSettingsRepository,
+            new WindowsSetupHostResourceProbe());
     }
 }

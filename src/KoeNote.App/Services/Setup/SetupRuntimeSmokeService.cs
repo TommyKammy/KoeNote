@@ -192,8 +192,8 @@ public sealed class SetupRuntimeSmokeService(
         {
             return new SetupSmokeCheck(
                 "ASR GPU profile smoke",
-                true,
-                "ASR CUDA runtime is not installed; GPU profile probe skipped.");
+                false,
+                $"ASR CUDA runtime is not installed; reinstall ASR GPU runtime before running GPU ASR. Missing: {string.Join("; ", AsrCudaRuntimeLayout.GetMissingPackageItems(paths))}");
         }
 
         if (!ShouldUseExplicitFasterWhisperProfile(state.SelectedAsrModelId))

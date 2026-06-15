@@ -1082,8 +1082,14 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (SetupCudaReviewRuntimeRecommended && CudaReviewRuntimeLayout.HasLegacyNvidiaRuntimeFiles(Paths))
+        {
+            SetupCudaReviewRuntimeSummary = $"アップデート後のReview GPU runtime移行が必要です。導入を実行すると旧保存先から永続保存先へ移行します: {Paths.CudaReviewRuntimeDirectory}";
+            return;
+        }
+
         SetupCudaReviewRuntimeSummary = SetupCudaReviewRuntimeRecommended
-            ? $"NVIDIA GPU detected. KoeNote GPU bridge is bundled; Setup Wizard will download NVIDIA CUDA redist DLLs if needed: {Paths.CudaReviewRuntimeDirectory}"
+            ? $"アップデート後にReview GPU runtimeの再導入が必要です。NVIDIA CUDA redist DLLs will be installed if needed: {Paths.CudaReviewRuntimeDirectory}"
             : "CUDA review runtime is optional and disabled because no NVIDIA GPU was detected. CPU review runtime will be used.";
     }
 
@@ -1095,8 +1101,14 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (SetupAsrCudaRuntimeRecommended && AsrCudaRuntimeLayout.HasLegacyNvidiaRuntimeFiles(Paths))
+        {
+            SetupAsrCudaRuntimeSummary = $"アップデート後のASR GPU runtime移行が必要です。導入を実行すると旧保存先から永続保存先へ移行します: {Paths.AsrCTranslate2RuntimeDirectory}";
+            return;
+        }
+
         SetupAsrCudaRuntimeSummary = SetupAsrCudaRuntimeRecommended
-            ? $"NVIDIA GPU detected. KoeNote ASR GPU files are bundled; Setup Wizard will download NVIDIA CUDA/cuDNN redist DLLs if needed: {Paths.AsrCTranslate2RuntimeDirectory}"
+            ? $"アップデート後にASR GPU runtimeの再導入が必要です。NVIDIA CUDA/cuDNN redist DLLs will be installed if needed: {Paths.AsrCTranslate2RuntimeDirectory}"
             : "CUDA ASR runtime is not required for the selected ASR model.";
     }
 

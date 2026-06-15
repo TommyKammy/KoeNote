@@ -718,8 +718,18 @@ public sealed class SetupWizardServiceTests
         Assert.False(smoke.IsSucceeded);
         Assert.False(completed.IsCompleted);
         Assert.Equal(SetupStep.SmokeTest, completed.CurrentStep);
-        Assert.Contains(smoke.Checks, check => check.Name == "ASR CUDA runtime" && !check.IsOk);
-        Assert.Contains(smoke.Checks, check => check.Name == "Review CUDA runtime" && !check.IsOk);
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR CUDA runtime" &&
+            !check.IsOk &&
+            check.Detail.Contains("アップデート後にASR GPU runtimeの再導入が必要", StringComparison.Ordinal));
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "Review CUDA runtime" &&
+            !check.IsOk &&
+            check.Detail.Contains("アップデート後にReview GPU runtimeの再導入が必要", StringComparison.Ordinal));
+        Assert.Contains(smoke.Checks, check =>
+            check.Name == "ASR GPU profile smoke" &&
+            !check.IsOk &&
+            check.Detail.Contains("reinstall ASR GPU runtime", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(smoke.Checks, check => check.Name == "speaker diarization runtime" && !check.IsOk);
     }
 
