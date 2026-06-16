@@ -96,6 +96,24 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "Controls",
             "TranscriptSegmentList.xaml"));
+        var transcriptSegmentListCode = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "TranscriptSegmentList.xaml.cs"));
+        var transcriptAudioPlayerXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "TranscriptAudioPlayer.xaml"));
+        var transcriptAudioPlayerCode = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "TranscriptAudioPlayer.xaml.cs"));
         var reviewPanelCode = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -159,9 +177,18 @@ public sealed class StandardLayoutShellTests
         Assert.DoesNotContain("BasedOn=\"{StaticResource {x:Type RadioButton}}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("<controls:TranscriptSegmentList DisplayMode=\"Raw\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("ShowCompactToolbar=\"True\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("SegmentSearchText", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedSpeakerFilter", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("IsTranscriptAutoScrollEnabled", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("public bool ShowCompactToolbar", transcriptSegmentListCode, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("<RowDefinition Height=\"64\" MinHeight=\"56\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsSlim=\"True\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenSlimPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenFullPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("public bool IsSlim", transcriptAudioPlayerCode, StringComparison.Ordinal);
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);

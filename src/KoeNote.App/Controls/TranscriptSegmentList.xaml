@@ -27,7 +27,79 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+            <Style x:Key="VisibleWhenCompactToolbar" TargetType="FrameworkElement">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding ShowCompactToolbar, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </DockPanel.Resources>
+
+        <Border DockPanel.Dock="Top"
+                Background="#FFFFFF"
+                BorderBrush="#E2E8F0"
+                BorderThickness="0,0,0,1"
+                Padding="12,8"
+                Style="{StaticResource VisibleWhenCompactToolbar}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid MaxWidth="320"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center">
+                    <TextBox Height="28"
+                             Padding="28,4,28,4"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding SegmentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="セグメントを検索" />
+                    <TextBlock Text="&#xE721;"
+                               FontFamily="Segoe MDL2 Assets"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="12"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Center"
+                               Margin="9,0,0,0"
+                               IsHitTestVisible="False" />
+                    <Button Command="{Binding ClearSegmentSearchCommand}"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Width="24"
+                            Height="24"
+                            MinWidth="0"
+                            Padding="0"
+                            Margin="0,0,2,0"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            ToolTip="検索をクリア">
+                        <TextBlock Text="&#xE711;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="10" />
+                    </Button>
+                </Grid>
+
+                <ComboBox Grid.Column="1"
+                          Style="{StaticResource ToolbarComboBox}"
+                          Width="140"
+                          Height="28"
+                          Margin="10,0,0,0"
+                          ItemsSource="{Binding SpeakerFilters}"
+                          SelectedItem="{Binding SelectedSpeakerFilter, Mode=TwoWay}"
+                          ToolTip="話者で絞り込み" />
+
+                <CheckBox Grid.Column="2"
+                          Content="自動スクロール"
+                          IsChecked="{Binding IsTranscriptAutoScrollEnabled, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          Margin="12,0,0,0"
+                          ToolTip="再生位置に合わせて本文を追従" />
+            </Grid>
+        </Border>
 
         <Border DockPanel.Dock="Top"
                 Background="#F7FCF9"
