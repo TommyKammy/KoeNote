@@ -30,6 +30,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
+        NotifyExportMenuTargetChanged();
     }
 
     private static string GetMainLayoutModeDisplayName(MainLayoutMode mode)
@@ -134,6 +135,7 @@ public sealed partial class MainWindowViewModel
                 OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
                 OnPropertyChanged(nameof(StandardAiRailToggleText));
                 OnPropertyChanged(nameof(StandardAiRailToggleToolTip));
+                NotifyExportMenuTargetChanged();
             }
         }
     }

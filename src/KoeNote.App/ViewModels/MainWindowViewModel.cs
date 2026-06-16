@@ -1561,7 +1561,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public int SelectedTranscriptTabIndex
     {
         get => _selectedTranscriptTabIndex;
-        set => SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3));
+        set
+        {
+            if (SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3)))
+            {
+                NotifyExportMenuTargetChanged();
+            }
+        }
     }
 
     public bool IsPolishedTranscriptTabHighlighted

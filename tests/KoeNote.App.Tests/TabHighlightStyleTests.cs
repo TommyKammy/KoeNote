@@ -212,12 +212,20 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"実行\"", headerXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("整文まで実行", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("CurrentExportTargetDisplayName", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ContextualExportMenuToolTip", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenReadableExportMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenRawExportMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenDiffExportMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenReviewCandidateExportMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenSummaryExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.True(
-            headerXaml.IndexOf("<MenuItem Header=\"整文\"", StringComparison.Ordinal) <
-            headerXaml.IndexOf("<MenuItem Header=\"素起こし\"", StringComparison.Ordinal));
+            headerXaml.IndexOf("Style=\"{StaticResource VisibleWhenReadableExportMenuItem}\"", StringComparison.Ordinal) <
+            headerXaml.IndexOf("Style=\"{StaticResource VisibleWhenRawExportMenuItem}\"", StringComparison.Ordinal));
         Assert.True(
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedDocxCommand}\"", StringComparison.Ordinal) <
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedXlsxCommand}\"", StringComparison.Ordinal));
+        Assert.Contains("差分ビューはエクスポート対象外です", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderModelBadgeButton", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleTrack", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleThumb", headerXaml, StringComparison.Ordinal);

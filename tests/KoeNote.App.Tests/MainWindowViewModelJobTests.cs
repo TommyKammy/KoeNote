@@ -470,15 +470,25 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         viewModel.SelectedTranscriptTabIndex = 3;
         viewModel.ShowReadableTranscriptTabCommand.Execute(null);
         Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsReadableExportMenuVisible);
+        Assert.False(viewModel.IsRawExportMenuVisible);
 
         viewModel.ShowRawTranscriptTabCommand.Execute(null);
         Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("素起こし", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsRawExportMenuVisible);
+        Assert.False(viewModel.IsReadableExportMenuVisible);
 
         viewModel.ShowDiffTranscriptTabCommand.Execute(null);
         Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("差分", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsDiffExportMenuVisible);
 
         viewModel.ShowReviewCandidateTranscriptTabCommand.Execute(null);
         Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("レビュー候補", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsReviewCandidateExportMenuVisible);
     }
 
     [Fact]
