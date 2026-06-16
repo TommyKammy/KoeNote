@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.ViewModels;
 
@@ -166,6 +167,17 @@ public sealed partial class MainWindowViewModel
         if (IsRawTranscriptEditingMode)
         {
             LoadReviewQueue();
+            if (SelectedJob is not null)
+            {
+                SelectedJob.UnreviewedDrafts = ReviewQueue.Count;
+                if (ReviewQueue.Count == 0)
+                {
+                    SelectedJob.Status = "完成文書作成待ち";
+                    SelectedJob.ProgressPercent = JobRunProgressPlan.ReviewSucceeded;
+                    MarkManualReviewStageCompleted();
+                }
+            }
+
             RefreshJobViews();
         }
 

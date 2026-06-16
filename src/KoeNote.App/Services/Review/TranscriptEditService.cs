@@ -1,4 +1,5 @@
 using System.Text.Json;
+using KoeNote.App.Services.Jobs;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Services.Review;
@@ -219,8 +220,13 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
-        var operation = LoadLastSegmentEditOperation(connection, transaction, jobId, segmentId);
+        var operation = LoadLastSegmentOperation(connection, transaction, jobId, segmentId);
         if (operation is null)
+        {
+            return false;
+        }
+
+        if (operation.OperationType is not ("segment_edit" or "raw_segment_edit"))
         {
             return false;
         }
@@ -435,7 +441,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             reader.GetString(6));
     }
 
-    private static OperationSnapshot? LoadLastSegmentEditOperation(
+    private static OperationSnapshot? LoadLastSegmentOperation(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string jobId,
@@ -448,7 +454,6 @@ public sealed class TranscriptEditService(AppPaths paths)
             FROM review_operation_history
             WHERE job_id = $job_id
               AND segment_id = $segment_id
-              AND operation_type IN ('segment_edit', 'raw_segment_edit')
             ORDER BY created_at DESC, rowid DESC
             LIMIT 1;
             """;
@@ -668,10 +673,29 @@ public sealed class TranscriptEditService(AppPaths paths)
             )
             UPDATE jobs
             SET unreviewed_draft_count = (SELECT value FROM pending),
+                status = CASE
+                    WHEN (SELECT value FROM pending) = 0
+                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
+                        THEN '完成文書作成待ち'
+                    ELSE status
+                END,
+                current_stage = CASE
+                    WHEN (SELECT value FROM pending) = 0
+                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
+                        THEN 'review_completed'
+                    ELSE current_stage
+                END,
+                progress_percent = CASE
+                    WHEN (SELECT value FROM pending) = 0
+                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
+                        THEN $progress_percent
+                    ELSE progress_percent
+                END,
                 updated_at = $updated_at
             WHERE job_id = $job_id;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
     }

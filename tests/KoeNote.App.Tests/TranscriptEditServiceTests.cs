@@ -63,6 +63,38 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void ApplyRawSegmentEdit_MovesZeroPendingJobOutOfReviewWaiting()
+    {
+        var paths = ArrangeSegment();
+        SetReviewWaitingJobState(paths, "job-001");
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "ミギワ", "右側", "候補", 0.75)
+        ]);
+
+        new TranscriptEditService(paths).ApplyRawSegmentEdit("job-001", "segment-001", "修正した素起こし");
+
+        AssertJobReviewCompleted(paths, "job-001");
+    }
+
+    [Fact]
+    public void UndoLastSegmentEdit_DoesNotBypassNewerReviewDecision()
+    {
+        var paths = ArrangeSegment();
+        var service = new TranscriptEditService(paths);
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "修正した素起こし");
+        InsertPendingDraft(paths, "draft-001", "job-001", "segment-001");
+        new ReviewOperationService(paths).AcceptDraft("draft-001");
+
+        Assert.False(service.UndoLastSegmentEdit("job-001", "segment-001"));
+
+        AssertSegment(
+            paths,
+            expectedFinalText: "再生成候補",
+            expectedReviewState: "reviewed",
+            expectedRawText: "修正した素起こし");
+    }
+
+    [Fact]
     public void ApplySpeakerAlias_ChangesPreviewSpeakerAndUndoRestoresSpeakerId()
     {
         var paths = ArrangeSegment();
@@ -374,6 +406,39 @@ public sealed class TranscriptEditServiceTests
         }
 
         transaction.Commit();
+    }
+
+    private static void SetReviewWaitingJobState(AppPaths paths, string jobId)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET status = '整文待ち',
+                current_stage = 'review_ready',
+                progress_percent = 70
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.ExecuteNonQuery();
+    }
+
+    private static void AssertJobReviewCompleted(AppPaths paths, string jobId)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT status, current_stage, progress_percent, unreviewed_draft_count
+            FROM jobs
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("完成文書作成待ち", reader.GetString(0));
+        Assert.Equal("review_completed", reader.GetString(1));
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(2));
+        Assert.Equal(0, reader.GetInt32(3));
     }
 
     private static SqliteConnection Open(AppPaths paths)
