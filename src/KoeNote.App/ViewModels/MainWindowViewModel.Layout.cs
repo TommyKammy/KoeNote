@@ -26,6 +26,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(MainLayoutModeToolTip));
         OnPropertyChanged(nameof(StandardJobRailColumnWidth));
         OnPropertyChanged(nameof(StandardJobRailColumnMinWidth));
+        OnPropertyChanged(nameof(StandardAiRailColumnWidth));
+        OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
     }
@@ -121,6 +123,39 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
+    public bool IsStandardAiRailExpanded
+    {
+        get => _isStandardAiRailExpanded;
+        private set
+        {
+            if (SetField(ref _isStandardAiRailExpanded, value))
+            {
+                OnPropertyChanged(nameof(StandardAiRailColumnWidth));
+                OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
+                OnPropertyChanged(nameof(StandardAiRailToggleText));
+                OnPropertyChanged(nameof(StandardAiRailToggleToolTip));
+            }
+        }
+    }
+
+    public GridLength StandardAiRailColumnWidth => IsStandardAiRailExpanded
+        ? new GridLength(388)
+        : new GridLength(64);
+
+    public double StandardAiRailColumnMinWidth => IsStandardAiRailExpanded ? 340 : 56;
+
+    public string StandardAiRailToggleText => IsStandardAiRailExpanded ? "›" : "‹";
+
+    public string StandardAiRailToggleToolTip => IsStandardAiRailExpanded
+        ? "AIアシストレールを折り畳みます。"
+        : "AIアシストレールを展開します。";
+
+    private Task ToggleStandardAiRailAsync()
+    {
+        IsStandardAiRailExpanded = !IsStandardAiRailExpanded;
+        return Task.CompletedTask;
+    }
+
     public string StandardLayoutTitle => SelectedJob?.Title ?? "ジョブを選択";
 
     public string StandardLayoutMeta
@@ -155,6 +190,11 @@ public sealed partial class MainWindowViewModel
     {
         get
         {
+            if (IsSummaryStale)
+            {
+                return "本文更新により要約の再生成が必要です。";
+            }
+
             if (SelectedJobUnreviewedDrafts > 0)
             {
                 return $"未確認の整文候補が{SelectedJobUnreviewedDrafts}件あります。";
@@ -165,6 +205,32 @@ public sealed partial class MainWindowViewModel
                 : "整文候補と要約を詳細レイアウトで確認できます。";
         }
     }
+
+    public string StandardLayoutAiReviewStatusText => SelectedJobUnreviewedDrafts > 0
+        ? $"未確認 {SelectedJobUnreviewedDrafts} 件"
+        : HasReviewDraft
+            ? "候補確認中"
+            : "候補なし";
+
+    public string StandardLayoutAiSummaryStatusText
+    {
+        get
+        {
+            if (IsSummaryStageRunning)
+            {
+                return "要約生成中";
+            }
+
+            if (IsSummaryStale)
+            {
+                return "本文更新あり";
+            }
+
+            return HasSummaryContent ? "要約あり" : "要約なし";
+        }
+    }
+
+    public bool HasStandardLayoutAiWarning => IsSummaryStale || SelectedJobUnreviewedDrafts > 0;
 
     public GridLength JobListColumnWidth
     {
@@ -195,6 +261,9 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         OnPropertyChanged(nameof(StandardLayoutAiBadgeText));
         OnPropertyChanged(nameof(StandardLayoutAiAssistText));
+        OnPropertyChanged(nameof(StandardLayoutAiReviewStatusText));
+        OnPropertyChanged(nameof(StandardLayoutAiSummaryStatusText));
+        OnPropertyChanged(nameof(HasStandardLayoutAiWarning));
     }
 
     private void ResetMainLayoutColumns(MainLayoutMode mode)

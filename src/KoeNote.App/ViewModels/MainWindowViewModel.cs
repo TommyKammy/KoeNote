@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
+    private bool _isStandardAiRailExpanded;
     private DomainPresetImportHistoryItem? _selectedDomainPresetImport;
     private string? _loadedDomainPresetPath;
     private string _loadedDomainPresetSummary = "プリセットJSONは未読み込みです。";
@@ -728,6 +729,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ToggleStandardJobRailCommand { get; private set; } = null!;
 
+    public ICommand ToggleStandardAiRailCommand { get; private set; } = null!;
+
     public ICommand SetupBackCommand { get; private set; } = null!;
 
     public ICommand SetupNextCommand { get; private set; } = null!;
@@ -987,6 +990,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _selectedCorrectionDraft, value))
             {
                 OnPropertyChanged(nameof(HasReviewDraft));
+                OnPropertyChanged(nameof(StandardLayoutAiReviewStatusText));
                 ApplySelectedDraftToReviewPane();
             }
         }
@@ -1920,6 +1924,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SummaryActionToolTip));
                 OnPropertyChanged(nameof(StandardLayoutAiBadgeText));
                 OnPropertyChanged(nameof(StandardLayoutAiAssistText));
+                OnPropertyChanged(nameof(StandardLayoutAiSummaryStatusText));
+                OnPropertyChanged(nameof(HasStandardLayoutAiWarning));
                 UpdateExportCommandStates();
             }
         }
@@ -1947,6 +1953,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _isSummaryStale, value))
             {
                 OnPropertyChanged(nameof(SummaryActionToolTip));
+                OnPropertyChanged(nameof(StandardLayoutAiAssistText));
+                OnPropertyChanged(nameof(StandardLayoutAiSummaryStatusText));
+                OnPropertyChanged(nameof(HasStandardLayoutAiWarning));
             }
         }
     }
@@ -2206,7 +2215,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool IsSummaryStageRunning
     {
         get => _isSummaryStageRunning;
-        private set => SetField(ref _isSummaryStageRunning, value);
+        private set
+        {
+            if (SetField(ref _isSummaryStageRunning, value))
+            {
+                OnPropertyChanged(nameof(StandardLayoutAiSummaryStatusText));
+            }
+        }
     }
 
     public bool EnableSummaryStage
