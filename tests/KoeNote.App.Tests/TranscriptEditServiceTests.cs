@@ -30,24 +30,27 @@ public sealed class TranscriptEditServiceTests
         var paths = ArrangeSegment();
         var service = new TranscriptEditService(paths);
 
+        SetNormalizedText(paths, "job-001", "segment-001", "正規化テキスト");
         service.ApplySegmentEdit("job-001", "segment-001", "手修正文");
         service.ApplyRawSegmentEdit("job-001", "segment-001", "修正した素起こし");
 
         AssertSegment(
             paths,
-            expectedFinalText: "手修正文",
+            expectedFinalText: null,
             expectedReviewState: "manually_edited",
-            expectedRawText: "修正した素起こし");
+            expectedRawText: "修正した素起こし",
+            expectedNormalizedText: null);
         var preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
         Assert.Equal("修正した素起こし", preview.RawTranscriptText);
-        Assert.Equal("手修正文", preview.Text);
+        Assert.Equal("修正した素起こし", preview.Text);
 
         Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
         AssertSegment(
             paths,
             expectedFinalText: "手修正文",
             expectedReviewState: "manually_edited",
-            expectedRawText: "ミギワ");
+            expectedRawText: "ミギワ",
+            expectedNormalizedText: "正規化テキスト");
     }
 
     [Fact]
@@ -215,9 +218,18 @@ public sealed class TranscriptEditServiceTests
         string? expectedFinalText,
         string expectedReviewState,
         int expectedPending = 0,
-        string? expectedRawText = null)
+        string? expectedRawText = null,
+        string? expectedNormalizedText = null)
     {
-        AssertSegment(paths, "job-001", "segment-001", expectedFinalText, expectedReviewState, expectedPending, expectedRawText);
+        AssertSegment(
+            paths,
+            "job-001",
+            "segment-001",
+            expectedFinalText,
+            expectedReviewState,
+            expectedPending,
+            expectedRawText,
+            expectedNormalizedText);
     }
 
     private static void AssertSegment(
@@ -227,12 +239,13 @@ public sealed class TranscriptEditServiceTests
         string? expectedFinalText,
         string expectedReviewState,
         int expectedPending = 0,
-        string? expectedRawText = null)
+        string? expectedRawText = null,
+        string? expectedNormalizedText = null)
     {
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.final_text, s.review_state, j.unreviewed_draft_count, s.raw_text
+            SELECT s.final_text, s.review_state, j.unreviewed_draft_count, s.raw_text, s.normalized_text
             FROM transcript_segments s
             JOIN jobs j ON j.job_id = s.job_id
             WHERE s.job_id = $job_id AND s.segment_id = $segment_id;
@@ -256,6 +269,30 @@ public sealed class TranscriptEditServiceTests
         {
             Assert.Equal(expectedRawText, reader.GetString(3));
         }
+
+        if (expectedNormalizedText is null)
+        {
+            Assert.True(reader.IsDBNull(4));
+        }
+        else
+        {
+            Assert.Equal(expectedNormalizedText, reader.GetString(4));
+        }
+    }
+
+    private static void SetNormalizedText(AppPaths paths, string jobId, string segmentId, string normalizedText)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE transcript_segments
+            SET normalized_text = $normalized_text
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.Parameters.AddWithValue("$normalized_text", normalizedText);
+        command.ExecuteNonQuery();
     }
 
     private static SqliteConnection Open(AppPaths paths)

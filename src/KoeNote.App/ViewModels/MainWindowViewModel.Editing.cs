@@ -218,7 +218,13 @@ public sealed partial class MainWindowViewModel
         var index = Segments.IndexOf(segment);
         if (index >= 0)
         {
-            Segments[index] = segment with { RawText = rawText };
+            Segments[index] = segment with
+            {
+                Text = rawText,
+                RawText = rawText,
+                NormalizedText = null,
+                FinalText = null
+            };
         }
     }
 

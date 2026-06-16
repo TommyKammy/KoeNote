@@ -78,13 +78,21 @@ public sealed class TranscriptEditService(AppPaths paths)
 
         var before = LoadRawSegmentSnapshot(connection, transaction, jobId, segmentId)
             ?? throw new KeyNotFoundException($"Transcript segment was not found: {jobId}/{segmentId}");
-        var after = before with { RawText = rawText, ReviewState = "manually_edited" };
+        var after = before with
+        {
+            RawText = rawText,
+            NormalizedText = null,
+            FinalText = null,
+            ReviewState = "manually_edited"
+        };
 
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             UPDATE transcript_segments
             SET raw_text = $raw_text,
+                normalized_text = NULL,
+                final_text = NULL,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
             """;
@@ -333,7 +341,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT job_id, segment_id, raw_text, review_state
+            SELECT job_id, segment_id, raw_text, normalized_text, final_text, review_state
             FROM transcript_segments
             WHERE job_id = $job_id AND segment_id = $segment_id;
             """;
@@ -350,7 +358,9 @@ public sealed class TranscriptEditService(AppPaths paths)
             reader.GetString(0),
             reader.GetString(1),
             reader.GetString(2),
-            reader.GetString(3));
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.GetString(5));
     }
 
     private static OperationSnapshot? LoadLastOperation(SqliteConnection connection, SqliteTransaction transaction, string? jobId)
@@ -469,7 +479,15 @@ public sealed class TranscriptEditService(AppPaths paths)
         var before = JsonSerializer.Deserialize<RawSegmentSnapshot>(operation.BeforeJson)
             ?? throw new InvalidOperationException("Invalid raw segment edit undo snapshot.");
 
-        RestoreRawSegment(connection, transaction, before.JobId, before.SegmentId, before.RawText, before.ReviewState);
+        RestoreRawSegment(
+            connection,
+            transaction,
+            before.JobId,
+            before.SegmentId,
+            before.RawText,
+            before.NormalizedText,
+            before.FinalText,
+            before.ReviewState);
     }
 
     private static void UndoSpeakerAlias(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -530,6 +548,8 @@ public sealed class TranscriptEditService(AppPaths paths)
         string jobId,
         string segmentId,
         string rawText,
+        string? normalizedText,
+        string? finalText,
         string reviewState)
     {
         using var command = connection.CreateCommand();
@@ -537,12 +557,16 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.CommandText = """
             UPDATE transcript_segments
             SET raw_text = $raw_text,
+                normalized_text = $normalized_text,
+                final_text = $final_text,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$segment_id", segmentId);
         command.Parameters.AddWithValue("$raw_text", rawText);
+        command.Parameters.AddWithValue("$normalized_text", (object?)normalizedText ?? DBNull.Value);
+        command.Parameters.AddWithValue("$final_text", (object?)finalText ?? DBNull.Value);
         command.Parameters.AddWithValue("$review_state", reviewState);
         command.ExecuteNonQuery();
     }
@@ -592,6 +616,8 @@ public sealed class TranscriptEditService(AppPaths paths)
         string JobId,
         string SegmentId,
         string RawText,
+        string? NormalizedText,
+        string? FinalText,
         string ReviewState);
 
     private sealed record SpeakerAliasSnapshot(
