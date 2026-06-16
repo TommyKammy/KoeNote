@@ -737,6 +737,35 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void InlineSegmentEdit_AutoSaveUsesModeFromEditStart()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        var repository = new TranscriptSegmentRepository(paths);
+        repository.SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw", "first readable"),
+            new TranscriptSegment("segment-002", job.JobId, 5, 10, "Speaker_1", "second raw", "second readable")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var first = viewModel.Segments.Single(segment => segment.SegmentId == "segment-001");
+        var second = viewModel.Segments.Single(segment => segment.SegmentId == "segment-002");
+
+        viewModel.IsStandardRawTranscriptViewSelected = true;
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedSegmentEditText = "edited raw first";
+        viewModel.IsStandardReadableTranscriptViewSelected = true;
+        viewModel.SelectedSegment = second;
+
+        Assert.False(viewModel.IsSegmentInlineEditActive);
+        var updated = repository.ReadPreviews(job.JobId).Single(segment => segment.SegmentId == "segment-001");
+        Assert.Equal("edited raw first", updated.RawTranscriptText);
+        Assert.Equal("edited raw first", updated.Text);
+    }
+
+    [Fact]
     public void InlineSegmentEdit_DoesNotChangeSelectionWhenAutoSaveCannotCommit()
     {
         var viewModel = CreateViewModel();

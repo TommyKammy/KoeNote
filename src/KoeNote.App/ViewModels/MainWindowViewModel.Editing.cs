@@ -18,7 +18,8 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        SelectedSegmentEditText = GetSegmentEditableText(segment!);
+        _segmentInlineEditStartedInRawMode = IsRawTranscriptEditingMode;
+        SelectedSegmentEditText = GetSegmentEditableText(segment!, _segmentInlineEditStartedInRawMode);
         IsSpeakerInlineEditActive = false;
         IsSegmentInlineEditActive = true;
         return Task.CompletedTask;
@@ -63,7 +64,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSegment is not null)
         {
-            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment);
+            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment, _segmentInlineEditStartedInRawMode);
         }
 
         IsSegmentInlineEditActive = false;
@@ -92,7 +93,7 @@ public sealed partial class MainWindowViewModel
             SelectedSegment is not null &&
             string.Equals(SelectedSegment.SegmentId, segment.SegmentId, StringComparison.Ordinal))
         {
-            SelectedSegmentEditText = GetSegmentEditableText(segment);
+            SelectedSegmentEditText = GetSegmentEditableText(segment, _segmentInlineEditStartedInRawMode);
             IsSegmentInlineEditActive = false;
             return Task.CompletedTask;
         }
@@ -100,9 +101,11 @@ public sealed partial class MainWindowViewModel
         if (_transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId))
         {
             LatestLog = "選択セグメントの直近編集を戻しました。";
+            LoadReviewQueue();
             ReloadSegmentsForSelectedJob(segment.SegmentId);
             LoadSummaryForSelectedJob();
             LoadReadablePolishedForSelectedJob();
+            RefreshJobViews();
         }
         else
         {
@@ -119,13 +122,17 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        if (string.Equals(SelectedSegmentEditText, GetSegmentEditableText(segment), StringComparison.Ordinal))
+        var useRawTranscript = IsSegmentInlineEditActive
+            ? _segmentInlineEditStartedInRawMode
+            : IsRawTranscriptEditingMode;
+
+        if (string.Equals(SelectedSegmentEditText, GetSegmentEditableText(segment, useRawTranscript), StringComparison.Ordinal))
         {
             IsSegmentInlineEditActive = false;
             return true;
         }
 
-        if (IsRawTranscriptEditingMode)
+        if (useRawTranscript)
         {
             _transcriptEditService.ApplyRawSegmentEdit(
                 SelectedJob.JobId,
@@ -141,7 +148,7 @@ public sealed partial class MainWindowViewModel
         }
 
         IsSegmentInlineEditActive = false;
-        LatestLog = IsRawTranscriptEditingMode
+        LatestLog = useRawTranscript
             ? "素起こし本文を手修正しました。"
             : "セグメント本文を手修正しました。元の文字起こしは保持されています。";
         if (reloadSegments)
@@ -150,7 +157,7 @@ public sealed partial class MainWindowViewModel
         }
         else
         {
-            if (IsRawTranscriptEditingMode)
+            if (useRawTranscript)
             {
                 ReplaceEditedRawSegmentPreview(segment, SelectedSegmentEditText);
             }
@@ -164,7 +171,7 @@ public sealed partial class MainWindowViewModel
 
         LoadSummaryForSelectedJob();
         LoadReadablePolishedForSelectedJob();
-        if (IsRawTranscriptEditingMode)
+        if (useRawTranscript)
         {
             LoadReviewQueue();
             if (SelectedJob is not null)
@@ -248,7 +255,12 @@ public sealed partial class MainWindowViewModel
 
     private string GetSegmentEditableText(TranscriptSegmentPreview segment)
     {
-        return IsRawTranscriptEditingMode ? segment.RawTranscriptText : segment.Text;
+        return GetSegmentEditableText(segment, IsRawTranscriptEditingMode);
+    }
+
+    private static string GetSegmentEditableText(TranscriptSegmentPreview segment, bool useRawTranscript)
+    {
+        return useRawTranscript ? segment.RawTranscriptText : segment.Text;
     }
 
     private void RefreshSelectedSegmentEditBuffer()

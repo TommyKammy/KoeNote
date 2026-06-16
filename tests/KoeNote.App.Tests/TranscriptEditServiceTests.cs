@@ -30,6 +30,7 @@ public sealed class TranscriptEditServiceTests
         var paths = ArrangeSegment();
         var service = new TranscriptEditService(paths);
 
+        SetReviewWaitingJobState(paths, "job-001");
         new CorrectionDraftRepository(paths).SaveDrafts([
             new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "ミギワ", "右側", "候補", 0.75)
         ]);
@@ -49,6 +50,8 @@ public sealed class TranscriptEditServiceTests
         Assert.Equal("修正した素起こし", preview.RawTranscriptText);
         Assert.Equal("修正した素起こし", preview.Text);
 
+        AssertJobReviewCompleted(paths, "job-001");
+
         InsertPendingDraft(paths, "draft-002", "job-001", "segment-001");
         Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
         AssertSegment(
@@ -60,6 +63,7 @@ public sealed class TranscriptEditServiceTests
             expectedNormalizedText: "正規化テキスト");
         AssertDraftStatus(paths, "draft-001", "pending");
         AssertDraftStatus(paths, "draft-002", "invalidated");
+        AssertJobReviewReady(paths, "job-001", expectedPending: 1);
     }
 
     [Fact]
@@ -439,6 +443,23 @@ public sealed class TranscriptEditServiceTests
         Assert.Equal("review_completed", reader.GetString(1));
         Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(2));
         Assert.Equal(0, reader.GetInt32(3));
+    }
+
+    private static void AssertJobReviewReady(AppPaths paths, string jobId, int expectedPending)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT current_stage, progress_percent, unreviewed_draft_count
+            FROM jobs
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("review_ready", reader.GetString(0));
+        Assert.Equal(70, reader.GetInt32(1));
+        Assert.Equal(expectedPending, reader.GetInt32(2));
     }
 
     private static SqliteConnection Open(AppPaths paths)

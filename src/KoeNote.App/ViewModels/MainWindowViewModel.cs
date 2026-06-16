@@ -184,6 +184,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isSegmentInlineEditActive;
+    private bool _segmentInlineEditStartedInRawMode;
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
