@@ -152,6 +152,18 @@ public sealed class TabHighlightStyleTests
 
         Assert.Contains("Margin=\"0\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"1\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"VisibleWhenStandardLayout\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"VisibleWhenDetailLayout\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"StandardRailButton\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"StandardWorkspaceGrid\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenStandardLayout}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenDetailLayout}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutTitle", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutMeta", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutJobBadgeText", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutAiBadgeText", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("AI アシスト", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReadablePolishedPanel />", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"JobListColumn\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"TranscriptColumn\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ReviewColumn\"", mainWindowXaml, StringComparison.Ordinal);

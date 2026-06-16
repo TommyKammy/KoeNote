@@ -86,6 +86,51 @@ public sealed partial class MainWindowViewModel
         ? "標準レイアウト: 校正に集中する既定の画面"
         : "詳細レイアウト: ジョブ、文字起こし、整文候補、要約を広く確認する画面";
 
+    public string StandardLayoutTitle => SelectedJob?.Title ?? "ジョブを選択";
+
+    public string StandardLayoutMeta
+    {
+        get
+        {
+            if (SelectedJob is null)
+            {
+                return "音声ファイルを追加すると整文ビューを確認できます。";
+            }
+
+            return $"{SelectedJob.FileName} · {SelectedJob.Status} · {Segments.Count}セグメント";
+        }
+    }
+
+    public string StandardLayoutJobBadgeText => Jobs.Count > 99 ? "99+" : Jobs.Count.ToString("0");
+
+    public string StandardLayoutAiBadgeText
+    {
+        get
+        {
+            if (SelectedJobUnreviewedDrafts > 0)
+            {
+                return Math.Min(SelectedJobUnreviewedDrafts, 99).ToString("0");
+            }
+
+            return HasSummaryContent ? "OK" : "0";
+        }
+    }
+
+    public string StandardLayoutAiAssistText
+    {
+        get
+        {
+            if (SelectedJobUnreviewedDrafts > 0)
+            {
+                return $"未確認の整文候補が{SelectedJobUnreviewedDrafts}件あります。";
+            }
+
+            return HasSummaryContent
+                ? "要約があります。"
+                : "整文候補と要約を詳細レイアウトで確認できます。";
+        }
+    }
+
     public GridLength JobListColumnWidth
     {
         get => _jobListColumnWidth;
@@ -107,6 +152,15 @@ public sealed partial class MainWindowViewModel
     public double JobListColumnMinWidth => IsStandardLayout ? 156 : 176;
 
     public double ReviewColumnMinWidth => IsStandardLayout ? 280 : 300;
+
+    private void NotifyStandardLayoutShellChanged()
+    {
+        OnPropertyChanged(nameof(StandardLayoutTitle));
+        OnPropertyChanged(nameof(StandardLayoutMeta));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
+        OnPropertyChanged(nameof(StandardLayoutAiBadgeText));
+        OnPropertyChanged(nameof(StandardLayoutAiAssistText));
+    }
 
     private void ResetMainLayoutColumns(MainLayoutMode mode)
     {

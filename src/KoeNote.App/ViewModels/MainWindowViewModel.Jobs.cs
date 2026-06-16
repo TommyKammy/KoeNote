@@ -49,6 +49,7 @@ public sealed partial class MainWindowViewModel
         _jobLogRepository.AddEvent(job.JobId, "created", "info", $"Registered audio file: {job.SourceAudioPath}");
         RefreshLogs();
         OnPropertyChanged(nameof(JobCountSummary));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         RefreshJobCommandStates();
         return job;
     }
@@ -114,6 +115,7 @@ public sealed partial class MainWindowViewModel
         FilteredJobs.Refresh();
         FilteredDeletedJobs.Refresh();
         OnPropertyChanged(nameof(JobCountSummary));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         OnPropertyChanged(nameof(DeletedJobCountSummary));
         LatestLog = $"Deleted job: {job.FileName}";
         RefreshJobCommandStates();
@@ -165,6 +167,7 @@ public sealed partial class MainWindowViewModel
         FilteredJobs.Refresh();
         FilteredDeletedJobs.Refresh();
         OnPropertyChanged(nameof(JobCountSummary));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         OnPropertyChanged(nameof(DeletedJobCountSummary));
         LatestLog = "Cleared all jobs.";
         RefreshJobCommandStates();
@@ -188,6 +191,7 @@ public sealed partial class MainWindowViewModel
         FilteredJobs.Refresh();
         FilteredDeletedJobs.Refresh();
         OnPropertyChanged(nameof(JobCountSummary));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         OnPropertyChanged(nameof(DeletedJobCountSummary));
         LatestLog = $"Restored job: {job.FileName}";
         RefreshJobCommandStates();
@@ -254,6 +258,7 @@ public sealed partial class MainWindowViewModel
 
         SelectedJob = Jobs.FirstOrDefault();
         OnPropertyChanged(nameof(JobCountSummary));
+        OnPropertyChanged(nameof(StandardLayoutJobBadgeText));
         OnPropertyChanged(nameof(DeletedJobCountSummary));
         RefreshJobCommandStates();
     }
@@ -274,6 +279,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedJobPlaybackPath));
         OnPropertyChanged(nameof(SelectedJobUpdatedAt));
         OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+        NotifyStandardLayoutShellChanged();
         RefreshPlaybackWaveform();
         RefreshJobCommandStates();
         UpdatePlaybackCommandStates();

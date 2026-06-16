@@ -85,6 +85,29 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal(3, first.JobListColumnWidth.Value);
         Assert.Equal(17, first.TranscriptColumnWidth.Value);
         Assert.Equal(5, first.ReviewColumnWidth.Value);
+        Assert.Equal("ジョブを選択", first.StandardLayoutTitle);
+        Assert.Equal("音声ファイルを追加すると整文ビューを確認できます。", first.StandardLayoutMeta);
+        Assert.Equal("0", first.StandardLayoutJobBadgeText);
+        Assert.Equal("0", first.StandardLayoutAiBadgeText);
+
+        var job = new JobSummary(
+            "job-001",
+            "校正ドキュメント",
+            "meeting.mp3",
+            @"C:\audio\meeting.mp3",
+            "整文完了",
+            100,
+            3,
+            DateTimeOffset.Now);
+        first.Jobs.Add(job);
+        first.SelectedJob = job;
+
+        Assert.Equal("校正ドキュメント", first.StandardLayoutTitle);
+        Assert.Contains("meeting.mp3", first.StandardLayoutMeta, StringComparison.Ordinal);
+        Assert.Contains("整文完了", first.StandardLayoutMeta, StringComparison.Ordinal);
+        Assert.Equal("1", first.StandardLayoutJobBadgeText);
+        Assert.Equal("3", first.StandardLayoutAiBadgeText);
+        Assert.Contains("3件", first.StandardLayoutAiAssistText, StringComparison.Ordinal);
 
         first.UseDetailLayoutCommand.Execute(null);
 
