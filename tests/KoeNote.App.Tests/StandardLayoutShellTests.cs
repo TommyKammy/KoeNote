@@ -106,6 +106,7 @@ public sealed class StandardLayoutShellTests
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BasedOn=\"{StaticResource StandardRailButton}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding FilteredJobs}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("SelectedItem=\"{Binding SelectedJob, Mode=TwoWay}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("RailInitial", railXaml, StringComparison.Ordinal);
