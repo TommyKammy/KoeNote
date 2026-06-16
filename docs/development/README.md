@@ -7,6 +7,7 @@ Current developer-facing notes live here. Historical phase-by-phase implementati
 - [Gemma 4 12B review model compatibility](gemma-4-12b-review-compatibility.md)
 - [LLM profile / task settings roadmap](llm-profile-task-settings-roadmap.md)
 - [Review candidate confirmation flow](review-candidate-confirmation-flow.md)
+- [Standard/detail layout manual checks](standard-detail-layout-manual-checks.md)
 
 Gemma 4 12B review release checks can be repeated with:
 

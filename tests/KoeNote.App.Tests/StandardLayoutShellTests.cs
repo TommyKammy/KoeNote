@@ -90,6 +90,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "Controls",
             "ReviewPanel.xaml"));
+        var readablePanelXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "ReadablePolishedPanel.xaml"));
         var transcriptSegmentListXaml = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -156,6 +162,17 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "ViewModels",
             "MainWindowViewModel.PostProcess.cs"));
+        var exportViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Export.cs"));
+        var layoutManualChecks = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "docs",
+            "development",
+            "standard-detail-layout-manual-checks.md"));
 
         Assert.Contains(
             "Width=\"{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
@@ -182,6 +199,10 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("SelectedSpeakerFilter", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("IsTranscriptAutoScrollEnabled", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCompactToolbar", transcriptSegmentListCode, StringComparison.Ordinal);
+        Assert.Contains("ReadablePolishedPanel", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"920\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentFontSize", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentLineHeight", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("<RowDefinition Height=\"64\" MinHeight=\"56\" />", mainWindowXaml, StringComparison.Ordinal);
@@ -227,10 +248,19 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("ReviewDraftActionBar", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("RememberCorrection", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCloseButton", reviewPanelCode, StringComparison.Ordinal);
+        Assert.Contains("IsReviewCandidateExportMenuVisible", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsSummaryExportMenuVisible", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("TranscriptExportSource.Polished", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("整文ビュー", layoutManualChecks, StringComparison.Ordinal);
+        Assert.Contains("本文幅", layoutManualChecks, StringComparison.Ordinal);
+        Assert.Contains("メタ情報", layoutManualChecks, StringComparison.Ordinal);
 
         Assert.Contains("public bool IsStandardJobRailExpanded", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("public GridLength StandardJobRailColumnWidth", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("private Task ToggleStandardJobRailAsync()", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("_uiPreferencesService.SaveMainLayoutMode(_mainLayoutMode);", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("var uiPreferences = _uiPreferencesService.Load();", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("_mainLayoutMode = UiPreferencesService.NormalizeMainLayoutMode(uiPreferences.MainLayoutMode);", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand = new RelayCommand(ToggleStandardJobRailAsync);", commandsViewModel, StringComparison.Ordinal);
         Assert.Contains("public ICommand ToggleStandardJobRailCommand", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardAiRailExpanded", layoutViewModel, StringComparison.Ordinal);
@@ -242,6 +272,9 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("RefreshSelectedSegmentEditBuffer();", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("private int EffectiveExportTranscriptTabIndex => IsStandardLayout", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsStandardRawTranscriptViewSelected", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("ExportReviewCandidateTranscriptTabIndex => TranscriptExportSource.Polished", exportViewModel, StringComparison.Ordinal);
         Assert.Contains("IsStandardRawTranscriptView = false;", postProcessViewModel, StringComparison.Ordinal);
         Assert.Contains("GetSegmentEditableText(SelectedSegment)", jobsViewModel, StringComparison.Ordinal);
     }
