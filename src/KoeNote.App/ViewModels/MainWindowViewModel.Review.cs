@@ -7,7 +7,7 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private void LoadReviewQueue()
+    private void LoadReviewQueue(bool updateSelection = true)
     {
         ReviewQueue.Clear();
 
@@ -19,7 +19,10 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        SelectedCorrectionDraft = ReviewQueue.FirstOrDefault();
+        if (updateSelection)
+        {
+            SelectedCorrectionDraft = ReviewQueue.FirstOrDefault();
+        }
         RefreshManualReviewStageFromQueue();
         UpdateReviewCommandStates();
     }

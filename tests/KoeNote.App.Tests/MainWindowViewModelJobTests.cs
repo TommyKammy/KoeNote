@@ -766,6 +766,36 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void InlineRawSegmentEdit_AutoSaveDoesNotSelectOtherDraft()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw", "first readable"),
+            new TranscriptSegment("segment-002", job.JobId, 5, 10, "Speaker_1", "second raw", "second readable")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "first raw", "first fixed", "reason", 0.75),
+            new CorrectionDraft("draft-002", job.JobId, "segment-002", "wording", "second raw", "second fixed", "reason", 0.75)
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+        var first = viewModel.Segments.Single(segment => segment.SegmentId == "segment-001");
+        var second = viewModel.Segments.Single(segment => segment.SegmentId == "segment-002");
+
+        viewModel.IsStandardRawTranscriptViewSelected = true;
+        viewModel.SelectedCorrectionDraft = null;
+        viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedSegmentEditText = "edited raw first";
+        viewModel.SelectedSegment = second;
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Null(viewModel.SelectedCorrectionDraft);
+    }
+
+    [Fact]
     public void SelectedTranscriptTabIndex_RefreshesSelectedSegmentEditBuffer()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

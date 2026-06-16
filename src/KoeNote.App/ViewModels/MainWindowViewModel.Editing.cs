@@ -177,7 +177,7 @@ public sealed partial class MainWindowViewModel
         LoadReadablePolishedForSelectedJob();
         if (useRawTranscript)
         {
-            LoadReviewQueue();
+            LoadReviewQueue(updateSelection: reloadSegments);
             if (SelectedJob is not null)
             {
                 SelectedJob.UnreviewedDrafts = ReviewQueue.Count;

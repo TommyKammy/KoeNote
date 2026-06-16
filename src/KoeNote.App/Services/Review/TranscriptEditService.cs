@@ -557,7 +557,9 @@ public sealed class TranscriptEditService(AppPaths paths)
             before.ReviewState);
         InvalidatePendingDraftsForSegment(connection, transaction, before.JobId, before.SegmentId);
         RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
-        if (before.PendingDraftIds.Count == 0 && CountPendingDrafts(connection, transaction, before.JobId) == 0)
+        if (before.PendingDraftIds.Count == 0 &&
+            before.JobPendingDraftCount == 0 &&
+            CountPendingDrafts(connection, transaction, before.JobId) == 0)
         {
             RestoreRawEditJobState(
                 connection,
