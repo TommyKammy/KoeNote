@@ -453,6 +453,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshSpeakerFilters();
         FilteredSegments.Refresh();
+        NotifyStandardLayoutShellChanged();
     }
 
     private void ApplyReviewDrafts(IReadOnlyList<CorrectionDraft> drafts)
