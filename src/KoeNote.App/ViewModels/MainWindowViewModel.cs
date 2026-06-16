@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Windows;
 using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows.Threading;
@@ -254,6 +253,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _uiPreferencesService = new UiPreferencesService(paths);
         var uiPreferences = _uiPreferencesService.Load();
         _mainLayoutMode = UiPreferencesService.NormalizeMainLayoutMode(uiPreferences.MainLayoutMode);
+        ResetMainLayoutColumns(_mainLayoutMode);
         _mainContentZoomState = new MainContentZoomState(_uiPreferencesService);
         var currentApplication = System.Windows.Application.Current;
         _shutdownApplication = currentApplication is null ? (() => { }) : currentApplication.Shutdown;

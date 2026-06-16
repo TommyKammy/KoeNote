@@ -36,13 +36,13 @@
                   Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="{Binding DataContext.JobListColumnWidth, ElementName=MainWorkspaceGrid}"
+                    <ColumnDefinition Width="{Binding DataContext.JobListColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
                                       MinWidth="{Binding DataContext.JobListColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="{Binding DataContext.TranscriptColumnWidth, ElementName=MainWorkspaceGrid}"
+                    <ColumnDefinition Width="{Binding DataContext.TranscriptColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
                                       MinWidth="540" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="{Binding DataContext.ReviewColumnWidth, ElementName=MainWorkspaceGrid}"
+                    <ColumnDefinition Width="{Binding DataContext.ReviewColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
                                       MinWidth="{Binding DataContext.ReviewColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>

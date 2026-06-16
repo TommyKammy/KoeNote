@@ -5,6 +5,10 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private GridLength _jobListColumnWidth = GetDefaultJobListColumnWidth(MainLayoutMode.Standard);
+    private GridLength _transcriptColumnWidth = GetDefaultTranscriptColumnWidth(MainLayoutMode.Standard);
+    private GridLength _reviewColumnWidth = GetDefaultReviewColumnWidth(MainLayoutMode.Standard);
+
     private Task SelectMainLayoutModeAsync(MainLayoutMode mode)
     {
         MainLayoutMode = mode;
@@ -20,9 +24,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsDetailLayoutSelected));
         OnPropertyChanged(nameof(MainLayoutModeDisplayText));
         OnPropertyChanged(nameof(MainLayoutModeToolTip));
-        OnPropertyChanged(nameof(JobListColumnWidth));
-        OnPropertyChanged(nameof(TranscriptColumnWidth));
-        OnPropertyChanged(nameof(ReviewColumnWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
     }
@@ -44,6 +45,7 @@ public sealed partial class MainWindowViewModel
             }
 
             _mainLayoutMode = normalized;
+            ResetMainLayoutColumns(_mainLayoutMode);
             _uiPreferencesService.SaveMainLayoutMode(_mainLayoutMode);
             NotifyMainLayoutModeChanged();
             LatestLog = $"レイアウトを{GetMainLayoutModeDisplayName(_mainLayoutMode)}に切り替えました。";
@@ -84,19 +86,53 @@ public sealed partial class MainWindowViewModel
         ? "標準レイアウト: 校正に集中する既定の画面"
         : "詳細レイアウト: ジョブ、文字起こし、整文候補、要約を広く確認する画面";
 
-    public GridLength JobListColumnWidth => IsStandardLayout
-        ? new GridLength(3, GridUnitType.Star)
-        : new GridLength(4, GridUnitType.Star);
+    public GridLength JobListColumnWidth
+    {
+        get => _jobListColumnWidth;
+        set => SetField(ref _jobListColumnWidth, value);
+    }
 
-    public GridLength TranscriptColumnWidth => IsStandardLayout
-        ? new GridLength(17, GridUnitType.Star)
-        : new GridLength(15, GridUnitType.Star);
+    public GridLength TranscriptColumnWidth
+    {
+        get => _transcriptColumnWidth;
+        set => SetField(ref _transcriptColumnWidth, value);
+    }
 
-    public GridLength ReviewColumnWidth => IsStandardLayout
-        ? new GridLength(5, GridUnitType.Star)
-        : new GridLength(6, GridUnitType.Star);
+    public GridLength ReviewColumnWidth
+    {
+        get => _reviewColumnWidth;
+        set => SetField(ref _reviewColumnWidth, value);
+    }
 
     public double JobListColumnMinWidth => IsStandardLayout ? 156 : 176;
 
     public double ReviewColumnMinWidth => IsStandardLayout ? 280 : 300;
+
+    private void ResetMainLayoutColumns(MainLayoutMode mode)
+    {
+        JobListColumnWidth = GetDefaultJobListColumnWidth(mode);
+        TranscriptColumnWidth = GetDefaultTranscriptColumnWidth(mode);
+        ReviewColumnWidth = GetDefaultReviewColumnWidth(mode);
+    }
+
+    private static GridLength GetDefaultJobListColumnWidth(MainLayoutMode mode)
+    {
+        return mode == MainLayoutMode.Detail
+            ? new GridLength(4, GridUnitType.Star)
+            : new GridLength(3, GridUnitType.Star);
+    }
+
+    private static GridLength GetDefaultTranscriptColumnWidth(MainLayoutMode mode)
+    {
+        return mode == MainLayoutMode.Detail
+            ? new GridLength(15, GridUnitType.Star)
+            : new GridLength(17, GridUnitType.Star);
+    }
+
+    private static GridLength GetDefaultReviewColumnWidth(MainLayoutMode mode)
+    {
+        return mode == MainLayoutMode.Detail
+            ? new GridLength(6, GridUnitType.Star)
+            : new GridLength(5, GridUnitType.Star);
+    }
 }
