@@ -814,6 +814,9 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
 
         Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
         Assert.Null(viewModel.SelectedCorrectionDraft);
+        Assert.Equal(
+            "手修正済み",
+            viewModel.Segments.Single(segment => segment.SegmentId == "segment-001").ReviewState);
     }
 
     [Fact]

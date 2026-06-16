@@ -253,7 +253,8 @@ public sealed partial class MainWindowViewModel
                 Text = rawText,
                 RawText = rawText,
                 NormalizedText = null,
-                FinalText = null
+                FinalText = null,
+                ReviewState = "手修正済み"
             };
         }
     }
