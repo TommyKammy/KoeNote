@@ -214,6 +214,7 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("RefreshSelectedSegmentEditBuffer();", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("IsStandardRawTranscriptView = false;", postProcessViewModel, StringComparison.Ordinal);
         Assert.Contains("GetSegmentEditableText(SelectedSegment)", jobsViewModel, StringComparison.Ordinal);
     }

@@ -44,6 +44,7 @@ public sealed partial class MainWindowViewModel
                 SelectedTranscriptTabIndex = value
                     ? RawTranscriptTabIndex
                     : ReadableTranscriptTabIndex;
+                RefreshSelectedSegmentEditBuffer();
                 OnPropertyChanged(nameof(IsStandardReadableTranscriptViewSelected));
                 OnPropertyChanged(nameof(IsStandardRawTranscriptViewSelected));
                 OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));

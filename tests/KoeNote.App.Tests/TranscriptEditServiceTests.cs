@@ -49,6 +49,7 @@ public sealed class TranscriptEditServiceTests
         Assert.Equal("修正した素起こし", preview.RawTranscriptText);
         Assert.Equal("修正した素起こし", preview.Text);
 
+        InsertPendingDraft(paths, "draft-002", "job-001", "segment-001");
         Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
         AssertSegment(
             paths,
@@ -58,6 +59,7 @@ public sealed class TranscriptEditServiceTests
             expectedRawText: "ミギワ",
             expectedNormalizedText: "正規化テキスト");
         AssertDraftStatus(paths, "draft-001", "pending");
+        AssertDraftStatus(paths, "draft-002", "invalidated");
     }
 
     [Fact]
@@ -309,6 +311,69 @@ public sealed class TranscriptEditServiceTests
         command.CommandText = "SELECT status FROM correction_drafts WHERE draft_id = $draft_id;";
         command.Parameters.AddWithValue("$draft_id", draftId);
         Assert.Equal(expectedStatus, command.ExecuteScalar() as string);
+    }
+
+    private static void InsertPendingDraft(AppPaths paths, string draftId, string jobId, string segmentId)
+    {
+        using var connection = Open(paths);
+        using var transaction = connection.BeginTransaction();
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO correction_drafts (
+                    draft_id,
+                    job_id,
+                    segment_id,
+                    issue_type,
+                    original_text,
+                    suggested_text,
+                    reason,
+                    confidence,
+                    status,
+                    created_at,
+                    source,
+                    source_ref_id
+                )
+                VALUES (
+                    $draft_id,
+                    $job_id,
+                    $segment_id,
+                    'wording',
+                    '修正した素起こし',
+                    '再生成候補',
+                    '候補',
+                    0.5,
+                    'pending',
+                    $created_at,
+                    'test',
+                    NULL
+                );
+                """;
+            command.Parameters.AddWithValue("$draft_id", draftId);
+            command.Parameters.AddWithValue("$job_id", jobId);
+            command.Parameters.AddWithValue("$segment_id", segmentId);
+            command.Parameters.AddWithValue("$created_at", DateTimeOffset.Now.ToString("o"));
+            command.ExecuteNonQuery();
+        }
+
+        using (var jobCommand = connection.CreateCommand())
+        {
+            jobCommand.Transaction = transaction;
+            jobCommand.CommandText = """
+                UPDATE jobs
+                SET unreviewed_draft_count = (
+                    SELECT COUNT(*)
+                    FROM correction_drafts
+                    WHERE job_id = $job_id AND status = 'pending'
+                )
+                WHERE job_id = $job_id;
+                """;
+            jobCommand.Parameters.AddWithValue("$job_id", jobId);
+            jobCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
     }
 
     private static SqliteConnection Open(AppPaths paths)

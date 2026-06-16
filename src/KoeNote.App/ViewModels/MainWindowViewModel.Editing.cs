@@ -163,6 +163,12 @@ public sealed partial class MainWindowViewModel
 
         LoadSummaryForSelectedJob();
         LoadReadablePolishedForSelectedJob();
+        if (IsRawTranscriptEditingMode)
+        {
+            LoadReviewQueue();
+            RefreshJobViews();
+        }
+
         return true;
     }
 
@@ -231,6 +237,14 @@ public sealed partial class MainWindowViewModel
     private string GetSegmentEditableText(TranscriptSegmentPreview segment)
     {
         return IsRawTranscriptEditingMode ? segment.RawTranscriptText : segment.Text;
+    }
+
+    private void RefreshSelectedSegmentEditBuffer()
+    {
+        if (SelectedSegment is not null && !IsSegmentInlineEditActive)
+        {
+            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment);
+        }
     }
 
     private bool IsRawTranscriptEditingMode => EffectiveExportTranscriptTabIndex == ExportRawTranscriptTabIndex;

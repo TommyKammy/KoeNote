@@ -521,6 +521,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             before.NormalizedText,
             before.FinalText,
             before.ReviewState);
+        InvalidatePendingDraftsForSegment(connection, transaction, before.JobId, before.SegmentId);
         RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
         RefreshRawEditPendingCount(connection, transaction, before.JobId);
     }
