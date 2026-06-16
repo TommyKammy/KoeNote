@@ -88,8 +88,8 @@
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}"
                   Style="{StaticResource VisibleWhenStandardLayout}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="{Binding StandardJobRailColumnWidth}"
-                                      MinWidth="{Binding StandardJobRailColumnMinWidth}" />
+                    <ColumnDefinition Width="{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}"
+                                      MinWidth="{Binding DataContext.StandardJobRailColumnMinWidth, ElementName=StandardWorkspaceGrid}" />
                     <ColumnDefinition Width="*" MinWidth="720" />
                     <ColumnDefinition Width="52" />
                 </Grid.ColumnDefinitions>

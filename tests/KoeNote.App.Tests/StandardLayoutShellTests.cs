@@ -97,7 +97,14 @@ public sealed class StandardLayoutShellTests
             "ViewModels",
             "MainWindowViewModel.cs"));
 
-        Assert.Contains("Width=\"{Binding StandardJobRailColumnWidth}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains(
+            "Width=\"{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "MinWidth=\"{Binding DataContext.StandardJobRailColumnMinWidth, ElementName=StandardWorkspaceGrid}\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
         Assert.Contains("<controls:StandardJobRailPanel Grid.RowSpan=\"3\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:JobListPanel Grid.RowSpan=\"2\" Grid.Column=\"0\" />", mainWindowXaml, StringComparison.Ordinal);
         Assert.True(
