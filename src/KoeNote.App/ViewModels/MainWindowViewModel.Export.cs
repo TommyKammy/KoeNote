@@ -9,6 +9,50 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private const int ExportReadableTranscriptTabIndex = 0;
+    private const int ExportRawTranscriptTabIndex = 1;
+    private const int ExportDiffTranscriptTabIndex = 2;
+    private const int ExportReviewCandidateTranscriptTabIndex = 3;
+
+    private int EffectiveExportTranscriptTabIndex => IsStandardLayout
+        ? ExportReadableTranscriptTabIndex
+        : SelectedTranscriptTabIndex;
+
+    public string CurrentExportTargetDisplayName => EffectiveExportTranscriptTabIndex switch
+    {
+        ExportReadableTranscriptTabIndex => "整文",
+        ExportRawTranscriptTabIndex => "素起こし",
+        ExportDiffTranscriptTabIndex => "差分",
+        ExportReviewCandidateTranscriptTabIndex => "レビュー候補",
+        _ => "表示中の対象"
+    };
+
+    public string ContextualExportMenuHeader => $"{CurrentExportTargetDisplayName}をエクスポート";
+
+    public string ContextualExportMenuToolTip => $"{CurrentExportTargetDisplayName}の出力形式を選びます。表示中のビューに合わせて候補が切り替わります。";
+
+    public bool IsReadableExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportReadableTranscriptTabIndex;
+
+    public bool IsRawExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportRawTranscriptTabIndex;
+
+    public bool IsDiffExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportDiffTranscriptTabIndex;
+
+    public bool IsReviewCandidateExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportReviewCandidateTranscriptTabIndex;
+
+    public bool IsSummaryExportMenuVisible => IsStandardAiRailExpanded || IsDetailLayout;
+
+    private void NotifyExportMenuTargetChanged()
+    {
+        OnPropertyChanged(nameof(CurrentExportTargetDisplayName));
+        OnPropertyChanged(nameof(ContextualExportMenuHeader));
+        OnPropertyChanged(nameof(ContextualExportMenuToolTip));
+        OnPropertyChanged(nameof(IsReadableExportMenuVisible));
+        OnPropertyChanged(nameof(IsRawExportMenuVisible));
+        OnPropertyChanged(nameof(IsDiffExportMenuVisible));
+        OnPropertyChanged(nameof(IsReviewCandidateExportMenuVisible));
+        OnPropertyChanged(nameof(IsSummaryExportMenuVisible));
+    }
+
     private Task ExportSelectedJobAsync()
     {
         return ExportSelectedJobWithDialogAsync(null);
