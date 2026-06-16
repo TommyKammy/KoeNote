@@ -30,6 +30,9 @@ public sealed class TranscriptEditServiceTests
         var paths = ArrangeSegment();
         var service = new TranscriptEditService(paths);
 
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "ミギワ", "右側", "候補", 0.75)
+        ]);
         SetNormalizedText(paths, "job-001", "segment-001", "正規化テキスト");
         service.ApplySegmentEdit("job-001", "segment-001", "手修正文");
         service.ApplyRawSegmentEdit("job-001", "segment-001", "修正した素起こし");
@@ -38,8 +41,10 @@ public sealed class TranscriptEditServiceTests
             paths,
             expectedFinalText: null,
             expectedReviewState: "manually_edited",
+            expectedPending: 0,
             expectedRawText: "修正した素起こし",
             expectedNormalizedText: null);
+        AssertDraftStatus(paths, "draft-001", "invalidated");
         var preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
         Assert.Equal("修正した素起こし", preview.RawTranscriptText);
         Assert.Equal("修正した素起こし", preview.Text);
@@ -49,8 +54,10 @@ public sealed class TranscriptEditServiceTests
             paths,
             expectedFinalText: "手修正文",
             expectedReviewState: "manually_edited",
+            expectedPending: 1,
             expectedRawText: "ミギワ",
             expectedNormalizedText: "正規化テキスト");
+        AssertDraftStatus(paths, "draft-001", "pending");
     }
 
     [Fact]
@@ -293,6 +300,15 @@ public sealed class TranscriptEditServiceTests
         command.Parameters.AddWithValue("$segment_id", segmentId);
         command.Parameters.AddWithValue("$normalized_text", normalizedText);
         command.ExecuteNonQuery();
+    }
+
+    private static void AssertDraftStatus(AppPaths paths, string draftId, string expectedStatus)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT status FROM correction_drafts WHERE draft_id = $draft_id;";
+        command.Parameters.AddWithValue("$draft_id", draftId);
+        Assert.Equal(expectedStatus, command.ExecuteScalar() as string);
     }
 
     private static SqliteConnection Open(AppPaths paths)

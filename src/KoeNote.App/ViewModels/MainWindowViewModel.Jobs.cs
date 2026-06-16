@@ -469,7 +469,7 @@ public sealed partial class MainWindowViewModel
     {
         return SelectedSegment is not null &&
             (IsSegmentInlineEditActive ||
-            (!string.Equals(SelectedSegmentEditText, SelectedSegment.Text, StringComparison.Ordinal) ||
+            (!string.Equals(SelectedSegmentEditText, GetSegmentEditableText(SelectedSegment), StringComparison.Ordinal) ||
                 !string.Equals(SelectedSpeakerAlias, SelectedSegment.Speaker, StringComparison.Ordinal)));
     }
 

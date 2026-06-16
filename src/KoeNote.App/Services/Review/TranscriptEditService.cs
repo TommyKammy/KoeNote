@@ -83,7 +83,8 @@ public sealed class TranscriptEditService(AppPaths paths)
             RawText = rawText,
             NormalizedText = null,
             FinalText = null,
-            ReviewState = "manually_edited"
+            ReviewState = "manually_edited",
+            PendingDraftIds = []
         };
 
         using var command = connection.CreateCommand();
@@ -101,6 +102,9 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.Parameters.AddWithValue("$raw_text", rawText);
         command.Parameters.AddWithValue("$review_state", after.ReviewState);
         command.ExecuteNonQuery();
+
+        InvalidatePendingDraftsForSegment(connection, transaction, jobId, segmentId);
+        RefreshRawEditPendingCount(connection, transaction, jobId);
 
         InsertHistory(
             connection,
@@ -360,7 +364,36 @@ public sealed class TranscriptEditService(AppPaths paths)
             reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4),
-            reader.GetString(5));
+            reader.GetString(5),
+            LoadPendingDraftIds(connection, transaction, jobId, segmentId));
+    }
+
+    private static IReadOnlyList<string> LoadPendingDraftIds(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT draft_id
+            FROM correction_drafts
+            WHERE job_id = $job_id
+              AND segment_id = $segment_id
+              AND status = 'pending';
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+
+        using var reader = command.ExecuteReader();
+        var draftIds = new List<string>();
+        while (reader.Read())
+        {
+            draftIds.Add(reader.GetString(0));
+        }
+
+        return draftIds;
     }
 
     private static OperationSnapshot? LoadLastOperation(SqliteConnection connection, SqliteTransaction transaction, string? jobId)
@@ -488,6 +521,8 @@ public sealed class TranscriptEditService(AppPaths paths)
             before.NormalizedText,
             before.FinalText,
             before.ReviewState);
+        RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
+        RefreshRawEditPendingCount(connection, transaction, before.JobId);
     }
 
     private static void UndoSpeakerAlias(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -571,6 +606,75 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
+    private static void InvalidatePendingDraftsForSegment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE correction_drafts
+            SET status = 'invalidated'
+            WHERE job_id = $job_id
+              AND segment_id = $segment_id
+              AND status = 'pending';
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.ExecuteNonQuery();
+    }
+
+    private static void RestorePendingDrafts(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        IReadOnlyList<string> draftIds)
+    {
+        if (draftIds.Count == 0)
+        {
+            return;
+        }
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE correction_drafts
+            SET status = 'pending'
+            WHERE draft_id = $draft_id;
+            """;
+        var parameter = command.Parameters.Add("$draft_id", SqliteType.Text);
+
+        foreach (var draftId in draftIds)
+        {
+            parameter.Value = draftId;
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static void RefreshRawEditPendingCount(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            WITH pending(value) AS (
+                SELECT COUNT(*)
+                FROM correction_drafts
+                WHERE job_id = $job_id AND status = 'pending'
+            )
+            UPDATE jobs
+            SET unreviewed_draft_count = (SELECT value FROM pending),
+                updated_at = $updated_at
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.ExecuteNonQuery();
+    }
+
     private static void RestoreJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId, int pendingCount)
     {
         using var command = connection.CreateCommand();
@@ -618,7 +722,8 @@ public sealed class TranscriptEditService(AppPaths paths)
         string RawText,
         string? NormalizedText,
         string? FinalText,
-        string ReviewState);
+        string ReviewState,
+        IReadOnlyList<string> PendingDraftIds);
 
     private sealed record SpeakerAliasSnapshot(
         string JobId,
