@@ -157,6 +157,17 @@ public sealed class TabHighlightStyleTests
     }
 
     [Fact]
+    public void ReadableDocumentStateDescription_UsesRunningStatusWhenPolishing()
+    {
+        var repoRoot = FindRepoRoot();
+        var viewModel = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "ViewModels", "MainWindowViewModel.cs"));
+
+        Assert.Contains("public string ReadableDocumentStateDescription => IsReadablePolishingInProgress || HasReadablePolishedContent", viewModel, StringComparison.Ordinal);
+        Assert.Contains("? ReadablePolishedStatus", viewModel, StringComparison.Ordinal);
+        Assert.Contains(": ReadablePolishedContentDisplay;", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainScreen_UsesMockupAlignedHeaderAndRightPaneCtas()
     {
         var repoRoot = FindRepoRoot();

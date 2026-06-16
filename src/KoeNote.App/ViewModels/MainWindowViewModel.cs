@@ -2001,7 +2001,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             ? "整文を表示しています"
             : "整文はまだ生成されていません";
 
-    public string ReadableDocumentStateDescription => HasReadablePolishedContent
+    public string ReadableDocumentStateDescription => IsReadablePolishingInProgress || HasReadablePolishedContent
         ? ReadablePolishedStatus
         : ReadablePolishedContentDisplay;
 

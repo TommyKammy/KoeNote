@@ -47,18 +47,18 @@ public sealed class ReadableDocumentBlockBuilderTests
     [Fact]
     public void Build_DoesNotStripOrdinaryTimeExpression()
     {
-        var blocks = ReadableDocumentBlockBuilder.Build("案内事項です。\n\n10:00に受付を開始します。");
+        var blocks = ReadableDocumentBlockBuilder.Build("Notes.\n\n10:00 reception starts.");
 
         Assert.Collection(
             blocks,
             first =>
             {
-                Assert.Equal("案内事項です。", first.Text);
+                Assert.Equal("Notes.", first.Text);
                 Assert.False(first.HasMeta);
             },
             second =>
             {
-                Assert.Equal("10:00に受付を開始します。", second.Text);
+                Assert.Equal("10:00 reception starts.", second.Text);
                 Assert.Equal(string.Empty, second.TimeRange);
                 Assert.Null(second.StartSeconds);
                 Assert.False(second.HasMeta);
@@ -70,13 +70,37 @@ public sealed class ReadableDocumentBlockBuilderTests
     [InlineData("ー")]
     public void Build_AcceptsFullWidthRangeSeparators(string separator)
     {
-        var blocks = ReadableDocumentBlockBuilder.Build($"[00:00 {separator} 00:05] Speaker_0: 本文です。");
+        var blocks = ReadableDocumentBlockBuilder.Build($"[00:00 {separator} 00:05] Speaker_0: Body text.");
 
         var block = Assert.Single(blocks);
         Assert.Equal("Speaker_0", block.Speaker);
         Assert.Equal("00:00 - 00:05", block.TimeRange);
-        Assert.Equal("本文です。", block.Text);
+        Assert.Equal("Body text.", block.Text);
         Assert.Equal(0, block.StartSeconds);
         Assert.Equal(5, block.EndSeconds);
+    }
+
+    [Fact]
+    public void Build_DoesNotSplitContinuationLineStartingWithScheduleRange()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build("[00:00 - 00:05] Speaker_0: Agenda\n10:00 - 11:00 Q&A");
+
+        var block = Assert.Single(blocks);
+        Assert.Equal("Speaker_0", block.Speaker);
+        Assert.Equal("00:00 - 00:05", block.TimeRange);
+        Assert.Equal("Agenda\n10:00 - 11:00 Q&A", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.Equal(0, block.StartSeconds);
+        Assert.Equal(5, block.EndSeconds);
+    }
+
+    [Fact]
+    public void Build_AcceptsEightyCharacterSpeakerName()
+    {
+        var speakerName = new string('A', 80);
+        var blocks = ReadableDocumentBlockBuilder.Build($"[00:00 - 00:05] {speakerName}: Body text.");
+
+        var block = Assert.Single(blocks);
+        Assert.Equal(speakerName, block.Speaker);
+        Assert.Equal("Body text.", block.Text);
     }
 }

@@ -8,18 +8,20 @@ public static class ReadableDocumentBlockBuilder
 {
     private const string TimestampPattern = @"\d{1,2}:\d{2}(?::\d{2})?";
     private const string RangeSeparatorPattern = @"(?:--|-|~|\u301c|\uFF5E|\u2013|\u2014|\u2212|\uFF0D|\u30FC)";
-    private const string SpeakerPattern = @"[^:\uFF1A\r\n]{1,48}";
+    private const string RangeSeparatorLookaheadPattern = @"(?!--|-|~|\u301c|\uFF5E|\u2013|\u2014|\u2212|\uFF0D|\u30FC)";
+    private const string SpeakerPattern = @"[^:\uFF1A\r\n]{1,80}";
+    private const string SpeakerAfterTimestampPattern = RangeSeparatorLookaheadPattern + SpeakerPattern;
 
     private static readonly Regex BracketedTimestampBlockPattern = new(
         @"^\s*\[(?<start>" + TimestampPattern + @")\s*(?:" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @"))?\]\s*(?:(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*)?(?<text>.*)$",
         RegexOptions.Compiled);
 
     private static readonly Regex RangedTimestampBlockPattern = new(
-        @"^\s*(?<start>" + TimestampPattern + @")\s*" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @")\s*(?:(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*)?(?<text>.*)$",
+        @"^\s*(?<start>" + TimestampPattern + @")\s*" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*(?<text>.*)$",
         RegexOptions.Compiled);
 
     private static readonly Regex SpeakerDelimitedTimestampBlockPattern = new(
-        @"^\s*(?<start>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*(?<text>.*)$",
+        @"^\s*(?<start>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerAfterTimestampPattern + @")[:\uFF1A]\s*(?<text>.*)$",
         RegexOptions.Compiled);
 
     public static IReadOnlyList<ReadableDocumentBlock> Build(string content)
