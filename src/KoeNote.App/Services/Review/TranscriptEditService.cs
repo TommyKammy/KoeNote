@@ -564,7 +564,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         if (before.PendingDraftIds.Count == 0 &&
             before.JobPendingDraftCount == 0 &&
             CountPendingDrafts(connection, transaction, before.JobId) == 0 &&
-            !HasLaterReviewDecision(connection, transaction, before.JobId, operation.CreatedAt, operation.RowId))
+            !HasLaterJobStateOperation(connection, transaction, before.JobId, operation.CreatedAt, operation.RowId))
         {
             RestoreRawEditJobState(
                 connection,
@@ -821,7 +821,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
-    private static bool HasLaterReviewDecision(
+    private static bool HasLaterJobStateOperation(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string jobId,
@@ -834,7 +834,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             SELECT 1
             FROM review_operation_history
             WHERE job_id = $job_id
-              AND operation_type = 'review_decision'
+              AND operation_type IN ('review_decision', 'segment_edit', 'raw_segment_edit')
               AND (
                   created_at > $created_at
                   OR (created_at = $created_at AND rowid > $rowid)

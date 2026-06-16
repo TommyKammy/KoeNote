@@ -188,6 +188,29 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void UndoLastRawSegmentEdit_DoesNotRestoreZeroPendingStateAfterLaterRawEdit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "first raw"),
+            new TranscriptSegment("segment-002", "job-001", 1, 2, "Speaker_1", "second raw")
+        ]);
+        SetJobState(paths, "job-001", "asr-only", "review_skipped", 55, pendingCount: 0);
+        var service = new TranscriptEditService(paths);
+
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "first raw edited");
+        service.ApplyRawSegmentEdit("job-001", "segment-002", "second raw edited");
+
+        Assert.True(service.UndoLastRawSegmentEdit("job-001", "segment-001"));
+
+        AssertJobReviewCompleted(paths, "job-001");
+    }
+
+    [Fact]
     public void UndoLastSegmentEdit_DoesNotBypassNewerReviewDecision()
     {
         var paths = ArrangeSegment();
