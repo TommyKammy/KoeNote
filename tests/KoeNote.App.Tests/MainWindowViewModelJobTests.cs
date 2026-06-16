@@ -887,6 +887,34 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void RevertSegmentEditCommand_RefreshesSelectedJobReviewBadges()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var jobRepository = new JobRepository(paths);
+        var job = jobRepository.CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", job.JobId, "segment-001", "wording", "first raw", "first fixed", "reason", 0.75)
+        ]);
+        jobRepository.MarkReviewCandidatesProcessed(job, pendingDraftCount: 1);
+        new TranscriptEditService(paths).ApplyRawSegmentEdit(job.JobId, "segment-001", "first raw edited");
+        var viewModel = new MainWindowViewModel(paths);
+        var segment = Assert.Single(viewModel.Segments);
+
+        Assert.Equal(0, viewModel.SelectedJobUnreviewedDrafts);
+
+        viewModel.RevertSegmentEditCommand.Execute(segment);
+
+        Assert.Equal(1, viewModel.SelectedJobUnreviewedDrafts);
+        Assert.Equal(1, viewModel.ReviewQueue.Count);
+    }
+
+    [Fact]
     public async Task RunSelectedJobAsync_StopsBeforeRunWhenSourceAudioIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

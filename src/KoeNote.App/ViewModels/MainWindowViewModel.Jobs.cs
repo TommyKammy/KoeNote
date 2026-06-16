@@ -285,6 +285,27 @@ public sealed partial class MainWindowViewModel
         UpdatePlaybackCommandStates();
     }
 
+    private void ReloadSelectedJobState()
+    {
+        if (SelectedJob is null)
+        {
+            return;
+        }
+
+        var latest = _jobRepository.LoadRecent()
+            .FirstOrDefault(job => string.Equals(job.JobId, SelectedJob.JobId, StringComparison.Ordinal));
+        if (latest is null)
+        {
+            return;
+        }
+
+        SelectedJob.Status = latest.Status;
+        SelectedJob.ProgressPercent = latest.ProgressPercent;
+        SelectedJob.UnreviewedDrafts = latest.UnreviewedDrafts;
+        SelectedJob.UpdatedAt = latest.UpdatedAt;
+        SelectedJob.NormalizedAudioPath = latest.NormalizedAudioPath;
+    }
+
     private void RefreshJobCommandStates()
     {
         if (ClearAllJobsCommand is RelayCommand clearAllCommand)

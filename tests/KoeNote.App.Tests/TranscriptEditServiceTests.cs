@@ -479,16 +479,17 @@ public sealed class TranscriptEditServiceTests
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT current_stage, progress_percent, unreviewed_draft_count
+            SELECT status, current_stage, progress_percent, unreviewed_draft_count
             FROM jobs
             WHERE job_id = $job_id;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal("review_ready", reader.GetString(0));
-        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(1));
-        Assert.Equal(expectedPending, reader.GetInt32(2));
+        Assert.Equal("整文待ち", reader.GetString(0));
+        Assert.Equal("review_ready", reader.GetString(1));
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(2));
+        Assert.Equal(expectedPending, reader.GetInt32(3));
     }
 
     private static SqliteConnection Open(AppPaths paths)

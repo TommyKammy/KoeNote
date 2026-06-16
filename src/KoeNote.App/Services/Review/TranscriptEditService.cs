@@ -677,7 +677,7 @@ public sealed class TranscriptEditService(AppPaths paths)
                     WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
                         THEN status
                     WHEN (SELECT value FROM pending) > 0
-                        THEN '謨ｴ譁・ｾ・■'
+                        THEN $review_ready_status
                     WHEN (SELECT value FROM pending) = 0
                         AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN '完成文書作成待ち'
@@ -707,6 +707,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             WHERE job_id = $job_id;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$review_ready_status", ReviewCandidateJobStateRules.Ready.Status);
         command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
