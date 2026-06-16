@@ -8,6 +8,11 @@ public sealed partial class MainWindowViewModel
 {
     private Task SelectTranscriptTabAsync(int tabIndex)
     {
+        if (tabIndex != ReadableTranscriptTabIndex && IsStandardLayout)
+        {
+            MainLayoutMode = MainLayoutMode.Detail;
+        }
+
         SelectedTranscriptTabIndex = tabIndex;
         return Task.CompletedTask;
     }

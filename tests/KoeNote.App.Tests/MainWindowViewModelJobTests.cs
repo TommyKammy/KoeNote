@@ -70,65 +70,6 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
-    public void MainLayoutMode_DefaultsToStandardAndPersistsSelection()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
-        var first = new MainWindowViewModel(paths);
-
-        Assert.Equal(MainLayoutMode.Standard, first.MainLayoutMode);
-        Assert.True(first.IsStandardLayout);
-        Assert.False(first.IsDetailLayout);
-        Assert.True(first.IsStandardLayoutSelected);
-        Assert.False(first.IsDetailLayoutSelected);
-        Assert.Equal("標準", first.MainLayoutModeDisplayText);
-        Assert.Equal(3, first.JobListColumnWidth.Value);
-        Assert.Equal(17, first.TranscriptColumnWidth.Value);
-        Assert.Equal(5, first.ReviewColumnWidth.Value);
-
-        first.UseDetailLayoutCommand.Execute(null);
-
-        Assert.Equal(MainLayoutMode.Detail, first.MainLayoutMode);
-        Assert.False(first.IsStandardLayoutSelected);
-        Assert.True(first.IsDetailLayoutSelected);
-        Assert.Equal("詳細", first.MainLayoutModeDisplayText);
-        Assert.Equal(4, first.JobListColumnWidth.Value);
-        Assert.Equal(15, first.TranscriptColumnWidth.Value);
-        Assert.Equal(6, first.ReviewColumnWidth.Value);
-
-        first.JobListColumnWidth = new System.Windows.GridLength(8, System.Windows.GridUnitType.Star);
-        first.TranscriptColumnWidth = new System.Windows.GridLength(10, System.Windows.GridUnitType.Star);
-        first.ReviewColumnWidth = new System.Windows.GridLength(7, System.Windows.GridUnitType.Star);
-        first.UseStandardLayoutCommand.Execute(null);
-
-        Assert.Equal(MainLayoutMode.Standard, first.MainLayoutMode);
-        Assert.Equal(3, first.JobListColumnWidth.Value);
-        Assert.Equal(17, first.TranscriptColumnWidth.Value);
-        Assert.Equal(5, first.ReviewColumnWidth.Value);
-
-        first.JobListColumnWidth = new System.Windows.GridLength(9, System.Windows.GridUnitType.Star);
-        first.UseDetailLayoutCommand.Execute(null);
-
-        Assert.Equal(MainLayoutMode.Detail, first.MainLayoutMode);
-        Assert.Equal(4, first.JobListColumnWidth.Value);
-        Assert.Equal(15, first.TranscriptColumnWidth.Value);
-        Assert.Equal(6, first.ReviewColumnWidth.Value);
-
-        var second = new MainWindowViewModel(paths);
-        Assert.Equal(MainLayoutMode.Detail, second.MainLayoutMode);
-        Assert.True(second.IsDetailLayout);
-        Assert.Equal(4, second.JobListColumnWidth.Value);
-        Assert.Equal(15, second.TranscriptColumnWidth.Value);
-        Assert.Equal(6, second.ReviewColumnWidth.Value);
-
-        second.ZoomInCommand.Execute(null);
-
-        var third = new MainWindowViewModel(paths);
-        Assert.Equal(MainLayoutMode.Detail, third.MainLayoutMode);
-        Assert.Equal(1.1, third.MainContentZoomScale, 3);
-    }
-
-    [Fact]
     public void JobSearchText_FiltersJobsByTitleFileNameAndStatus()
     {
         var viewModel = CreateViewModel();

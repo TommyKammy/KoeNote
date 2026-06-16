@@ -906,6 +906,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 LoadSummaryForSelectedJob();
                 LoadReadablePolishedForSelectedJob();
                 LoadReviewQueue();
+                NotifyStandardLayoutShellChanged();
                 RefreshLogCommandStates();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
@@ -1913,6 +1914,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SummaryContentDisplay));
                 OnPropertyChanged(nameof(SummaryActionText));
                 OnPropertyChanged(nameof(SummaryActionToolTip));
+                OnPropertyChanged(nameof(StandardLayoutAiBadgeText));
+                OnPropertyChanged(nameof(StandardLayoutAiAssistText));
                 UpdateExportCommandStates();
             }
         }

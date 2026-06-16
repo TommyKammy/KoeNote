@@ -247,6 +247,7 @@ public sealed partial class MainWindowViewModel
         {
             Segments.Clear();
             SelectedSegment = null;
+            OnPropertyChanged(nameof(StandardLayoutMeta));
             RefreshPostProcessCommandStates();
             return;
         }
@@ -264,6 +265,7 @@ public sealed partial class MainWindowViewModel
                 FilteredSegments.Refresh();
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
+                OnPropertyChanged(nameof(StandardLayoutMeta));
                 RefreshPostProcessCommandStates();
                 return;
             }
@@ -285,6 +287,8 @@ public sealed partial class MainWindowViewModel
         {
             _isReloadingSegments = false;
         }
+
+        OnPropertyChanged(nameof(StandardLayoutMeta));
     }
 
     private bool CanEditSelectedSegment()
