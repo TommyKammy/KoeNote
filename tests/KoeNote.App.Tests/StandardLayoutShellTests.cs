@@ -22,9 +22,9 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("ShowRawTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ShowDiffTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ShowReviewCandidateTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("原文を確認", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("差分を見る", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("レビュー候補", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"原文\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"差分\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"レビュー候補\"", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("tabIndex != ReadableTranscriptTabIndex && IsStandardLayout", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("MainLayoutMode = MainLayoutMode.Detail;", transcriptViewModel, StringComparison.Ordinal);
         Assert.True(

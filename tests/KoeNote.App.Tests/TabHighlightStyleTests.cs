@@ -124,12 +124,36 @@ public sealed class TabHighlightStyleTests
         var repoRoot = FindRepoRoot();
         var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
 
+        Assert.Contains("CopyReadablePolishedContentCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowRawTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowDiffTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowReviewCandidateTranscriptTabCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("原文を確認", xaml, StringComparison.Ordinal);
-        Assert.Contains("差分を見る", xaml, StringComparison.Ordinal);
+        Assert.Contains("ConfirmSpeakerNamesAndRunReadablePolishingCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"原文\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"差分\"", xaml, StringComparison.Ordinal);
         Assert.Contains("レビュー候補", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"再整文\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadablePolishedPanel_UsesDocumentProofreadingSurface()
+    {
+        var repoRoot = FindRepoRoot();
+        var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
+        var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
+
+        Assert.Contains("FlowDocumentScrollViewer x:Name=\"ReadableDocumentViewer\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"920\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontFamily\" Value=\"Yu Gothic UI\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentFontSize", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentLineHeight", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentStateTitle", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentStateDescription", xaml, StringComparison.Ordinal);
+        Assert.Contains("viewModel.ReadableDocumentBlocks", code, StringComparison.Ordinal);
+        Assert.Contains("BuildMetaCell", code, StringComparison.Ordinal);
+        Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
+        Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding ReadablePolishedContent, Mode=OneWay}\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
