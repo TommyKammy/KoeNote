@@ -315,6 +315,7 @@ public sealed partial class MainWindowViewModel
             ReloadSegmentsForSelectedJob(selectedSegmentId);
             LoadSummaryForSelectedJob();
             LoadReadablePolishedForSelectedJob();
+            ReloadSelectedJobState();
             RefreshJobViews();
         }
         else
