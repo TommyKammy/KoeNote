@@ -117,11 +117,9 @@ public partial class ReadablePolishedPanel : UserControl
             return;
         }
 
-        var textBrush = ResolveBrush("TextBrush", Brushes.Black);
-        var mutedBrush = ResolveBrush("TextBrushMuted", Brushes.Gray);
-        var separatorBrush = new SolidColorBrush(Color.FromRgb(0xF1, 0xEF, 0xE8));
-        var speakerBackgroundBrush = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xFF));
-        var speakerForegroundBrush = new SolidColorBrush(Color.FromRgb(0x37, 0x30, 0xA3));
+        var textBrush = new SolidColorBrush(Color.FromRgb(0x17, 0x1C, 0x27));
+        var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
+        var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
 
         var document = new FlowDocument
         {
@@ -143,8 +141,9 @@ public partial class ReadablePolishedPanel : UserControl
         var rowGroup = new TableRowGroup();
         foreach (var block in viewModel.ReadableDocumentBlocks)
         {
+            var speakerPalette = GetSpeakerPalette(block.Speaker);
             var row = new TableRow();
-            row.Cells.Add(BuildMetaCell(block, mutedBrush, speakerBackgroundBrush, speakerForegroundBrush));
+            row.Cells.Add(BuildMetaCell(block, mutedBrush, speakerPalette));
             row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush));
             rowGroup.Rows.Add(row);
         }
@@ -157,8 +156,7 @@ public partial class ReadablePolishedPanel : UserControl
     private TableCell BuildMetaCell(
         ReadableDocumentBlock block,
         Brush mutedBrush,
-        Brush speakerBackgroundBrush,
-        Brush speakerForegroundBrush)
+        SpeakerPalette speakerPalette)
     {
         var cell = new TableCell
         {
@@ -176,7 +174,7 @@ public partial class ReadablePolishedPanel : UserControl
         {
             var speakerBorder = new Border
             {
-                Background = speakerBackgroundBrush,
+                Background = speakerPalette.Background,
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(8, 3, 8, 3),
                 Child = new TextBlock
@@ -185,7 +183,7 @@ public partial class ReadablePolishedPanel : UserControl
                     FontFamily = new FontFamily("Yu Gothic UI"),
                     FontSize = 11,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = speakerForegroundBrush,
+                    Foreground = speakerPalette.Foreground,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     MaxWidth = 92
                 }
@@ -209,6 +207,37 @@ public partial class ReadablePolishedPanel : UserControl
 
         cell.Blocks.Add(paragraph);
         return cell;
+    }
+
+    private static SpeakerPalette GetSpeakerPalette(string speaker)
+    {
+        var palettes = new[]
+        {
+            new SpeakerPalette(Color.FromRgb(0xEA, 0xF1, 0xFA), Color.FromRgb(0x2F, 0x58, 0x96)),
+            new SpeakerPalette(Color.FromRgb(0xF2, 0xEC, 0xFB), Color.FromRgb(0x5F, 0x44, 0xA0)),
+            new SpeakerPalette(Color.FromRgb(0xFB, 0xF1, 0xE7), Color.FromRgb(0x95, 0x57, 0x1F)),
+            new SpeakerPalette(Color.FromRgb(0xED, 0xF0, 0xF3), Color.FromRgb(0x5B, 0x64, 0x72))
+        };
+
+        if (string.IsNullOrWhiteSpace(speaker))
+        {
+            return palettes[^1];
+        }
+
+        var hash = 0;
+        foreach (var character in speaker)
+        {
+            hash = unchecked((hash * 31) + character);
+        }
+
+        return palettes[(hash & int.MaxValue) % palettes.Length];
+    }
+
+    private sealed record SpeakerPalette(Color BackgroundColor, Color ForegroundColor)
+    {
+        public Brush Background { get; } = new SolidColorBrush(BackgroundColor);
+
+        public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
     private TableCell BuildBodyCell(
@@ -236,11 +265,6 @@ public partial class ReadablePolishedPanel : UserControl
             Margin = new Thickness(0, 20, 0, 26)
         }));
         return cell;
-    }
-
-    private Brush ResolveBrush(string resourceKey, Brush fallback)
-    {
-        return TryFindResource(resourceKey) as Brush ?? fallback;
     }
 
     private static int FindReadableBlockIndex(IReadOnlyList<ReadableDocumentBlock> blocks, double positionSeconds)
