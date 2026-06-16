@@ -144,7 +144,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="58" />
                     <RowDefinition Height="*" MinHeight="420" />
-                    <RowDefinition Height="108" MinHeight="92" />
+                    <RowDefinition Height="64" MinHeight="56" />
                 </Grid.RowDefinitions>
 
                 <controls:StandardJobRailPanel Grid.RowSpan="3"
@@ -266,12 +266,15 @@
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 Style="{StaticResource VisibleWhenStandardRawTranscript}">
-                            <controls:TranscriptSegmentList DisplayMode="Raw" />
+                            <controls:TranscriptSegmentList DisplayMode="Raw"
+                                                            ShowCompactToolbar="True" />
                         </Border>
                     </Grid>
                 </Border>
 
-                <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="2" />
+                <controls:TranscriptAudioPlayer Grid.Column="1"
+                                                Grid.Row="2"
+                                                IsSlim="True" />
 
                 <controls:StandardAiAssistRailPanel Grid.RowSpan="3"
                                                     Grid.Column="2" />

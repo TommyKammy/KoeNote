@@ -16,6 +16,12 @@ public partial class TranscriptSegmentList : UserControl
         typeof(TranscriptSegmentList),
         new PropertyMetadata("Polished"));
 
+    public static readonly DependencyProperty ShowCompactToolbarProperty = DependencyProperty.Register(
+        nameof(ShowCompactToolbar),
+        typeof(bool),
+        typeof(TranscriptSegmentList),
+        new PropertyMetadata(false));
+
     private bool _suppressNextInlineAutoSave;
 
     public TranscriptSegmentList()
@@ -29,6 +35,12 @@ public partial class TranscriptSegmentList : UserControl
     {
         get => (string)GetValue(DisplayModeProperty);
         set => SetValue(DisplayModeProperty, value);
+    }
+
+    public bool ShowCompactToolbar
+    {
+        get => (bool)GetValue(ShowCompactToolbarProperty);
+        set => SetValue(ShowCompactToolbarProperty, value);
     }
 
     private void OnDataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
