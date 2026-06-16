@@ -110,9 +110,6 @@
                                 <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw">
                                     <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Polished">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
                                 <MultiDataTrigger>
                                     <MultiDataTrigger.Conditions>
                                         <Condition Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Raw" />
@@ -214,7 +211,7 @@
                                      Style="{StaticResource SpeakerEditorStyle}" />
 
                             <TextBlock Grid.Column="2"
-                                       Text="{Binding Text}"
+                                       Text="{Binding RawTranscriptText}"
                                        TextWrapping="Wrap"
                                        TextTrimming="None"
                                        FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -222,6 +219,14 @@
                                        LineHeight="{Binding DataContext.TranscriptBodyLineHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                        Style="{StaticResource InlineDisplayTextStyle}"
                                        MouseLeftButtonDown="OnSegmentTextMouseLeftButtonDown" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Text}"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="None"
+                                       FontSize="{Binding DataContext.TranscriptBodyFontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       FontWeight="Normal"
+                                       LineHeight="{Binding DataContext.TranscriptBodyLineHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       Style="{StaticResource VisibleWhenPolishedTranscriptMode}" />
                             <Grid Grid.Column="2"
                                   Style="{StaticResource VisibleWhenDiffTranscriptMode}">
                                 <Grid.RowDefinitions>

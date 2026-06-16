@@ -173,6 +173,7 @@ public sealed partial class MainWindowViewModel
             if (result.Succeeded)
             {
                 LoadReadablePolishedForSelectedJob();
+                IsStandardRawTranscriptView = false;
                 SelectedTranscriptTabIndex = ReadableTranscriptTabIndex;
             }
             else

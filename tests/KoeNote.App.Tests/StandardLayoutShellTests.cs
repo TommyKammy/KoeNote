@@ -90,6 +90,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "Controls",
             "ReviewPanel.xaml"));
+        var transcriptSegmentListXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "TranscriptSegmentList.xaml"));
         var reviewPanelCode = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -120,6 +126,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "ViewModels",
             "MainWindowViewModel.Transcript.cs"));
+        var postProcessViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.PostProcess.cs"));
 
         Assert.Contains(
             "Width=\"{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
@@ -142,6 +154,8 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:TranscriptSegmentList DisplayMode=\"Raw\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
@@ -193,6 +207,8 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public ICommand ToggleStandardAiRailCommand", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsStandardRawTranscriptView = false;", postProcessViewModel, StringComparison.Ordinal);
     }
 
     [Fact]

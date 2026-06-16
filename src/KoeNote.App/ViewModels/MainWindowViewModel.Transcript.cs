@@ -41,6 +41,9 @@ public sealed partial class MainWindowViewModel
         {
             if (SetField(ref _isStandardRawTranscriptView, value))
             {
+                SelectedTranscriptTabIndex = value
+                    ? RawTranscriptTabIndex
+                    : ReadableTranscriptTabIndex;
                 OnPropertyChanged(nameof(IsStandardReadableTranscriptViewSelected));
                 OnPropertyChanged(nameof(IsStandardRawTranscriptViewSelected));
                 OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
