@@ -1,5 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.ViewModels;
 
@@ -37,5 +40,35 @@ public partial class MainWindow : Window
         e.Cancel = !ConfirmationDialogService.Default.Confirm(
             this,
             ConfirmationDialogRequest.Exit(isRunning));
+    }
+
+    private void OnWorkspaceSplitterDragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.JobListColumnWidth = JobListColumn.Width;
+        viewModel.TranscriptColumnWidth = TranscriptColumn.Width;
+        viewModel.ReviewColumnWidth = ReviewColumn.Width;
+        RebindWorkspaceColumnWidth(JobListColumn, nameof(MainWindowViewModel.JobListColumnWidth), viewModel);
+        RebindWorkspaceColumnWidth(TranscriptColumn, nameof(MainWindowViewModel.TranscriptColumnWidth), viewModel);
+        RebindWorkspaceColumnWidth(ReviewColumn, nameof(MainWindowViewModel.ReviewColumnWidth), viewModel);
+    }
+
+    private static void RebindWorkspaceColumnWidth(
+        ColumnDefinition column,
+        string propertyName,
+        MainWindowViewModel viewModel)
+    {
+        BindingOperations.SetBinding(
+            column,
+            ColumnDefinition.WidthProperty,
+            new Binding(propertyName)
+            {
+                Source = viewModel,
+                Mode = BindingMode.TwoWay
+            });
     }
 }
