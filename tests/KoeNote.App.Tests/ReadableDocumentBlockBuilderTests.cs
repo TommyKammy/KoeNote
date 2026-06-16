@@ -65,6 +65,28 @@ public sealed class ReadableDocumentBlockBuilderTests
             });
     }
 
+    [Fact]
+    public void Build_DoesNotStripAgendaTimeLabel()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build("Agenda\n\n10:00 Reception: starts");
+
+        Assert.Collection(
+            blocks,
+            first =>
+            {
+                Assert.Equal("Agenda", first.Text);
+                Assert.False(first.HasMeta);
+            },
+            second =>
+            {
+                Assert.Equal("10:00 Reception: starts", second.Text);
+                Assert.Equal(string.Empty, second.Speaker);
+                Assert.Equal(string.Empty, second.TimeRange);
+                Assert.Null(second.StartSeconds);
+                Assert.False(second.HasMeta);
+            });
+    }
+
     [Theory]
     [InlineData("－")]
     [InlineData("ー")]
