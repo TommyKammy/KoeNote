@@ -14,7 +14,11 @@ public sealed partial class MainWindowViewModel
     private const int ExportDiffTranscriptTabIndex = 2;
     private const int ExportReviewCandidateTranscriptTabIndex = 3;
 
-    public string CurrentExportTargetDisplayName => SelectedTranscriptTabIndex switch
+    private int EffectiveExportTranscriptTabIndex => IsStandardLayout
+        ? ExportReadableTranscriptTabIndex
+        : SelectedTranscriptTabIndex;
+
+    public string CurrentExportTargetDisplayName => EffectiveExportTranscriptTabIndex switch
     {
         ExportReadableTranscriptTabIndex => "整文",
         ExportRawTranscriptTabIndex => "素起こし",
@@ -27,13 +31,13 @@ public sealed partial class MainWindowViewModel
 
     public string ContextualExportMenuToolTip => $"{CurrentExportTargetDisplayName}の出力形式を選びます。表示中のビューに合わせて候補が切り替わります。";
 
-    public bool IsReadableExportMenuVisible => SelectedTranscriptTabIndex == ExportReadableTranscriptTabIndex;
+    public bool IsReadableExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportReadableTranscriptTabIndex;
 
-    public bool IsRawExportMenuVisible => SelectedTranscriptTabIndex == ExportRawTranscriptTabIndex;
+    public bool IsRawExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportRawTranscriptTabIndex;
 
-    public bool IsDiffExportMenuVisible => SelectedTranscriptTabIndex == ExportDiffTranscriptTabIndex;
+    public bool IsDiffExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportDiffTranscriptTabIndex;
 
-    public bool IsReviewCandidateExportMenuVisible => SelectedTranscriptTabIndex == ExportReviewCandidateTranscriptTabIndex;
+    public bool IsReviewCandidateExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportReviewCandidateTranscriptTabIndex;
 
     public bool IsSummaryExportMenuVisible => IsStandardAiRailExpanded || IsDetailLayout;
 

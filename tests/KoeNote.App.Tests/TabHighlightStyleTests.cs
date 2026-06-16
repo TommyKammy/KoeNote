@@ -225,6 +225,8 @@ public sealed class TabHighlightStyleTests
         Assert.True(
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedDocxCommand}\"", StringComparison.Ordinal) <
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedXlsxCommand}\"", StringComparison.Ordinal));
+        Assert.Contains("<MenuItem Header=\"差分\" Style=\"{StaticResource VisibleWhenDiffExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MenuItem Header=\"差分\" IsEnabled=\"False\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("差分ビューはエクスポート対象外です", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderModelBadgeButton", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleTrack", headerXaml, StringComparison.Ordinal);

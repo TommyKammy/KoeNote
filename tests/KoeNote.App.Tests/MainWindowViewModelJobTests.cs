@@ -467,6 +467,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     {
         var viewModel = CreateViewModel();
 
+        viewModel.UseDetailLayoutCommand.Execute(null);
         viewModel.SelectedTranscriptTabIndex = 3;
         viewModel.ShowReadableTranscriptTabCommand.Execute(null);
         Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
@@ -489,6 +490,23 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("レビュー候補", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReviewCandidateExportMenuVisible);
+    }
+
+    [Fact]
+    public void ExportMenuTarget_TreatsStandardLayoutAsReadableView()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.UseDetailLayoutCommand.Execute(null);
+        viewModel.SelectedTranscriptTabIndex = 3;
+        Assert.Equal("レビュー候補", viewModel.CurrentExportTargetDisplayName);
+
+        viewModel.UseStandardLayoutCommand.Execute(null);
+
+        Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
+        Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsReadableExportMenuVisible);
+        Assert.False(viewModel.IsReviewCandidateExportMenuVisible);
     }
 
     [Fact]

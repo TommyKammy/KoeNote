@@ -158,7 +158,7 @@
                                 <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                                 <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
-                            <MenuItem Header="差分" IsEnabled="False" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
+                            <MenuItem Header="差分" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
                                 <MenuItem Header="差分ビューはエクスポート対象外です" IsEnabled="False" Style="{StaticResource HeaderExportMenuItem}" />
                             </MenuItem>
                             <MenuItem Header="レビュー候補" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
