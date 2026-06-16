@@ -507,6 +507,16 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsReviewCandidateExportMenuVisible);
+
+        viewModel.IsStandardRawTranscriptViewSelected = true;
+        Assert.Equal("素起こし", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsRawExportMenuVisible);
+        Assert.False(viewModel.IsReadableExportMenuVisible);
+
+        viewModel.IsStandardReadableTranscriptViewSelected = true;
+        Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
+        Assert.True(viewModel.IsReadableExportMenuVisible);
+        Assert.False(viewModel.IsRawExportMenuVisible);
     }
 
     [Fact]

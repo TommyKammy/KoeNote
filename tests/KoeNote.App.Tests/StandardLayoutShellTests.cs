@@ -114,6 +114,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "ViewModels",
             "MainWindowViewModel.cs"));
+        var transcriptViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Transcript.cs"));
 
         Assert.Contains(
             "Width=\"{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
@@ -128,6 +134,13 @@ public sealed class StandardLayoutShellTests
         Assert.True(
             mainWindowXaml.IndexOf("<controls:StandardJobRailPanel Grid.RowSpan=\"3\"", StringComparison.Ordinal) <
             mainWindowXaml.IndexOf("Style=\"{StaticResource VisibleWhenDetailLayout}\"", StringComparison.Ordinal));
+        Assert.Contains("Content=\"原文\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"整文\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsStandardRawTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsStandardReadableTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:TranscriptSegmentList DisplayMode=\"Raw\" />", mainWindowXaml, StringComparison.Ordinal);
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
@@ -177,6 +190,8 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("private Task ToggleStandardAiRailAsync()", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardAiRailCommand = new RelayCommand(ToggleStandardAiRailAsync);", commandsViewModel, StringComparison.Ordinal);
         Assert.Contains("public ICommand ToggleStandardAiRailCommand", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
     }
 
     [Fact]

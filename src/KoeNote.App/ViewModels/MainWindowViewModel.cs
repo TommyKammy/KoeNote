@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
+    private bool _isStandardRawTranscriptView;
     private bool _isStandardAiRailExpanded;
     private DomainPresetImportHistoryItem? _selectedDomainPresetImport;
     private string? _loadedDomainPresetPath;

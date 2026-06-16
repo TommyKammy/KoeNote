@@ -15,7 +15,9 @@ public sealed partial class MainWindowViewModel
     private const int ExportReviewCandidateTranscriptTabIndex = 3;
 
     private int EffectiveExportTranscriptTabIndex => IsStandardLayout
-        ? ExportReadableTranscriptTabIndex
+        ? IsStandardRawTranscriptViewSelected
+            ? ExportRawTranscriptTabIndex
+            : ExportReadableTranscriptTabIndex
         : SelectedTranscriptTabIndex;
 
     public string CurrentExportTargetDisplayName => EffectiveExportTranscriptTabIndex switch

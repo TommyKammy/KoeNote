@@ -30,6 +30,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
+        OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
+        OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
         NotifyExportMenuTargetChanged();
     }
 
