@@ -91,7 +91,8 @@
                     <ColumnDefinition Width="{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}"
                                       MinWidth="{Binding DataContext.StandardJobRailColumnMinWidth, ElementName=StandardWorkspaceGrid}" />
                     <ColumnDefinition Width="*" MinWidth="720" />
-                    <ColumnDefinition Width="52" />
+                    <ColumnDefinition Width="{Binding DataContext.StandardAiRailColumnWidth, ElementName=StandardWorkspaceGrid}"
+                                      MinWidth="{Binding DataContext.StandardAiRailColumnMinWidth, ElementName=StandardWorkspaceGrid}" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="58" />
@@ -190,46 +191,8 @@
 
                 <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="2" />
 
-                <Border Grid.RowSpan="3"
-                        Grid.Column="2"
-                        Background="#FAFBFC"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1,0,0,0"
-                        Padding="0,16">
-                    <DockPanel LastChildFill="False">
-                        <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
-                            <Border Width="24"
-                                    Height="24"
-                                    CornerRadius="7"
-                                    Background="{StaticResource AccentBrush}"
-                                    Margin="0,0,0,14"
-                                    ToolTip="{Binding StandardLayoutAiAssistText}">
-                                <TextBlock Text="{Binding StandardLayoutAiBadgeText}"
-                                           Foreground="#FFFFFF"
-                                           FontSize="12"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="AI アシスト"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextBrush}">
-                                <TextBlock.LayoutTransform>
-                                    <RotateTransform Angle="90" />
-                                </TextBlock.LayoutTransform>
-                            </TextBlock>
-                        </StackPanel>
-                        <Button DockPanel.Dock="Bottom"
-                                Style="{StaticResource StandardRailButton}"
-                                Command="{Binding UseDetailLayoutCommand}"
-                                ToolTip="整文候補と要約を詳細表示">
-                            <TextBlock Text="&#xE76B;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="12" />
-                        </Button>
-                    </DockPanel>
-                </Border>
+                <controls:StandardAiAssistRailPanel Grid.RowSpan="3"
+                                                    Grid.Column="2" />
             </Grid>
 
             <Grid x:Name="MainWorkspaceGrid"

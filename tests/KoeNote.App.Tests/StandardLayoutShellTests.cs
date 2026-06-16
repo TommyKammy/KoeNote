@@ -78,6 +78,24 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "Controls",
             "StandardJobRailPanel.xaml.cs"));
+        var aiRailXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "StandardAiAssistRailPanel.xaml"));
+        var reviewPanelXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "ReviewPanel.xaml"));
+        var reviewPanelCode = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "ReviewPanel.xaml.cs"));
         var layoutViewModel = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -126,11 +144,39 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("ProgressPercent", railXaml, StringComparison.Ordinal);
         Assert.Contains("OnJobRailImportDropZoneClick", railCode, StringComparison.Ordinal);
 
+        Assert.Contains(
+            "Width=\"{Binding DataContext.StandardAiRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "MinWidth=\"{Binding DataContext.StandardAiRailColumnMinWidth, ElementName=StandardWorkspaceGrid}\"",
+            mainWindowXaml,
+            StringComparison.Ordinal);
+        Assert.Contains("<controls:StandardAiAssistRailPanel Grid.RowSpan=\"3\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsStandardAiRailExpanded", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("ToggleStandardAiRailCommand", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutAiBadgeText", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutAiAssistText", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutAiReviewStatusText", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutAiSummaryStatusText", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("HasStandardLayoutAiWarning", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("IsSummaryStale", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewPanel ShowCloseButton=\"False\" />", aiRailXaml, StringComparison.Ordinal);
+        Assert.Contains("RunPostSummaryCommand", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("ReviewDraftActionBar", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("RememberCorrection", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("public bool ShowCloseButton", reviewPanelCode, StringComparison.Ordinal);
+
         Assert.Contains("public bool IsStandardJobRailExpanded", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("public GridLength StandardJobRailColumnWidth", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("private Task ToggleStandardJobRailAsync()", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand = new RelayCommand(ToggleStandardJobRailAsync);", commandsViewModel, StringComparison.Ordinal);
         Assert.Contains("public ICommand ToggleStandardJobRailCommand", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("public bool IsStandardAiRailExpanded", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("public GridLength StandardAiRailColumnWidth", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("private Task ToggleStandardAiRailAsync()", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("ToggleStandardAiRailCommand = new RelayCommand(ToggleStandardAiRailAsync);", commandsViewModel, StringComparison.Ordinal);
+        Assert.Contains("public ICommand ToggleStandardAiRailCommand", mainViewModel, StringComparison.Ordinal);
     }
 
     [Fact]

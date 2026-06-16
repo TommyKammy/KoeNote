@@ -1,0 +1,271 @@
+<UserControl x:Class="KoeNote.App.Controls.StandardAiAssistRailPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:KoeNote.App.Controls">
+    <UserControl.Resources>
+        <Style x:Key="VisibleWhenStandardAiRailExpanded" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsStandardAiRailExpanded, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="VisibleWhenStandardAiRailCollapsed" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsStandardAiRailExpanded, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="VisibleWhenStandardAiWarning" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasStandardLayoutAiWarning}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="VisibleWhenStandardSummaryStale" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSummaryStale}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="StandardAiRailIconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RailButtonChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RailButtonChrome" Property="Background" Value="#EEF2F6" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StandardAiRailMetric" TargetType="Border">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+    </UserControl.Resources>
+
+    <Border Background="#FAFBFC"
+            BorderBrush="{StaticResource BorderBrushSoft}"
+            BorderThickness="1,0,0,0">
+        <Grid>
+            <DockPanel Style="{StaticResource VisibleWhenStandardAiRailCollapsed}"
+                       LastChildFill="False"
+                       Margin="0,16">
+                <StackPanel DockPanel.Dock="Top"
+                            HorizontalAlignment="Center">
+                    <Button Style="{StaticResource StandardAiRailIconButton}"
+                            Command="{Binding ToggleStandardAiRailCommand}"
+                            ToolTip="{Binding StandardAiRailToggleToolTip}"
+                            Margin="0,0,0,14">
+                        <TextBlock Text="{Binding StandardAiRailToggleText}"
+                                   FontSize="18"
+                                   FontWeight="SemiBold" />
+                    </Button>
+
+                    <Border Width="26"
+                            Height="26"
+                            CornerRadius="8"
+                            Background="{StaticResource AccentBrush}"
+                            Margin="0,0,0,12"
+                            ToolTip="{Binding StandardLayoutAiAssistText}">
+                        <TextBlock Text="{Binding StandardLayoutAiBadgeText}"
+                                   Foreground="#FFFFFF"
+                                   FontSize="12"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+
+                    <Border Width="9"
+                            Height="9"
+                            CornerRadius="5"
+                            Background="{StaticResource WarningBrush}"
+                            Margin="0,0,0,12"
+                            Style="{StaticResource VisibleWhenStandardAiWarning}" />
+
+                    <TextBlock Text="AI アシスト"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}">
+                        <TextBlock.LayoutTransform>
+                            <RotateTransform Angle="90" />
+                        </TextBlock.LayoutTransform>
+                    </TextBlock>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom"
+                            HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding StandardLayoutAiReviewStatusText}"
+                               Width="120"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedBrush}"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis">
+                        <TextBlock.LayoutTransform>
+                            <RotateTransform Angle="90" />
+                        </TextBlock.LayoutTransform>
+                    </TextBlock>
+                    <Button Style="{StaticResource StandardAiRailIconButton}"
+                            Command="{Binding UseDetailLayoutCommand}"
+                            ToolTip="整文候補と要約を詳細表示"
+                            Margin="0,18,0,0">
+                        <TextBlock Text="&#xE76B;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12" />
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+
+            <DockPanel Style="{StaticResource VisibleWhenStandardAiRailExpanded}"
+                       LastChildFill="True">
+                <Border DockPanel.Dock="Top"
+                        Padding="14,14,14,12"
+                        Background="#FFFFFF"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,0,8">
+                                <Border Width="26"
+                                        Height="26"
+                                        CornerRadius="8"
+                                        Background="{StaticResource AccentBrush}"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="{Binding StandardLayoutAiBadgeText}"
+                                               Foreground="#FFFFFF"
+                                               FontSize="12"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="AI アシスト"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding StandardLayoutAiAssistText}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Style="{StaticResource StandardAiRailIconButton}"
+                                Command="{Binding ToggleStandardAiRailCommand}"
+                                ToolTip="{Binding StandardAiRailToggleToolTip}"
+                                Margin="12,0,0,0">
+                            <TextBlock Text="{Binding StandardAiRailToggleText}"
+                                       FontSize="18"
+                                       FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border DockPanel.Dock="Top"
+                        Padding="14,12,14,4"
+                        Background="#FFFFFF"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="0,0,0,1">
+                    <StackPanel>
+                        <Border Style="{StaticResource StandardAiRailMetric}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="整文候補"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MutedBrush}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding StandardLayoutAiReviewStatusText}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextBrush}" />
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource StandardAiRailMetric}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="要約"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MutedBrush}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding StandardLayoutAiSummaryStatusText}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextBrush}" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="本文が更新されています。要約を再生成できます。"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource VisibleWhenStandardSummaryStale}" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="12"
+                              Background="#F7F8FA">
+                    <controls:ReviewPanel ShowCloseButton="False" />
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </Border>
+</UserControl>
