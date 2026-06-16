@@ -138,6 +138,7 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("Content=\"整文\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsStandardRawTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsStandardReadableTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BasedOn=\"{StaticResource {x:Type RadioButton}}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:TranscriptSegmentList DisplayMode=\"Raw\" />", mainWindowXaml, StringComparison.Ordinal);

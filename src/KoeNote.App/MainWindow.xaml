@@ -47,7 +47,7 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="StandardTranscriptModeRadio" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
+        <Style x:Key="StandardTranscriptModeRadio" TargetType="RadioButton">
             <Setter Property="MinWidth" Value="58" />
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="12,0" />

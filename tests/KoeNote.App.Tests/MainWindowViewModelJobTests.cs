@@ -265,6 +265,12 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.ExportPolishedXlsxCommand.CanExecute(null));
         Assert.False(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
 
+        viewModel.IsStandardRawTranscriptViewSelected = true;
+        Assert.True(viewModel.ExportSelectedJobCommand.CanExecute(null));
+
+        viewModel.IsStandardReadableTranscriptViewSelected = true;
+        Assert.False(viewModel.ExportSelectedJobCommand.CanExecute(null));
+
         var derivativeRepository = new TranscriptDerivativeRepository(paths);
         derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
             job.JobId,
