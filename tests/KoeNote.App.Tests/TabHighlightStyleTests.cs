@@ -184,6 +184,7 @@ public sealed class TabHighlightStyleTests
         var listsXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Resources", "Lists.xaml"));
         var stageXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "StageProgressPanel.xaml"));
         var statusXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "StatusBarPanel.xaml"));
+        var standardJobRailXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "StandardJobRailPanel.xaml"));
 
         Assert.Contains("Margin=\"0\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"1\" />", mainWindowXaml, StringComparison.Ordinal);
@@ -195,7 +196,7 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("Style=\"{StaticResource VisibleWhenDetailLayout}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("StandardLayoutTitle", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("StandardLayoutMeta", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("StandardLayoutJobBadgeText", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardLayoutJobBadgeText", standardJobRailXaml, StringComparison.Ordinal);
         Assert.Contains("StandardLayoutAiBadgeText", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("AI アシスト", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:ReadablePolishedPanel />", mainWindowXaml, StringComparison.Ordinal);

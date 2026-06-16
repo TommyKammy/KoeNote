@@ -47,6 +47,7 @@ public sealed partial class MainWindowViewModel
         CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
         UseStandardLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Standard));
         UseDetailLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Detail));
+        ToggleStandardJobRailCommand = new RelayCommand(ToggleStandardJobRailAsync);
         SetupBackCommand = new RelayCommand(SetupBackAsync, CanUseSetupBackAction);
         SetupNextCommand = new RelayCommand(SetupNextAsync, CanUseSetupNextAction);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
