@@ -351,19 +351,9 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT s.job_id,
-                   s.segment_id,
-                   s.raw_text,
-                   s.normalized_text,
-                   s.final_text,
-                   s.review_state,
-                   j.unreviewed_draft_count,
-                   j.status,
-                   j.current_stage,
-                   j.progress_percent
-            FROM transcript_segments s
-            JOIN jobs j ON j.job_id = s.job_id
-            WHERE s.job_id = $job_id AND s.segment_id = $segment_id;
+            SELECT job_id, segment_id, raw_text, normalized_text, final_text, review_state
+            FROM transcript_segments
+            WHERE job_id = $job_id AND segment_id = $segment_id;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$segment_id", segmentId);
@@ -381,11 +371,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             reader.IsDBNull(3) ? null : reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
-            LoadPendingDraftIds(connection, transaction, jobId, segmentId),
-            reader.GetInt32(6),
-            reader.GetString(7),
-            reader.IsDBNull(8) ? null : reader.GetString(8),
-            reader.GetInt32(9));
+            LoadPendingDraftIds(connection, transaction, jobId, segmentId));
     }
 
     private static IReadOnlyList<string> LoadPendingDraftIds(
@@ -542,14 +528,7 @@ public sealed class TranscriptEditService(AppPaths paths)
             before.ReviewState);
         InvalidatePendingDraftsForSegment(connection, transaction, before.JobId, before.SegmentId);
         RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
-        RestoreRawEditJobState(
-            connection,
-            transaction,
-            before.JobId,
-            before.JobPendingDraftCount,
-            before.JobStatus,
-            before.JobCurrentStage,
-            before.JobProgressPercent);
+        RefreshRawEditPendingCount(connection, transaction, before.JobId);
     }
 
     private static void UndoSpeakerAlias(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -695,18 +674,30 @@ public sealed class TranscriptEditService(AppPaths paths)
             UPDATE jobs
             SET unreviewed_draft_count = (SELECT value FROM pending),
                 status = CASE
+                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
+                        THEN status
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN '謨ｴ譁・ｾ・■'
                     WHEN (SELECT value FROM pending) = 0
                         AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN '完成文書作成待ち'
                     ELSE status
                 END,
                 current_stage = CASE
+                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
+                        THEN current_stage
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN 'review_ready'
                     WHEN (SELECT value FROM pending) = 0
                         AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN 'review_completed'
                     ELSE current_stage
                 END,
                 progress_percent = CASE
+                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
+                        THEN progress_percent
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN $progress_percent
                     WHEN (SELECT value FROM pending) = 0
                         AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN $progress_percent
@@ -733,35 +724,6 @@ public sealed class TranscriptEditService(AppPaths paths)
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
         command.Parameters.AddWithValue("$pending_count", pendingCount);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.ExecuteNonQuery();
-    }
-
-    private static void RestoreRawEditJobState(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        string jobId,
-        int pendingCount,
-        string status,
-        string? currentStage,
-        int progressPercent)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE jobs
-            SET unreviewed_draft_count = $pending_count,
-                status = $status,
-                current_stage = $current_stage,
-                progress_percent = $progress_percent,
-                updated_at = $updated_at
-            WHERE job_id = $job_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$pending_count", pendingCount);
-        command.Parameters.AddWithValue("$status", status);
-        command.Parameters.AddWithValue("$current_stage", (object?)currentStage ?? DBNull.Value);
-        command.Parameters.AddWithValue("$progress_percent", progressPercent);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
     }
@@ -798,11 +760,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         string? NormalizedText,
         string? FinalText,
         string ReviewState,
-        IReadOnlyList<string> PendingDraftIds,
-        int JobPendingDraftCount,
-        string JobStatus,
-        string? JobCurrentStage,
-        int JobProgressPercent);
+        IReadOnlyList<string> PendingDraftIds);
 
     private sealed record SpeakerAliasSnapshot(
         string JobId,

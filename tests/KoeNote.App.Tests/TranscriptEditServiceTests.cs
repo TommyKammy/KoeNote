@@ -81,6 +81,35 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void UndoLastSegmentEdit_RecomputesPendingCountAfterOtherReviewDecision()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        InsertJob(paths, "job-001");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", "job-001", 0, 1, "Speaker_0", "first raw"),
+            new TranscriptSegment("segment-002", "job-001", 1, 2, "Speaker_1", "second raw")
+        ]);
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "segment-001", "wording", "first raw", "first fixed", "reason", 0.75),
+            new CorrectionDraft("draft-002", "job-001", "segment-002", "wording", "second raw", "second fixed", "reason", 0.75)
+        ]);
+        SetReviewWaitingJobState(paths, "job-001");
+        var service = new TranscriptEditService(paths);
+
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "first raw edited");
+        new ReviewOperationService(paths).AcceptDraft("draft-002");
+
+        Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
+
+        AssertDraftStatus(paths, "draft-001", "pending");
+        AssertDraftStatus(paths, "draft-002", "accepted");
+        AssertJobReviewReady(paths, "job-001", expectedPending: 1);
+    }
+
+    [Fact]
     public void UndoLastSegmentEdit_DoesNotBypassNewerReviewDecision()
     {
         var paths = ArrangeSegment();
@@ -458,7 +487,7 @@ public sealed class TranscriptEditServiceTests
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
         Assert.Equal("review_ready", reader.GetString(0));
-        Assert.Equal(70, reader.GetInt32(1));
+        Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(1));
         Assert.Equal(expectedPending, reader.GetInt32(2));
     }
 

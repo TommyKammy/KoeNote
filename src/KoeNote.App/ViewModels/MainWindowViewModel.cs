@@ -1568,6 +1568,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3)))
             {
                 NotifyExportMenuTargetChanged();
+                RefreshSelectedSegmentEditBuffer();
             }
         }
     }

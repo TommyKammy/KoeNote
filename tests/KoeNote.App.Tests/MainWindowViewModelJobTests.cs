@@ -766,6 +766,30 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SelectedTranscriptTabIndex_RefreshesSelectedSegmentEditBuffer()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw", "first readable")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("first readable", viewModel.SelectedSegmentEditText);
+
+        viewModel.SelectedTranscriptTabIndex = 1;
+
+        Assert.Equal("first raw", viewModel.SelectedSegmentEditText);
+
+        viewModel.SelectedTranscriptTabIndex = 0;
+
+        Assert.Equal("first readable", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
     public void InlineSegmentEdit_DoesNotChangeSelectionWhenAutoSaveCannotCommit()
     {
         var viewModel = CreateViewModel();
