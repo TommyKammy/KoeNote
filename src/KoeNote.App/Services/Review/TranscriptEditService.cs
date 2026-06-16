@@ -56,6 +56,57 @@ public sealed class TranscriptEditService(AppPaths paths)
         transaction.Commit();
     }
 
+    public void ApplyRawSegmentEdit(string jobId, string segmentId, string rawText)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("Job id is required.", nameof(jobId));
+        }
+
+        if (string.IsNullOrWhiteSpace(segmentId))
+        {
+            throw new ArgumentException("Segment id is required.", nameof(segmentId));
+        }
+
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            throw new ArgumentException("Raw text is required.", nameof(rawText));
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        var before = LoadRawSegmentSnapshot(connection, transaction, jobId, segmentId)
+            ?? throw new KeyNotFoundException($"Transcript segment was not found: {jobId}/{segmentId}");
+        var after = before with { RawText = rawText, ReviewState = "manually_edited" };
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE transcript_segments
+            SET raw_text = $raw_text,
+                review_state = $review_state
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.Parameters.AddWithValue("$raw_text", rawText);
+        command.Parameters.AddWithValue("$review_state", after.ReviewState);
+        command.ExecuteNonQuery();
+
+        InsertHistory(
+            connection,
+            transaction,
+            jobId,
+            draftId: null,
+            segmentId,
+            "raw_segment_edit",
+            before,
+            after);
+
+        transaction.Commit();
+    }
+
     public void ApplySpeakerAlias(string jobId, string speakerId, string displayName)
     {
         if (string.IsNullOrWhiteSpace(jobId))
@@ -126,6 +177,9 @@ public sealed class TranscriptEditService(AppPaths paths)
             case "segment_edit":
                 UndoSegmentEdit(connection, transaction, operation);
                 break;
+            case "raw_segment_edit":
+                UndoRawSegmentEdit(connection, transaction, operation);
+                break;
             case "speaker_alias":
                 UndoSpeakerAlias(connection, transaction, operation);
                 break;
@@ -159,7 +213,18 @@ public sealed class TranscriptEditService(AppPaths paths)
             return false;
         }
 
-        UndoSegmentEdit(connection, transaction, operation);
+        switch (operation.OperationType)
+        {
+            case "segment_edit":
+                UndoSegmentEdit(connection, transaction, operation);
+                break;
+            case "raw_segment_edit":
+                UndoRawSegmentEdit(connection, transaction, operation);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown segment edit operation type: {operation.OperationType}");
+        }
+
         DeleteHistory(connection, transaction, operation.OperationId);
         transaction.Commit();
         return true;
@@ -259,6 +324,35 @@ public sealed class TranscriptEditService(AppPaths paths)
         return new SpeakerAliasSnapshot(jobId, speakerId, displayName, displayName is not null);
     }
 
+    private static RawSegmentSnapshot? LoadRawSegmentSnapshot(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT job_id, segment_id, raw_text, review_state
+            FROM transcript_segments
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        return new RawSegmentSnapshot(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3));
+    }
+
     private static OperationSnapshot? LoadLastOperation(SqliteConnection connection, SqliteTransaction transaction, string? jobId)
     {
         using var command = connection.CreateCommand();
@@ -267,14 +361,14 @@ public sealed class TranscriptEditService(AppPaths paths)
             ? """
               SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
               FROM review_operation_history
-              ORDER BY created_at DESC, operation_id DESC
+              ORDER BY created_at DESC, rowid DESC
               LIMIT 1;
               """
             : """
               SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
               FROM review_operation_history
               WHERE job_id = $job_id
-              ORDER BY created_at DESC, operation_id DESC
+              ORDER BY created_at DESC, rowid DESC
               LIMIT 1;
               """;
         if (!string.IsNullOrWhiteSpace(jobId))
@@ -311,8 +405,8 @@ public sealed class TranscriptEditService(AppPaths paths)
             FROM review_operation_history
             WHERE job_id = $job_id
               AND segment_id = $segment_id
-              AND operation_type = 'segment_edit'
-            ORDER BY created_at DESC, operation_id DESC
+              AND operation_type IN ('segment_edit', 'raw_segment_edit')
+            ORDER BY created_at DESC, rowid DESC
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
@@ -370,6 +464,14 @@ public sealed class TranscriptEditService(AppPaths paths)
         RestoreSegment(connection, transaction, before.JobId, before.SegmentId, before.FinalText, before.ReviewState);
     }
 
+    private static void UndoRawSegmentEdit(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
+    {
+        var before = JsonSerializer.Deserialize<RawSegmentSnapshot>(operation.BeforeJson)
+            ?? throw new InvalidOperationException("Invalid raw segment edit undo snapshot.");
+
+        RestoreRawSegment(connection, transaction, before.JobId, before.SegmentId, before.RawText, before.ReviewState);
+    }
+
     private static void UndoSpeakerAlias(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
     {
         var before = JsonSerializer.Deserialize<SpeakerAliasSnapshot>(operation.BeforeJson)
@@ -422,6 +524,29 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
+    private static void RestoreRawSegment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId,
+        string rawText,
+        string reviewState)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE transcript_segments
+            SET raw_text = $raw_text,
+                review_state = $review_state
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.Parameters.AddWithValue("$raw_text", rawText);
+        command.Parameters.AddWithValue("$review_state", reviewState);
+        command.ExecuteNonQuery();
+    }
+
     private static void RestoreJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId, int pendingCount)
     {
         using var command = connection.CreateCommand();
@@ -461,6 +586,12 @@ public sealed class TranscriptEditService(AppPaths paths)
         string JobId,
         string SegmentId,
         string? FinalText,
+        string ReviewState);
+
+    private sealed record RawSegmentSnapshot(
+        string JobId,
+        string SegmentId,
+        string RawText,
         string ReviewState);
 
     private sealed record SpeakerAliasSnapshot(

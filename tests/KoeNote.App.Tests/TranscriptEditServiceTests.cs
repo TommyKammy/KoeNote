@@ -25,6 +25,32 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void ApplyRawSegmentEdit_UpdatesRawTextAndUndoRestoresOriginalState()
+    {
+        var paths = ArrangeSegment();
+        var service = new TranscriptEditService(paths);
+
+        service.ApplySegmentEdit("job-001", "segment-001", "手修正文");
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "修正した素起こし");
+
+        AssertSegment(
+            paths,
+            expectedFinalText: "手修正文",
+            expectedReviewState: "manually_edited",
+            expectedRawText: "修正した素起こし");
+        var preview = Assert.Single(new TranscriptSegmentRepository(paths).ReadPreviews("job-001"));
+        Assert.Equal("修正した素起こし", preview.RawTranscriptText);
+        Assert.Equal("手修正文", preview.Text);
+
+        Assert.True(service.UndoLastSegmentEdit("job-001", "segment-001"));
+        AssertSegment(
+            paths,
+            expectedFinalText: "手修正文",
+            expectedReviewState: "manually_edited",
+            expectedRawText: "ミギワ");
+    }
+
+    [Fact]
     public void ApplySpeakerAlias_ChangesPreviewSpeakerAndUndoRestoresSpeakerId()
     {
         var paths = ArrangeSegment();
@@ -188,9 +214,10 @@ public sealed class TranscriptEditServiceTests
         AppPaths paths,
         string? expectedFinalText,
         string expectedReviewState,
-        int expectedPending = 0)
+        int expectedPending = 0,
+        string? expectedRawText = null)
     {
-        AssertSegment(paths, "job-001", "segment-001", expectedFinalText, expectedReviewState, expectedPending);
+        AssertSegment(paths, "job-001", "segment-001", expectedFinalText, expectedReviewState, expectedPending, expectedRawText);
     }
 
     private static void AssertSegment(
@@ -199,12 +226,13 @@ public sealed class TranscriptEditServiceTests
         string segmentId,
         string? expectedFinalText,
         string expectedReviewState,
-        int expectedPending = 0)
+        int expectedPending = 0,
+        string? expectedRawText = null)
     {
         using var connection = Open(paths);
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.final_text, s.review_state, j.unreviewed_draft_count
+            SELECT s.final_text, s.review_state, j.unreviewed_draft_count, s.raw_text
             FROM transcript_segments s
             JOIN jobs j ON j.job_id = s.job_id
             WHERE s.job_id = $job_id AND s.segment_id = $segment_id;
@@ -224,6 +252,10 @@ public sealed class TranscriptEditServiceTests
 
         Assert.Equal(expectedReviewState, reader.GetString(1));
         Assert.Equal(expectedPending, reader.GetInt32(2));
+        if (expectedRawText is not null)
+        {
+            Assert.Equal(expectedRawText, reader.GetString(3));
+        }
     }
 
     private static SqliteConnection Open(AppPaths paths)

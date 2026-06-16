@@ -967,7 +967,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
             else
             {
-                SelectedSegmentEditText = value.Text;
+                SelectedSegmentEditText = GetSegmentEditableText(value);
                 SelectedSpeakerAlias = value.Speaker;
                 if (!_isSelectingSegmentForDraft && !_isSelectingSegmentForPlayback)
                 {

@@ -17,7 +17,7 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        SelectedSegmentEditText = segment!.Text;
+        SelectedSegmentEditText = GetSegmentEditableText(segment!);
         IsSpeakerInlineEditActive = false;
         IsSegmentInlineEditActive = true;
         return Task.CompletedTask;
@@ -62,7 +62,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSegment is not null)
         {
-            SelectedSegmentEditText = SelectedSegment.Text;
+            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment);
         }
 
         IsSegmentInlineEditActive = false;
@@ -91,7 +91,7 @@ public sealed partial class MainWindowViewModel
             SelectedSegment is not null &&
             string.Equals(SelectedSegment.SegmentId, segment.SegmentId, StringComparison.Ordinal))
         {
-            SelectedSegmentEditText = segment.Text;
+            SelectedSegmentEditText = GetSegmentEditableText(segment);
             IsSegmentInlineEditActive = false;
             return Task.CompletedTask;
         }
@@ -118,26 +118,46 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        if (string.Equals(SelectedSegmentEditText, segment.Text, StringComparison.Ordinal))
+        if (string.Equals(SelectedSegmentEditText, GetSegmentEditableText(segment), StringComparison.Ordinal))
         {
             IsSegmentInlineEditActive = false;
             return true;
         }
 
-        _transcriptEditService.ApplySegmentEdit(
-            SelectedJob.JobId,
-            segment.SegmentId,
-            SelectedSegmentEditText);
+        if (IsRawTranscriptEditingMode)
+        {
+            _transcriptEditService.ApplyRawSegmentEdit(
+                SelectedJob.JobId,
+                segment.SegmentId,
+                SelectedSegmentEditText);
+        }
+        else
+        {
+            _transcriptEditService.ApplySegmentEdit(
+                SelectedJob.JobId,
+                segment.SegmentId,
+                SelectedSegmentEditText);
+        }
 
         IsSegmentInlineEditActive = false;
-        LatestLog = "セグメント本文を手修正しました。元の文字起こしは保持されています。";
+        LatestLog = IsRawTranscriptEditingMode
+            ? "素起こし本文を手修正しました。"
+            : "セグメント本文を手修正しました。元の文字起こしは保持されています。";
         if (reloadSegments)
         {
             ReloadSegmentsForSelectedJob(segment.SegmentId);
         }
         else
         {
-            ReplaceEditedSegmentPreview(segment, SelectedSegmentEditText);
+            if (IsRawTranscriptEditingMode)
+            {
+                ReplaceEditedRawSegmentPreview(segment, SelectedSegmentEditText);
+            }
+            else
+            {
+                ReplaceEditedSegmentPreview(segment, SelectedSegmentEditText);
+            }
+
             FilteredSegments.Refresh();
         }
 
@@ -192,6 +212,22 @@ public sealed partial class MainWindowViewModel
             Segments[index] = segment with { Text = text, FinalText = text };
         }
     }
+
+    private void ReplaceEditedRawSegmentPreview(TranscriptSegmentPreview segment, string rawText)
+    {
+        var index = Segments.IndexOf(segment);
+        if (index >= 0)
+        {
+            Segments[index] = segment with { RawText = rawText };
+        }
+    }
+
+    private string GetSegmentEditableText(TranscriptSegmentPreview segment)
+    {
+        return IsRawTranscriptEditingMode ? segment.RawTranscriptText : segment.Text;
+    }
+
+    private bool IsRawTranscriptEditingMode => EffectiveExportTranscriptTabIndex == ExportRawTranscriptTabIndex;
 
     private void ReplaceEditedSpeakerPreview(TranscriptSegmentPreview segment, string speaker)
     {
