@@ -98,7 +98,10 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        if (_transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId))
+        var reverted = IsRawTranscriptEditingMode
+            ? _transcriptEditService.UndoLastRawSegmentEdit(SelectedJob.JobId, segment.SegmentId)
+            : _transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId);
+        if (reverted)
         {
             LatestLog = "選択セグメントの直近編集を戻しました。";
             LoadReviewQueue();

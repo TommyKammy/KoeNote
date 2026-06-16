@@ -790,6 +790,29 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void MainLayoutMode_RefreshesSelectedSegmentEditBuffer()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw", "first readable")
+        ]);
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.UseDetailLayoutCommand.Execute(null);
+        viewModel.ShowRawTranscriptTabCommand.Execute(null);
+        Assert.Equal("first raw", viewModel.SelectedSegmentEditText);
+
+        viewModel.UseStandardLayoutCommand.Execute(null);
+
+        Assert.True(viewModel.IsStandardReadableTranscriptVisible);
+        Assert.Equal("first readable", viewModel.SelectedSegmentEditText);
+    }
+
+    [Fact]
     public void InlineSegmentEdit_DoesNotChangeSelectionWhenAutoSaveCannotCommit()
     {
         var viewModel = CreateViewModel();
@@ -884,6 +907,32 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal("first", repository.ReadPreviews(job.JobId).Single().Text);
         Assert.Equal("first", viewModel.SelectedSegment?.Text);
         Assert.Contains("戻しました", viewModel.LatestLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RevertSegmentEditCommand_InRawViewDoesNotUndoFinalTextEdit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        var repository = new TranscriptSegmentRepository(paths);
+        repository.SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first")
+        ]);
+        var editService = new TranscriptEditService(paths);
+        editService.ApplyRawSegmentEdit(job.JobId, "segment-001", "raw edited");
+        editService.ApplySegmentEdit(job.JobId, "segment-001", "final edited");
+        var viewModel = new MainWindowViewModel(paths);
+        var segment = Assert.Single(viewModel.Segments);
+
+        viewModel.IsStandardRawTranscriptViewSelected = true;
+        viewModel.RevertSegmentEditCommand.Execute(segment);
+
+        var updated = repository.ReadPreviews(job.JobId).Single();
+        Assert.Equal("raw edited", updated.RawTranscriptText);
+        Assert.Equal("final edited", updated.Text);
     }
 
     [Fact]

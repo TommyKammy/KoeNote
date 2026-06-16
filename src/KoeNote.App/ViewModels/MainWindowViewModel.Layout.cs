@@ -33,6 +33,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
         OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
         NotifyExportMenuTargetChanged();
+        RefreshSelectedSegmentEditBuffer();
     }
 
     private static string GetMainLayoutModeDisplayName(MainLayoutMode mode)

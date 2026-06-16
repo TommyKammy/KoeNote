@@ -128,6 +128,23 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void UndoLastRawSegmentEdit_DoesNotUndoFinalTextEdit()
+    {
+        var paths = ArrangeSegment();
+        var service = new TranscriptEditService(paths);
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "raw edited");
+        service.ApplySegmentEdit("job-001", "segment-001", "final edited");
+
+        Assert.False(service.UndoLastRawSegmentEdit("job-001", "segment-001"));
+
+        AssertSegment(
+            paths,
+            expectedFinalText: "final edited",
+            expectedReviewState: "manually_edited",
+            expectedRawText: "raw edited");
+    }
+
+    [Fact]
     public void ApplySpeakerAlias_ChangesPreviewSpeakerAndUndoRestoresSpeakerId()
     {
         var paths = ArrangeSegment();

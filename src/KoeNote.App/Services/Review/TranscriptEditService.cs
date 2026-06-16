@@ -207,6 +207,16 @@ public sealed class TranscriptEditService(AppPaths paths)
 
     public bool UndoLastSegmentEdit(string jobId, string segmentId)
     {
+        return UndoLastSegmentEdit(jobId, segmentId, rawOnly: false);
+    }
+
+    public bool UndoLastRawSegmentEdit(string jobId, string segmentId)
+    {
+        return UndoLastSegmentEdit(jobId, segmentId, rawOnly: true);
+    }
+
+    private bool UndoLastSegmentEdit(string jobId, string segmentId, bool rawOnly)
+    {
         if (string.IsNullOrWhiteSpace(jobId))
         {
             throw new ArgumentException("Job id is required.", nameof(jobId));
@@ -222,6 +232,11 @@ public sealed class TranscriptEditService(AppPaths paths)
 
         var operation = LoadLastSegmentOperation(connection, transaction, jobId, segmentId);
         if (operation is null)
+        {
+            return false;
+        }
+
+        if (rawOnly && operation.OperationType != "raw_segment_edit")
         {
             return false;
         }
