@@ -81,6 +81,15 @@ public sealed partial class MainWindowViewModel
         return ExportSummaryAsync("Markdown (*.md)|*.md", "md", "markdown");
     }
 
+    private void RefreshReadableDocumentBlocks()
+    {
+        ReadableDocumentBlocks.Clear();
+        foreach (var block in ReadableDocumentBlockBuilder.Build(ReadablePolishedContent))
+        {
+            ReadableDocumentBlocks.Add(block);
+        }
+    }
+
     private Task ExportSummaryTextAsync()
     {
         return ExportSummaryAsync("Text document (*.txt)|*.txt", "txt", "text");

@@ -135,6 +135,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _mergeConsecutiveSpeakersOnExport;
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
+    private readonly ObservableCollection<ReadableDocumentBlock> _readableDocumentBlocks = [];
     private string _readablePolishedContent = string.Empty;
     private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
@@ -1966,8 +1967,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _readablePolishedContent, value))
             {
+                RefreshReadableDocumentBlocks();
                 OnPropertyChanged(nameof(HasReadablePolishedContent));
+                OnPropertyChanged(nameof(HasReadableDocumentBlocks));
                 OnPropertyChanged(nameof(ReadablePolishedContentDisplay));
+                OnPropertyChanged(nameof(ReadableDocumentStateTitle));
+                OnPropertyChanged(nameof(ReadableDocumentStateDescription));
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
                 if (CopyReadablePolishedContentCommand is RelayCommand copyCommand)
@@ -1985,6 +1990,20 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string ReadablePolishedContentDisplay => HasReadablePolishedContent
         ? ReadablePolishedContent
         : "整文はまだ生成されていません。素起こしを確認するか、このジョブ全体から整文を生成してください。";
+
+    public ObservableCollection<ReadableDocumentBlock> ReadableDocumentBlocks => _readableDocumentBlocks;
+
+    public bool HasReadableDocumentBlocks => ReadableDocumentBlocks.Count > 0;
+
+    public string ReadableDocumentStateTitle => IsReadablePolishingInProgress
+        ? "整文を生成中です"
+        : HasReadablePolishedContent
+            ? "整文を表示しています"
+            : "整文はまだ生成されていません";
+
+    public string ReadableDocumentStateDescription => IsReadablePolishingInProgress || HasReadablePolishedContent
+        ? ReadablePolishedStatus
+        : ReadablePolishedContentDisplay;
 
     public string ReadablePolishedActionText => IsReadablePolishingInProgress
         ? "生成中"
@@ -2007,6 +2026,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                OnPropertyChanged(nameof(ReadableDocumentStateTitle));
+                OnPropertyChanged(nameof(ReadableDocumentStateDescription));
                 UpdateExportCommandStates();
             }
         }
@@ -2015,7 +2036,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string ReadablePolishedStatus
     {
         get => _readablePolishedStatus;
-        private set => SetField(ref _readablePolishedStatus, value);
+        private set
+        {
+            if (SetField(ref _readablePolishedStatus, value))
+            {
+                OnPropertyChanged(nameof(ReadableDocumentStateDescription));
+            }
+        }
     }
 
     public double MainContentZoomScale

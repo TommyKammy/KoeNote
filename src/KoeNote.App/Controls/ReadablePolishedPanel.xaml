@@ -3,167 +3,190 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <Style x:Key="VisibleWhenReadablePolishedContent" TargetType="FrameworkElement">
+        <Style x:Key="VisibleWhenReadableDocumentBlocks" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
+                <DataTrigger Binding="{Binding HasReadableDocumentBlocks}" Value="True">
                     <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="VisibleWhenNoReadablePolishedContent" TargetType="FrameworkElement">
+        <Style x:Key="VisibleWhenNoReadableDocumentBlocks" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Visible" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="True">
+                <DataTrigger Binding="{Binding HasReadableDocumentBlocks}" Value="True">
                     <Setter Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="ReadableDocumentMetaText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Yu Gothic UI" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#646C7B" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
     </UserControl.Resources>
 
-    <Grid Margin="0">
+    <Grid Margin="0"
+          Background="#F3F5F8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                HorizontalAlignment="Right"
-                Background="#FFFFFF"
-                BorderBrush="{StaticResource BorderBrushSoft}"
+                Background="#FBFCFD"
+                BorderBrush="#D6DAE1"
                 BorderThickness="0,0,0,1"
-                CornerRadius="0"
-                Padding="16,8"
-                Margin="0">
-            <WrapPanel>
-                <Button Command="{Binding ShowRawTranscriptTabCommand}"
-                        Padding="10,6"
-                        MinWidth="0"
-                        Margin="0,0,6,0"
-                        ToolTip="ASR原文を確認・修正します"
-                        Style="{StaticResource ToolbarButton}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8A5;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12"
-                                   Margin="0,0,6,0" />
-                        <TextBlock Text="原文を確認"
-                                   FontSize="12"
-                                   FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding ShowDiffTranscriptTabCommand}"
-                        Padding="10,6"
-                        MinWidth="0"
-                        Margin="0,0,6,0"
-                        ToolTip="素起こしとレビュー候補の差分を確認します"
-                        Style="{StaticResource ToolbarButton}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8AB;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12"
-                                   Margin="0,0,6,0" />
-                        <TextBlock Text="差分を見る"
-                                   FontSize="12"
-                                   FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding ShowReviewCandidateTranscriptTabCommand}"
-                        Padding="10,6"
-                        MinWidth="0"
-                        Margin="0,0,6,0"
-                        ToolTip="最終整文前のレビュー候補を確認します"
-                        Style="{StaticResource ToolbarButton}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE70F;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12"
-                                   Margin="0,0,6,0" />
-                        <TextBlock Text="レビュー候補"
-                                   FontSize="12"
-                                   FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding ConfirmSpeakerNamesAndRunReadablePolishingCommand}"
-                        Padding="10,6"
-                        MinWidth="0"
-                        ToolTip="話者名を確認してから整文を再実行します"
-                        Style="{StaticResource ToolbarButton}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8D4;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12"
-                                   Margin="0,0,6,0" />
-                        <TextBlock Text="話者確認して再整文"
-                                   FontSize="12"
-                                   FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-            </WrapPanel>
+                Padding="16,8">
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ReadableDocumentStateTitle}"
+                               FontFamily="Yu Gothic UI"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="#0F7A3D" />
+                    <TextBlock Text="{Binding ReadablePolishedStatus}"
+                               Margin="10,0,0,0"
+                               FontSize="11"
+                               Foreground="#646C7B"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <WrapPanel DockPanel.Dock="Right"
+                           HorizontalAlignment="Right">
+                    <Button Command="{Binding CopyReadablePolishedContentCommand}"
+                            Padding="10,6"
+                            MinWidth="0"
+                            Margin="0,0,6,0"
+                            ToolTip="整文をコピー"
+                            Style="{StaticResource ToolbarButton}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8C8;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="コピー"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ShowRawTranscriptTabCommand}"
+                            Padding="10,6"
+                            MinWidth="0"
+                            Margin="0,0,6,0"
+                            ToolTip="ASR原文を確認・修正します"
+                            Style="{StaticResource ToolbarButton}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8A5;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="原文"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ShowDiffTranscriptTabCommand}"
+                            Padding="10,6"
+                            MinWidth="0"
+                            Margin="0,0,6,0"
+                            ToolTip="素起こしとレビュー候補の差分を確認します"
+                            Style="{StaticResource ToolbarButton}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8AB;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="差分"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ShowReviewCandidateTranscriptTabCommand}"
+                            Padding="10,6"
+                            MinWidth="0"
+                            Margin="0,0,6,0"
+                            ToolTip="最終整文前のレビュー候補を確認します"
+                            Style="{StaticResource ToolbarButton}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE70F;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="レビュー候補"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ConfirmSpeakerNamesAndRunReadablePolishingCommand}"
+                            Padding="10,6"
+                            MinWidth="0"
+                            ToolTip="話者名を確認してから整文を再実行します"
+                            Style="{StaticResource ToolbarButton}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8D4;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="12"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Text="再整文"
+                                       FontSize="12"
+                                       FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </DockPanel>
         </Border>
 
-        <Border x:Name="ReadablePolishedContentCard"
-                Grid.Row="1"
-                Background="#FFFFFF"
-                BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="0"
-                CornerRadius="0"
-                Padding="18">
-            <Grid>
-                <TextBox x:Name="ReadablePolishedTextBox"
-                         Text="{Binding ReadablePolishedContent, Mode=OneWay}"
-                         IsReadOnly="True"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         Padding="0"
-                         FontSize="{Binding ReadableDocumentFontSize}"
-                         FontWeight="Normal"
-                         Foreground="{StaticResource TextBrush}"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Disabled"
-                         Style="{StaticResource VisibleWhenReadablePolishedContent}" />
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Style="{StaticResource VisibleWhenNoReadablePolishedContent}">
-                    <TextBlock Text="{Binding ReadablePolishedContentDisplay}"
-                               FontSize="{Binding ReadableDocumentFontSize}"
-                               FontWeight="Normal"
-                               LineHeight="{Binding ReadableDocumentLineHeight}"
-                               Foreground="{StaticResource TextBrush}"
-                               TextWrapping="Wrap" />
-                </ScrollViewer>
-                <Button HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Command="{Binding CopyReadablePolishedContentCommand}"
-                        Padding="10,6"
-                        ToolTip="整文をコピー">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=ReadablePolishedContentCard}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding HasReadablePolishedContent}" Value="False">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                        <TextBlock Text="&#xE8C8;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12"
-                                   Margin="0,0,6,0" />
-                        <TextBlock Text="コピー"
-                                   FontSize="12"
-                                   FontWeight="SemiBold" />
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="ReadableDocumentScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="28,24"
+                          Style="{StaticResource VisibleWhenReadableDocumentBlocks}">
+                <Border MaxWidth="920"
+                        HorizontalAlignment="Center"
+                        Background="#FFFFFF"
+                        BorderBrush="#D6DAE1"
+                        BorderThickness="1"
+                        Padding="42,36">
+                    <FlowDocumentScrollViewer x:Name="ReadableDocumentViewer"
+                                              IsToolBarVisible="False"
+                                              VerticalScrollBarVisibility="Disabled"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Background="Transparent"
+                                              BorderThickness="0" />
+                </Border>
+            </ScrollViewer>
+
+            <Grid Style="{StaticResource VisibleWhenNoReadableDocumentBlocks}">
+                <Border MaxWidth="620"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="36"
+                        Background="#FBFCFD"
+                        BorderBrush="#D6DAE1"
+                        BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReadableDocumentStateTitle}"
+                                   FontFamily="Yu Gothic UI"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#171C27"
+                                   TextAlignment="Center" />
+                        <TextBlock Text="{Binding ReadableDocumentStateDescription}"
+                                   Margin="0,12,0,0"
+                                   FontFamily="Yu Gothic UI"
+                                   FontSize="{Binding ReadableDocumentFontSize}"
+                                   LineHeight="{Binding ReadableDocumentLineHeight}"
+                                   Foreground="#646C7B"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
                     </StackPanel>
-                </Button>
+                </Border>
             </Grid>
-        </Border>
+        </Grid>
     </Grid>
 </UserControl>
