@@ -45,6 +45,8 @@ public sealed partial class MainWindowViewModel
         CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync, CanCloseSetupWizardModal);
         OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
         CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
+        UseStandardLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Standard));
+        UseDetailLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Detail));
         SetupBackCommand = new RelayCommand(SetupBackAsync, CanUseSetupBackAction);
         SetupNextCommand = new RelayCommand(SetupNextAsync, CanUseSetupNextAction);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);

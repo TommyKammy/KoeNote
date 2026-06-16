@@ -3,7 +3,15 @@ using System.Text.Json;
 
 namespace KoeNote.App.Services;
 
-public sealed record UiPreferences(double MainContentZoomScale = 1.0);
+public enum MainLayoutMode
+{
+    Standard,
+    Detail
+}
+
+public sealed record UiPreferences(
+    double MainContentZoomScale = 1.0,
+    MainLayoutMode MainLayoutMode = MainLayoutMode.Standard);
 
 public sealed class UiPreferencesService(AppPaths paths)
 {
@@ -40,5 +48,20 @@ public sealed class UiPreferencesService(AppPaths paths)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         File.WriteAllText(_path, JsonSerializer.Serialize(preferences, JsonOptions));
+    }
+
+    public void SaveMainContentZoomScale(double scale)
+    {
+        Save(Load() with { MainContentZoomScale = scale });
+    }
+
+    public void SaveMainLayoutMode(MainLayoutMode mode)
+    {
+        Save(Load() with { MainLayoutMode = NormalizeMainLayoutMode(mode) });
+    }
+
+    public static MainLayoutMode NormalizeMainLayoutMode(MainLayoutMode mode)
+    {
+        return Enum.IsDefined(mode) ? mode : MainLayoutMode.Standard;
     }
 }

@@ -137,6 +137,7 @@ public sealed class TabHighlightStyleTests
     {
         var repoRoot = FindRepoRoot();
         var mainWindowXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "MainWindow.xaml"));
+        var mainWindowCode = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "MainWindow.xaml.cs"));
         var headerXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "HeaderToolbar.xaml"));
         var headerStyles = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "HeaderToolbar.Styles.xaml"));
         var controlsXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Resources", "Controls.xaml"));
@@ -151,6 +152,12 @@ public sealed class TabHighlightStyleTests
 
         Assert.Contains("Margin=\"0\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("<ColumnDefinition Width=\"1\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"JobListColumn\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TranscriptColumn\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ReviewColumn\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Equal(2, AllIndexesOf(mainWindowXaml, "DragCompleted=\"OnWorkspaceSplitterDragCompleted\"").Count());
+        Assert.Contains("BindingOperations.SetBinding", mainWindowCode, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinition.WidthProperty", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"0\" />", controlsXaml, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"0\"", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);

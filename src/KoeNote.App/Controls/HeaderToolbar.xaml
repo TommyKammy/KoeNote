@@ -163,6 +163,24 @@
                         VerticalAlignment="Center"
                         HorizontalAlignment="Right"
                         Margin="12,0,12,0">
+                <Border Background="#F3F5F8"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="2"
+                        Margin="0,0,12,0"
+                        ToolTip="{Binding MainLayoutModeToolTip}">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Content="標準"
+                                     GroupName="MainLayoutMode"
+                                     Style="{StaticResource HeaderLayoutRadioButton}"
+                                     IsChecked="{Binding IsStandardLayoutSelected, Mode=TwoWay}" />
+                        <RadioButton Content="詳細"
+                                     GroupName="MainLayoutMode"
+                                     Style="{StaticResource HeaderLayoutRadioButton}"
+                                     IsChecked="{Binding IsDetailLayoutSelected, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
                 <TextBlock Text="{Binding AppVersionDisplay}"
                            Style="{StaticResource HeaderInfoValue}"
                            ToolTip="{Binding AppVersionToolTip}"

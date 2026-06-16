@@ -32,14 +32,21 @@
                       Margin="0"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-            <Grid Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
+            <Grid x:Name="MainWorkspaceGrid"
+                  Width="{Binding ViewportWidth, ElementName=MainContentScrollViewer}"
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="4*" MinWidth="176" />
+                    <ColumnDefinition x:Name="JobListColumn"
+                                      Width="{Binding DataContext.JobListColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
+                                      MinWidth="{Binding DataContext.JobListColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="15*" MinWidth="540" />
+                    <ColumnDefinition x:Name="TranscriptColumn"
+                                      Width="{Binding DataContext.TranscriptColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
+                                      MinWidth="540" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="6*" MinWidth="300" />
+                    <ColumnDefinition x:Name="ReviewColumn"
+                                      Width="{Binding DataContext.ReviewColumnWidth, ElementName=MainWorkspaceGrid, Mode=TwoWay}"
+                                      MinWidth="{Binding DataContext.ReviewColumnMinWidth, ElementName=MainWorkspaceGrid}" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" MinHeight="420" />
@@ -49,10 +56,12 @@
                 <controls:JobListPanel Grid.RowSpan="2" Grid.Column="0" />
                 <GridSplitter Grid.RowSpan="2"
                               Grid.Column="1"
+                              DragCompleted="OnWorkspaceSplitterDragCompleted"
                               Style="{StaticResource ModernVerticalGridSplitter}" />
                 <controls:TranscriptPanel Grid.Column="2" Grid.Row="0" Margin="0" />
                 <GridSplitter Grid.RowSpan="2"
                               Grid.Column="3"
+                              DragCompleted="OnWorkspaceSplitterDragCompleted"
                               Style="{StaticResource ModernVerticalGridSplitter}" />
                 <DockPanel Grid.Column="4" Grid.RowSpan="2">
                     <controls:ReviewPanel />
