@@ -81,6 +81,21 @@ public sealed class TranscriptEditServiceTests
     }
 
     [Fact]
+    public void UndoLastRawSegmentEdit_RestoresZeroPendingJobState()
+    {
+        var paths = ArrangeSegment();
+        SetJobState(paths, "job-001", "asr-only", "review_skipped", 55, pendingCount: 0);
+        var service = new TranscriptEditService(paths);
+
+        service.ApplyRawSegmentEdit("job-001", "segment-001", "raw edited");
+        AssertJobReviewCompleted(paths, "job-001");
+
+        Assert.True(service.UndoLastRawSegmentEdit("job-001", "segment-001"));
+
+        AssertJobState(paths, "job-001", "asr-only", "review_skipped", 55, expectedPending: 0);
+    }
+
+    [Fact]
     public void UndoLastSegmentEdit_RecomputesPendingCountAfterOtherReviewDecision()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -473,6 +488,32 @@ public sealed class TranscriptEditServiceTests
         command.ExecuteNonQuery();
     }
 
+    private static void SetJobState(
+        AppPaths paths,
+        string jobId,
+        string status,
+        string currentStage,
+        int progressPercent,
+        int pendingCount)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE jobs
+            SET status = $status,
+                current_stage = $current_stage,
+                progress_percent = $progress_percent,
+                unreviewed_draft_count = $pending_count
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$current_stage", currentStage);
+        command.Parameters.AddWithValue("$progress_percent", progressPercent);
+        command.Parameters.AddWithValue("$pending_count", pendingCount);
+        command.ExecuteNonQuery();
+    }
+
     private static void AssertJobReviewCompleted(AppPaths paths, string jobId)
     {
         using var connection = Open(paths);
@@ -506,6 +547,30 @@ public sealed class TranscriptEditServiceTests
         Assert.Equal("整文待ち", reader.GetString(0));
         Assert.Equal("review_ready", reader.GetString(1));
         Assert.Equal(JobRunProgressPlan.ReviewSucceeded, reader.GetInt32(2));
+        Assert.Equal(expectedPending, reader.GetInt32(3));
+    }
+
+    private static void AssertJobState(
+        AppPaths paths,
+        string jobId,
+        string expectedStatus,
+        string expectedCurrentStage,
+        int expectedProgressPercent,
+        int expectedPending)
+    {
+        using var connection = Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT status, current_stage, progress_percent, unreviewed_draft_count
+            FROM jobs
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(expectedStatus, reader.GetString(0));
+        Assert.Equal(expectedCurrentStage, reader.GetString(1));
+        Assert.Equal(expectedProgressPercent, reader.GetInt32(2));
         Assert.Equal(expectedPending, reader.GetInt32(3));
     }
 
