@@ -16,10 +16,6 @@ public static class ReadableDocumentBlockBuilder
         @"^\s*\[(?<start>" + TimestampPattern + @")\s*(?:" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @"))?\]\s*(?:(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*)?(?<text>.*)$",
         RegexOptions.Compiled);
 
-    private static readonly Regex RangedTimestampBlockPattern = new(
-        @"^\s*(?<start>" + TimestampPattern + @")\s*" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*(?<text>.*)$",
-        RegexOptions.Compiled);
-
     private static readonly Regex SpeakerDelimitedTimestampBlockPattern = new(
         @"^\s*(?<start>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerAfterTimestampPattern + @")[:\uFF1A]\s*(?<text>.*)$",
         RegexOptions.Compiled);
@@ -121,12 +117,6 @@ public static class ReadableDocumentBlockBuilder
     private static bool TryMatchTimestampedBlock(string line, out Match match)
     {
         match = BracketedTimestampBlockPattern.Match(line);
-        if (match.Success)
-        {
-            return true;
-        }
-
-        match = RangedTimestampBlockPattern.Match(line);
         if (match.Success)
         {
             return true;

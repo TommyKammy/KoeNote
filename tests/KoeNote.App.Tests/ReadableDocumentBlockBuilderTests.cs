@@ -83,12 +83,12 @@ public sealed class ReadableDocumentBlockBuilderTests
     [Fact]
     public void Build_DoesNotSplitContinuationLineStartingWithScheduleRange()
     {
-        var blocks = ReadableDocumentBlockBuilder.Build("[00:00 - 00:05] Speaker_0: Agenda\n10:00 - 11:00 Q&A");
+        var blocks = ReadableDocumentBlockBuilder.Build("[00:00 - 00:05] Speaker_0: Agenda\n10:00 - 11:00 Q&A: discussion");
 
         var block = Assert.Single(blocks);
         Assert.Equal("Speaker_0", block.Speaker);
         Assert.Equal("00:00 - 00:05", block.TimeRange);
-        Assert.Equal("Agenda\n10:00 - 11:00 Q&A", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.Equal("Agenda\n10:00 - 11:00 Q&A: discussion", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
         Assert.Equal(0, block.StartSeconds);
         Assert.Equal(5, block.EndSeconds);
     }
