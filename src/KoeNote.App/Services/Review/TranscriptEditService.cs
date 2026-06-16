@@ -437,13 +437,13 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.Transaction = transaction;
         command.CommandText = string.IsNullOrWhiteSpace(jobId)
             ? """
-              SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+              SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
               FROM review_operation_history
               ORDER BY created_at DESC, rowid DESC
               LIMIT 1;
               """
             : """
-              SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+              SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
               FROM review_operation_history
               WHERE job_id = $job_id
               ORDER BY created_at DESC, rowid DESC
@@ -461,13 +461,15 @@ public sealed class TranscriptEditService(AppPaths paths)
         }
 
         return new OperationSnapshot(
-            reader.GetString(0),
+            reader.GetInt64(0),
             reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.GetString(7),
+            reader.GetString(8));
     }
 
     private static OperationSnapshot? LoadLastSegmentOperation(
@@ -479,7 +481,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+            SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
             FROM review_operation_history
             WHERE job_id = $job_id
               AND segment_id = $segment_id
@@ -496,13 +498,15 @@ public sealed class TranscriptEditService(AppPaths paths)
         }
 
         return new OperationSnapshot(
-            reader.GetString(0),
+            reader.GetInt64(0),
             reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.GetString(7),
+            reader.GetString(8));
     }
 
     private static void UndoReviewDecision(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -559,7 +563,8 @@ public sealed class TranscriptEditService(AppPaths paths)
         RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
         if (before.PendingDraftIds.Count == 0 &&
             before.JobPendingDraftCount == 0 &&
-            CountPendingDrafts(connection, transaction, before.JobId) == 0)
+            CountPendingDrafts(connection, transaction, before.JobId) == 0 &&
+            !HasLaterReviewDecision(connection, transaction, before.JobId, operation.CreatedAt, operation.RowId))
         {
             RestoreRawEditJobState(
                 connection,
@@ -732,32 +737,23 @@ public sealed class TranscriptEditService(AppPaths paths)
             UPDATE jobs
             SET unreviewed_draft_count = (SELECT value FROM pending),
                 status = CASE
-                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
-                        THEN status
                     WHEN (SELECT value FROM pending) > 0
                         THEN $review_ready_status
                     WHEN (SELECT value FROM pending) = 0
-                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN '完成文書作成待ち'
                     ELSE status
                 END,
                 current_stage = CASE
-                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
-                        THEN current_stage
                     WHEN (SELECT value FROM pending) > 0
                         THEN 'review_ready'
                     WHEN (SELECT value FROM pending) = 0
-                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN 'review_completed'
                     ELSE current_stage
                 END,
                 progress_percent = CASE
-                    WHEN COALESCE(current_stage, '') = 'readable_polishing_completed'
-                        THEN progress_percent
                     WHEN (SELECT value FROM pending) > 0
                         THEN $progress_percent
                     WHEN (SELECT value FROM pending) = 0
-                        AND COALESCE(current_stage, '') <> 'readable_polishing_completed'
                         THEN $progress_percent
                     ELSE progress_percent
                 END,
@@ -825,6 +821,32 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
+    private static bool HasLaterReviewDecision(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string createdAt,
+        long rowId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT 1
+            FROM review_operation_history
+            WHERE job_id = $job_id
+              AND operation_type = 'review_decision'
+              AND (
+                  created_at > $created_at
+                  OR (created_at = $created_at AND rowid > $rowid)
+              )
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$created_at", createdAt);
+        command.Parameters.AddWithValue("$rowid", rowId);
+        return command.ExecuteScalar() is not null;
+    }
+
     internal sealed record ReviewDecisionHistorySnapshot(
         string JobId,
         string SegmentId,
@@ -861,11 +883,13 @@ public sealed class TranscriptEditService(AppPaths paths)
         bool Exists);
 
     private sealed record OperationSnapshot(
+        long RowId,
         string OperationId,
         string JobId,
         string? DraftId,
         string? SegmentId,
         string OperationType,
         string BeforeJson,
-        string AfterJson);
+        string AfterJson,
+        string CreatedAt);
 }

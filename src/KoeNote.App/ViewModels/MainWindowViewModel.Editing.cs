@@ -178,6 +178,7 @@ public sealed partial class MainWindowViewModel
         if (useRawTranscript)
         {
             LoadReviewQueue(updateSelection: reloadSegments);
+            _suppressNextSegmentDraftSelection = !reloadSegments;
             if (SelectedJob is not null)
             {
                 SelectedJob.UnreviewedDrafts = ReviewQueue.Count;

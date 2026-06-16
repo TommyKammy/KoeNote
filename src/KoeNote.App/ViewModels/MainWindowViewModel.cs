@@ -185,6 +185,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isSegmentInlineEditActive;
     private bool _segmentInlineEditStartedInRawMode;
+    private bool _suppressNextSegmentDraftSelection;
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
@@ -941,6 +942,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 }
             }
 
+            var suppressDraftSelection = _suppressNextSegmentDraftSelection;
+            _suppressNextSegmentDraftSelection = false;
+
             if (!_isReloadingSegments &&
                 _isSpeakerInlineEditActive &&
                 _selectedSegment is { } previousSpeakerSegment &&
@@ -970,7 +974,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 SelectedSegmentEditText = GetSegmentEditableText(value);
                 SelectedSpeakerAlias = value.Speaker;
-                if (!_isSelectingSegmentForDraft && !_isSelectingSegmentForPlayback)
+                if (!suppressDraftSelection &&
+                    !_isSelectingSegmentForDraft &&
+                    !_isSelectingSegmentForPlayback)
                 {
                     SelectFirstDraftForSegment(value.SegmentId);
                 }

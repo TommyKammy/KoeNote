@@ -296,6 +296,27 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void RawExportDialogFilterIncludesExcelFormat()
+    {
+        var createFilter = typeof(TranscriptExportDialogService).GetMethod(
+            "CreateFilter",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        var getFormatFromFilterIndex = typeof(TranscriptExportDialogService).GetMethod(
+            "GetFormatFromFilterIndex",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        var filter = Assert.IsType<string>(createFilter!.Invoke(
+            null,
+            [null, TranscriptExportSource.Raw]));
+        var selectedFormat = Assert.IsType<TranscriptExportFormat>(getFormatFromFilterIndex!.Invoke(
+            null,
+            [7, TranscriptExportSource.Raw]));
+
+        Assert.Contains("Excel workbook (*.xlsx)|*.xlsx", filter, StringComparison.Ordinal);
+        Assert.Equal(TranscriptExportFormat.Xlsx, selectedFormat);
+    }
+
+    [Fact]
     public void IncludeExportTimestamps_CanBeToggled()
     {
         var viewModel = CreateViewModel();
@@ -786,8 +807,8 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         var second = viewModel.Segments.Single(segment => segment.SegmentId == "segment-002");
 
         viewModel.IsStandardRawTranscriptViewSelected = true;
-        viewModel.SelectedCorrectionDraft = null;
         viewModel.BeginSegmentInlineEditCommand.Execute(first);
+        viewModel.SelectedCorrectionDraft = null;
         viewModel.SelectedSegmentEditText = "edited raw first";
         viewModel.SelectedSegment = second;
 

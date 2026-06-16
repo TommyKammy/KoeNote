@@ -84,7 +84,7 @@ public sealed class TranscriptExportDialogService
 
         return source == TranscriptExportSource.ReadablePolished
             ? "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|Word document (*.docx)|*.docx|Excel workbook (*.xlsx)|*.xlsx"
-            : "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|JSON (*.json)|*.json|SRT subtitles (*.srt)|*.srt|WebVTT subtitles (*.vtt)|*.vtt|Word document (*.docx)|*.docx";
+            : "Text document (*.txt)|*.txt|Markdown (*.md)|*.md|JSON (*.json)|*.json|SRT subtitles (*.srt)|*.srt|WebVTT subtitles (*.vtt)|*.vtt|Word document (*.docx)|*.docx|Excel workbook (*.xlsx)|*.xlsx";
     }
 
     private static TranscriptExportFormat GetFormatFromFilterIndex(int filterIndex, TranscriptExportSource source)
@@ -107,6 +107,7 @@ public sealed class TranscriptExportDialogService
             4 => TranscriptExportFormat.Srt,
             5 => TranscriptExportFormat.Vtt,
             6 => TranscriptExportFormat.Docx,
+            7 => TranscriptExportFormat.Xlsx,
             _ => TranscriptExportFormat.Text
         };
     }
