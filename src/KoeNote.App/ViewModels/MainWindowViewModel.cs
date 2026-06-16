@@ -100,6 +100,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private JobSummary? _selectedJob;
     private TranscriptSegmentPreview? _selectedSegment;
     private CorrectionDraft? _selectedCorrectionDraft;
+    private bool _isStandardRawTranscriptView;
     private bool _isStandardAiRailExpanded;
     private DomainPresetImportHistoryItem? _selectedDomainPresetImport;
     private string? _loadedDomainPresetPath;
@@ -183,6 +184,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _selectedSegmentEditText = string.Empty;
     private string _selectedSpeakerAlias = string.Empty;
     private bool _isSegmentInlineEditActive;
+    private bool _segmentInlineEditStartedInRawMode;
+    private bool _suppressNextSegmentDraftSelection;
     private bool _isSpeakerInlineEditActive;
     private bool _isReloadingSegments;
     private bool _isRunInProgress;
@@ -939,6 +942,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 }
             }
 
+            var suppressDraftSelection = _suppressNextSegmentDraftSelection;
+            _suppressNextSegmentDraftSelection = false;
+
             if (!_isReloadingSegments &&
                 _isSpeakerInlineEditActive &&
                 _selectedSegment is { } previousSpeakerSegment &&
@@ -966,9 +972,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             }
             else
             {
-                SelectedSegmentEditText = value.Text;
+                SelectedSegmentEditText = GetSegmentEditableText(value);
                 SelectedSpeakerAlias = value.Speaker;
-                if (!_isSelectingSegmentForDraft && !_isSelectingSegmentForPlayback)
+                if (!suppressDraftSelection &&
+                    !_isSelectingSegmentForDraft &&
+                    !_isSelectingSegmentForPlayback)
                 {
                     SelectFirstDraftForSegment(value.SegmentId);
                 }
@@ -1566,6 +1574,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3)))
             {
                 NotifyExportMenuTargetChanged();
+                RefreshSelectedSegmentEditBuffer();
             }
         }
     }

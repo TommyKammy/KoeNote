@@ -91,7 +91,7 @@ public sealed partial class MainWindowViewModel
         SaveSpeakerInlineEditCommand = new RelayCommand(SaveSpeakerInlineEditAsync, CanEditSelectedSpeaker);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
-        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportReadablePolishing);
+        ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportCurrentTranscriptTarget);
         ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportReadablePolishing);
         ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Polished), CanExportSelectedJob);
         ExportSrtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Srt, TranscriptExportSource.Polished), CanExportSelectedJob);

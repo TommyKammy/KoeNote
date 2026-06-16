@@ -30,7 +30,10 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(StandardAiRailColumnMinWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
+        OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
+        OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
         NotifyExportMenuTargetChanged();
+        RefreshSelectedSegmentEditBuffer();
     }
 
     private static string GetMainLayoutModeDisplayName(MainLayoutMode mode)

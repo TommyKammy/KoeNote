@@ -87,10 +87,11 @@ public partial class ReadablePolishedPanel : UserControl
         if (DataContext is not MainWindowViewModel
             {
                 IsTranscriptAutoScrollEnabled: true,
-                SelectedTranscriptTabIndex: 0,
                 SelectedSegment: { } segment,
                 HasReadableDocumentBlocks: true
-            } viewModel)
+            } viewModel ||
+            (!viewModel.IsStandardReadableTranscriptVisible &&
+             viewModel.SelectedTranscriptTabIndex != 0))
         {
             return;
         }

@@ -31,6 +31,53 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="VisibleWhenStandardReadableTranscript" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsStandardReadableTranscriptVisible}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="VisibleWhenStandardRawTranscript" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsStandardRawTranscriptVisible}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StandardTranscriptModeRadio" TargetType="RadioButton">
+            <Setter Property="MinWidth" Value="58" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="ModeChrome"
+                                Background="Transparent"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ModeChrome" Property="Background" Value="#EEF2F6" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ModeChrome" Property="Background" Value="#FFFFFF" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="StandardRailButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Width" Value="34" />
             <Setter Property="Height" Value="34" />
@@ -113,6 +160,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding StandardLayoutTitle}"
@@ -125,6 +173,29 @@
                                        Margin="0,3,0,0" />
                         </StackPanel>
                         <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="18,0,12,0">
+                            <Border Background="#EEF2F6"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="2">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Content="原文"
+                                                 GroupName="StandardTranscriptMode"
+                                                 Style="{StaticResource StandardTranscriptModeRadio}"
+                                                 IsChecked="{Binding IsStandardRawTranscriptViewSelected, Mode=TwoWay}"
+                                                 ToolTip="ASR原文を確認・修正します" />
+                                    <RadioButton Content="整文"
+                                                 GroupName="StandardTranscriptMode"
+                                                 Style="{StaticResource StandardTranscriptModeRadio}"
+                                                 IsChecked="{Binding IsStandardReadableTranscriptViewSelected, Mode=TwoWay}"
+                                                 ToolTip="整文ビューを表示します" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
                             <Button Command="{Binding UseDetailLayoutCommand}"
@@ -179,14 +250,25 @@
                         Grid.Row="1"
                         Background="#F7F8FA"
                         Padding="34,24,34,18">
-                    <Border MaxWidth="900"
-                            HorizontalAlignment="Center"
-                            Background="#FFFFFF"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                        <controls:ReadablePolishedPanel />
-                    </Border>
+                    <Grid>
+                        <Border MaxWidth="900"
+                                HorizontalAlignment="Center"
+                                Background="#FFFFFF"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Style="{StaticResource VisibleWhenStandardReadableTranscript}">
+                            <controls:ReadablePolishedPanel />
+                        </Border>
+
+                        <Border Background="#FFFFFF"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Style="{StaticResource VisibleWhenStandardRawTranscript}">
+                            <controls:TranscriptSegmentList DisplayMode="Raw" />
+                        </Border>
+                    </Grid>
                 </Border>
 
                 <controls:TranscriptAudioPlayer Grid.Column="1" Grid.Row="2" />

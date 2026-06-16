@@ -1,4 +1,5 @@
 using KoeNote.App.Models;
+using KoeNote.App.Services.Jobs;
 
 namespace KoeNote.App.ViewModels;
 
@@ -17,7 +18,8 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        SelectedSegmentEditText = segment!.Text;
+        _segmentInlineEditStartedInRawMode = IsRawTranscriptEditingMode;
+        SelectedSegmentEditText = GetSegmentEditableText(segment!, _segmentInlineEditStartedInRawMode);
         IsSpeakerInlineEditActive = false;
         IsSegmentInlineEditActive = true;
         return Task.CompletedTask;
@@ -62,7 +64,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSegment is not null)
         {
-            SelectedSegmentEditText = SelectedSegment.Text;
+            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment, _segmentInlineEditStartedInRawMode);
         }
 
         IsSegmentInlineEditActive = false;
@@ -91,17 +93,23 @@ public sealed partial class MainWindowViewModel
             SelectedSegment is not null &&
             string.Equals(SelectedSegment.SegmentId, segment.SegmentId, StringComparison.Ordinal))
         {
-            SelectedSegmentEditText = segment.Text;
+            SelectedSegmentEditText = GetSegmentEditableText(segment, _segmentInlineEditStartedInRawMode);
             IsSegmentInlineEditActive = false;
             return Task.CompletedTask;
         }
 
-        if (_transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId))
+        var reverted = IsRawTranscriptEditingMode
+            ? _transcriptEditService.UndoLastRawSegmentEdit(SelectedJob.JobId, segment.SegmentId)
+            : _transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId);
+        if (reverted)
         {
             LatestLog = "選択セグメントの直近編集を戻しました。";
+            LoadReviewQueue();
             ReloadSegmentsForSelectedJob(segment.SegmentId);
             LoadSummaryForSelectedJob();
             LoadReadablePolishedForSelectedJob();
+            ReloadSelectedJobState();
+            RefreshJobViews();
         }
         else
         {
@@ -118,31 +126,73 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        if (string.Equals(SelectedSegmentEditText, segment.Text, StringComparison.Ordinal))
+        var useRawTranscript = IsSegmentInlineEditActive
+            ? _segmentInlineEditStartedInRawMode
+            : IsRawTranscriptEditingMode;
+
+        if (string.Equals(SelectedSegmentEditText, GetSegmentEditableText(segment, useRawTranscript), StringComparison.Ordinal))
         {
             IsSegmentInlineEditActive = false;
             return true;
         }
 
-        _transcriptEditService.ApplySegmentEdit(
-            SelectedJob.JobId,
-            segment.SegmentId,
-            SelectedSegmentEditText);
+        if (useRawTranscript)
+        {
+            _transcriptEditService.ApplyRawSegmentEdit(
+                SelectedJob.JobId,
+                segment.SegmentId,
+                SelectedSegmentEditText);
+        }
+        else
+        {
+            _transcriptEditService.ApplySegmentEdit(
+                SelectedJob.JobId,
+                segment.SegmentId,
+                SelectedSegmentEditText);
+        }
 
         IsSegmentInlineEditActive = false;
-        LatestLog = "セグメント本文を手修正しました。元の文字起こしは保持されています。";
+        LatestLog = useRawTranscript
+            ? "素起こし本文を手修正しました。"
+            : "セグメント本文を手修正しました。元の文字起こしは保持されています。";
         if (reloadSegments)
         {
             ReloadSegmentsForSelectedJob(segment.SegmentId);
         }
         else
         {
-            ReplaceEditedSegmentPreview(segment, SelectedSegmentEditText);
+            if (useRawTranscript)
+            {
+                ReplaceEditedRawSegmentPreview(segment, SelectedSegmentEditText);
+            }
+            else
+            {
+                ReplaceEditedSegmentPreview(segment, SelectedSegmentEditText);
+            }
+
             FilteredSegments.Refresh();
         }
 
         LoadSummaryForSelectedJob();
         LoadReadablePolishedForSelectedJob();
+        if (useRawTranscript)
+        {
+            LoadReviewQueue(updateSelection: reloadSegments);
+            _suppressNextSegmentDraftSelection = !reloadSegments;
+            if (SelectedJob is not null)
+            {
+                SelectedJob.UnreviewedDrafts = ReviewQueue.Count;
+                if (ReviewQueue.Count == 0)
+                {
+                    SelectedJob.Status = "完成文書作成待ち";
+                    SelectedJob.ProgressPercent = JobRunProgressPlan.ReviewSucceeded;
+                    MarkManualReviewStageCompleted();
+                }
+            }
+
+            RefreshJobViews();
+        }
+
         return true;
     }
 
@@ -193,6 +243,42 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private void ReplaceEditedRawSegmentPreview(TranscriptSegmentPreview segment, string rawText)
+    {
+        var index = Segments.IndexOf(segment);
+        if (index >= 0)
+        {
+            Segments[index] = segment with
+            {
+                Text = rawText,
+                RawText = rawText,
+                NormalizedText = null,
+                FinalText = null,
+                ReviewState = "手修正済み"
+            };
+        }
+    }
+
+    private string GetSegmentEditableText(TranscriptSegmentPreview segment)
+    {
+        return GetSegmentEditableText(segment, IsRawTranscriptEditingMode);
+    }
+
+    private static string GetSegmentEditableText(TranscriptSegmentPreview segment, bool useRawTranscript)
+    {
+        return useRawTranscript ? segment.RawTranscriptText : segment.Text;
+    }
+
+    private void RefreshSelectedSegmentEditBuffer()
+    {
+        if (SelectedSegment is not null && !IsSegmentInlineEditActive)
+        {
+            SelectedSegmentEditText = GetSegmentEditableText(SelectedSegment);
+        }
+    }
+
+    private bool IsRawTranscriptEditingMode => EffectiveExportTranscriptTabIndex == ExportRawTranscriptTabIndex;
+
     private void ReplaceEditedSpeakerPreview(TranscriptSegmentPreview segment, string speaker)
     {
         for (var i = 0; i < Segments.Count; i++)
@@ -231,6 +317,7 @@ public sealed partial class MainWindowViewModel
             ReloadSegmentsForSelectedJob(selectedSegmentId);
             LoadSummaryForSelectedJob();
             LoadReadablePolishedForSelectedJob();
+            ReloadSelectedJobState();
             RefreshJobViews();
         }
         else

@@ -15,7 +15,9 @@ public sealed partial class MainWindowViewModel
     private const int ExportReviewCandidateTranscriptTabIndex = 3;
 
     private int EffectiveExportTranscriptTabIndex => IsStandardLayout
-        ? ExportReadableTranscriptTabIndex
+        ? IsStandardRawTranscriptViewSelected
+            ? ExportRawTranscriptTabIndex
+            : ExportReadableTranscriptTabIndex
         : SelectedTranscriptTabIndex;
 
     public string CurrentExportTargetDisplayName => EffectiveExportTranscriptTabIndex switch
@@ -51,11 +53,14 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsDiffExportMenuVisible));
         OnPropertyChanged(nameof(IsReviewCandidateExportMenuVisible));
         OnPropertyChanged(nameof(IsSummaryExportMenuVisible));
+        UpdateExportCommandStates();
     }
 
     private Task ExportSelectedJobAsync()
     {
-        return ExportSelectedJobWithDialogAsync(null);
+        return GetCurrentExportSource() is { } source
+            ? ExportSelectedJobWithDialogAsync(null, source)
+            : Task.CompletedTask;
     }
 
     private Task ExportSelectedJobFormatAsync(TranscriptExportFormat format)
@@ -217,6 +222,28 @@ public sealed partial class MainWindowViewModel
             TranscriptDerivativeKinds.Polished);
         return derivative is { Content.Length: > 0 } &&
             TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out _);
+    }
+
+    private bool CanExportCurrentTranscriptTarget()
+    {
+        return EffectiveExportTranscriptTabIndex switch
+        {
+            ExportReadableTranscriptTabIndex => CanExportReadablePolishing(),
+            ExportRawTranscriptTabIndex => CanExportSelectedJob(),
+            ExportReviewCandidateTranscriptTabIndex => CanExportSelectedJob(),
+            _ => false
+        };
+    }
+
+    private TranscriptExportSource? GetCurrentExportSource()
+    {
+        return EffectiveExportTranscriptTabIndex switch
+        {
+            ExportReadableTranscriptTabIndex => TranscriptExportSource.ReadablePolished,
+            ExportRawTranscriptTabIndex => TranscriptExportSource.Raw,
+            ExportReviewCandidateTranscriptTabIndex => TranscriptExportSource.Polished,
+            _ => null
+        };
     }
 
     private bool CanOpenExportFolder()

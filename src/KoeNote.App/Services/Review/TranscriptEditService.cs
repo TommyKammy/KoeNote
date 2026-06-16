@@ -1,4 +1,5 @@
 using System.Text.Json;
+using KoeNote.App.Services.Jobs;
 using Microsoft.Data.Sqlite;
 
 namespace KoeNote.App.Services.Review;
@@ -50,6 +51,69 @@ public sealed class TranscriptEditService(AppPaths paths)
             draftId: null,
             segmentId,
             "segment_edit",
+            before,
+            after);
+
+        transaction.Commit();
+    }
+
+    public void ApplyRawSegmentEdit(string jobId, string segmentId, string rawText)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("Job id is required.", nameof(jobId));
+        }
+
+        if (string.IsNullOrWhiteSpace(segmentId))
+        {
+            throw new ArgumentException("Segment id is required.", nameof(segmentId));
+        }
+
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            throw new ArgumentException("Raw text is required.", nameof(rawText));
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        var before = LoadRawSegmentSnapshot(connection, transaction, jobId, segmentId)
+            ?? throw new KeyNotFoundException($"Transcript segment was not found: {jobId}/{segmentId}");
+        var after = before with
+        {
+            RawText = rawText,
+            NormalizedText = null,
+            FinalText = null,
+            ReviewState = "manually_edited",
+            PendingDraftIds = []
+        };
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE transcript_segments
+            SET raw_text = $raw_text,
+                normalized_text = NULL,
+                final_text = NULL,
+                review_state = $review_state
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.Parameters.AddWithValue("$raw_text", rawText);
+        command.Parameters.AddWithValue("$review_state", after.ReviewState);
+        command.ExecuteNonQuery();
+
+        InvalidatePendingDraftsForSegment(connection, transaction, jobId, segmentId);
+        RefreshRawEditPendingCount(connection, transaction, jobId);
+
+        InsertHistory(
+            connection,
+            transaction,
+            jobId,
+            draftId: null,
+            segmentId,
+            "raw_segment_edit",
             before,
             after);
 
@@ -126,6 +190,9 @@ public sealed class TranscriptEditService(AppPaths paths)
             case "segment_edit":
                 UndoSegmentEdit(connection, transaction, operation);
                 break;
+            case "raw_segment_edit":
+                UndoRawSegmentEdit(connection, transaction, operation);
+                break;
             case "speaker_alias":
                 UndoSpeakerAlias(connection, transaction, operation);
                 break;
@@ -140,6 +207,16 @@ public sealed class TranscriptEditService(AppPaths paths)
 
     public bool UndoLastSegmentEdit(string jobId, string segmentId)
     {
+        return UndoLastSegmentEdit(jobId, segmentId, rawOnly: false);
+    }
+
+    public bool UndoLastRawSegmentEdit(string jobId, string segmentId)
+    {
+        return UndoLastSegmentEdit(jobId, segmentId, rawOnly: true);
+    }
+
+    private bool UndoLastSegmentEdit(string jobId, string segmentId, bool rawOnly)
+    {
         if (string.IsNullOrWhiteSpace(jobId))
         {
             throw new ArgumentException("Job id is required.", nameof(jobId));
@@ -153,13 +230,34 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var connection = SqliteConnectionFactory.Open(paths);
         using var transaction = connection.BeginTransaction();
 
-        var operation = LoadLastSegmentEditOperation(connection, transaction, jobId, segmentId);
+        var operation = LoadLastSegmentOperation(connection, transaction, jobId, segmentId);
         if (operation is null)
         {
             return false;
         }
 
-        UndoSegmentEdit(connection, transaction, operation);
+        if (rawOnly && operation.OperationType != "raw_segment_edit")
+        {
+            return false;
+        }
+
+        if (operation.OperationType is not ("segment_edit" or "raw_segment_edit"))
+        {
+            return false;
+        }
+
+        switch (operation.OperationType)
+        {
+            case "segment_edit":
+                UndoSegmentEdit(connection, transaction, operation);
+                break;
+            case "raw_segment_edit":
+                UndoRawSegmentEdit(connection, transaction, operation);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown segment edit operation type: {operation.OperationType}");
+        }
+
         DeleteHistory(connection, transaction, operation.OperationId);
         transaction.Commit();
         return true;
@@ -259,22 +357,96 @@ public sealed class TranscriptEditService(AppPaths paths)
         return new SpeakerAliasSnapshot(jobId, speakerId, displayName, displayName is not null);
     }
 
+    private static RawSegmentSnapshot? LoadRawSegmentSnapshot(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT s.job_id,
+                   s.segment_id,
+                   s.raw_text,
+                   s.normalized_text,
+                   s.final_text,
+                   s.review_state,
+                   j.unreviewed_draft_count,
+                   j.status,
+                   j.current_stage,
+                   j.progress_percent
+            FROM transcript_segments s
+            JOIN jobs j ON j.job_id = s.job_id
+            WHERE s.job_id = $job_id AND s.segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        return new RawSegmentSnapshot(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.GetString(5),
+            LoadPendingDraftIds(connection, transaction, jobId, segmentId),
+            reader.GetInt32(6),
+            reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetString(8),
+            reader.GetInt32(9));
+    }
+
+    private static IReadOnlyList<string> LoadPendingDraftIds(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT draft_id
+            FROM correction_drafts
+            WHERE job_id = $job_id
+              AND segment_id = $segment_id
+              AND status = 'pending';
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+
+        using var reader = command.ExecuteReader();
+        var draftIds = new List<string>();
+        while (reader.Read())
+        {
+            draftIds.Add(reader.GetString(0));
+        }
+
+        return draftIds;
+    }
+
     private static OperationSnapshot? LoadLastOperation(SqliteConnection connection, SqliteTransaction transaction, string? jobId)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = string.IsNullOrWhiteSpace(jobId)
             ? """
-              SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+              SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
               FROM review_operation_history
-              ORDER BY created_at DESC, operation_id DESC
+              ORDER BY created_at DESC, rowid DESC
               LIMIT 1;
               """
             : """
-              SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+              SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
               FROM review_operation_history
               WHERE job_id = $job_id
-              ORDER BY created_at DESC, operation_id DESC
+              ORDER BY created_at DESC, rowid DESC
               LIMIT 1;
               """;
         if (!string.IsNullOrWhiteSpace(jobId))
@@ -289,16 +461,18 @@ public sealed class TranscriptEditService(AppPaths paths)
         }
 
         return new OperationSnapshot(
-            reader.GetString(0),
+            reader.GetInt64(0),
             reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.GetString(7),
+            reader.GetString(8));
     }
 
-    private static OperationSnapshot? LoadLastSegmentEditOperation(
+    private static OperationSnapshot? LoadLastSegmentOperation(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string jobId,
@@ -307,12 +481,11 @@ public sealed class TranscriptEditService(AppPaths paths)
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json
+            SELECT rowid, operation_id, job_id, draft_id, segment_id, operation_type, before_json, after_json, created_at
             FROM review_operation_history
             WHERE job_id = $job_id
               AND segment_id = $segment_id
-              AND operation_type = 'segment_edit'
-            ORDER BY created_at DESC, operation_id DESC
+            ORDER BY created_at DESC, rowid DESC
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$job_id", jobId);
@@ -325,13 +498,15 @@ public sealed class TranscriptEditService(AppPaths paths)
         }
 
         return new OperationSnapshot(
-            reader.GetString(0),
+            reader.GetInt64(0),
             reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.GetString(7),
+            reader.GetString(8));
     }
 
     private static void UndoReviewDecision(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -368,6 +543,42 @@ public sealed class TranscriptEditService(AppPaths paths)
             ?? throw new InvalidOperationException("Invalid segment edit undo snapshot.");
 
         RestoreSegment(connection, transaction, before.JobId, before.SegmentId, before.FinalText, before.ReviewState);
+    }
+
+    private static void UndoRawSegmentEdit(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
+    {
+        var before = JsonSerializer.Deserialize<RawSegmentSnapshot>(operation.BeforeJson)
+            ?? throw new InvalidOperationException("Invalid raw segment edit undo snapshot.");
+
+        RestoreRawSegment(
+            connection,
+            transaction,
+            before.JobId,
+            before.SegmentId,
+            before.RawText,
+            before.NormalizedText,
+            before.FinalText,
+            before.ReviewState);
+        InvalidatePendingDraftsForSegment(connection, transaction, before.JobId, before.SegmentId);
+        RestorePendingDrafts(connection, transaction, before.PendingDraftIds);
+        if (before.PendingDraftIds.Count == 0 &&
+            before.JobPendingDraftCount == 0 &&
+            CountPendingDrafts(connection, transaction, before.JobId) == 0 &&
+            !HasLaterJobStateOperation(connection, transaction, before.JobId, operation.CreatedAt, operation.RowId))
+        {
+            RestoreRawEditJobState(
+                connection,
+                transaction,
+                before.JobId,
+                before.JobPendingDraftCount,
+                before.JobStatus,
+                before.JobCurrentStage,
+                before.JobProgressPercent);
+        }
+        else
+        {
+            RefreshRawEditPendingCount(connection, transaction, before.JobId);
+        }
     }
 
     private static void UndoSpeakerAlias(SqliteConnection connection, SqliteTransaction transaction, OperationSnapshot operation)
@@ -422,6 +633,169 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
+    private static void RestoreRawSegment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId,
+        string rawText,
+        string? normalizedText,
+        string? finalText,
+        string reviewState)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE transcript_segments
+            SET raw_text = $raw_text,
+                normalized_text = $normalized_text,
+                final_text = $final_text,
+                review_state = $review_state
+            WHERE job_id = $job_id AND segment_id = $segment_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.Parameters.AddWithValue("$raw_text", rawText);
+        command.Parameters.AddWithValue("$normalized_text", (object?)normalizedText ?? DBNull.Value);
+        command.Parameters.AddWithValue("$final_text", (object?)finalText ?? DBNull.Value);
+        command.Parameters.AddWithValue("$review_state", reviewState);
+        command.ExecuteNonQuery();
+    }
+
+    private static void InvalidatePendingDraftsForSegment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string segmentId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE correction_drafts
+            SET status = 'invalidated'
+            WHERE job_id = $job_id
+              AND segment_id = $segment_id
+              AND status = 'pending';
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$segment_id", segmentId);
+        command.ExecuteNonQuery();
+    }
+
+    private static void RestorePendingDrafts(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        IReadOnlyList<string> draftIds)
+    {
+        if (draftIds.Count == 0)
+        {
+            return;
+        }
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE correction_drafts
+            SET status = 'pending'
+            WHERE draft_id = $draft_id;
+            """;
+        var parameter = command.Parameters.Add("$draft_id", SqliteType.Text);
+
+        foreach (var draftId in draftIds)
+        {
+            parameter.Value = draftId;
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static int CountPendingDrafts(SqliteConnection connection, SqliteTransaction transaction, string jobId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT COUNT(*)
+            FROM correction_drafts
+            WHERE job_id = $job_id AND status = 'pending';
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        return Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static void RefreshRawEditPendingCount(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            WITH pending(value) AS (
+                SELECT COUNT(*)
+                FROM correction_drafts
+                WHERE job_id = $job_id AND status = 'pending'
+            )
+            UPDATE jobs
+            SET unreviewed_draft_count = (SELECT value FROM pending),
+                status = CASE
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN $review_ready_status
+                    WHEN (SELECT value FROM pending) = 0
+                        THEN '完成文書作成待ち'
+                    ELSE status
+                END,
+                current_stage = CASE
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN 'review_ready'
+                    WHEN (SELECT value FROM pending) = 0
+                        THEN 'review_completed'
+                    ELSE current_stage
+                END,
+                progress_percent = CASE
+                    WHEN (SELECT value FROM pending) > 0
+                        THEN $progress_percent
+                    WHEN (SELECT value FROM pending) = 0
+                        THEN $progress_percent
+                    ELSE progress_percent
+                END,
+                updated_at = $updated_at
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$review_ready_status", ReviewCandidateJobStateRules.Ready.Status);
+        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded);
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.ExecuteNonQuery();
+    }
+
+    private static void RestoreRawEditJobState(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        int pendingCount,
+        string status,
+        string? currentStage,
+        int progressPercent)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE jobs
+            SET unreviewed_draft_count = $pending_count,
+                status = $status,
+                current_stage = $current_stage,
+                progress_percent = $progress_percent,
+                updated_at = $updated_at
+            WHERE job_id = $job_id;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$pending_count", pendingCount);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$current_stage", (object?)currentStage ?? DBNull.Value);
+        command.Parameters.AddWithValue("$progress_percent", progressPercent);
+        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+        command.ExecuteNonQuery();
+    }
+
     private static void RestoreJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId, int pendingCount)
     {
         using var command = connection.CreateCommand();
@@ -447,6 +821,32 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.ExecuteNonQuery();
     }
 
+    private static bool HasLaterJobStateOperation(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string jobId,
+        string createdAt,
+        long rowId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT 1
+            FROM review_operation_history
+            WHERE job_id = $job_id
+              AND operation_type IN ('review_decision', 'segment_edit', 'raw_segment_edit')
+              AND (
+                  created_at > $created_at
+                  OR (created_at = $created_at AND rowid > $rowid)
+              )
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$job_id", jobId);
+        command.Parameters.AddWithValue("$created_at", createdAt);
+        command.Parameters.AddWithValue("$rowid", rowId);
+        return command.ExecuteScalar() is not null;
+    }
+
     internal sealed record ReviewDecisionHistorySnapshot(
         string JobId,
         string SegmentId,
@@ -463,6 +863,19 @@ public sealed class TranscriptEditService(AppPaths paths)
         string? FinalText,
         string ReviewState);
 
+    private sealed record RawSegmentSnapshot(
+        string JobId,
+        string SegmentId,
+        string RawText,
+        string? NormalizedText,
+        string? FinalText,
+        string ReviewState,
+        IReadOnlyList<string> PendingDraftIds,
+        int JobPendingDraftCount,
+        string JobStatus,
+        string? JobCurrentStage,
+        int JobProgressPercent);
+
     private sealed record SpeakerAliasSnapshot(
         string JobId,
         string SpeakerId,
@@ -470,11 +883,13 @@ public sealed class TranscriptEditService(AppPaths paths)
         bool Exists);
 
     private sealed record OperationSnapshot(
+        long RowId,
         string OperationId,
         string JobId,
         string? DraftId,
         string? SegmentId,
         string OperationType,
         string BeforeJson,
-        string AfterJson);
+        string AfterJson,
+        string CreatedAt);
 }

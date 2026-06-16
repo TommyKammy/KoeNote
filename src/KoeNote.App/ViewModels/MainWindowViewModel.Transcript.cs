@@ -6,6 +6,54 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    public bool IsStandardReadableTranscriptViewSelected
+    {
+        get => !IsStandardRawTranscriptView;
+        set
+        {
+            if (value)
+            {
+                IsStandardRawTranscriptView = false;
+            }
+        }
+    }
+
+    public bool IsStandardRawTranscriptViewSelected
+    {
+        get => IsStandardRawTranscriptView;
+        set
+        {
+            if (value)
+            {
+                IsStandardRawTranscriptView = true;
+            }
+        }
+    }
+
+    public bool IsStandardReadableTranscriptVisible => IsStandardLayout && !IsStandardRawTranscriptView;
+
+    public bool IsStandardRawTranscriptVisible => IsStandardLayout && IsStandardRawTranscriptView;
+
+    private bool IsStandardRawTranscriptView
+    {
+        get => _isStandardRawTranscriptView;
+        set
+        {
+            if (SetField(ref _isStandardRawTranscriptView, value))
+            {
+                SelectedTranscriptTabIndex = value
+                    ? RawTranscriptTabIndex
+                    : ReadableTranscriptTabIndex;
+                RefreshSelectedSegmentEditBuffer();
+                OnPropertyChanged(nameof(IsStandardReadableTranscriptViewSelected));
+                OnPropertyChanged(nameof(IsStandardRawTranscriptViewSelected));
+                OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
+                OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
+                NotifyExportMenuTargetChanged();
+            }
+        }
+    }
+
     private Task SelectTranscriptTabAsync(int tabIndex)
     {
         if (tabIndex != ReadableTranscriptTabIndex && IsStandardLayout)

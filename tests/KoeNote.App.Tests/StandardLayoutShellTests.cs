@@ -90,6 +90,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "Controls",
             "ReviewPanel.xaml"));
+        var transcriptSegmentListXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "TranscriptSegmentList.xaml"));
         var reviewPanelCode = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -114,6 +120,24 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "ViewModels",
             "MainWindowViewModel.cs"));
+        var jobsViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Jobs.cs"));
+        var transcriptViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Transcript.cs"));
+        var postProcessViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.PostProcess.cs"));
 
         Assert.Contains(
             "Width=\"{Binding DataContext.StandardJobRailColumnWidth, ElementName=StandardWorkspaceGrid}\"",
@@ -128,6 +152,16 @@ public sealed class StandardLayoutShellTests
         Assert.True(
             mainWindowXaml.IndexOf("<controls:StandardJobRailPanel Grid.RowSpan=\"3\"", StringComparison.Ordinal) <
             mainWindowXaml.IndexOf("Style=\"{StaticResource VisibleWhenDetailLayout}\"", StringComparison.Ordinal));
+        Assert.Contains("Content=\"原文\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"整文\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsStandardRawTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("IsStandardReadableTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BasedOn=\"{StaticResource {x:Type RadioButton}}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:TranscriptSegmentList DisplayMode=\"Raw\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
@@ -177,6 +211,12 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("private Task ToggleStandardAiRailAsync()", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardAiRailCommand = new RelayCommand(ToggleStandardAiRailAsync);", commandsViewModel, StringComparison.Ordinal);
         Assert.Contains("public ICommand ToggleStandardAiRailCommand", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("RefreshSelectedSegmentEditBuffer();", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("IsStandardRawTranscriptView = false;", postProcessViewModel, StringComparison.Ordinal);
+        Assert.Contains("GetSegmentEditableText(SelectedSegment)", jobsViewModel, StringComparison.Ordinal);
     }
 
     [Fact]

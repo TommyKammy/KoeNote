@@ -285,6 +285,27 @@ public sealed partial class MainWindowViewModel
         UpdatePlaybackCommandStates();
     }
 
+    private void ReloadSelectedJobState()
+    {
+        if (SelectedJob is null)
+        {
+            return;
+        }
+
+        var latest = _jobRepository.LoadRecent()
+            .FirstOrDefault(job => string.Equals(job.JobId, SelectedJob.JobId, StringComparison.Ordinal));
+        if (latest is null)
+        {
+            return;
+        }
+
+        SelectedJob.Status = latest.Status;
+        SelectedJob.ProgressPercent = latest.ProgressPercent;
+        SelectedJob.UnreviewedDrafts = latest.UnreviewedDrafts;
+        SelectedJob.UpdatedAt = latest.UpdatedAt;
+        SelectedJob.NormalizedAudioPath = latest.NormalizedAudioPath;
+    }
+
     private void RefreshJobCommandStates()
     {
         if (ClearAllJobsCommand is RelayCommand clearAllCommand)
@@ -469,7 +490,7 @@ public sealed partial class MainWindowViewModel
     {
         return SelectedSegment is not null &&
             (IsSegmentInlineEditActive ||
-            (!string.Equals(SelectedSegmentEditText, SelectedSegment.Text, StringComparison.Ordinal) ||
+            (!string.Equals(SelectedSegmentEditText, GetSegmentEditableText(SelectedSegment), StringComparison.Ordinal) ||
                 !string.Equals(SelectedSpeakerAlias, SelectedSegment.Speaker, StringComparison.Ordinal)));
     }
 
