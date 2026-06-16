@@ -6,8 +6,20 @@ namespace KoeNote.App.Services.Transcript;
 
 public static class ReadableDocumentBlockBuilder
 {
-    private static readonly Regex TimestampedBlockPattern = new(
-        @"^\s*\[?(?<start>\d{1,2}:\d{2}(?::\d{2})?)\s*(?:(?:-|--|~|\u301c|\uff5e|\u2013|\u2014)\s*(?<end>\d{1,2}:\d{2}(?::\d{2})?))?\]?\s*(?:(?<speaker>[^:：\r\n]{1,48})[:：]\s*)?(?<text>.*)$",
+    private const string TimestampPattern = @"\d{1,2}:\d{2}(?::\d{2})?";
+    private const string RangeSeparatorPattern = @"(?:--|-|~|\u301c|\uFF5E|\u2013|\u2014|\u2212|\uFF0D|\u30FC)";
+    private const string SpeakerPattern = @"[^:\uFF1A\r\n]{1,48}";
+
+    private static readonly Regex BracketedTimestampBlockPattern = new(
+        @"^\s*\[(?<start>" + TimestampPattern + @")\s*(?:" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @"))?\]\s*(?:(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*)?(?<text>.*)$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex RangedTimestampBlockPattern = new(
+        @"^\s*(?<start>" + TimestampPattern + @")\s*" + RangeSeparatorPattern + @"\s*(?<end>" + TimestampPattern + @")\s*(?:(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*)?(?<text>.*)$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex SpeakerDelimitedTimestampBlockPattern = new(
+        @"^\s*(?<start>" + TimestampPattern + @")\s+(?<speaker>" + SpeakerPattern + @")[:\uFF1A]\s*(?<text>.*)$",
         RegexOptions.Compiled);
 
     public static IReadOnlyList<ReadableDocumentBlock> Build(string content)
@@ -67,8 +79,7 @@ public static class ReadableDocumentBlockBuilder
         }
 
         var firstLine = trimmedLines[0];
-        var match = TimestampedBlockPattern.Match(firstLine);
-        if (match.Success)
+        if (TryMatchTimestampedBlock(firstLine, out var match))
         {
             var textLines = new List<string>(trimmedLines.Length)
             {
@@ -102,7 +113,25 @@ public static class ReadableDocumentBlockBuilder
 
     private static bool LooksLikeTimestampedBlock(string line)
     {
-        return TimestampedBlockPattern.IsMatch(line);
+        return TryMatchTimestampedBlock(line, out _);
+    }
+
+    private static bool TryMatchTimestampedBlock(string line, out Match match)
+    {
+        match = BracketedTimestampBlockPattern.Match(line);
+        if (match.Success)
+        {
+            return true;
+        }
+
+        match = RangedTimestampBlockPattern.Match(line);
+        if (match.Success)
+        {
+            return true;
+        }
+
+        match = SpeakerDelimitedTimestampBlockPattern.Match(line);
+        return match.Success;
     }
 
     private static string FormatTimeRange(string startText, string endText)
