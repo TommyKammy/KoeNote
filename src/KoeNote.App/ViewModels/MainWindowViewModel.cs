@@ -167,6 +167,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private int _selectedLogPanelTabIndex;
     private int _selectedDetailPanelTabIndex;
     private bool _isDetailPanelOpen;
+    private bool _isStandardJobRailExpanded;
     private bool _isSetupWizardModalOpen;
     private string? _activeModelDownloadModelId;
     private string _selectedSpeakerFilter = "全話者";
@@ -724,6 +725,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand UseStandardLayoutCommand { get; private set; } = null!;
 
     public ICommand UseDetailLayoutCommand { get; private set; } = null!;
+
+    public ICommand ToggleStandardJobRailCommand { get; private set; } = null!;
 
     public ICommand SetupBackCommand { get; private set; } = null!;
 

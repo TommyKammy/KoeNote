@@ -88,7 +88,8 @@
                   Height="{Binding ViewportHeight, ElementName=MainContentScrollViewer}"
                   Style="{StaticResource VisibleWhenStandardLayout}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="56" />
+                    <ColumnDefinition Width="{Binding StandardJobRailColumnWidth}"
+                                      MinWidth="{Binding StandardJobRailColumnMinWidth}" />
                     <ColumnDefinition Width="*" MinWidth="720" />
                     <ColumnDefinition Width="52" />
                 </Grid.ColumnDefinitions>
@@ -98,52 +99,8 @@
                     <RowDefinition Height="108" MinHeight="92" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.RowSpan="3"
-                        Grid.Column="0"
-                        Background="#FAFBFC"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="0,0,1,0"
-                        Padding="0,14">
-                    <DockPanel LastChildFill="False">
-                        <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center">
-                            <Button Style="{StaticResource StandardRailButton}"
-                                    Command="{Binding UseDetailLayoutCommand}"
-                                    ToolTip="詳細レイアウトを開く">
-                                <TextBlock Text="&#xE76C;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="12" />
-                            </Button>
-                            <Border Width="34"
-                                    Height="34"
-                                    CornerRadius="9"
-                                    Background="{StaticResource AccentLightBrush}"
-                                    Margin="0,0,0,10"
-                                    ToolTip="{Binding JobCountSummary}">
-                                <TextBlock Text="{Binding StandardLayoutJobBadgeText}"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           FontSize="13"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center" />
-                            </Border>
-                            <Button Style="{StaticResource StandardRailButton}"
-                                    Command="{Binding AddAudioCommand}"
-                                    ToolTip="音声ファイルを追加">
-                                <TextBlock Text="&#xE710;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="14" />
-                            </Button>
-                        </StackPanel>
-                        <Button DockPanel.Dock="Bottom"
-                                Style="{StaticResource StandardRailButton}"
-                                Command="{Binding UseDetailLayoutCommand}"
-                                ToolTip="ジョブ一覧を詳細表示">
-                            <TextBlock Text="&#xE8A5;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="14" />
-                        </Button>
-                    </DockPanel>
-                </Border>
+                <controls:StandardJobRailPanel Grid.RowSpan="3"
+                                               Grid.Column="0" />
 
                 <Border Grid.Column="1"
                         Grid.Row="0"

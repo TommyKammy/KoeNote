@@ -53,6 +53,8 @@ public sealed class JobSummary : INotifyPropertyChanged
 
     public string Title { get; }
 
+    public string RailInitial => string.IsNullOrWhiteSpace(Title) ? "?" : Title.Trim()[0].ToString();
+
     public string FileName { get; }
 
     public string SourceAudioPath { get; }

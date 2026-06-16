@@ -58,6 +58,74 @@ public sealed class StandardLayoutShellTests
     }
 
     [Fact]
+    public void StandardLayout_UsesCollapsibleJobRailAndKeepsDetailJobList()
+    {
+        var repoRoot = FindRepoRoot();
+        var mainWindowXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "MainWindow.xaml"));
+        var railXaml = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "StandardJobRailPanel.xaml"));
+        var railCode = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "Controls",
+            "StandardJobRailPanel.xaml.cs"));
+        var layoutViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Layout.cs"));
+        var commandsViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Commands.cs"));
+        var mainViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.cs"));
+
+        Assert.Contains("Width=\"{Binding StandardJobRailColumnWidth}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:StandardJobRailPanel Grid.RowSpan=\"3\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:JobListPanel Grid.RowSpan=\"2\" Grid.Column=\"0\" />", mainWindowXaml, StringComparison.Ordinal);
+        Assert.True(
+            mainWindowXaml.IndexOf("<controls:StandardJobRailPanel Grid.RowSpan=\"3\"", StringComparison.Ordinal) <
+            mainWindowXaml.IndexOf("Style=\"{StaticResource VisibleWhenDetailLayout}\"", StringComparison.Ordinal));
+
+        Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
+        Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding FilteredJobs}\"", railXaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedJob, Mode=TwoWay}\"", railXaml, StringComparison.Ordinal);
+        Assert.Contains("RailInitial", railXaml, StringComparison.Ordinal);
+        Assert.Contains("AddAudioCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("ClearAllJobsCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("UseDetailLayoutCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("JobSearchText", railXaml, StringComparison.Ordinal);
+        Assert.Contains("AllowDrop=\"True\"", railXaml, StringComparison.Ordinal);
+        Assert.Contains("UnreviewedDrafts", railXaml, StringComparison.Ordinal);
+        Assert.Contains("ProgressPercent", railXaml, StringComparison.Ordinal);
+        Assert.Contains("OnJobRailImportDropZoneClick", railCode, StringComparison.Ordinal);
+
+        Assert.Contains("public bool IsStandardJobRailExpanded", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("public GridLength StandardJobRailColumnWidth", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("private Task ToggleStandardJobRailAsync()", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("ToggleStandardJobRailCommand = new RelayCommand(ToggleStandardJobRailAsync);", commandsViewModel, StringComparison.Ordinal);
+        Assert.Contains("public ICommand ToggleStandardJobRailCommand", mainViewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StandardLayoutViewModelCoverage_IsCompiledByUnitTestProject()
     {
         var repoRoot = FindRepoRoot();

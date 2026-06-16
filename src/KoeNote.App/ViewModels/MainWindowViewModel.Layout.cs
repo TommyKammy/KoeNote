@@ -24,6 +24,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsDetailLayoutSelected));
         OnPropertyChanged(nameof(MainLayoutModeDisplayText));
         OnPropertyChanged(nameof(MainLayoutModeToolTip));
+        OnPropertyChanged(nameof(StandardJobRailColumnWidth));
+        OnPropertyChanged(nameof(StandardJobRailColumnMinWidth));
         OnPropertyChanged(nameof(JobListColumnMinWidth));
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
     }
@@ -85,6 +87,39 @@ public sealed partial class MainWindowViewModel
     public string MainLayoutModeToolTip => IsStandardLayout
         ? "標準レイアウト: 校正に集中する既定の画面"
         : "詳細レイアウト: ジョブ、文字起こし、整文候補、要約を広く確認する画面";
+
+    public bool IsStandardJobRailExpanded
+    {
+        get => _isStandardJobRailExpanded;
+        private set
+        {
+            if (SetField(ref _isStandardJobRailExpanded, value))
+            {
+                OnPropertyChanged(nameof(StandardJobRailColumnWidth));
+                OnPropertyChanged(nameof(StandardJobRailColumnMinWidth));
+                OnPropertyChanged(nameof(StandardJobRailToggleText));
+                OnPropertyChanged(nameof(StandardJobRailToggleToolTip));
+            }
+        }
+    }
+
+    public GridLength StandardJobRailColumnWidth => IsStandardJobRailExpanded
+        ? new GridLength(244)
+        : new GridLength(76);
+
+    public double StandardJobRailColumnMinWidth => IsStandardJobRailExpanded ? 220 : 72;
+
+    public string StandardJobRailToggleText => IsStandardJobRailExpanded ? "‹" : "›";
+
+    public string StandardJobRailToggleToolTip => IsStandardJobRailExpanded
+        ? "ジョブレールを折り畳みます。"
+        : "ジョブレールを展開します。";
+
+    private Task ToggleStandardJobRailAsync()
+    {
+        IsStandardJobRailExpanded = !IsStandardJobRailExpanded;
+        return Task.CompletedTask;
+    }
 
     public string StandardLayoutTitle => SelectedJob?.Title ?? "ジョブを選択";
 
