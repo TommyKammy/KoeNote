@@ -181,10 +181,10 @@
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="1"
                                     CornerRadius="16" />
-                            <TextBox x:Name="StandardJobSearchTextBox"
+                            <TextBox x:Name="StandardReadableSearchTextBox"
                                      Style="{StaticResource SearchPillTextBox}"
-                                     Text="{Binding JobSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="ジョブ名で検索" />
+                                      Text="{Binding ReadableDocumentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                      ToolTip="整文本文を検索" />
                             <Grid Width="14"
                                   Height="14"
                                   Margin="12,0,0,0"
@@ -205,7 +205,7 @@
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round" />
                             </Grid>
-                            <TextBlock Text="ジョブを検索"
+                            <TextBlock Text="整文本文を検索"
                                        Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
                                        VerticalAlignment="Center"
@@ -218,8 +218,8 @@
                                         <Style.Triggers>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding Text, ElementName=StandardJobSearchTextBox}" Value="" />
-                                                    <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=StandardJobSearchTextBox}" Value="False" />
+                                                    <Condition Binding="{Binding Text, ElementName=StandardReadableSearchTextBox}" Value="" />
+                                                    <Condition Binding="{Binding IsKeyboardFocusWithin, ElementName=StandardReadableSearchTextBox}" Value="False" />
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Visible" />
                                             </MultiDataTrigger>
@@ -228,12 +228,12 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <Button Content="x"
-                                    Command="{Binding ClearJobSearchCommand}">
+                                    Command="{Binding ClearReadableDocumentSearchCommand}">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource SearchClearButton}">
                                         <Setter Property="Visibility" Value="Visible" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Text, ElementName=StandardJobSearchTextBox}" Value="">
+                                            <DataTrigger Binding="{Binding Text, ElementName=StandardReadableSearchTextBox}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -272,21 +272,11 @@
                         Grid.Row="1"
                         Margin="12,12,12,0"
                         Background="#F7F8FA"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1,1,1,0"
-                        CornerRadius="10,10,0,0"
-                        Padding="24,20,24,18"
+                        BorderThickness="0"
+                        Padding="16,12,16,18"
                         SnapsToDevicePixels="True">
                     <Grid>
-                        <Border MaxWidth="1080"
-                                HorizontalAlignment="Center"
-                                Background="#FFFFFF"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Style="{StaticResource VisibleWhenStandardReadableTranscript}">
-                            <controls:ReadablePolishedPanel />
-                        </Border>
+                        <controls:ReadablePolishedPanel Style="{StaticResource VisibleWhenStandardReadableTranscript}" />
 
                         <Border Background="#FFFFFF"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
