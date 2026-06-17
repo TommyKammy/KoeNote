@@ -246,10 +246,16 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Column="1"
+                <Border x:Name="StandardDocumentSurface"
+                        Grid.Column="1"
                         Grid.Row="1"
+                        Margin="12,12,12,0"
                         Background="#F7F8FA"
-                        Padding="34,24,34,18">
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1,1,1,0"
+                        CornerRadius="10,10,0,0"
+                        Padding="34,24,34,18"
+                        SnapsToDevicePixels="True">
                     <Grid>
                         <Border MaxWidth="900"
                                 HorizontalAlignment="Center"
@@ -274,6 +280,7 @@
 
                 <controls:TranscriptAudioPlayer Grid.Column="1"
                                                 Grid.Row="2"
+                                                Margin="12,0,12,10"
                                                 IsSlim="True" />
 
                 <controls:StandardAiAssistRailPanel Grid.RowSpan="3"

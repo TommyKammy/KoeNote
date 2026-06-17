@@ -194,6 +194,9 @@ public sealed class StandardLayoutShellTests
         Assert.DoesNotContain("BasedOn=\"{StaticResource {x:Type RadioButton}}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"StandardDocumentSurface\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"10,10,0,0\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"12,12,12,0\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("ShowCompactToolbar=\"True\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("SegmentSearchText", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("SelectedSpeakerFilter", transcriptSegmentListXaml, StringComparison.Ordinal);
@@ -201,14 +204,17 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public bool ShowCompactToolbar", transcriptSegmentListCode, StringComparison.Ordinal);
         Assert.Contains("ReadablePolishedPanel", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"920\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"8\"", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentFontSize", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentLineHeight", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("<RowDefinition Height=\"64\" MinHeight=\"56\" />", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsSlim=\"True\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"12,0,12,10\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenSlimPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenFullPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"0,0,10,10\"", transcriptAudioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("public bool IsSlim", transcriptAudioPlayerCode, StringComparison.Ordinal);
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
