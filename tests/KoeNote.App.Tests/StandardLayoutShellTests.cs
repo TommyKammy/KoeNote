@@ -213,13 +213,17 @@ public sealed class StandardLayoutShellTests
 
         Assert.Contains("IsStandardJobRailExpanded", railXaml, StringComparison.Ordinal);
         Assert.Contains("ToggleStandardJobRailCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("StandardJobRailBadgeButton", railXaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"ジョブ一覧を開く\"", railXaml, StringComparison.Ordinal);
+        Assert.Contains("<UniformGrid Columns=\"2\"", railXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BasedOn=\"{StaticResource StandardRailButton}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding FilteredJobs}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("SelectedItem=\"{Binding SelectedJob, Mode=TwoWay}\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("RailInitial", railXaml, StringComparison.Ordinal);
         Assert.Contains("AddAudioCommand", railXaml, StringComparison.Ordinal);
         Assert.Contains("ClearAllJobsCommand", railXaml, StringComparison.Ordinal);
-        Assert.Contains("UseDetailLayoutCommand", railXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("UseDetailLayoutCommand", railXaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding UseDetailLayoutCommand}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("JobSearchText", railXaml, StringComparison.Ordinal);
         Assert.Contains("AllowDrop=\"True\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("UnreviewedDrafts", railXaml, StringComparison.Ordinal);
