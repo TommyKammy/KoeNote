@@ -38,6 +38,35 @@ public sealed class TranscriptDerivativeRepositoryTests
     }
 
     [Fact]
+    public void ReadLatestDisplayable_ReturnsLatestStaleDerivative()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, "first text");
+        var repository = new TranscriptDerivativeRepository(fixture.Paths);
+        var sourceHash = repository.ComputeCurrentRawTranscriptHash("job-001");
+        repository.Save(new TranscriptDerivativeSaveRequest(
+            "job-001",
+            TranscriptDerivativeKinds.Summary,
+            TranscriptDerivativeFormats.Markdown,
+            "Old summary.",
+            TranscriptDerivativeSourceKinds.Polished,
+            sourceHash,
+            "000001..000001",
+            null,
+            "bonsai-8b-q1-0",
+            "summary-v1",
+            "lightweight",
+            TranscriptDerivativeStatuses.Stale));
+
+        var latest = repository.ReadLatestDisplayable("job-001", TranscriptDerivativeKinds.Summary);
+
+        Assert.NotNull(latest);
+        Assert.Equal("Old summary.", latest.Content);
+        Assert.Equal(TranscriptDerivativeStatuses.Stale, latest.Status);
+        Assert.Null(repository.ReadLatestSuccessful("job-001", TranscriptDerivativeKinds.Summary));
+    }
+
+    [Fact]
     public void SaveChunk_StoresChunksInChunkIndexOrder()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();

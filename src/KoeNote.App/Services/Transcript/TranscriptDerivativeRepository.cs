@@ -266,6 +266,49 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         return reader.Read() ? ReadDerivative(reader) : null;
     }
 
+    public TranscriptDerivative? ReadLatestDisplayable(string jobId, string kind)
+    {
+        if (string.IsNullOrWhiteSpace(jobId) || string.IsNullOrWhiteSpace(kind))
+        {
+            return null;
+        }
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                derivative_id,
+                job_id,
+                kind,
+                content_format,
+                content,
+                source_kind,
+                source_transcript_hash,
+                source_segment_range,
+                source_chunk_ids,
+                model_id,
+                prompt_version,
+                generation_profile,
+                status,
+                error_message,
+                created_at,
+                updated_at
+            FROM transcript_derivatives
+            WHERE job_id = $job_id
+              AND kind = $kind
+              AND status IN ($succeeded, $stale)
+            ORDER BY updated_at DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddValue("$job_id", jobId);
+        command.Parameters.AddValue("$kind", kind);
+        command.Parameters.AddValue("$succeeded", TranscriptDerivativeStatuses.Succeeded);
+        command.Parameters.AddValue("$stale", TranscriptDerivativeStatuses.Stale);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadDerivative(reader) : null;
+    }
+
     public IReadOnlyList<TranscriptDerivativeChunk> ReadChunks(string derivativeId)
     {
         if (string.IsNullOrWhiteSpace(derivativeId))

@@ -16,7 +16,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var summary = _transcriptDerivativeRepository.ReadLatestSuccessful(SelectedJob.JobId, TranscriptDerivativeKinds.Summary);
+        var summary = _transcriptDerivativeRepository.ReadLatestDisplayable(SelectedJob.JobId, TranscriptDerivativeKinds.Summary);
         if (summary is null)
         {
             IsSummaryStale = false;
@@ -26,7 +26,8 @@ public sealed partial class MainWindowViewModel
         }
 
         SummaryContent = summary.Content;
-        IsSummaryStale = _transcriptDerivativeRepository.IsStale(summary);
+        IsSummaryStale = string.Equals(summary.Status, TranscriptDerivativeStatuses.Stale, StringComparison.Ordinal) ||
+            _transcriptDerivativeRepository.IsStale(summary);
         SummaryStatus = IsSummaryStale
             ? "古い要約があります。再実行すると更新できます。"
             : $"要約済み: {summary.UpdatedAt:yyyy/MM/dd HH:mm}";
@@ -206,14 +207,28 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSummaryAfterReadableDocumentChanged(string jobId)
     {
-        var summary = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Summary);
-        LoadSummaryForSelectedJob();
-        if (summary is not null && HasSummaryContent &&
+        var summary = _transcriptDerivativeRepository.ReadLatestDisplayable(jobId, TranscriptDerivativeKinds.Summary);
+        if (summary is not null &&
             string.Equals(summary.SourceKind, TranscriptDerivativeSourceKinds.Polished, StringComparison.Ordinal))
         {
-            IsSummaryStale = true;
-            SummaryStatus = "古い要約があります。再実行すると更新できます。";
+            _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+                summary.JobId,
+                summary.Kind,
+                summary.ContentFormat,
+                summary.Content,
+                summary.SourceKind,
+                summary.SourceTranscriptHash,
+                summary.SourceSegmentRange,
+                summary.SourceChunkIds,
+                summary.ModelId,
+                summary.PromptVersion,
+                summary.GenerationProfile,
+                TranscriptDerivativeStatuses.Stale,
+                summary.ErrorMessage,
+                summary.DerivativeId));
         }
+
+        LoadSummaryForSelectedJob();
     }
 
     private IReadOnlyList<string> FindSpeakerIdsByDisplayName(string jobId, string speakerDisplayName)
