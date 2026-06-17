@@ -31,12 +31,13 @@
                     CornerRadius="10"
                     Padding="46,38"
                     Style="{StaticResource VisibleWhenReadableDocumentBlocks}">
-                <FlowDocumentScrollViewer x:Name="ReadableDocumentViewer"
-                                          IsToolBarVisible="False"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          Background="Transparent"
-                                          BorderThickness="0" />
+                <ScrollViewer x:Name="ReadableDocumentScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Background="Transparent"
+                              BorderThickness="0">
+                    <StackPanel x:Name="ReadableDocumentBlocksPanel" />
+                </ScrollViewer>
             </Border>
 
             <Grid Style="{StaticResource VisibleWhenNoReadableDocumentBlocks}">

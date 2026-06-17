@@ -142,8 +142,9 @@ public sealed class TabHighlightStyleTests
         var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
         var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
 
-        Assert.Contains("FlowDocumentScrollViewer x:Name=\"ReadableDocumentViewer\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("ReadableDocumentScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("StackPanel x:Name=\"ReadableDocumentBlocksPanel\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("FlowDocumentScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"1080\"", xaml, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"10\"", xaml, StringComparison.Ordinal);
@@ -153,10 +154,12 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ReadableDocumentStateTitle", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentStateDescription", xaml, StringComparison.Ordinal);
         Assert.Contains("viewModel.ReadableDocumentBlocks", code, StringComparison.Ordinal);
-        Assert.Contains("BuildMetaCell", code, StringComparison.Ordinal);
-        Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
+        Assert.Contains("BuildReadableBlockRow", code, StringComparison.Ordinal);
+        Assert.Contains("BuildMetaPanel", code, StringComparison.Ordinal);
+        Assert.Contains("BuildBodyTextBlock", code, StringComparison.Ordinal);
         Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);
-        Assert.Contains("ColumnWidth = 10000", code, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping = TextWrapping.Wrap", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentSearchText", code, StringComparison.Ordinal);
         Assert.Contains("AddHighlightedRuns", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ReadablePolishedContent, Mode=OneWay}\"", xaml, StringComparison.Ordinal);
