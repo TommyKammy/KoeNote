@@ -255,7 +255,10 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("IsSummaryStale", aiRailXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:ReviewPanel ShowCloseButton=\"False\" />", aiRailXaml, StringComparison.Ordinal);
         Assert.Contains("RunPostSummaryCommand", reviewPanelXaml, StringComparison.Ordinal);
-        Assert.Contains("AI インスペクタ", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("AI アシスト", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorSectionCard", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorTabPill", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("表記ゆれ", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorTargetText", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorCurrentTabText", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorSegmentText", reviewPanelXaml, StringComparison.Ordinal);
