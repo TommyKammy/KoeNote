@@ -1071,7 +1071,7 @@ public sealed partial class MainWindowViewModel
             : Paths.PythonPackages;
         SetupDiarizationRuntimeSummary = isInstalled
             ? $"Speaker diarization runtime installed: {installPath}"
-            : $"Speaker diarization runtime is not installed. KoeNote will use bundled Python 3.12 if available: {Paths.BundledPythonPath}";
+            : $"{DiarizationRuntimeLayout.DescribeMissingRuntimeData(Paths)} KoeNote will use bundled Python 3.12 if available: {Paths.BundledPythonPath}";
     }
 
     private void RefreshCudaReviewRuntimeSummary()

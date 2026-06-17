@@ -53,6 +53,13 @@ public sealed class ScriptedDiarizationService(
                 return new DiarizationRunResult($"failed: {runtime.Message}", rawOutputPath, segments, 0, 0, DateTimeOffset.UtcNow - startedAt);
             }
 
+            if (!DiarizationRuntimeLayout.HasPackage(paths, runtime.Command.InstallPath))
+            {
+                var status = $"failed: {DiarizationRuntimeLayout.DescribeMissingRuntimeData(paths, runtime.Command.InstallPath)}";
+                WriteStatus(rawOutputPath, status);
+                return new DiarizationRunResult(status, rawOutputPath, segments, 0, 0, DateTimeOffset.UtcNow - startedAt);
+            }
+
             processResult = await processRunner.RunAsync(
                 runtime.Command.FileName,
                 runtime.Command.BuildArguments(

@@ -69,6 +69,7 @@ public sealed class DiarizationRuntimeService(
             }
 
             Directory.CreateDirectory(paths.PythonEnvironments);
+            RecreateManagedRuntimeIfPackageDataIsMissing();
             var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken);
             if (!runtime.IsSucceeded || runtime.Command is null)
             {
@@ -153,6 +154,18 @@ public sealed class DiarizationRuntimeService(
             $"Ready to install {PackageSpec} using {source.Command.DisplayName} {source.Command.Version}.",
             paths.DiarizationPythonEnvironment,
             string.Empty);
+    }
+
+    private void RecreateManagedRuntimeIfPackageDataIsMissing()
+    {
+        if (!DiarizationRuntimeLayout.HasManagedPackageMetadata(paths) ||
+            DiarizationRuntimeLayout.HasRequiredManagedRuntimeData(paths) ||
+            !Directory.Exists(paths.DiarizationPythonEnvironment))
+        {
+            return;
+        }
+
+        Directory.Delete(paths.DiarizationPythonEnvironment, recursive: true);
     }
 
     private async Task<ManagedPythonRuntimeResult> EnsureManagedPythonRuntimeAsync(CancellationToken cancellationToken)

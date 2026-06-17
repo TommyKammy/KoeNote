@@ -81,4 +81,66 @@ public static class DiarizationRuntimeLayout
             .Where(path => !File.Exists(path))
             .ToArray();
     }
+
+    public static bool HasPackage(AppPaths paths, string installPath)
+    {
+        return IsLegacyInstallPath(paths, installPath)
+            ? HasLegacyPackage(paths)
+            : HasManagedPackage(paths);
+    }
+
+    public static string DescribeMissingRuntimeData(AppPaths paths, string installPath)
+    {
+        if (IsLegacyInstallPath(paths, installPath))
+        {
+            return DescribeMissingRuntimeData(
+                paths.PythonPackages,
+                HasLegacyPackageMetadata(paths),
+                GetMissingLegacyRuntimeData(paths));
+        }
+
+        return DescribeMissingRuntimeData(
+            paths.DiarizationPythonEnvironment,
+            HasManagedPackageMetadata(paths),
+            GetMissingManagedRuntimeData(paths));
+    }
+
+    public static string DescribeMissingRuntimeData(AppPaths paths)
+    {
+        var managedMissing = HasManagedPackageMetadata(paths)
+            ? GetMissingManagedRuntimeData(paths)
+            : [];
+        if (managedMissing.Count > 0)
+        {
+            return $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", managedMissing)}";
+        }
+
+        var legacyMissing = HasLegacyPackageMetadata(paths)
+            ? GetMissingLegacyRuntimeData(paths)
+            : [];
+        if (legacyMissing.Count > 0)
+        {
+            return $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", legacyMissing)}";
+        }
+
+        return $"Not installed: {paths.DiarizationPythonEnvironment}";
+    }
+
+    private static string DescribeMissingRuntimeData(
+        string installPath,
+        bool hasPackageMetadata,
+        IReadOnlyList<string> missing)
+    {
+        if (hasPackageMetadata && missing.Count > 0)
+        {
+            return $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missing)}";
+        }
+
+        return $"Not installed: {installPath}";
+    }
+
+    private static bool IsLegacyInstallPath(AppPaths paths, string installPath)
+    {
+        return string.Equals(installPath, paths.PythonPackages, StringComparison.OrdinalIgnoreCase);
+    }
 }
