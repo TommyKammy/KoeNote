@@ -128,6 +128,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ShowRawTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowDiffTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowReviewCandidateTranscriptTabCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Path=\"IsStandardLayout\"", xaml, StringComparison.Ordinal);
+        Assert.Equal(3, AllIndexesOf(xaml, "Converter=\"{StaticResource BooleanToVisibilityConverter}\"").Count());
         Assert.Contains("ConfirmSpeakerNamesAndRunReadablePolishingCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"原文\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"差分\"", xaml, StringComparison.Ordinal);
@@ -236,15 +238,30 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("x:Key=\"HeaderToggleThumb\"", headerStyles, StringComparison.Ordinal);
 
         Assert.DoesNotContain("ShowReadableTranscriptTabCommand", reviewXaml, StringComparison.Ordinal);
-        Assert.Contains("<controls:ReviewDraftEmptyState Grid.Row=\"0\" />", reviewXaml, StringComparison.Ordinal);
-        Assert.Contains("<controls:ReviewDraftActionBar Grid.Row=\"1\" />", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewDraftEmptyState />", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewDraftActionBar DockPanel.Dock=\"Bottom\"", reviewXaml, StringComparison.Ordinal);
+        Assert.True(
+            reviewXaml.IndexOf("<controls:ReviewDraftActionBar DockPanel.Dock=\"Bottom\"", StringComparison.Ordinal) <
+            reviewXaml.IndexOf("<ScrollViewer VerticalScrollBarVisibility=\"Auto\">", StringComparison.Ordinal));
         Assert.Contains("整文候補はありません", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
         Assert.Contains("「整文」タブで結果を確認", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
         Assert.Contains("この候補への操作", reviewDraftActionBarXaml, StringComparison.Ordinal);
         Assert.Contains("レビュー候補を反映して、次の候補へ進みます", reviewDraftActionBarXaml, StringComparison.Ordinal);
         Assert.Contains("RunPostSummaryCommand", reviewXaml, StringComparison.Ordinal);
         Assert.Single(AllIndexesOf(reviewXaml, "Command=\"{Binding RunPostSummaryCommand}\""));
+        Assert.Contains("AI アシスト", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorSectionCard", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorTabPill", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("表記ゆれ", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorTargetText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorCurrentTabText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorSegmentText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("Binding CanRunSelectedJob", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RunPreflightSummary}\"", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorMetaLabel", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("TranscriptInlineToggle", transcriptXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"ビュー\"", transcriptXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"文字起こし\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"話者:\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"テキストを検索\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("TranscriptToggleTrack", transcriptXaml, StringComparison.Ordinal);
@@ -370,8 +387,9 @@ public sealed class TabHighlightStyleTests
         var repoRoot = FindRepoRoot();
         var reviewXaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReviewPanel.xaml"));
 
-        Assert.Contains("<Border Grid.Row=\"1\"", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<Grid Grid.Row=\"1\"", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenNoSummaryStyle}\"", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<Border Background=\"#FFFFFF\"", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("Padding=\"18\"", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("<Grid Width=\"34\"", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("ScaleTransform ScaleX=\"1.18\" ScaleY=\"1.18\"", reviewXaml, StringComparison.Ordinal);

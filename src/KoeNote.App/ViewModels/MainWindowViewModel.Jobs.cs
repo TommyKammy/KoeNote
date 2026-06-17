@@ -279,6 +279,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedJobPlaybackPath));
         OnPropertyChanged(nameof(SelectedJobUpdatedAt));
         OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+        OnPropertyChanged(nameof(DetailInspectorTargetText));
         NotifyStandardLayoutShellChanged();
         RefreshPlaybackWaveform();
         RefreshJobCommandStates();

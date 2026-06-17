@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
         OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
         OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
+        OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
         NotifyExportMenuTargetChanged();
         RefreshSelectedSegmentEditBuffer();
     }
@@ -175,6 +176,29 @@ public sealed partial class MainWindowViewModel
             return $"{SelectedJob.FileName} · {SelectedJob.Status} · {Segments.Count}セグメント";
         }
     }
+
+    private int EffectiveDetailInspectorTranscriptTabIndex => IsStandardLayout
+        ? IsStandardRawTranscriptViewSelected
+            ? RawTranscriptTabIndex
+            : ReadableTranscriptTabIndex
+        : SelectedTranscriptTabIndex;
+
+    public string DetailInspectorCurrentTabText => EffectiveDetailInspectorTranscriptTabIndex switch
+    {
+        ReadableTranscriptTabIndex => "整文",
+        RawTranscriptTabIndex => "素起こし",
+        DiffTranscriptTabIndex => "差分",
+        ReviewCandidateTranscriptTabIndex => "レビュー候補",
+        _ => "文字起こし"
+    };
+
+    public string DetailInspectorTargetText => SelectedJob is null
+        ? "ジョブ未選択"
+        : $"{SelectedJob.Title} · {SelectedJob.Status}";
+
+    public string DetailInspectorSegmentText => SelectedSegment is null
+        ? "セグメント未選択"
+        : $"{SelectedSegment.Start} - {SelectedSegment.End} · {SelectedSegment.Speaker}";
 
     public string StandardLayoutJobBadgeText => Jobs.Count > 99 ? "99+" : Jobs.Count.ToString("0");
 

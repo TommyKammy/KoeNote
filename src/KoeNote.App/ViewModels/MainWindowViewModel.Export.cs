@@ -53,6 +53,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsDiffExportMenuVisible));
         OnPropertyChanged(nameof(IsReviewCandidateExportMenuVisible));
         OnPropertyChanged(nameof(IsSummaryExportMenuVisible));
+        OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
         UpdateExportCommandStates();
     }
 

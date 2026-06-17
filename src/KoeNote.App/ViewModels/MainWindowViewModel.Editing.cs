@@ -335,6 +335,7 @@ public sealed partial class MainWindowViewModel
             Segments.Clear();
             SelectedSegment = null;
             OnPropertyChanged(nameof(StandardLayoutMeta));
+            OnPropertyChanged(nameof(DetailInspectorSegmentText));
             RefreshPostProcessCommandStates();
             return;
         }
@@ -353,6 +354,7 @@ public sealed partial class MainWindowViewModel
                 UpdateExportCommandStates();
                 UpdatePlaybackCommandStates();
                 OnPropertyChanged(nameof(StandardLayoutMeta));
+                OnPropertyChanged(nameof(DetailInspectorSegmentText));
                 RefreshPostProcessCommandStates();
                 return;
             }
@@ -376,6 +378,7 @@ public sealed partial class MainWindowViewModel
         }
 
         OnPropertyChanged(nameof(StandardLayoutMeta));
+        OnPropertyChanged(nameof(DetailInspectorSegmentText));
     }
 
     private bool CanEditSelectedSegment()

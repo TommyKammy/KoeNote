@@ -907,6 +907,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobPlaybackPath));
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
+                OnPropertyChanged(nameof(DetailInspectorTargetText));
+                OnPropertyChanged(nameof(CanRunSelectedJob));
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
                 RefreshPlaybackWaveform();
@@ -961,6 +963,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 return;
             }
+
+            OnPropertyChanged(nameof(DetailInspectorSegmentText));
 
             if (value is null)
             {
@@ -1573,6 +1577,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _selectedTranscriptTabIndex, Math.Clamp(value, 0, 3)))
             {
+                OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
                 NotifyExportMenuTargetChanged();
                 RefreshSelectedSegmentEditBuffer();
             }
