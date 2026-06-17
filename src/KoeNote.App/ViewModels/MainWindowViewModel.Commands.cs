@@ -11,6 +11,9 @@ public sealed partial class MainWindowViewModel
         DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
         ClearJobSearchCommand = new RelayCommand(ClearJobSearchAsync, () => !string.IsNullOrEmpty(JobSearchText));
+        ClearReadableDocumentSearchCommand = new RelayCommand(
+            ClearReadableDocumentSearchAsync,
+            () => !string.IsNullOrEmpty(ReadableDocumentSearchText));
         ClearSegmentSearchCommand = new RelayCommand(ClearSegmentSearchAsync, () => !string.IsNullOrEmpty(SegmentSearchText));
         RestoreJobCommand = new RelayCommand<JobSummary>(RestoreJobAsync, job => job is not null && !IsRunInProgress);
         PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);

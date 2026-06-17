@@ -162,6 +162,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isModelDownloadInProgress;
     private bool _isModelDownloadProgressIndeterminate;
     private string _jobSearchText = string.Empty;
+    private string _readableDocumentSearchText = string.Empty;
     private string _segmentSearchText = string.Empty;
     private DiagnosticLogScopeOption? _selectedDiagnosticLogScope;
     private MainLayoutMode _mainLayoutMode = MainLayoutMode.Standard;
@@ -663,6 +664,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ClearAllJobsCommand { get; private set; } = null!;
 
     public ICommand ClearJobSearchCommand { get; private set; } = null!;
+
+    public ICommand ClearReadableDocumentSearchCommand { get; private set; } = null!;
 
     public ICommand ClearSegmentSearchCommand { get; private set; } = null!;
 
@@ -1527,6 +1530,21 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public string ReadableDocumentSearchText
+    {
+        get => _readableDocumentSearchText;
+        set
+        {
+            if (SetField(ref _readableDocumentSearchText, value))
+            {
+                if (ClearReadableDocumentSearchCommand is RelayCommand command)
+                {
+                    command.RaiseCanExecuteChanged();
+                }
+            }
+        }
+    }
+
     public string SegmentSearchText
     {
         get => _segmentSearchText;
@@ -1561,6 +1579,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private Task ClearJobSearchAsync()
     {
         JobSearchText = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private Task ClearReadableDocumentSearchAsync()
+    {
+        ReadableDocumentSearchText = string.Empty;
         return Task.CompletedTask;
     }
 

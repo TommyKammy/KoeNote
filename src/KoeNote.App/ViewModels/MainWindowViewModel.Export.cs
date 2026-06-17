@@ -29,9 +29,9 @@ public sealed partial class MainWindowViewModel
         _ => "表示中の対象"
     };
 
-    public string ContextualExportMenuHeader => $"{CurrentExportTargetDisplayName}をエクスポート";
+    public string ContextualExportMenuHeader => "エクスポート";
 
-    public string ContextualExportMenuToolTip => $"{CurrentExportTargetDisplayName}の出力形式を選びます。表示中のビューに合わせて候補が切り替わります。";
+    public string ContextualExportMenuToolTip => $"{CurrentExportTargetDisplayName}の出力形式を選びます。表示中のビューに合わせてメニュー候補が切り替わります。";
 
     public bool IsReadableExportMenuVisible => EffectiveExportTranscriptTabIndex == ExportReadableTranscriptTabIndex;
 

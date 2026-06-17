@@ -145,14 +145,6 @@
                             <RotateTransform Angle="90" />
                         </TextBlock.LayoutTransform>
                     </TextBlock>
-                    <Button Style="{StaticResource StandardAiRailIconButton}"
-                            Command="{Binding UseDetailLayoutCommand}"
-                            ToolTip="整文候補と要約を詳細表示"
-                            Margin="0,18,0,0">
-                        <TextBlock Text="&#xE76B;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="12" />
-                    </Button>
                 </StackPanel>
             </DockPanel>
 

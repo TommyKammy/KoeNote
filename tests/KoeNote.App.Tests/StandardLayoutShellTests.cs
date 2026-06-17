@@ -3,7 +3,7 @@ namespace KoeNote.App.Tests;
 public sealed class StandardLayoutShellTests
 {
     [Fact]
-    public void StandardShellSupplementalTranscriptRoutes_OpenDetailLayoutTabs()
+    public void StandardShell_RemovesSupplementalTranscriptRoutesFromReadablePanel()
     {
         var repoRoot = FindRepoRoot();
         var readablePanelXaml = File.ReadAllText(Path.Combine(
@@ -19,12 +19,11 @@ public sealed class StandardLayoutShellTests
             "ViewModels",
             "MainWindowViewModel.Transcript.cs"));
 
-        Assert.Contains("ShowRawTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("ShowDiffTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("ShowReviewCandidateTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"原文\"", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"差分\"", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"レビュー候補\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("CopyReadablePolishedContentCommand", readablePanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowRawTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowDiffTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowReviewCandidateTranscriptTabCommand", readablePanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfirmSpeakerNamesAndRunReadablePolishingCommand", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("tabIndex != ReadableTranscriptTabIndex && IsStandardLayout", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("MainLayoutMode = MainLayoutMode.Detail;", transcriptViewModel, StringComparison.Ordinal);
         Assert.True(
@@ -197,20 +196,28 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("Content=\"整文\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsStandardRawTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsStandardReadableTranscriptViewSelected", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"StandardReadableSearchTextBox\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"整文本文を検索\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ReadableDocumentSearchText, UpdateSourceTrigger=PropertyChanged}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ClearReadableDocumentSearchCommand}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding ExportSelectedJobCommand}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding RunSelectedJobCommand}\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding UseDetailLayoutCommand}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BasedOn=\"{StaticResource {x:Type RadioButton}}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource VisibleWhenStandardRawTranscript}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"StandardDocumentSurface\"", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"10,10,0,0\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Margin=\"12,12,12,0\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReadablePolishedPanel Style=\"{StaticResource VisibleWhenStandardReadableTranscript}\" />", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("ShowCompactToolbar=\"True\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("SegmentSearchText", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("SelectedSpeakerFilter", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("IsTranscriptAutoScrollEnabled", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCompactToolbar", transcriptSegmentListCode, StringComparison.Ordinal);
         Assert.Contains("ReadablePolishedPanel", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"920\"", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"8\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"1080\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Stretch\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"10\"", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentFontSize", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentLineHeight", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
@@ -235,7 +242,6 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("AddAudioCommand", railXaml, StringComparison.Ordinal);
         Assert.Contains("ClearAllJobsCommand", railXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("UseDetailLayoutCommand", railXaml, StringComparison.Ordinal);
-        Assert.Contains("Command=\"{Binding UseDetailLayoutCommand}\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("JobSearchText", railXaml, StringComparison.Ordinal);
         Assert.Contains("AllowDrop=\"True\"", railXaml, StringComparison.Ordinal);
         Assert.Contains("UnreviewedDrafts", railXaml, StringComparison.Ordinal);

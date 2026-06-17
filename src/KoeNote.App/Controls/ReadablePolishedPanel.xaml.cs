@@ -11,7 +11,8 @@ namespace KoeNote.App.Controls;
 public partial class ReadablePolishedPanel : UserControl
 {
     private INotifyPropertyChanged? _subscribedViewModel;
-    private readonly List<Paragraph> _readableBlockAnchors = [];
+    private readonly List<FrameworkElement> _readableBlockAnchors = [];
+    private FrameworkElement? _firstSearchMatchAnchor;
 
     public ReadablePolishedPanel()
     {
@@ -76,7 +77,8 @@ public partial class ReadablePolishedPanel : UserControl
         if (e.PropertyName is nameof(MainWindowViewModel.ReadablePolishedContent) or
             nameof(MainWindowViewModel.HasReadableDocumentBlocks) or
             nameof(MainWindowViewModel.ReadableDocumentFontSize) or
-            nameof(MainWindowViewModel.ReadableDocumentLineHeight))
+            nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
+            nameof(MainWindowViewModel.ReadableDocumentSearchText))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);
         }
@@ -111,64 +113,76 @@ public partial class ReadablePolishedPanel : UserControl
     private void RebuildReadableDocument()
     {
         _readableBlockAnchors.Clear();
+        _firstSearchMatchAnchor = null;
+        ReadableDocumentBlocksPanel.Children.Clear();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
         {
-            ReadableDocumentViewer.Document = null;
             return;
         }
 
         var textBrush = new SolidColorBrush(Color.FromRgb(0x17, 0x1C, 0x27));
         var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
         var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
+        var searchText = viewModel.ReadableDocumentSearchText;
 
-        var document = new FlowDocument
-        {
-            PagePadding = new Thickness(0),
-            ColumnWidth = 760,
-            FontFamily = new FontFamily("Yu Gothic UI"),
-            FontSize = viewModel.ReadableDocumentFontSize,
-            LineHeight = viewModel.ReadableDocumentLineHeight,
-            Foreground = textBrush
-        };
-
-        var table = new Table
-        {
-            CellSpacing = 0
-        };
-        table.Columns.Add(new TableColumn { Width = new GridLength(122) });
-        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
-
-        var rowGroup = new TableRowGroup();
         foreach (var block in viewModel.ReadableDocumentBlocks)
         {
-            var speakerPalette = GetSpeakerPalette(block.Speaker);
-            var row = new TableRow();
-            row.Cells.Add(BuildMetaCell(block, mutedBrush, speakerPalette));
-            row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush));
-            rowGroup.Rows.Add(row);
+            ReadableDocumentBlocksPanel.Children.Add(
+                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
         }
 
-        table.RowGroups.Add(rowGroup);
-        document.Blocks.Add(table);
-        ReadableDocumentViewer.Document = document;
+        if (_firstSearchMatchAnchor is { } firstSearchMatch)
+        {
+            Dispatcher.BeginInvoke(new Action(firstSearchMatch.BringIntoView));
+        }
     }
 
-    private TableCell BuildMetaCell(
+    private Grid BuildReadableBlockRow(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush mutedBrush,
+        Brush separatorBrush,
+        string searchText)
+    {
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(122) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var meta = BuildMetaPanel(block, mutedBrush, GetSpeakerPalette(block.Speaker));
+        Grid.SetColumn(meta, 0);
+        Grid.SetRow(meta, 0);
+        row.Children.Add(meta);
+
+        var body = BuildBodyTextBlock(block, viewModel, textBrush, searchText);
+        Grid.SetColumn(body, 1);
+        Grid.SetRow(body, 0);
+        row.Children.Add(body);
+
+        var separator = new Border
+        {
+            Height = 1,
+            Background = separatorBrush,
+            Margin = new Thickness(0, 20, 0, 26)
+        };
+        Grid.SetColumn(separator, 1);
+        Grid.SetRow(separator, 1);
+        row.Children.Add(separator);
+
+        return row;
+    }
+
+    private StackPanel BuildMetaPanel(
         ReadableDocumentBlock block,
         Brush mutedBrush,
         SpeakerPalette speakerPalette)
     {
-        var cell = new TableCell
+        var panel = new StackPanel
         {
-            Padding = new Thickness(0, 3, 20, 0)
-        };
-        var paragraph = new Paragraph
-        {
-            Margin = new Thickness(0),
-            FontSize = 11,
-            LineHeight = 16,
-            Foreground = mutedBrush
+            Margin = new Thickness(0, 3, 20, 0)
         };
 
         if (block.HasSpeaker)
@@ -189,25 +203,23 @@ public partial class ReadablePolishedPanel : UserControl
                     MaxWidth = 92
                 }
             };
-            paragraph.Inlines.Add(new InlineUIContainer(speakerBorder));
+            panel.Children.Add(speakerBorder);
         }
 
         if (block.HasTimeRange)
         {
-            if (paragraph.Inlines.Count > 0)
+            panel.Children.Add(new TextBlock
             {
-                paragraph.Inlines.Add(new LineBreak());
-            }
-
-            paragraph.Inlines.Add(new Run(block.TimeRange)
-            {
-                Foreground = mutedBrush,
-                FontSize = 11
+                Text = block.TimeRange,
+                Margin = block.HasSpeaker ? new Thickness(0, 4, 0, 0) : new Thickness(0),
+                FontFamily = new FontFamily("Yu Gothic UI"),
+                FontSize = 11,
+                LineHeight = 16,
+                Foreground = mutedBrush
             });
         }
 
-        cell.Blocks.Add(paragraph);
-        return cell;
+        return panel;
     }
 
     private static SpeakerPalette GetSpeakerPalette(string speaker)
@@ -241,31 +253,65 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
-    private TableCell BuildBodyCell(
+    private TextBlock BuildBodyTextBlock(
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
-        Brush separatorBrush)
+        string searchText)
     {
-        var cell = new TableCell();
-        var body = new Paragraph(new Run(block.Text))
+        var body = new TextBlock
         {
-            Margin = new Thickness(0),
             FontFamily = new FontFamily("Yu Gothic UI"),
             FontSize = viewModel.ReadableDocumentFontSize,
             LineHeight = viewModel.ReadableDocumentLineHeight,
-            Foreground = textBrush
+            Foreground = textBrush,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Left
         };
+        AddHighlightedRuns(body, block.Text, searchText);
         _readableBlockAnchors.Add(body);
-
-        cell.Blocks.Add(body);
-        cell.Blocks.Add(new BlockUIContainer(new Border
+        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
         {
-            Height = 1,
-            Background = separatorBrush,
-            Margin = new Thickness(0, 20, 0, 26)
-        }));
-        return cell;
+            _firstSearchMatchAnchor = body;
+        }
+
+        return body;
+    }
+
+    private static bool ContainsSearchText(string text, string searchText) =>
+        !string.IsNullOrWhiteSpace(searchText) &&
+        text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+
+    private static void AddHighlightedRuns(TextBlock textBlock, string text, string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            textBlock.Inlines.Add(new Run(text));
+            return;
+        }
+
+        var startIndex = 0;
+        while (startIndex < text.Length)
+        {
+            var matchIndex = text.IndexOf(searchText, startIndex, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                textBlock.Inlines.Add(new Run(text[startIndex..]));
+                return;
+            }
+
+            if (matchIndex > startIndex)
+            {
+                textBlock.Inlines.Add(new Run(text[startIndex..matchIndex]));
+            }
+
+            textBlock.Inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0xFE, 0xF3, 0xC7)),
+                FontWeight = FontWeights.SemiBold
+            });
+            startIndex = matchIndex + searchText.Length;
+        }
     }
 
     private static int FindReadableBlockIndex(IReadOnlyList<ReadableDocumentBlock> blocks, double positionSeconds)
