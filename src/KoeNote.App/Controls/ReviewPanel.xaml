@@ -5,6 +5,7 @@
              xmlns:controls="clr-namespace:KoeNote.App.Controls"
              xmlns:models="clr-namespace:KoeNote.App.Models">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="VisibleWhenDraftStyle" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
@@ -33,6 +34,14 @@
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSummaryStageRunning}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="VisibleWhenDetailLayoutStyle" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDetailLayout}" Value="True">
                     <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </Style.Triggers>
@@ -181,6 +190,9 @@
                                        FontWeight="SemiBold" />
                         </Border>
                         <Border Style="{StaticResource InspectorTabPill}">
+                            <Border.Visibility>
+                                <Binding Path="IsDetailLayout" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                            </Border.Visibility>
                             <TextBlock Text="表記ゆれ"
                                        Foreground="{StaticResource MutedBrush}"
                                        FontSize="12"
@@ -531,7 +543,8 @@
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="10">
+                            Padding="10"
+                            Style="{StaticResource VisibleWhenDetailLayoutStyle}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

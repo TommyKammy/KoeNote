@@ -119,22 +119,20 @@ public sealed class TabHighlightStyleTests
     }
 
     [Fact]
-    public void ReadablePolishedPanel_ExposesSupplementalReviewRoutes()
+    public void ReadablePolishedPanel_RemovesSupplementalReviewRoutes()
     {
         var repoRoot = FindRepoRoot();
         var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
 
-        Assert.Contains("CopyReadablePolishedContentCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("ShowRawTranscriptTabCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("ShowDiffTranscriptTabCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("ShowReviewCandidateTranscriptTabCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("Path=\"IsStandardLayout\"", xaml, StringComparison.Ordinal);
-        Assert.Equal(3, AllIndexesOf(xaml, "Converter=\"{StaticResource BooleanToVisibilityConverter}\"").Count());
-        Assert.Contains("ConfirmSpeakerNamesAndRunReadablePolishingCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"原文\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"差分\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("レビュー候補", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"再整文\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("CopyReadablePolishedContentCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowRawTranscriptTabCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowDiffTranscriptTabCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowReviewCandidateTranscriptTabCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfirmSpeakerNamesAndRunReadablePolishingCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"原文\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"差分\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"レビュー候補\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"再整文\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -145,7 +143,8 @@ public sealed class TabHighlightStyleTests
         var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
 
         Assert.Contains("FlowDocumentScrollViewer x:Name=\"ReadableDocumentViewer\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"920\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"1040\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"10\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontFamily\" Value=\"Yu Gothic UI\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentFontSize", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentLineHeight", xaml, StringComparison.Ordinal);
@@ -214,7 +213,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"実行\"", headerXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("整文まで実行", headerXaml, StringComparison.Ordinal);
-        Assert.Contains("CurrentExportTargetDisplayName", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ContextualExportMenuHeader", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding CurrentExportTargetDisplayName}\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("ContextualExportMenuToolTip", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenReadableExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenRawExportMenuItem", headerXaml, StringComparison.Ordinal);
