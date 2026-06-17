@@ -169,8 +169,8 @@
 
         <Border Background="#FFFFFF"
                 BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="1,1,1,0"
-                CornerRadius="0"
+                BorderThickness="1"
+                CornerRadius="0,0,10,10"
                 MinHeight="56"
                 Padding="12,6"
                 Style="{StaticResource VisibleWhenSlimPlayer}">

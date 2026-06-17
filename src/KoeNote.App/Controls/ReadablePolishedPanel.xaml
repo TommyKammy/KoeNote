@@ -151,6 +151,7 @@
                         Background="#FFFFFF"
                         BorderBrush="#D6DAE1"
                         BorderThickness="1"
+                        CornerRadius="8"
                         Padding="42,36">
                     <FlowDocumentScrollViewer x:Name="ReadableDocumentViewer"
                                               IsToolBarVisible="False"
@@ -168,7 +169,8 @@
                         Padding="36"
                         Background="#FBFCFD"
                         BorderBrush="#D6DAE1"
-                        BorderThickness="1">
+                        BorderThickness="1"
+                        CornerRadius="8">
                     <StackPanel>
                         <TextBlock Text="{Binding ReadableDocumentStateTitle}"
                                    FontFamily="Yu Gothic UI"
