@@ -280,7 +280,7 @@
 
                 <controls:TranscriptAudioPlayer Grid.Column="1"
                                                 Grid.Row="2"
-                                                Margin="12,0,12,10"
+                                                Margin="12,0,12,8"
                                                 IsSlim="True" />
 
                 <controls:StandardAiAssistRailPanel Grid.RowSpan="3"

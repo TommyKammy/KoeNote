@@ -211,7 +211,7 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("Style=\"{StaticResource VisibleWhenPolishedTranscriptMode}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("<RowDefinition Height=\"64\" MinHeight=\"56\" />", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("IsSlim=\"True\"", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"12,0,12,10\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"12,0,12,8\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenSlimPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenFullPlayer", transcriptAudioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"0,0,10,10\"", transcriptAudioPlayerXaml, StringComparison.Ordinal);
