@@ -4,6 +4,8 @@ namespace KoeNote.App.Services.Transcript;
 
 public static class ReadableDocumentSpeakerRenamer
 {
+    public const int MaxSpeakerNameLength = 80;
+
     private const string TimestampPattern = @"\d{1,2}:\d{2}(?::\d{2})?";
     private const string RangeSeparatorPattern = @"(?:--|-|~|\u301c|\uFF5E|\u2013|\u2014|\u2212|\uFF0D|\u30FC)";
     private const string SpeakerPattern = @"[^:\uFF1A\r\n]{1,80}";
@@ -23,6 +25,11 @@ public static class ReadableDocumentSpeakerRenamer
 
         var normalizedCurrentSpeaker = currentSpeaker.Trim();
         var normalizedReplacementSpeaker = replacementSpeaker.Trim();
+        if (!IsValidSpeakerName(normalizedReplacementSpeaker))
+        {
+            return new ReadableDocumentSpeakerRenameResult(content, 0);
+        }
+
         if (string.Equals(normalizedCurrentSpeaker, normalizedReplacementSpeaker, StringComparison.Ordinal))
         {
             return new ReadableDocumentSpeakerRenameResult(content, 0);
@@ -62,6 +69,20 @@ public static class ReadableDocumentSpeakerRenamer
         return new ReadableDocumentSpeakerRenameResult(
             updatedBlockCount > 0 ? string.Join(newline, lines) : content,
             updatedBlockCount);
+    }
+
+    public static bool IsValidSpeakerName(string speakerName)
+    {
+        if (string.IsNullOrWhiteSpace(speakerName))
+        {
+            return false;
+        }
+
+        var normalized = speakerName.Trim();
+        return normalized.Length <= MaxSpeakerNameLength &&
+            !normalized.Contains(':', StringComparison.Ordinal) &&
+            !normalized.Contains('：', StringComparison.Ordinal) &&
+            !normalized.Any(static character => char.IsControl(character));
     }
 }
 

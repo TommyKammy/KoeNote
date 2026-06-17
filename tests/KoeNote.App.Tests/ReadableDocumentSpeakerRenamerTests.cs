@@ -47,4 +47,18 @@ public sealed class ReadableDocumentSpeakerRenamerTests
         Assert.Equal(0, result.UpdatedBlockCount);
         Assert.Equal(content, result.Content);
     }
+
+    [Theory]
+    [InlineData("Alice:Host")]
+    [InlineData("Alice：Host")]
+    [InlineData("123456789012345678901234567890123456789012345678901234567890123456789012345678901")]
+    public void Rename_RejectsSpeakerNamesThatCannotBeParsed(string speakerName)
+    {
+        const string content = "[00:00 - 00:10] Speaker_0: Hello";
+
+        var result = ReadableDocumentSpeakerRenamer.Rename(content, "Speaker_0", speakerName);
+
+        Assert.False(result.Changed);
+        Assert.Equal(content, result.Content);
+    }
 }

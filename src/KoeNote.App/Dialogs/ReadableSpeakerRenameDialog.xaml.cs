@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Dialogs;
 
@@ -18,11 +19,11 @@ public partial class ReadableSpeakerRenameDialog : Window
 
     private void OnApplyClick(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(SpeakerName))
+        if (!ReadableDocumentSpeakerRenamer.IsValidSpeakerName(SpeakerName))
         {
             MessageBox.Show(
                 this,
-                "話者名を入力してください。",
+                "話者名は80文字以内で入力してください。コロン（: / ：）や改行は使用できません。",
                 "話者名を変更",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

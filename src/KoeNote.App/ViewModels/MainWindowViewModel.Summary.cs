@@ -95,6 +95,7 @@ public sealed partial class MainWindowViewModel
         if (SelectedJob is null ||
             string.IsNullOrWhiteSpace(currentSpeaker) ||
             string.IsNullOrWhiteSpace(replacementSpeaker) ||
+            IsRunInProgress ||
             !HasReadablePolishedContent)
         {
             return false;
@@ -113,22 +114,30 @@ public sealed partial class MainWindowViewModel
 
         var jobId = SelectedJob.JobId;
         var selectedSegmentId = SelectedSegment?.SegmentId;
+        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
+        var wasDerivativeStale = derivative is not null && _transcriptDerivativeRepository.IsStale(derivative);
         var speakerIds = FindSpeakerIdsByDisplayName(jobId, normalizedCurrentSpeaker);
         foreach (var speakerId in speakerIds)
         {
-            _transcriptEditService.ApplySpeakerAlias(jobId, speakerId, normalizedReplacementSpeaker);
+            _transcriptEditService.ApplySpeakerAlias(
+                jobId,
+                speakerId,
+                normalizedReplacementSpeaker,
+                recordHistory: false);
         }
 
-        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
         if (derivative is not null)
         {
+            var sourceTranscriptHash = wasDerivativeStale
+                ? derivative.SourceTranscriptHash
+                : _transcriptDerivativeRepository.ComputeCurrentRawTranscriptHash(jobId);
             var savedDerivative = _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
                 derivative.JobId,
                 derivative.Kind,
                 derivative.ContentFormat,
                 renameResult.Content,
                 derivative.SourceKind,
-                _transcriptDerivativeRepository.ComputeCurrentRawTranscriptHash(jobId),
+                sourceTranscriptHash,
                 derivative.SourceSegmentRange,
                 derivative.SourceChunkIds,
                 derivative.ModelId,
@@ -137,6 +146,11 @@ public sealed partial class MainWindowViewModel
                 derivative.Status,
                 derivative.ErrorMessage,
                 derivative.DerivativeId));
+            SaveRenamedReadableDerivativeChunks(
+                derivative.DerivativeId,
+                normalizedCurrentSpeaker,
+                normalizedReplacementSpeaker,
+                sourceTranscriptHash);
             ReadablePolishedStatus = $"整文済み: {savedDerivative.UpdatedAt:yyyy/MM/dd HH:mm}";
         }
 
@@ -146,8 +160,72 @@ public sealed partial class MainWindowViewModel
             ReloadSegmentsForSelectedJob(selectedSegmentId);
         }
 
+        RefreshSummaryAfterReadableDocumentChanged(jobId);
         LatestLog = $"整文の話者名を更新しました: {normalizedCurrentSpeaker} -> {normalizedReplacementSpeaker}";
         return true;
+    }
+
+    private void SaveRenamedReadableDerivativeChunks(
+        string derivativeId,
+        string currentSpeaker,
+        string replacementSpeaker,
+        string sourceTranscriptHash)
+    {
+        foreach (var chunk in _transcriptDerivativeRepository.ReadChunks(derivativeId))
+        {
+            var chunkRenameResult = ReadableDocumentSpeakerRenamer.Rename(
+                chunk.Content,
+                currentSpeaker,
+                replacementSpeaker);
+            if (!chunkRenameResult.Changed)
+            {
+                continue;
+            }
+
+            _transcriptDerivativeRepository.SaveChunk(new TranscriptDerivativeChunkSaveRequest(
+                chunk.DerivativeId,
+                chunk.JobId,
+                chunk.ChunkIndex,
+                chunk.SourceKind,
+                chunk.SourceSegmentIds,
+                chunk.SourceStartSeconds,
+                chunk.SourceEndSeconds,
+                sourceTranscriptHash,
+                chunk.ContentFormat,
+                chunkRenameResult.Content,
+                chunk.ModelId,
+                chunk.PromptVersion,
+                chunk.GenerationProfile,
+                chunk.Status,
+                chunk.ErrorMessage,
+                chunk.ChunkId));
+        }
+    }
+
+    private void RefreshSummaryAfterReadableDocumentChanged(string jobId)
+    {
+        var summary = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Summary);
+        if (summary is not null &&
+            string.Equals(summary.SourceKind, TranscriptDerivativeSourceKinds.Polished, StringComparison.Ordinal))
+        {
+            _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+                summary.JobId,
+                summary.Kind,
+                summary.ContentFormat,
+                summary.Content,
+                summary.SourceKind,
+                summary.SourceTranscriptHash,
+                summary.SourceSegmentRange,
+                summary.SourceChunkIds,
+                summary.ModelId,
+                summary.PromptVersion,
+                summary.GenerationProfile,
+                TranscriptDerivativeStatuses.Stale,
+                summary.ErrorMessage,
+                summary.DerivativeId));
+        }
+
+        LoadSummaryForSelectedJob();
     }
 
     private IReadOnlyList<string> FindSpeakerIdsByDisplayName(string jobId, string speakerDisplayName)

@@ -120,7 +120,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         transaction.Commit();
     }
 
-    public void ApplySpeakerAlias(string jobId, string speakerId, string displayName)
+    public void ApplySpeakerAlias(string jobId, string speakerId, string displayName, bool recordHistory = true)
     {
         if (string.IsNullOrWhiteSpace(jobId))
         {
@@ -158,15 +158,18 @@ public sealed class TranscriptEditService(AppPaths paths)
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
 
-        InsertHistory(
-            connection,
-            transaction,
-            jobId,
-            draftId: null,
-            segmentId: null,
-            "speaker_alias",
-            before,
-            after);
+        if (recordHistory)
+        {
+            InsertHistory(
+                connection,
+                transaction,
+                jobId,
+                draftId: null,
+                segmentId: null,
+                "speaker_alias",
+                before,
+                after);
+        }
 
         transaction.Commit();
     }

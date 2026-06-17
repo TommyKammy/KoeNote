@@ -60,6 +60,7 @@
                 <TextBox x:Name="SpeakerNameTextBox"
                          Margin="0,4,0,0"
                          MinHeight="36"
+                         MaxLength="80"
                          Padding="10,7"
                          BorderBrush="#CBD5E1"
                          BorderThickness="1"
