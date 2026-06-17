@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
+using KoeNote.App.Dialogs;
 using KoeNote.App.Models;
 using KoeNote.App.ViewModels;
 
@@ -78,6 +80,7 @@ public partial class ReadablePolishedPanel : UserControl
             nameof(MainWindowViewModel.HasReadableDocumentBlocks) or
             nameof(MainWindowViewModel.ReadableDocumentFontSize) or
             nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
+            nameof(MainWindowViewModel.IsRunInProgress) or
             nameof(MainWindowViewModel.ReadableDocumentSearchText))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);
@@ -152,7 +155,7 @@ public partial class ReadablePolishedPanel : UserControl
         row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var meta = BuildMetaPanel(block, mutedBrush, GetSpeakerPalette(block.Speaker));
+        var meta = BuildMetaPanel(block, viewModel, mutedBrush, GetSpeakerPalette(block.Speaker));
         Grid.SetColumn(meta, 0);
         Grid.SetRow(meta, 0);
         row.Children.Add(meta);
@@ -177,6 +180,7 @@ public partial class ReadablePolishedPanel : UserControl
 
     private StackPanel BuildMetaPanel(
         ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
         Brush mutedBrush,
         SpeakerPalette speakerPalette)
     {
@@ -191,7 +195,9 @@ public partial class ReadablePolishedPanel : UserControl
             {
                 Background = speakerPalette.Background,
                 CornerRadius = new CornerRadius(6),
+                Cursor = viewModel.IsRunInProgress ? Cursors.Arrow : Cursors.Hand,
                 Padding = new Thickness(8, 3, 8, 3),
+                ToolTip = viewModel.IsRunInProgress ? "実行中は話者名を変更できません" : "話者名を変更",
                 Child = new TextBlock
                 {
                     Text = block.Speaker,
@@ -203,6 +209,15 @@ public partial class ReadablePolishedPanel : UserControl
                     MaxWidth = 92
                 }
             };
+            if (!viewModel.IsRunInProgress)
+            {
+                speakerBorder.MouseLeftButtonUp += (_, e) =>
+                {
+                    e.Handled = true;
+                    OpenSpeakerRenameDialog(block, viewModel);
+                };
+            }
+
             panel.Children.Add(speakerBorder);
         }
 
@@ -220,6 +235,25 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         return panel;
+    }
+
+    private void OpenSpeakerRenameDialog(ReadableDocumentBlock block, MainWindowViewModel viewModel)
+    {
+        if (!block.HasSpeaker)
+        {
+            return;
+        }
+
+        var dialog = new ReadableSpeakerRenameDialog(block.Speaker)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        viewModel.RenameReadableDocumentSpeaker(block.Speaker, dialog.SpeakerName);
     }
 
     private static SpeakerPalette GetSpeakerPalette(string speaker)
