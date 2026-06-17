@@ -239,7 +239,10 @@ public sealed class TabHighlightStyleTests
 
         Assert.DoesNotContain("ShowReadableTranscriptTabCommand", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:ReviewDraftEmptyState />", reviewXaml, StringComparison.Ordinal);
-        Assert.Contains("<controls:ReviewDraftActionBar Margin=\"0,0,0,12\" />", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("<controls:ReviewDraftActionBar DockPanel.Dock=\"Bottom\"", reviewXaml, StringComparison.Ordinal);
+        Assert.True(
+            reviewXaml.IndexOf("<controls:ReviewDraftActionBar DockPanel.Dock=\"Bottom\"", StringComparison.Ordinal) <
+            reviewXaml.IndexOf("<ScrollViewer VerticalScrollBarVisibility=\"Auto\">", StringComparison.Ordinal));
         Assert.Contains("整文候補はありません", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
         Assert.Contains("「整文」タブで結果を確認", reviewDraftEmptyStateXaml, StringComparison.Ordinal);
         Assert.Contains("この候補への操作", reviewDraftActionBarXaml, StringComparison.Ordinal);
