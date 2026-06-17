@@ -128,6 +128,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ShowRawTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowDiffTranscriptTabCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ShowReviewCandidateTranscriptTabCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Path=\"IsStandardLayout\"", xaml, StringComparison.Ordinal);
+        Assert.Equal(3, AllIndexesOf(xaml, "Converter=\"{StaticResource BooleanToVisibilityConverter}\"").Count());
         Assert.Contains("ConfirmSpeakerNamesAndRunReadablePolishingCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"原文\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"差分\"", xaml, StringComparison.Ordinal);
@@ -244,7 +246,14 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("レビュー候補を反映して、次の候補へ進みます", reviewDraftActionBarXaml, StringComparison.Ordinal);
         Assert.Contains("RunPostSummaryCommand", reviewXaml, StringComparison.Ordinal);
         Assert.Single(AllIndexesOf(reviewXaml, "Command=\"{Binding RunPostSummaryCommand}\""));
+        Assert.Contains("AI インスペクタ", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorTargetText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorCurrentTabText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorSegmentText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("InspectorMetaLabel", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("TranscriptInlineToggle", transcriptXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"ビュー\"", transcriptXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"文字起こし\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"話者:\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"テキストを検索\"", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("TranscriptToggleTrack", transcriptXaml, StringComparison.Ordinal);

@@ -255,6 +255,10 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("IsSummaryStale", aiRailXaml, StringComparison.Ordinal);
         Assert.Contains("<controls:ReviewPanel ShowCloseButton=\"False\" />", aiRailXaml, StringComparison.Ordinal);
         Assert.Contains("RunPostSummaryCommand", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("AI インスペクタ", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorTargetText", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorCurrentTabText", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("DetailInspectorSegmentText", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReviewDraftActionBar", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("RememberCorrection", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCloseButton", reviewPanelCode, StringComparison.Ordinal);
@@ -280,6 +284,12 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public ICommand ToggleStandardAiRailCommand", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
+        Assert.Contains("public string DetailInspectorCurrentTabText", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("public string DetailInspectorTargetText", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("public string DetailInspectorSegmentText", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorTargetText));", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorSegmentText));", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorCurrentTabText));", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("RefreshSelectedSegmentEditBuffer();", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("private int EffectiveExportTranscriptTabIndex => IsStandardLayout", exportViewModel, StringComparison.Ordinal);

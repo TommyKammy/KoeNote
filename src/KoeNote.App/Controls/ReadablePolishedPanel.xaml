@@ -79,6 +79,9 @@
                             Margin="0,0,6,0"
                             ToolTip="ASR原文を確認・修正します"
                             Style="{StaticResource ToolbarButton}">
+                        <Button.Visibility>
+                            <Binding Path="IsStandardLayout" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                        </Button.Visibility>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="&#xE8A5;"
                                        FontFamily="Segoe MDL2 Assets"
@@ -95,6 +98,9 @@
                             Margin="0,0,6,0"
                             ToolTip="素起こしとレビュー候補の差分を確認します"
                             Style="{StaticResource ToolbarButton}">
+                        <Button.Visibility>
+                            <Binding Path="IsStandardLayout" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                        </Button.Visibility>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="&#xE8AB;"
                                        FontFamily="Segoe MDL2 Assets"
@@ -111,6 +117,9 @@
                             Margin="0,0,6,0"
                             ToolTip="最終整文前のレビュー候補を確認します"
                             Style="{StaticResource ToolbarButton}">
+                        <Button.Visibility>
+                            <Binding Path="IsStandardLayout" Converter="{StaticResource BooleanToVisibilityConverter}" />
+                        </Button.Visibility>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="&#xE70F;"
                                        FontFamily="Segoe MDL2 Assets"

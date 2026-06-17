@@ -42,6 +42,17 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style x:Key="InspectorMetaLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="InspectorMetaValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}">
@@ -59,19 +70,23 @@
 
                     <StackPanel VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <TextBlock Text="&#x2728;"
-                                       FontFamily="Segoe UI Emoji"
-                                       FontSize="15"
-                                       Foreground="#F59E0B"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,5,0" />
-                            <TextBlock Text="整文候補"
+                            <Border Style="{StaticResource LucideInlineIconBadge}"
+                                    Background="{StaticResource AccentLightBrush}"
+                                    CornerRadius="5"
+                                    Margin="0,0,7,0">
+                                <Path Style="{StaticResource LucidePathIcon}"
+                                      Width="14"
+                                      Height="14"
+                                      Stroke="{StaticResource AccentBrush}"
+                                      Data="M4 21v-7m0 0l4 4m-4-4l-4 4m12-15h8m-8 4h8m-8 4h8M4 3h4v4H4z" />
+                            </Border>
+                            <TextBlock Text="AI インスペクタ"
                                        Style="{StaticResource SectionTitle}"
                                        FontSize="13"
                                        Margin="0"
                                        VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock Text="{Binding SummaryStatus}"
+                        <TextBlock Text="選択中のジョブ、タブ、整文候補、要約をまとめて確認します。"
                                    Style="{StaticResource MutedText}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
@@ -128,12 +143,57 @@
                 </Grid>
             </Border>
 
-            <Grid Margin="14">
+            <Border DockPanel.Dock="Top"
+                    Margin="12,12,12,0"
+                    Padding="10"
+                    Background="#F8FAFC"
+                    BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="8">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="3*" MinHeight="160" />
-                        <RowDefinition Height="10" />
-                        <RowDefinition Height="2*" MinHeight="140" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="74" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="対象" Style="{StaticResource InspectorMetaLabel}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding DetailInspectorTargetText}"
+                               Style="{StaticResource InspectorMetaValue}" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="ビュー"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource InspectorMetaLabel}" />
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="1"
+                               Text="{Binding DetailInspectorCurrentTabText}"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource InspectorMetaValue}" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="セグメント"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource InspectorMetaLabel}" />
+                    <TextBlock Grid.Row="2"
+                               Grid.Column="1"
+                               Text="{Binding DetailInspectorSegmentText}"
+                               Margin="0,6,0,0"
+                               Style="{StaticResource InspectorMetaValue}" />
+                </Grid>
+            </Border>
+
+            <Grid Margin="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="3*" MinHeight="150" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="2*" MinHeight="126" />
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="2"
@@ -284,7 +344,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="レビュー候補"
+                            <TextBlock Text="整文候補"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                             <WrapPanel Grid.Column="1" VerticalAlignment="Center">

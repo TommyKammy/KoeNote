@@ -273,7 +273,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="文字起こし"
+                                    <TextBlock Text="ビュー"
                                                FontSize="13"
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource TextBrush}"
