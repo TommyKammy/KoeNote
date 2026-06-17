@@ -80,6 +80,7 @@ public partial class ReadablePolishedPanel : UserControl
             nameof(MainWindowViewModel.HasReadableDocumentBlocks) or
             nameof(MainWindowViewModel.ReadableDocumentFontSize) or
             nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
+            nameof(MainWindowViewModel.IsRunInProgress) or
             nameof(MainWindowViewModel.ReadableDocumentSearchText))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);

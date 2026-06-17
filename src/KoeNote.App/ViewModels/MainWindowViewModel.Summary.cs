@@ -151,7 +151,9 @@ public sealed partial class MainWindowViewModel
                 normalizedCurrentSpeaker,
                 normalizedReplacementSpeaker,
                 sourceTranscriptHash);
-            ReadablePolishedStatus = $"整文済み: {savedDerivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+            ReadablePolishedStatus = wasDerivativeStale
+                ? "古い整文があります。再生成すると更新できます。"
+                : $"整文済み: {savedDerivative.UpdatedAt:yyyy/MM/dd HH:mm}";
         }
 
         ReadablePolishedContent = renameResult.Content;
@@ -205,35 +207,19 @@ public sealed partial class MainWindowViewModel
     private void RefreshSummaryAfterReadableDocumentChanged(string jobId)
     {
         var summary = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Summary);
-        if (summary is not null &&
+        LoadSummaryForSelectedJob();
+        if (summary is not null && HasSummaryContent &&
             string.Equals(summary.SourceKind, TranscriptDerivativeSourceKinds.Polished, StringComparison.Ordinal))
         {
-            _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
-                summary.JobId,
-                summary.Kind,
-                summary.ContentFormat,
-                summary.Content,
-                summary.SourceKind,
-                summary.SourceTranscriptHash,
-                summary.SourceSegmentRange,
-                summary.SourceChunkIds,
-                summary.ModelId,
-                summary.PromptVersion,
-                summary.GenerationProfile,
-                TranscriptDerivativeStatuses.Stale,
-                summary.ErrorMessage,
-                summary.DerivativeId));
+            IsSummaryStale = true;
+            SummaryStatus = "古い要約があります。再実行すると更新できます。";
         }
-
-        LoadSummaryForSelectedJob();
     }
 
     private IReadOnlyList<string> FindSpeakerIdsByDisplayName(string jobId, string speakerDisplayName)
     {
         var speakerIds = Segments
-            .Where(segment =>
-                string.Equals(segment.Speaker, speakerDisplayName, StringComparison.Ordinal) ||
-                string.Equals(segment.SpeakerId, speakerDisplayName, StringComparison.OrdinalIgnoreCase))
+            .Where(segment => string.Equals(segment.Speaker, speakerDisplayName, StringComparison.Ordinal))
             .Select(static segment => segment.SpeakerId)
             .Where(static speakerId => !string.IsNullOrWhiteSpace(speakerId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -244,9 +230,7 @@ public sealed partial class MainWindowViewModel
         }
 
         return _transcriptSegmentRepository.ReadPreviews(jobId)
-            .Where(segment =>
-                string.Equals(segment.Speaker, speakerDisplayName, StringComparison.Ordinal) ||
-                string.Equals(segment.SpeakerId, speakerDisplayName, StringComparison.OrdinalIgnoreCase))
+            .Where(segment => string.Equals(segment.Speaker, speakerDisplayName, StringComparison.Ordinal))
             .Select(static segment => segment.SpeakerId)
             .Where(static speakerId => !string.IsNullOrWhiteSpace(speakerId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
