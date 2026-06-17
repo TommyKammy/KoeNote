@@ -908,6 +908,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedJobUpdatedAt));
                 OnPropertyChanged(nameof(SelectedJobUnreviewedDrafts));
                 OnPropertyChanged(nameof(DetailInspectorTargetText));
+                OnPropertyChanged(nameof(CanRunSelectedJob));
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
                 RefreshPlaybackWaveform();

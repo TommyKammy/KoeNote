@@ -150,6 +150,12 @@ public sealed class StandardLayoutShellTests
             "KoeNote.App",
             "ViewModels",
             "MainWindowViewModel.Jobs.cs"));
+        var editingViewModel = File.ReadAllText(Path.Combine(
+            repoRoot,
+            "src",
+            "KoeNote.App",
+            "ViewModels",
+            "MainWindowViewModel.Editing.cs"));
         var transcriptViewModel = File.ReadAllText(Path.Combine(
             repoRoot,
             "src",
@@ -262,6 +268,8 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("DetailInspectorTargetText", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorCurrentTabText", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorSegmentText", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("Binding CanRunSelectedJob", reviewPanelXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RunPreflightSummary}\"", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReviewDraftActionBar", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("RememberCorrection", reviewPanelXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCloseButton", reviewPanelCode, StringComparison.Ordinal);
@@ -288,11 +296,16 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("public bool IsStandardReadableTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("public bool IsStandardRawTranscriptViewSelected", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("public string DetailInspectorCurrentTabText", layoutViewModel, StringComparison.Ordinal);
+        Assert.Contains("private int EffectiveDetailInspectorTranscriptTabIndex => IsStandardLayout", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("public string DetailInspectorTargetText", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("public string DetailInspectorSegmentText", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("OnPropertyChanged(nameof(DetailInspectorTargetText));", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorTargetText));", jobsViewModel, StringComparison.Ordinal);
         Assert.Contains("OnPropertyChanged(nameof(DetailInspectorSegmentText));", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorSegmentText));", editingViewModel, StringComparison.Ordinal);
         Assert.Contains("OnPropertyChanged(nameof(DetailInspectorCurrentTabText));", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorCurrentTabText));", exportViewModel, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(DetailInspectorCurrentTabText));", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("SelectedTranscriptTabIndex = value", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("RefreshSelectedSegmentEditBuffer();", transcriptViewModel, StringComparison.Ordinal);
         Assert.Contains("private int EffectiveExportTranscriptTabIndex => IsStandardLayout", exportViewModel, StringComparison.Ordinal);

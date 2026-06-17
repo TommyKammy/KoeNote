@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(ReviewColumnMinWidth));
         OnPropertyChanged(nameof(IsStandardReadableTranscriptVisible));
         OnPropertyChanged(nameof(IsStandardRawTranscriptVisible));
+        OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
         NotifyExportMenuTargetChanged();
         RefreshSelectedSegmentEditBuffer();
     }
@@ -176,7 +177,13 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public string DetailInspectorCurrentTabText => SelectedTranscriptTabIndex switch
+    private int EffectiveDetailInspectorTranscriptTabIndex => IsStandardLayout
+        ? IsStandardRawTranscriptViewSelected
+            ? RawTranscriptTabIndex
+            : ReadableTranscriptTabIndex
+        : SelectedTranscriptTabIndex;
+
+    public string DetailInspectorCurrentTabText => EffectiveDetailInspectorTranscriptTabIndex switch
     {
         ReadableTranscriptTabIndex => "整文",
         RawTranscriptTabIndex => "素起こし",

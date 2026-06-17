@@ -253,6 +253,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("DetailInspectorTargetText", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorCurrentTabText", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("DetailInspectorSegmentText", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("Binding CanRunSelectedJob", reviewXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding RunPreflightSummary}\"", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("InspectorMetaLabel", reviewXaml, StringComparison.Ordinal);
         Assert.Contains("TranscriptInlineToggle", transcriptXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"ビュー\"", transcriptXaml, StringComparison.Ordinal);
