@@ -53,6 +53,43 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="StandardJobRailBadgeButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="#E9F7EF" />
+            <Setter Property="Foreground" Value="#0F7A3D" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RailBadgeChrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RailBadgeChrome" Property="Background" Value="#DDF4E8" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="RailBadgeChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="RailBadgeChrome" Property="BorderThickness" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="StandardJobRailListBox" TargetType="ListBox">
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
@@ -140,30 +177,20 @@
 
                 <StackPanel HorizontalAlignment="Center"
                             Style="{StaticResource VisibleWhenStandardJobRailCollapsed}">
-                    <Border Width="42"
-                            Height="42"
-                            CornerRadius="12"
-                            Background="#E9F7EF"
-                            Margin="0,0,0,8"
-                            ToolTip="{Binding JobCountSummary}">
+                    <Button Command="{Binding ToggleStandardJobRailCommand}"
+                            ToolTip="ジョブ一覧を開く"
+                            AutomationProperties.Name="ジョブ一覧を開く"
+                            Style="{StaticResource StandardJobRailBadgeButton}">
                         <TextBlock Text="{Binding StandardLayoutJobBadgeText}"
-                                   Foreground="#0F7A3D"
                                    FontSize="13"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center" />
-                    </Border>
+                    </Button>
                     <Button Style="{StaticResource StandardJobRailIconButton}"
                             Command="{Binding AddAudioCommand}"
                             ToolTip="音声ファイルを追加">
                         <TextBlock Text="&#xE710;"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14" />
-                    </Button>
-                    <Button Style="{StaticResource StandardJobRailIconButton}"
-                            Command="{Binding UseDetailLayoutCommand}"
-                            ToolTip="詳細レイアウトでジョブ一覧を開く">
-                        <TextBlock Text="&#xE8A5;"
                                    FontFamily="Segoe MDL2 Assets"
                                    FontSize="14" />
                     </Button>
@@ -218,7 +245,7 @@
                             </Button.Style>
                         </Button>
                     </Grid>
-                    <UniformGrid Columns="3"
+                    <UniformGrid Columns="2"
                                  Margin="0,0,0,12">
                         <Button Command="{Binding AddAudioCommand}"
                                 ToolTip="音声ファイルを追加"
@@ -236,15 +263,6 @@
                                 Margin="6,0"
                                 Style="{StaticResource ToolbarButton}">
                             <TextBlock Text="&#xE74D;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="13" />
-                        </Button>
-                        <Button Command="{Binding UseDetailLayoutCommand}"
-                                ToolTip="詳細ジョブ一覧を開く"
-                                Padding="8,6"
-                                MinWidth="0"
-                                Style="{StaticResource ToolbarButton}">
-                            <TextBlock Text="&#xE8A5;"
                                        FontFamily="Segoe MDL2 Assets"
                                        FontSize="13" />
                         </Button>
