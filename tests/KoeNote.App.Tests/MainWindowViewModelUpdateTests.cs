@@ -496,6 +496,29 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void UpdateRestartBlockedReason_StaysHiddenWhenNoUpdateIsAvailable()
+    {
+        var viewModel = CreateViewModel();
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                false,
+                false,
+                "0.15.0",
+                null,
+                "KoeNote is up to date (0.15.0)."),
+            true);
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+
+        Assert.False(viewModel.CanShowUpdateRestartAction);
+        Assert.Empty(viewModel.UpdateRestartBlockedReason);
+        Assert.False(viewModel.HasUpdateRestartBlockedReason);
+    }
+
+    [Fact]
     public async Task UpdateAndRestartCommand_DownloadsUnverifiedUpdateThenStartsInstaller()
     {
         var viewModel = CreateViewModel();

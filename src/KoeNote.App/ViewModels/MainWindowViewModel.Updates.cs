@@ -86,7 +86,7 @@ public sealed partial class MainWindowViewModel
         ? "Downloading update..."
         : "Update and restart";
 
-    public string UpdateRestartBlockedReason => IsRunInProgress
+    public string UpdateRestartBlockedReason => _availableUpdate is not null && IsRunInProgress
         ? "Finish or cancel the current run before updating and restarting."
         : string.Empty;
 
