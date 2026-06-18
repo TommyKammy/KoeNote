@@ -57,6 +57,7 @@ public sealed partial class MainWindowViewModel
                 OnPropertyChanged(nameof(HasVerifiedUpdateInstaller));
                 OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
                 OnPropertyChanged(nameof(CanShowInstallUpdateAction));
+                OnPropertyChanged(nameof(UpdateRestartActionText));
                 if (DownloadUpdateCommand is RelayCommand command)
                 {
                     command.RaiseCanExecuteChanged();
@@ -66,6 +67,11 @@ public sealed partial class MainWindowViewModel
                 {
                     installCommand.RaiseCanExecuteChanged();
                 }
+
+                if (UpdateAndRestartCommand is RelayCommand updateAndRestartCommand)
+                {
+                    updateAndRestartCommand.RaiseCanExecuteChanged();
+                }
             }
         }
     }
@@ -73,6 +79,18 @@ public sealed partial class MainWindowViewModel
     public bool HasVerifiedUpdateInstaller => !string.IsNullOrWhiteSpace(VerifiedUpdateInstallerPath);
 
     public bool CanShowInstallUpdateAction => HasVerifiedUpdateInstaller;
+
+    public bool CanShowUpdateRestartAction => _availableUpdate is not null;
+
+    public string UpdateRestartActionText => IsUpdateDownloadInProgress
+        ? "Downloading update..."
+        : "Update and restart";
+
+    public string UpdateRestartBlockedReason => IsRunInProgress
+        ? "Finish or cancel the current run before updating and restarting."
+        : string.Empty;
+
+    public bool HasUpdateRestartBlockedReason => !string.IsNullOrWhiteSpace(UpdateRestartBlockedReason);
 
     public bool IsUpdateCheckInProgress
     {
@@ -99,7 +117,13 @@ public sealed partial class MainWindowViewModel
                     command.RaiseCanExecuteChanged();
                 }
 
+                if (UpdateAndRestartCommand is RelayCommand updateAndRestartCommand)
+                {
+                    updateAndRestartCommand.RaiseCanExecuteChanged();
+                }
+
                 OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
+                OnPropertyChanged(nameof(UpdateRestartActionText));
             }
         }
     }
@@ -147,6 +171,7 @@ public sealed partial class MainWindowViewModel
             OnPropertyChanged(nameof(IsUpdateMandatory));
             OnPropertyChanged(nameof(AvailableUpdateVersion));
             OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
+            OnPropertyChanged(nameof(CanShowUpdateRestartAction));
             RefreshUpdateCommandStates();
             LatestLog = $"Update check failed: {exception.Message}";
         }
@@ -168,8 +193,36 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
         OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
         OnPropertyChanged(nameof(CanShowInstallUpdateAction));
+        OnPropertyChanged(nameof(CanShowUpdateRestartAction));
+        OnPropertyChanged(nameof(UpdateRestartActionText));
+        OnPropertyChanged(nameof(UpdateRestartBlockedReason));
+        OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
         RefreshUpdateCommandStates();
         return Task.CompletedTask;
+    }
+
+    private async Task UpdateAndRestartAsync()
+    {
+        if (_availableUpdate is null || IsUpdateDownloadInProgress)
+        {
+            return;
+        }
+
+        if (IsRunInProgress)
+        {
+            UpdateNotificationMessage = UpdateRestartBlockedReason;
+            return;
+        }
+
+        if (!HasVerifiedUpdateInstaller)
+        {
+            await DownloadUpdateAsync();
+        }
+
+        if (HasVerifiedUpdateInstaller)
+        {
+            await InstallVerifiedUpdateAsync();
+        }
     }
 
     private async Task DownloadUpdateAsync()
@@ -193,8 +246,8 @@ public sealed partial class MainWindowViewModel
             var result = await _updateDownloadService.DownloadAndVerifyAsync(_availableUpdate, progress);
             VerifiedUpdateInstallerPath = result.FilePath;
             UpdateDownloadProgressText = $"SHA256 verified installer: {result.FilePath}";
-            UpdateNotificationTitle = $"Update ready: KoeNote {AvailableUpdateVersion}";
-            UpdateNotificationMessage = "The installer has been downloaded and SHA256 verified. This project distributes unsigned MSI files, so Windows may show a publisher warning.";
+            UpdateNotificationTitle = $"Ready to update and restart: KoeNote {AvailableUpdateVersion}";
+            UpdateNotificationMessage = "The update package has been downloaded and SHA256 verified. Choose Update and restart to apply it.";
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
             RecordUpdateHistory("download_verified", _availableUpdate.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
         }
@@ -218,6 +271,11 @@ public sealed partial class MainWindowViewModel
         return _availableUpdate is not null && !IsUpdateDownloadInProgress && !HasVerifiedUpdateInstaller;
     }
 
+    private bool CanUpdateAndRestart()
+    {
+        return _availableUpdate is not null && !IsUpdateDownloadInProgress && !IsRunInProgress;
+    }
+
     private Task InstallVerifiedUpdateAsync()
     {
         if (!CanInstallVerifiedUpdate())
@@ -229,9 +287,9 @@ public sealed partial class MainWindowViewModel
         {
             var result = _updateInstallerLauncher.Launch(VerifiedUpdateInstallerPath, _availableUpdate?.Sha256);
             ClearVerifiedUpdateInstallerState();
-            UpdateDownloadProgressText = $"Installer started: {result.InstallerPath}";
-            UpdateNotificationTitle = "Update installer started";
-            UpdateNotificationMessage = $"Follow the installer prompts to complete the update. Verification: {result.TrustDescription}.";
+            UpdateDownloadProgressText = $"Update and restart started: {result.InstallerPath}";
+            UpdateNotificationTitle = "Update and restart started";
+            UpdateNotificationMessage = $"KoeNote will close so Windows can apply the verified update. Verification: {result.TrustDescription}.";
             LatestLog = $"Update installer started: {result.InstallerPath}";
             RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Verification: {result.TrustDescription}", result.InstallerPath);
             _shutdownApplication();
@@ -296,12 +354,16 @@ public sealed partial class MainWindowViewModel
             ? $"Required update: KoeNote {result.LatestRelease.Version}"
             : $"Update available: KoeNote {result.LatestRelease.Version}";
         UpdateNotificationMessage = result.IsMandatory
-            ? "A required update is available. Finish current work, then install the latest release."
-            : "A newer KoeNote release is available. Review the release notes when you are ready.";
+            ? "A required update is available. Finish current work, then choose Update and restart."
+            : "A newer KoeNote release is available. Choose Update and restart when your current work is saved.";
         OnPropertyChanged(nameof(IsUpdateMandatory));
         OnPropertyChanged(nameof(AvailableUpdateVersion));
         OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
         OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
+        OnPropertyChanged(nameof(CanShowUpdateRestartAction));
+        OnPropertyChanged(nameof(UpdateRestartActionText));
+        OnPropertyChanged(nameof(UpdateRestartBlockedReason));
+        OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
         RefreshUpdateCommandStates();
 
         LatestLog = result.Message;
@@ -312,6 +374,7 @@ public sealed partial class MainWindowViewModel
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = string.Empty;
         OnPropertyChanged(nameof(CanShowInstallUpdateAction));
+        OnPropertyChanged(nameof(UpdateRestartActionText));
     }
 
     private static string FormatUpdateDownloadProgress(UpdateDownloadProgress progress)
@@ -340,6 +403,11 @@ public sealed partial class MainWindowViewModel
         if (InstallVerifiedUpdateCommand is RelayCommand installCommand)
         {
             installCommand.RaiseCanExecuteChanged();
+        }
+
+        if (UpdateAndRestartCommand is RelayCommand updateAndRestartCommand)
+        {
+            updateAndRestartCommand.RaiseCanExecuteChanged();
         }
     }
 

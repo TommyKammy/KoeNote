@@ -881,6 +881,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand InstallVerifiedUpdateCommand { get; private set; } = null!;
 
+    public ICommand UpdateAndRestartCommand { get; private set; } = null!;
+
     public ICommand DismissUpdateNotificationCommand { get; private set; } = null!;
 
     public ICommand OpenUpdateReleaseNotesCommand { get; private set; } = null!;
@@ -1764,6 +1766,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                     installUpdateCommand.RaiseCanExecuteChanged();
                 }
 
+                if (UpdateAndRestartCommand is RelayCommand updateAndRestartCommand)
+                {
+                    updateAndRestartCommand.RaiseCanExecuteChanged();
+                }
+
+                OnPropertyChanged(nameof(UpdateRestartBlockedReason));
+                OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
                 UpdateModelCatalogCommandStates();
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
