@@ -54,9 +54,17 @@ function Get-KoeNoteMsiSmokeRegistration {
         throw "$Name was not found in Windows Apps management uninstall registry entries."
     }
 
-    $app = $apps | Where-Object {
+    $visibleApps = @($apps | Where-Object {
         $_.SystemComponent -ne 1
-    } | Select-Object -First 1
+    })
+    if ($visibleApps.Count -gt 1) {
+        $productCodes = $visibleApps | ForEach-Object {
+            Split-Path -Path $_.PSPath -Leaf
+        }
+        throw "$Name has duplicate visible Windows Apps registration entries: $($productCodes -join ', ')"
+    }
+
+    $app = $visibleApps | Select-Object -First 1
     if (-not $app) {
         throw "$Name was found only as hidden Windows Installer ARP entries."
     }
@@ -231,7 +239,7 @@ function New-KoeNoteUpgradeSmokeData {
     $jobsRoot = Join-Path $appDataRoot "jobs"
     $jobRoot = Join-Path $jobsRoot "upgrade-smoke-job"
     $modelsRoot = Join-Path $localDataRoot "models"
-    $runtimesRoot = Join-Path $localDataRoot "runtimes"
+    $runtimesRoot = Join-Path (Join-Path $localDataRoot "runtimes") "gpu"
 
     New-Item -ItemType Directory -Force -Path $jobRoot | Out-Null
     New-Item -ItemType Directory -Force -Path $modelsRoot | Out-Null
@@ -357,7 +365,12 @@ if ($previousRegistration) {
 
 Test-KoeNoteInstallPayload -Registration $registration -Name $DisplayName
 Test-KoeNoteStartMenuShortcuts -Name $DisplayName -InstallLocation $registration.InstallLocation
-Test-KoeNoteInstalledAppLaunch -Registration $registration -Name $DisplayName
+if ($TestAllDataCleanup) {
+    Write-Host "Skipping installed app launch check during isolated all-data cleanup smoke to avoid creating real KoeNote user data."
+}
+else {
+    Test-KoeNoteInstalledAppLaunch -Registration $registration -Name $DisplayName
+}
 
 Write-Host "Found $DisplayName app registration:"
 [pscustomobject]@{

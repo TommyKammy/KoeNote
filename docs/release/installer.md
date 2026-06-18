@@ -146,6 +146,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNote
 ```
 
 To also verify the all-data uninstall path without touching real KoeNote data, add `-TestAllDataCleanup`. The smoke script creates temporary AppData / LocalAppData / ProgramData roots and passes them to the MSI cleanup action.
+The installed app launch check is skipped automatically in this mode so the smoke does not create real KoeNote AppData/LocalAppData files.
 
 To test an MSI-to-MSI upgrade:
 
