@@ -34,15 +34,8 @@ public abstract class MainWindowViewModelTestBase
 
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         Touch(paths.ReviewModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "llm-jp-4-8b-thinking-q4-k-m",
@@ -336,6 +329,18 @@ public abstract class MainWindowViewModelTestBase
             InstalledAt: DateTimeOffset.Now,
             LastVerifiedAt: DateTimeOffset.Now,
             Status: "installed"));
+    }
+
+    protected static void CreateVerifiedStandardAsrModel(AppPaths paths)
+    {
+        CreateFasterWhisperRuntime(paths);
+        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        RegisterVerifiedModel(
+            paths,
+            "kotoba-whisper-v2.2-faster",
+            "asr",
+            "kotoba-whisper-v2.2-faster",
+            paths.KotobaWhisperFasterModelPath);
     }
 
     protected static void CreateFasterWhisperRuntime(AppPaths paths)

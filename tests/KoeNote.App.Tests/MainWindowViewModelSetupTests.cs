@@ -1223,16 +1223,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         Touch(paths.ReviewModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "llm-jp-4-8b-thinking-q4-k-m",
@@ -1268,16 +1260,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         Touch(paths.ReviewModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "llm-jp-4-8b-thinking-q4-k-m",
@@ -1330,16 +1314,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         Touch(paths.ReviewModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "llm-jp-4-8b-thinking-q4-k-m",
@@ -1382,16 +1358,8 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.LlamaCompletionPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         Touch(paths.ReviewModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "llm-jp-4-8b-thinking-q4-k-m",
@@ -1439,19 +1407,11 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
         Touch(paths.TernaryLlamaCompletionPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         var ternaryModelPath = Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0", "Ternary-Bonsai-8B-Q2_0.gguf");
         var bonsaiModelPath = Path.Combine(paths.UserModels, "review", "bonsai-8b-q1-0", "Bonsai-8B-Q1_0.gguf");
         Touch(ternaryModelPath);
         Touch(bonsaiModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
         RegisterVerifiedModel(
             paths,
             "ternary-bonsai-8b-q2-0",
