@@ -1,9 +1,24 @@
+using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Models;
 
 namespace KoeNote.App.ViewModels;
 
 internal sealed class ModelCatalogPresenter
 {
+    public ModelCatalogEntry? RefreshEntries(
+        ICollection<ModelCatalogEntry> targetEntries,
+        IEnumerable<ModelCatalogEntry> sourceEntries,
+        string? preferredModelId)
+    {
+        targetEntries.Clear();
+        foreach (var entry in sourceEntries)
+        {
+            targetEntries.Add(entry);
+        }
+
+        return ResolveSelection(targetEntries, preferredModelId);
+    }
+
     public ModelCatalogEntry? ResolveSelection(
         IEnumerable<ModelCatalogEntry> entries,
         string? preferredModelId)
@@ -16,6 +31,41 @@ internal sealed class ModelCatalogPresenter
 
         return entryList.FirstOrDefault(entry =>
             entry.ModelId.Equals(preferredModelId, StringComparison.OrdinalIgnoreCase)) ?? entryList.FirstOrDefault();
+    }
+
+    public IReadOnlyList<AsrEngineOption> BuildAsrEngineOptions(
+        IEnumerable<IAsrEngine> engines,
+        Func<string, bool> isInstalled)
+    {
+        return engines
+            .Where(static engine => IsUserSelectableAsrEngine(engine.EngineId))
+            .Select(engine => new AsrEngineOption(
+                engine.EngineId,
+                engine.DisplayName,
+                isInstalled(engine.EngineId)))
+            .ToArray();
+    }
+
+    public ModelCatalogEntry? FindInstalledEntry(
+        IEnumerable<ModelCatalogEntry> entries,
+        string role,
+        Func<ModelCatalogEntry, bool> predicate)
+    {
+        return entries.FirstOrDefault(entry =>
+            entry.IsInstalled &&
+            entry.IsVerified &&
+            entry.InstalledModel is not null &&
+            entry.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+            predicate(entry));
+    }
+
+    public static bool IsUserSelectableAsrEngine(string? engineId)
+    {
+        return engineId is "kotoba-whisper-v2.2-faster"
+            or "whisper-base"
+            or "whisper-small"
+            or "faster-whisper-large-v3-turbo"
+            or "faster-whisper-large-v3";
     }
 
     public bool CanDownload(ModelCatalogEntry? entry)
