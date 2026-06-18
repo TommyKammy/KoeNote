@@ -846,6 +846,37 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void Constructor_SurfacesPendingUpdaterSuccessResultAsUpdatedVersion()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        var resultPath = Path.Combine(paths.UpdateDownloads, "KoeNote-update-0.20.0.result.json");
+        File.WriteAllText(resultPath, """
+            {
+              "Status": "Success",
+              "ExitCode": 0,
+              "Version": "0.20.0",
+              "InstallerPath": "KoeNote.msi",
+              "TargetExePath": "KoeNote.App.exe",
+              "LogPath": "install.log",
+              "CompletedAt": "2026-06-18T00:00:00Z",
+              "Message": "Update installed. Relaunching KoeNote."
+            }
+            """);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("KoeNote updated to v0.20.0", viewModel.UpdateNotificationTitle);
+        Assert.Contains("install.log", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+        Assert.False(File.Exists(resultPath));
+        Assert.True(File.Exists(resultPath + ".seen"));
+        var history = File.ReadAllText(paths.UpdateHistoryPath);
+        Assert.Contains("install_completed", history, StringComparison.Ordinal);
+        Assert.Contains("relaunch_completed", history, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Constructor_SurfacesPendingRebootResultAsRestartRequired()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

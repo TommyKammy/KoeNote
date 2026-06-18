@@ -2,6 +2,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using System.IO.Compression;
+using System.Text.Json;
 
 namespace KoeNote.App.Tests;
 
@@ -44,7 +45,7 @@ public sealed class JobLogExportServiceTests
         Assert.Contains("## Recent Crash Logs", report);
         Assert.Contains(crashLog, report);
         Assert.Contains("crash details", report);
-        Assert.Contains("Raw transcript, prompt, and worker-output contents are not embedded.", report);
+        Assert.Contains("Raw transcript, prompt, installer log, and worker-output contents are not embedded.", report);
     }
 
     [Fact]
@@ -91,6 +92,39 @@ public sealed class JobLogExportServiceTests
         Assert.Contains("selected job event", report);
         Assert.Contains("other-job", report);
         Assert.Contains("other job event", report);
+    }
+
+    [Fact]
+    public void BuildDiagnosticReport_IncludesUpdaterHelperArtifactReferencesWithoutLogContents()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        var repository = new JobLogRepository(paths);
+        var service = new JobLogExportService(paths, repository);
+        var job = CreateJob();
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        Directory.CreateDirectory(paths.UpdateLogs);
+        var resultPath = Path.Combine(paths.UpdateDownloads, "KoeNote-update-0.20.0.result.json.seen");
+        var logPath = Path.Combine(paths.UpdateLogs, "KoeNote-update-0.20.0.log");
+        File.WriteAllText(resultPath, JsonSerializer.Serialize(new
+        {
+            Status = "Success",
+            ExitCode = 0,
+            Version = "0.20.0",
+            InstallerPath = "KoeNote.msi",
+            TargetExePath = "KoeNote.App.exe",
+            LogPath = logPath,
+            CompletedAt = DateTimeOffset.Parse("2026-06-18T00:00:00Z"),
+            Message = "Update installed. Relaunching KoeNote."
+        }));
+        File.WriteAllText(logPath, "sensitive installer detail");
+
+        var report = service.BuildDiagnosticReport(job);
+
+        Assert.Contains("## Updater Helper Artifacts", report);
+        Assert.Contains("Result\tMarker=seen\tStatus=Success\tVersion=0.20.0", report);
+        Assert.Contains(logPath, report);
+        Assert.Contains("Log\tName=KoeNote-update-0.20.0.log", report);
+        Assert.DoesNotContain("sensitive installer detail", report);
     }
 
     [Fact]
