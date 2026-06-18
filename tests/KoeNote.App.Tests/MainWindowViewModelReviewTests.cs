@@ -829,15 +829,7 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         Touch(paths.FfmpegPath);
-        Touch(paths.FasterWhisperScriptPath);
-        CreateFasterWhisperRuntime(paths);
-        CreateMinimalModelDirectory(paths.KotobaWhisperFasterModelPath);
-        RegisterVerifiedModel(
-            paths,
-            "kotoba-whisper-v2.2-faster",
-            "asr",
-            "kotoba-whisper-v2.2-faster",
-            paths.KotobaWhisperFasterModelPath);
+        CreateVerifiedStandardAsrModel(paths);
         var audioPath = Path.Combine(root, "meeting.wav");
         Touch(audioPath);
         new AsrSettingsRepository(paths).Save(new AsrSettings(string.Empty, string.Empty, "kotoba-whisper-v2.2-faster", false));
