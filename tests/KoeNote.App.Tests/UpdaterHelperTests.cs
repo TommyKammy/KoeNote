@@ -18,13 +18,14 @@ public sealed class UpdaterHelperTests
         await File.WriteAllTextAsync(targetExe, "app");
         var installFolder = Path.GetDirectoryName(targetExe)!;
         var options = new UpdaterOptions(msiPath, ComputeSha256("installer"), targetExe, installFolder, 1234, logPath, resultPath, "0.20.0");
-        var runner = new RecordingUpdaterProcessRunner();
+        var runner = new RecordingUpdaterProcessRunner { ResultPathExpectedBeforeStart = resultPath };
         var service = new UpdaterService(runner);
 
         var exitCode = await service.ExecuteAsync(options);
 
         Assert.Equal(UpdaterExitCode.Success, exitCode);
         Assert.Equal(1234, runner.WaitedProcessIds.Single());
+        Assert.True(runner.ResultExistedBeforeStart);
         var install = Assert.Single(runner.Runs);
         Assert.Equal("msiexec.exe", install.FileName);
         Assert.Equal(["/i", msiPath, "/qn", "/norestart", "/L*v", logPath, $"INSTALLFOLDER={installFolder}{Path.DirectorySeparatorChar}"], install.Arguments);
@@ -32,6 +33,36 @@ public sealed class UpdaterHelperTests
         var result = ReadResult(resultPath);
         Assert.Equal((int)UpdaterExitCode.Success, result.ExitCode);
         Assert.Equal("0.20.0", result.Version);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AbortsWhenParentDoesNotExitBeforeTimeout()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            Path.Combine(root, "KoeNote.App.exe"),
+            root,
+            1234,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0",
+            ParentExitTimeoutSeconds: 1);
+        var runner = new RecordingUpdaterProcessRunner { WaitNeverCompletes = true };
+        var service = new UpdaterService(runner);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.ParentExitTimedOut, exitCode);
+        Assert.Equal(1234, runner.WaitedProcessIds.Single());
+        Assert.Empty(runner.Runs);
+        Assert.Empty(runner.Starts);
+        var result = ReadResult(options.ResultPath);
+        Assert.Equal((int)UpdaterExitCode.ParentExitTimedOut, result.ExitCode);
+        Assert.Contains("did not exit", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -149,11 +180,13 @@ public sealed class UpdaterHelperTests
             "--target-exe", "KoeNote.App.exe",
             "--install-folder", "custom",
             "--parent-pid", "42",
+            "--parent-timeout-seconds", "15",
             "--log", "update.log",
             "--version", "0.20.0"
         ]);
 
         Assert.Equal(42, options.ParentProcessId);
+        Assert.Equal(15, options.ParentExitTimeoutSeconds);
         Assert.EndsWith("custom", options.InstallFolderPath, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("update.result.json", options.ResultPath, StringComparison.OrdinalIgnoreCase);
         Assert.Throws<ArgumentException>(() => UpdaterOptions.Parse(["--msi", "KoeNote.msi"]));
@@ -163,6 +196,16 @@ public sealed class UpdaterHelperTests
             "--target-exe", "KoeNote.App.exe",
             "--install-folder", "custom",
             "--parent-pid", "42",
+            "--log", "update.log",
+            "--version", "0.20.0"
+        ]));
+        Assert.Throws<ArgumentException>(() => UpdaterOptions.Parse([
+            "--msi", "KoeNote.msi",
+            "--sha256", new string('a', 64),
+            "--target-exe", "KoeNote.App.exe",
+            "--install-folder", "custom",
+            "--parent-pid", "42",
+            "--parent-timeout-seconds", "0",
             "--log", "update.log",
             "--version", "0.20.0"
         ]));
@@ -192,6 +235,12 @@ public sealed class UpdaterHelperTests
 
         public bool ThrowOnStart { get; init; }
 
+        public bool WaitNeverCompletes { get; init; }
+
+        public string? ResultPathExpectedBeforeStart { get; init; }
+
+        public bool ResultExistedBeforeStart { get; private set; }
+
         public List<int> WaitedProcessIds { get; } = [];
 
         public List<RunCapture> Runs { get; } = [];
@@ -201,6 +250,11 @@ public sealed class UpdaterHelperTests
         public Task WaitForExitAsync(int processId, CancellationToken cancellationToken)
         {
             WaitedProcessIds.Add(processId);
+            if (WaitNeverCompletes)
+            {
+                return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
             return Task.CompletedTask;
         }
 
@@ -218,6 +272,11 @@ public sealed class UpdaterHelperTests
             }
 
             Starts.Add(fileName);
+            if (ResultPathExpectedBeforeStart is not null)
+            {
+                ResultExistedBeforeStart = File.Exists(ResultPathExpectedBeforeStart);
+            }
+
             return Task.FromResult(true);
         }
     }

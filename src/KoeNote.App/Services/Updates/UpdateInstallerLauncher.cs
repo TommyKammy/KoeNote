@@ -21,7 +21,8 @@ public sealed record UpdateInstallerLaunchOptions(
     string? HelperPath = null,
     string? TargetExePath = null,
     string? HelperWorkingRoot = null,
-    int? ParentProcessId = null)
+    int? ParentProcessId = null,
+    int ParentExitTimeoutSeconds = 120)
 {
     public static UpdateInstallerLaunchOptions FromEnvironment()
     {
@@ -119,6 +120,8 @@ public sealed class UpdateInstallerLauncher(
         startInfo.ArgumentList.Add(installFolderPath);
         startInfo.ArgumentList.Add("--parent-pid");
         startInfo.ArgumentList.Add(parentProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("--parent-timeout-seconds");
+        startInfo.ArgumentList.Add(_options.ParentExitTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         startInfo.ArgumentList.Add("--log");
         startInfo.ArgumentList.Add(logPath);
         startInfo.ArgumentList.Add("--result");

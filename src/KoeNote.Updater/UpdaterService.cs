@@ -20,7 +20,14 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
     {
         if (options.ParentProcessId > 0)
         {
-            await processRunner.WaitForExitAsync(options.ParentProcessId, cancellationToken);
+            var parentExited = await WaitForParentExitAsync(options, cancellationToken);
+            if (!parentExited)
+            {
+                return WriteResult(
+                    UpdaterExitCode.ParentExitTimedOut,
+                    options,
+                    $"KoeNote did not exit within {options.ParentExitTimeoutSeconds} seconds, so the silent update was canceled.");
+            }
         }
 
         if (!VerifyInstaller(options.MsiPath, options.ExpectedSha256))
@@ -49,13 +56,15 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.InstallFailed, options, failureMessage);
         }
 
+        WriteResult(UpdaterExitCode.Success, options, "Update installed. Relaunching KoeNote.");
+
         var relaunched = await TryStartAsync(options, cancellationToken);
         if (!relaunched)
         {
             return WriteResult(UpdaterExitCode.RelaunchFailed, options, "The updated KoeNote executable could not be relaunched.");
         }
 
-        return WriteResult(UpdaterExitCode.Success, options, "Update installed and KoeNote relaunched.");
+        return UpdaterExitCode.Success;
     }
 
     private static bool VerifyInstaller(string path, string expectedSha256)
@@ -91,6 +100,21 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return await processRunner.StartAsync(options.TargetExePath, cancellationToken);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> WaitForParentExitAsync(UpdaterOptions options, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(options.ParentExitTimeoutSeconds));
+        try
+        {
+            await processRunner.WaitForExitAsync(options.ParentProcessId, timeout.Token);
+            return true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return false;
         }

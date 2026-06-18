@@ -8,11 +8,12 @@ public sealed record UpdaterOptions(
     int ParentProcessId,
     string LogPath,
     string ResultPath,
-    string Version)
+    string Version,
+    int ParentExitTimeoutSeconds = 120)
 {
     public static string HelpText => """
         Usage:
-          KoeNote.Updater.exe --msi <path> --sha256 <hex> --target-exe <path> --install-folder <path> --parent-pid <pid> --log <path> --version <version> [--result <path>]
+          KoeNote.Updater.exe --msi <path> --sha256 <hex> --target-exe <path> --install-folder <path> --parent-pid <pid> --log <path> --version <version> [--result <path>] [--parent-timeout-seconds <seconds>]
         """;
 
     public static UpdaterOptions Parse(IReadOnlyList<string> args)
@@ -32,10 +33,18 @@ public sealed record UpdaterOptions(
         var resultPath = values.TryGetValue("--result", out var explicitResultPath) && !string.IsNullOrWhiteSpace(explicitResultPath)
             ? explicitResultPath
             : Path.ChangeExtension(logPath, ".result.json");
+        var parentExitTimeoutSeconds = values.TryGetValue("--parent-timeout-seconds", out var timeoutValue)
+            ? timeoutValue
+            : "120";
 
         if (!int.TryParse(parentPidValue, out var parentPid) || parentPid < 0)
         {
             throw new ArgumentException("--parent-pid must be a non-negative integer.");
+        }
+
+        if (!int.TryParse(parentExitTimeoutSeconds, out var parentTimeoutSeconds) || parentTimeoutSeconds <= 0)
+        {
+            throw new ArgumentException("--parent-timeout-seconds must be a positive integer.");
         }
 
         if (!IsHexSha256(sha256))
@@ -51,7 +60,8 @@ public sealed record UpdaterOptions(
             parentPid,
             Path.GetFullPath(logPath),
             Path.GetFullPath(resultPath),
-            version);
+            version,
+            parentTimeoutSeconds);
     }
 
     private static Dictionary<string, string> ReadValues(IReadOnlyList<string> args)

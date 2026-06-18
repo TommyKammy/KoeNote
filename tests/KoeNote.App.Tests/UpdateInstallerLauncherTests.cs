@@ -33,7 +33,8 @@ public sealed class UpdateInstallerLauncherTests
                 HelperPath: helperPath,
                 TargetExePath: targetExePath,
                 HelperWorkingRoot: helperWorkingRoot,
-                ParentProcessId: 1234));
+                ParentProcessId: 1234,
+                ParentExitTimeoutSeconds: 15));
 
         var result = launcher.Launch(installerPath, ComputeSha256(payload), "0.14.0");
 
@@ -57,6 +58,8 @@ public sealed class UpdateInstallerLauncherTests
         Assert.Contains(Path.GetFullPath(Path.GetDirectoryName(targetExePath)!), arguments);
         Assert.Contains("--parent-pid", arguments);
         Assert.Contains("1234", arguments);
+        Assert.Contains("--parent-timeout-seconds", arguments);
+        Assert.Contains("15", arguments);
         Assert.Contains("--log", arguments);
         Assert.Contains("--result", arguments);
         Assert.Contains("--version", arguments);

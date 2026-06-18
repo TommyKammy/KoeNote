@@ -7,5 +7,6 @@ public enum UpdaterExitCode
     VerificationFailed = 10,
     InstallFailed = 20,
     RelaunchFailed = 30,
+    ParentExitTimedOut = 40,
     UnexpectedFailure = 99
 }
