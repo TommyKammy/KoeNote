@@ -342,7 +342,7 @@ public sealed class ScriptedJsonAsrEngineTests
         File.WriteAllText(audioPath, "");
         Directory.CreateDirectory(modelPath);
         var runner = new CapturingAsrProcessRunner();
-        var engine = CreateEngine(paths, runner);
+        var engine = CreateEngine(paths, runner, sourceName: "faster-whisper");
 
         await engine.TranscribeAsync(
             new AsrInput("job-001", audioPath),
@@ -370,13 +370,45 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("2", runner.Arguments);
         Assert.Contains("--chunk-seconds", runner.Arguments);
         Assert.Contains("300", runner.Arguments);
+        Assert.Contains("--diarization", runner.Arguments);
+        Assert.Contains("off", runner.Arguments);
 
         var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
         var log = File.ReadAllText(logPath);
+        Assert.Contains("--diarization off", log);
         Assert.Contains("requested_device: cuda", log);
         Assert.Contains("requested_compute_type: float16", log);
         Assert.Contains($"execution_profile_id: {AsrExecutionProfiles.CudaFloat16}", log);
         Assert.Contains("attempt_number: 2", log);
+    }
+
+    [Fact]
+    public async Task TranscribeAsync_ReazonSpeechWorker_DoesNotPassFasterWhisperDiarizationArgument()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "reazonspeech_k2_transcribe.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var runner = new CapturingAsrProcessRunner();
+        var engine = CreateEngine(paths, runner, sourceName: "reazonspeech-k2");
+
+        await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "reazonspeech-k2-v3",
+                scriptPath),
+            new AsrOptions());
+
+        Assert.NotNull(runner.Arguments);
+        Assert.DoesNotContain("--diarization", runner.Arguments);
     }
 
     [Fact]
@@ -392,7 +424,7 @@ public sealed class ScriptedJsonAsrEngineTests
         WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
         Directory.CreateDirectory(modelPath);
         var runner = new ChunkedAsrProcessRunner();
-        var engine = CreateEngine(paths, runner);
+        var engine = CreateEngine(paths, runner, sourceName: "faster-whisper");
 
         var result = await engine.TranscribeAsync(
             new AsrInput("job-001", audioPath),
@@ -414,6 +446,8 @@ public sealed class ScriptedJsonAsrEngineTests
         {
             Assert.Contains("--device", arguments);
             Assert.Contains("cuda", arguments);
+            Assert.Contains("--diarization", arguments);
+            Assert.Contains("off", arguments);
             Assert.DoesNotContain("--chunk-seconds", arguments);
         });
         Assert.Equal(3, result.Segments.Count);
@@ -718,12 +752,15 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Equal(AsrFailureCategory.ProcessFailed, exception.Category);
     }
 
-    private static ScriptedJsonAsrEngine CreateEngine(AppPaths paths, ExternalProcessRunner? processRunner = null)
+    private static ScriptedJsonAsrEngine CreateEngine(
+        AppPaths paths,
+        ExternalProcessRunner? processRunner = null,
+        string sourceName = "scripted")
     {
         return new ScriptedJsonAsrEngine(
             "scripted-test",
             "Scripted test",
-            "scripted",
+            sourceName,
             processRunner ?? new ExternalProcessRunner(),
             new AsrJsonNormalizer(),
             new AsrResultStore(),

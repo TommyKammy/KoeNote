@@ -76,7 +76,7 @@ public sealed class ScriptedJsonAsrEngine(
                     cancellationToken);
             }
 
-            var arguments = BuildArguments(input, config, options, scriptJsonPath);
+            var arguments = BuildArguments(input, config, options, scriptJsonPath, ShouldDisableWorkerDiarization());
             var processResult = await processRunner.RunAsync(
                 config.RuntimePath,
                 arguments,
@@ -168,7 +168,7 @@ public sealed class ScriptedJsonAsrEngine(
                 chunk.OffsetSeconds,
                 chunk.DurationSeconds,
                 chunk.AudioPath);
-            var arguments = BuildArguments(chunkInput, config, workerOptions, chunkJsonPath);
+            var arguments = BuildArguments(chunkInput, config, workerOptions, chunkJsonPath, ShouldDisableWorkerDiarization());
             jobLogRepository.AddEvent(
                 input.JobId,
                 "asr",
@@ -279,7 +279,8 @@ public sealed class ScriptedJsonAsrEngine(
         AsrInput input,
         AsrEngineConfig config,
         AsrOptions options,
-        string outputJsonPath)
+        string outputJsonPath,
+        bool disableWorkerDiarization)
     {
         var arguments = new List<string>
         {
@@ -293,6 +294,12 @@ public sealed class ScriptedJsonAsrEngine(
             "--language",
             "ja"
         };
+
+        if (disableWorkerDiarization)
+        {
+            arguments.Add("--diarization");
+            arguments.Add("off");
+        }
 
         if (!string.IsNullOrWhiteSpace(options.Context))
         {
@@ -349,6 +356,11 @@ public sealed class ScriptedJsonAsrEngine(
         }
 
         return arguments;
+    }
+
+    private bool ShouldDisableWorkerDiarization()
+    {
+        return sourceName.Equals("faster-whisper", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCommandName(string value)
