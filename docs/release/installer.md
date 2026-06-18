@@ -155,4 +155,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase13\Test-KoeNote
   -MsiPath artifacts\msi\KoeNote-v0.15.0-win-x64.msi
 ```
 
-The upgrade smoke refuses to run when existing KoeNote user data is present unless `-AllowExistingUserData` is passed.
+The upgrade smoke installs the older MSI with:
+
+```powershell
+msiexec /i <old.msi> /qn /norestart /L*v <temp>\KoeNote-MsiSmoke\install-previous.log
+```
+
+It then seeds settings, setup state, job data, and model data before installing the newer MSI with:
+
+```powershell
+msiexec /i <new.msi> /qn /norestart /L*v <temp>\KoeNote-MsiSmoke\install.log
+```
+
+The smoke verifies that the newer package remains registered in Windows Apps, Start Menu shortcuts still target the installed app and cleanup tools, the payload exists under `%LOCALAPPDATA%\Programs\KoeNote`, the app launches, and the seeded user/setup/model data is preserved. It also writes an uninstall log at `<temp>\KoeNote-MsiSmoke\uninstall.log`.
+
+Run this on a clean interactive Windows VM. The upgrade smoke refuses to run when existing KoeNote user data is present unless `-AllowExistingUserData` is passed. Use `-SkipLaunchCheck` only for non-interactive packaging validation where launching the installed WPF app is not possible.
+
+Updater helper constraints:
+
+- Use `msiexec /i <msi> /qn /norestart /L*v <log>` for silent upgrades.
+- Wait for KoeNote to exit before invoking `msiexec`, because the MSI owns `%LOCALAPPDATA%\Programs\KoeNote`.
+- Keep upgrade logs in a user-writable diagnostic location and surface the path on failure.
+- Do not pass all-data cleanup properties during upgrade; user data, setup state, jobs, and model/runtime directories must be preserved.
+- Relaunch `%LOCALAPPDATA%\Programs\KoeNote\KoeNote.App.exe` only after `msiexec` exits with code `0`.

@@ -4,6 +4,7 @@ param(
     [string]$DisplayName = "KoeNote",
     [switch]$AllowExistingUserData,
     [switch]$TestAllDataCleanup,
+    [switch]$SkipLaunchCheck,
     [switch]$SkipInstall
 )
 
@@ -13,6 +14,190 @@ $msi = Resolve-Path $MsiPath
 $upgradeFromMsi = if ($UpgradeFromMsiPath) { Resolve-Path $UpgradeFromMsiPath } else { $null }
 $logRoot = Join-Path ([IO.Path]::GetTempPath()) "KoeNote-MsiSmoke"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+
+function Test-KoeNoteMsiSmokeLog {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "$Description log was not created: $Path"
+    }
+
+    $log = Get-Item -LiteralPath $Path
+    if ($log.Length -le 0) {
+        throw "$Description log is empty: $Path"
+    }
+}
+
+function Get-KoeNoteMsiSmokeRegistration {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $uninstallRoots = @(
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+
+    $registryEntries = $uninstallRoots | ForEach-Object {
+        Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue
+    }
+
+    $apps = $registryEntries | Where-Object {
+        $_.DisplayName -eq $Name
+    }
+
+    if (-not $apps) {
+        throw "$Name was not found in Windows Apps management uninstall registry entries."
+    }
+
+    $app = $apps | Where-Object {
+        $_.SystemComponent -ne 1
+    } | Select-Object -First 1
+    if (-not $app) {
+        throw "$Name was found only as hidden Windows Installer ARP entries."
+    }
+
+    $productCode = Split-Path -Path $app.PSPath -Leaf
+    $metadataEntry = $registryEntries | Where-Object {
+        (Split-Path -Path $_.PSPath -Leaf) -eq $productCode -and
+        ($_.InstallLocation -or $_.DisplayIcon -or $_.QuietUninstallString)
+    } | Select-Object -First 1
+
+    if (-not $app.UninstallString -or $app.UninstallString -notmatch "msiexec") {
+        throw "$Name uninstall entry is missing a standard msiexec UninstallString."
+    }
+
+    if ($app.UninstallString -notmatch "(?i)/I") {
+        throw "$Name uninstall entry must open MSI maintenance UI with /I. Actual: $($app.UninstallString)"
+    }
+
+    $quietUninstallString = if ($app.QuietUninstallString) { $app.QuietUninstallString } else { $metadataEntry.QuietUninstallString }
+    if (-not $quietUninstallString -or $quietUninstallString -notmatch "msiexec" -or $quietUninstallString -notmatch "/q") {
+        throw "$Name uninstall entry is missing a standard quiet msiexec QuietUninstallString."
+    }
+
+    [pscustomobject]@{
+        App = $app
+        ProductCode = $productCode
+        MetadataEntry = $metadataEntry
+        InstallLocation = if ($app.InstallLocation) { $app.InstallLocation } else { $metadataEntry.InstallLocation }
+        DisplayIcon = if ($app.DisplayIcon) { $app.DisplayIcon } else { $metadataEntry.DisplayIcon }
+        QuietUninstallString = $quietUninstallString
+    }
+}
+
+function Test-KoeNoteInstallPayload {
+    param(
+        [Parameter(Mandatory = $true)]$Registration,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Registration.InstallLocation)) {
+        throw "$Name app registration is missing InstallLocation."
+    }
+
+    $installLocation = [IO.Path]::GetFullPath($Registration.InstallLocation).TrimEnd('\', '/')
+    $expectedInstallLocation = [IO.Path]::GetFullPath((Join-Path (Join-Path $env:LOCALAPPDATA "Programs") $Name)).TrimEnd('\', '/')
+    if (-not $installLocation.Equals($expectedInstallLocation, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Name installed to an unexpected location. Expected $expectedInstallLocation but got $installLocation."
+    }
+
+    $appExe = Join-Path $installLocation "KoeNote.App.exe"
+    $cleanupExe = Join-Path $installLocation "KoeNoteCleanup.exe"
+    foreach ($path in @($appExe, $cleanupExe)) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "$Name install payload is missing: $path"
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Registration.DisplayIcon)) {
+        throw "$Name app registration is missing DisplayIcon."
+    }
+
+    $displayIcon = $Registration.DisplayIcon.Trim('"')
+    if (-not (Test-Path -LiteralPath $displayIcon -PathType Leaf)) {
+        throw "$Name DisplayIcon target does not exist: $displayIcon"
+    }
+}
+
+function Test-KoeNoteStartMenuShortcuts {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$InstallLocation
+    )
+
+    $programsFolder = [Environment]::GetFolderPath("Programs")
+    $shortcutFolder = Join-Path $programsFolder $Name
+    $shortcuts = @(
+        [pscustomobject]@{
+            Path = Join-Path $shortcutFolder "$Name.lnk"
+            Target = Join-Path $InstallLocation "KoeNote.App.exe"
+        },
+        [pscustomobject]@{
+            Path = Join-Path $shortcutFolder "$Name Cleanup.lnk"
+            Target = Join-Path $InstallLocation "KoeNoteCleanup.exe"
+        }
+    )
+
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        foreach ($shortcutInfo in $shortcuts) {
+            if (-not (Test-Path -LiteralPath $shortcutInfo.Path -PathType Leaf)) {
+                throw "$Name Start Menu shortcut is missing: $($shortcutInfo.Path)"
+            }
+
+            $shortcut = $shell.CreateShortcut($shortcutInfo.Path)
+            $actualTarget = [IO.Path]::GetFullPath($shortcut.TargetPath)
+            $expectedTarget = [IO.Path]::GetFullPath($shortcutInfo.Target)
+            if (-not $actualTarget.Equals($expectedTarget, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "$Name Start Menu shortcut points to $actualTarget instead of $expectedTarget."
+            }
+        }
+    }
+    finally {
+        [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
+    }
+}
+
+function Test-KoeNoteInstalledAppLaunch {
+    param(
+        [Parameter(Mandatory = $true)]$Registration,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($SkipLaunchCheck) {
+        Write-Host "Skipping installed app launch check because -SkipLaunchCheck was passed."
+        return
+    }
+
+    if (-not [Environment]::UserInteractive) {
+        throw "$Name launch smoke requires an interactive user session. Re-run on a clean VM session or pass -SkipLaunchCheck only for non-interactive packaging validation."
+    }
+
+    $installLocation = [IO.Path]::GetFullPath($Registration.InstallLocation).TrimEnd('\', '/')
+    $appExe = Join-Path $installLocation "KoeNote.App.exe"
+    $process = Start-Process -FilePath $appExe -WorkingDirectory $installLocation -PassThru
+    try {
+        Start-Sleep -Seconds 5
+        if ($process.HasExited) {
+            throw "$Name exited during launch smoke with exit code $($process.ExitCode)."
+        }
+
+        Write-Host "$Name launched successfully from $appExe."
+    }
+    finally {
+        if (-not $process.HasExited) {
+            [void]$process.CloseMainWindow()
+            if (-not $process.WaitForExit(5000)) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
 
 function Test-KoeNoteSmokeDataRootAvailable {
     $existingRoots = @(
@@ -46,25 +231,30 @@ function New-KoeNoteUpgradeSmokeData {
     $jobsRoot = Join-Path $appDataRoot "jobs"
     $jobRoot = Join-Path $jobsRoot "upgrade-smoke-job"
     $modelsRoot = Join-Path $localDataRoot "models"
+    $runtimesRoot = Join-Path $localDataRoot "runtimes"
 
     New-Item -ItemType Directory -Force -Path $jobRoot | Out-Null
     New-Item -ItemType Directory -Force -Path $modelsRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $runtimesRoot | Out-Null
 
     $settingsPath = Join-Path $appDataRoot "settings.json"
     $setupStatePath = Join-Path $appDataRoot "setup-state.json"
     $jobMarkerPath = Join-Path $jobRoot "marker.txt"
     $modelMarkerPath = Join-Path $modelsRoot "upgrade-smoke-model.marker"
+    $runtimeMarkerPath = Join-Path $runtimesRoot "upgrade-smoke-runtime.marker"
 
     Set-NewKoeNoteSmokeFile -Path $settingsPath -Value '{ "asrEngine": "upgrade-smoke", "reviewEngine": "upgrade-smoke", "networkAccess": false }'
     Set-NewKoeNoteSmokeFile -Path $setupStatePath -Value '{ "completed": true, "source": "upgrade-smoke" }'
     Set-NewKoeNoteSmokeFile -Path $jobMarkerPath -Value "upgrade smoke job data"
     Set-NewKoeNoteSmokeFile -Path $modelMarkerPath -Value "upgrade smoke model data"
+    Set-NewKoeNoteSmokeFile -Path $runtimeMarkerPath -Value "upgrade smoke runtime data"
 
     [pscustomobject]@{
         SettingsPath = $settingsPath
         SetupStatePath = $setupStatePath
         JobMarkerPath = $jobMarkerPath
         ModelMarkerPath = $modelMarkerPath
+        RuntimeMarkerPath = $runtimeMarkerPath
     }
 }
 
@@ -73,7 +263,7 @@ function Test-KoeNoteUpgradeSmokeData {
         [Parameter(Mandatory = $true)]$Seed
     )
 
-    foreach ($path in @($Seed.SettingsPath, $Seed.SetupStatePath, $Seed.JobMarkerPath, $Seed.ModelMarkerPath)) {
+    foreach ($path in @($Seed.SettingsPath, $Seed.SetupStatePath, $Seed.JobMarkerPath, $Seed.ModelMarkerPath, $Seed.RuntimeMarkerPath)) {
         if (-not (Test-Path -LiteralPath $path)) {
             throw "Upgrade did not preserve expected KoeNote data: $path"
         }
@@ -119,6 +309,7 @@ function Test-KoeNoteIsolatedCleanupSmokeDataRemoved {
 }
 
 if (-not $SkipInstall) {
+    $previousRegistration = $null
     if ($upgradeFromMsi) {
         Test-KoeNoteSmokeDataRootAvailable
 
@@ -128,6 +319,11 @@ if (-not $SkipInstall) {
         if ($previousInstall.ExitCode -ne 0) {
             throw "Previous MSI install failed with exit code $($previousInstall.ExitCode). Log: $previousInstallLog"
         }
+        Test-KoeNoteMsiSmokeLog -Path $previousInstallLog -Description "Previous MSI install"
+
+        $previousRegistration = Get-KoeNoteMsiSmokeRegistration -Name $DisplayName
+        Test-KoeNoteInstallPayload -Registration $previousRegistration -Name $DisplayName
+        Test-KoeNoteStartMenuShortcuts -Name $DisplayName -InstallLocation $previousRegistration.InstallLocation
 
         $seed = New-KoeNoteUpgradeSmokeData
     }
@@ -138,65 +334,41 @@ if (-not $SkipInstall) {
     if ($install.ExitCode -ne 0) {
         throw "MSI install failed with exit code $($install.ExitCode). Log: $installLog"
     }
+    Test-KoeNoteMsiSmokeLog -Path $installLog -Description "MSI install"
 
     if ($upgradeFromMsi) {
         Test-KoeNoteUpgradeSmokeData -Seed $seed
     }
 }
 
-$uninstallRoots = @(
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-)
+$registration = Get-KoeNoteMsiSmokeRegistration -Name $DisplayName
+$app = $registration.App
+$productCode = $registration.ProductCode
+$metadataEntry = $registration.MetadataEntry
+$quietUninstallString = $registration.QuietUninstallString
 
-$registryEntries = $uninstallRoots | ForEach-Object {
-    Get-ItemProperty -Path $_ -ErrorAction SilentlyContinue
+if ($previousRegistration) {
+    $sameProductCode = $registration.ProductCode.Equals($previousRegistration.ProductCode, [StringComparison]::OrdinalIgnoreCase)
+    $sameDisplayVersion = [string]::Equals($registration.App.DisplayVersion, $previousRegistration.App.DisplayVersion, [StringComparison]::OrdinalIgnoreCase)
+    if ($sameProductCode -and $sameDisplayVersion) {
+        throw "Silent upgrade left $DisplayName registered as the previous MSI version/product. Version: $($registration.App.DisplayVersion), ProductCode: $($registration.ProductCode)"
+    }
 }
 
-$apps = $registryEntries | Where-Object {
-    $_.DisplayName -eq $DisplayName
-}
-
-if (-not $apps) {
-    throw "$DisplayName was not found in Windows Apps management uninstall registry entries."
-}
-
-$app = $apps | Where-Object {
-    $_.SystemComponent -ne 1
-} | Select-Object -First 1
-if (-not $app) {
-    throw "$DisplayName was found only as hidden Windows Installer ARP entries."
-}
-
-$productCode = Split-Path -Path $app.PSPath -Leaf
-$metadataEntry = $registryEntries | Where-Object {
-    (Split-Path -Path $_.PSPath -Leaf) -eq $productCode -and
-    ($_.InstallLocation -or $_.DisplayIcon -or $_.QuietUninstallString)
-} | Select-Object -First 1
-
-if (-not $app.UninstallString -or $app.UninstallString -notmatch "msiexec") {
-    throw "$DisplayName uninstall entry is missing a standard msiexec UninstallString."
-}
-
-if ($app.UninstallString -notmatch "(?i)/I") {
-    throw "$DisplayName uninstall entry must open MSI maintenance UI with /I. Actual: $($app.UninstallString)"
-}
-
-$quietUninstallString = if ($app.QuietUninstallString) { $app.QuietUninstallString } else { $metadataEntry.QuietUninstallString }
-if (-not $quietUninstallString -or $quietUninstallString -notmatch "msiexec" -or $quietUninstallString -notmatch "/q") {
-    throw "$DisplayName uninstall entry is missing a standard quiet msiexec QuietUninstallString."
-}
+Test-KoeNoteInstallPayload -Registration $registration -Name $DisplayName
+Test-KoeNoteStartMenuShortcuts -Name $DisplayName -InstallLocation $registration.InstallLocation
+Test-KoeNoteInstalledAppLaunch -Registration $registration -Name $DisplayName
 
 Write-Host "Found $DisplayName app registration:"
 [pscustomobject]@{
     DisplayName = $app.DisplayName
     DisplayVersion = $app.DisplayVersion
     Publisher = $app.Publisher
-    InstallLocation = if ($app.InstallLocation) { $app.InstallLocation } else { $metadataEntry.InstallLocation }
-    DisplayIcon = if ($app.DisplayIcon) { $app.DisplayIcon } else { $metadataEntry.DisplayIcon }
+    InstallLocation = $registration.InstallLocation
+    DisplayIcon = $registration.DisplayIcon
     UninstallString = $app.UninstallString
     QuietUninstallString = $quietUninstallString
+    SmokeLogDirectory = $logRoot
 }
 
 if (-not $SkipInstall) {
@@ -214,8 +386,9 @@ if (-not $SkipInstall) {
     if ($uninstall.ExitCode -ne 0) {
         throw "MSI uninstall failed with exit code $($uninstall.ExitCode). Log: $uninstallLog"
     }
+    Test-KoeNoteMsiSmokeLog -Path $uninstallLog -Description "MSI uninstall"
 
-    $installLocation = if ($app.InstallLocation) { $app.InstallLocation } else { $metadataEntry.InstallLocation }
+    $installLocation = $registration.InstallLocation
     if ($installLocation -and (Test-Path -LiteralPath $installLocation)) {
         throw "$DisplayName uninstall left the application install directory behind: $installLocation"
     }
