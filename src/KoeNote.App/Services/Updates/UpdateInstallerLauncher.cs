@@ -163,6 +163,7 @@ public sealed class UpdateInstallerLauncher(
         }
 
         var workingRoot = Path.GetFullPath(_options.HelperWorkingRoot ?? Path.Combine(Path.GetTempPath(), "KoeNote", "updater-helper"));
+        CleanupOldHelperDirectories(workingRoot, DateTimeOffset.UtcNow.AddDays(-1));
         var helperDirectory = Path.Combine(workingRoot, $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(helperDirectory);
 
@@ -181,6 +182,30 @@ public sealed class UpdateInstallerLauncher(
         }
 
         return copiedHelperPath;
+    }
+
+    private static void CleanupOldHelperDirectories(string workingRoot, DateTimeOffset deleteBefore)
+    {
+        if (!Directory.Exists(workingRoot))
+        {
+            return;
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(workingRoot))
+        {
+            try
+            {
+                if (Directory.GetLastWriteTimeUtc(directory) >= deleteBefore.UtcDateTime)
+                {
+                    continue;
+                }
+
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
     }
 
     private string ResolveTargetExePath()

@@ -119,6 +119,33 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WritesResultWhenMsiexecCannotStart()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            Path.Combine(root, "KoeNote.App.exe"),
+            root,
+            0,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var runner = new RecordingUpdaterProcessRunner { ThrowOnRun = true };
+        var service = new UpdaterService(runner);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.InstallFailed, exitCode);
+        Assert.Empty(runner.Starts);
+        var result = ReadResult(options.ResultPath);
+        Assert.Equal((int)UpdaterExitCode.InstallFailed, result.ExitCode);
+        Assert.Contains("msiexec could not be started", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReportsRebootRequiredWithoutRelaunching()
     {
         var root = CreateTempRoot();
@@ -235,6 +262,8 @@ public sealed class UpdaterHelperTests
 
         public bool ThrowOnStart { get; init; }
 
+        public bool ThrowOnRun { get; init; }
+
         public bool WaitNeverCompletes { get; init; }
 
         public string? ResultPathExpectedBeforeStart { get; init; }
@@ -260,6 +289,11 @@ public sealed class UpdaterHelperTests
 
         public Task<int> RunAsync(string fileName, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
         {
+            if (ThrowOnRun)
+            {
+                throw new InvalidOperationException("Blocked by policy.");
+            }
+
             Runs.Add(new RunCapture(fileName, [.. arguments]));
             return Task.FromResult(InstallExitCode);
         }

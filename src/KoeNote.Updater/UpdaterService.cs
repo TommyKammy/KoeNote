@@ -35,18 +35,26 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.VerificationFailed, options, "The MSI did not match the expected SHA256.");
         }
 
-        var installExitCode = await processRunner.RunAsync(
-            "msiexec.exe",
-            [
-                "/i",
-                options.MsiPath,
-                "/qn",
-                "/norestart",
-                "/L*v",
-                options.LogPath,
-                $"INSTALLFOLDER={EnsureTrailingDirectorySeparator(options.InstallFolderPath)}"
-            ],
-            cancellationToken);
+        int installExitCode;
+        try
+        {
+            installExitCode = await processRunner.RunAsync(
+                "msiexec.exe",
+                [
+                    "/i",
+                    options.MsiPath,
+                    "/qn",
+                    "/norestart",
+                    "/L*v",
+                    options.LogPath,
+                    $"INSTALLFOLDER={EnsureTrailingDirectorySeparator(options.InstallFolderPath)}"
+                ],
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec could not be started: {exception.Message}");
+        }
 
         if (installExitCode != MsiSuccess)
         {

@@ -69,6 +69,43 @@ public sealed class UpdateInstallerLauncherTests
     }
 
     [Fact]
+    public void Launch_RemovesOldTemporaryHelperCopies()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var installerPath = Path.Combine(root, "KoeNote-v0.14.0-win-x64.msi");
+        var helperPath = Path.Combine(root, "app", "KoeNote.Updater.exe");
+        var targetExePath = Path.Combine(root, "app", "KoeNote.App.exe");
+        var helperWorkingRoot = Path.Combine(root, "helper-work");
+        Directory.CreateDirectory(Path.GetDirectoryName(helperPath)!);
+        Directory.CreateDirectory(helperWorkingRoot);
+        var oldHelperDirectory = Path.Combine(helperWorkingRoot, "old-helper");
+        var recentHelperDirectory = Path.Combine(helperWorkingRoot, "recent-helper");
+        Directory.CreateDirectory(oldHelperDirectory);
+        Directory.CreateDirectory(recentHelperDirectory);
+        File.WriteAllText(Path.Combine(oldHelperDirectory, "KoeNote.Updater.exe"), "old");
+        File.WriteAllText(installerPath, "msi");
+        File.WriteAllText(helperPath, "helper");
+        File.WriteAllText(targetExePath, "app");
+        Directory.SetLastWriteTimeUtc(oldHelperDirectory, DateTime.UtcNow.AddDays(-2));
+        Directory.SetLastWriteTimeUtc(recentHelperDirectory, DateTime.UtcNow);
+        var launcher = new UpdateInstallerLauncher(
+            _ => new Process(),
+            options: new UpdateInstallerLaunchOptions(
+                RequireAuthenticodeSignature: false,
+                HelperPath: helperPath,
+                TargetExePath: targetExePath,
+                HelperWorkingRoot: helperWorkingRoot));
+
+        launcher.Launch(installerPath, ComputeSha256("msi"), "0.14.0");
+
+        Assert.False(Directory.Exists(oldHelperDirectory));
+        Assert.True(Directory.Exists(recentHelperDirectory));
+        Assert.Contains(
+            Directory.EnumerateDirectories(helperWorkingRoot),
+            directory => string.Equals(Path.GetFileName(directory), "recent-helper", StringComparison.OrdinalIgnoreCase) is false);
+    }
+
+    [Fact]
     public void Launch_RejectsMissingInstaller()
     {
         var launcher = new UpdateInstallerLauncher(_ => null, new RecordingSignatureVerifier());

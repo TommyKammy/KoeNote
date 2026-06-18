@@ -411,7 +411,8 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.14.0",
                 null,
                 "KoeNote is up to date (0.14.0)."),
-            true);
+            true,
+            false);
 
         Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
         Assert.Empty(viewModel.UpdateDownloadProgressText);
@@ -435,6 +436,7 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.14.0",
                 null,
                 "KoeNote is up to date (0.14.0)."),
+            false,
             false);
 
         Assert.Equal("User action completed.", viewModel.LatestLog);
@@ -481,7 +483,8 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.14.0",
                 CreateUpdateRelease(),
                 "KoeNote 0.15.0 is available."),
-            true);
+            true,
+            false);
 
         Assert.True(viewModel.CanShowUpdateRestartAction);
         Assert.Equal("Update and restart", viewModel.UpdateRestartActionText);
@@ -509,7 +512,8 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.15.0",
                 null,
                 "KoeNote is up to date (0.15.0)."),
-            true);
+            true,
+            false);
 
         SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
 
@@ -532,7 +536,8 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.14.0",
                 CreateUpdateRelease(),
                 "KoeNote 0.15.0 is available."),
-            true);
+            true,
+            false);
         SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
         Assert.True(viewModel.HasUpdateRestartBlockedReason);
         SetPrivateField(viewModel, "_updateCheckService", new ThrowingUpdateCheckService());
@@ -568,7 +573,8 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 "0.14.0",
                 release,
                 "KoeNote 0.15.0 is available."),
-            true);
+            true,
+            false);
 
         viewModel.UpdateAndRestartCommand.Execute(null);
         for (var i = 0; i < 20 && launcher.StartedInstallerPath is null; i++)
@@ -612,6 +618,45 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
         Assert.True(File.Exists(resultPath + ".seen"));
     }
 
+    [Fact]
+    public async Task StartupUpdateCheckAfterPendingFailurePreservesRetryAction()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        File.WriteAllText(Path.Combine(paths.UpdateDownloads, "KoeNote-update-0.20.0.result.json"), """
+            {
+              "Status": "InstallFailed",
+              "ExitCode": 20,
+              "Version": "0.20.0",
+              "InstallerPath": "KoeNote.msi",
+              "TargetExePath": "KoeNote.App.exe",
+              "LogPath": "install.log",
+              "CompletedAt": "2026-06-18T00:00:00Z",
+              "Message": "msiexec exited with code 3010. Windows reported that a restart is required."
+            }
+            """);
+        var viewModel = new MainWindowViewModel(paths);
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.19.0",
+                CreateUpdateRelease(),
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesOnStartupAsync");
+
+        Assert.Equal("Update failed", viewModel.UpdateNotificationTitle);
+        Assert.Contains("3010", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.CanShowUpdateDownloadAction);
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+        Assert.Equal("0.15.0", viewModel.AvailableUpdateVersion);
+    }
+
     private static LatestReleaseInfo CreateUpdateRelease()
     {
         return new LatestReleaseInfo(
@@ -649,6 +694,14 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
         public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("latest.json unavailable");
+        }
+    }
+
+    private sealed class ReturningUpdateCheckService(UpdateCheckResult result) : IUpdateCheckService
+    {
+        public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(result);
         }
     }
 
