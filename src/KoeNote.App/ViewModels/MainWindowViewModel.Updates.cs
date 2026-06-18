@@ -341,6 +341,10 @@ public sealed partial class MainWindowViewModel
                 OnPropertyChanged(nameof(AvailableUpdateVersion));
                 OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
                 OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
+                OnPropertyChanged(nameof(CanShowUpdateRestartAction));
+                OnPropertyChanged(nameof(UpdateRestartActionText));
+                OnPropertyChanged(nameof(UpdateRestartBlockedReason));
+                OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
                 RefreshUpdateCommandStates();
             }
 
