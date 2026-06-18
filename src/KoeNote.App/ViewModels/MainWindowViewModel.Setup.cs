@@ -291,7 +291,7 @@ public sealed partial class MainWindowViewModel
                 ModelDownloadProgressStageText = "インストール中";
                 var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
                     cancellation.Token,
-                    CreateRuntimeInstallProgress());
+                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -353,7 +353,7 @@ public sealed partial class MainWindowViewModel
                     ModelDownloadProgressStageText = "インストール中";
                     var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
                         cancellation.Token,
-                        CreateRuntimeInstallProgress());
+                        CreateRuntimeInstallProgress(useDeterminateProgress: false));
                     RefreshSetupWizard();
                     if (!runtimeResult.IsSucceeded)
                     {
@@ -395,7 +395,7 @@ public sealed partial class MainWindowViewModel
                 IsModelDownloadProgressIndeterminate = true;
                 var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
                     cancellation.Token,
-                    CreateRuntimeInstallProgress());
+                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -595,7 +595,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Installing {presetDisplayName}: {spec.PresetProgressDetail}";
         ModelDownloadProgressStageText = spec.InitialStageText;
         IsModelDownloadProgressIndeterminate = true;
-        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress());
+        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress(useDeterminateProgress: false));
         RefreshSetupWizard();
         if (result.IsSucceeded)
         {
@@ -622,11 +622,11 @@ public sealed partial class MainWindowViewModel
         return false;
     }
 
-    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress()
+    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress(bool useDeterminateProgress = true)
     {
         return new Progress<RuntimeInstallProgress>(progress =>
         {
-            if (progress.DisplayPercent is { } percent)
+            if (useDeterminateProgress && progress.DisplayPercent is { } percent)
             {
                 ModelDownloadProgressPercent = percent;
                 IsModelDownloadProgressIndeterminate = false;
