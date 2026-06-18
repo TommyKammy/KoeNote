@@ -2190,7 +2190,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 return;
             }
 
-            var engineId = IsUserSelectableAsrEngine(value) ? value : DefaultSelectableAsrEngineId;
+            var engineId = ModelCatalogPresenter.IsUserSelectableAsrEngine(value) ? value : DefaultSelectableAsrEngineId;
             if (SetField(ref _selectedAsrEngineId, engineId))
             {
                 UpdateSelectedSettingsAsrEngine();

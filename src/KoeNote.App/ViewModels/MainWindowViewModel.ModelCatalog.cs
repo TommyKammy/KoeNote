@@ -290,15 +290,10 @@ public sealed partial class MainWindowViewModel
     private void RefreshModelCatalog()
     {
         var selectedModelId = SelectedModelCatalogEntry?.ModelId;
-        ModelCatalogEntries.Clear();
-        foreach (var entry in _modelCatalogService.ListEntries())
-        {
-            ModelCatalogEntries.Add(entry);
-        }
-
-        SelectedModelCatalogEntry = selectedModelId is null
-            ? _modelCatalogPresenter.ResolveSelection(ModelCatalogEntries, preferredModelId: null)
-            : _modelCatalogPresenter.ResolveSelection(ModelCatalogEntries, selectedModelId);
+        SelectedModelCatalogEntry = _modelCatalogPresenter.RefreshEntries(
+            ModelCatalogEntries,
+            _modelCatalogService.ListEntries(),
+            selectedModelId);
         RefreshAvailableAsrEngines();
         OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
         OnPropertyChanged(nameof(ReviewStageAssetsReady));
@@ -329,22 +324,8 @@ public sealed partial class MainWindowViewModel
 
     private ModelCatalogEntry? FindInstalledCatalogEntry(string role, Func<ModelCatalogEntry, bool> predicate)
     {
-        return FindInstalledCatalogEntry(ModelCatalogEntries, role, predicate) ??
-            FindInstalledCatalogEntry(_modelCatalogService.ListEntries(), role, predicate);
-    }
-
-    private static ModelCatalogEntry? FindInstalledCatalogEntry(
-        IEnumerable<ModelCatalogEntry> entries,
-        string role,
-        Func<ModelCatalogEntry, bool> predicate)
-    {
-        return entries.FirstOrDefault(entry =>
-            entry.IsInstalled &&
-            entry.IsVerified &&
-            entry.InstalledModel is { } installed &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)) &&
-            entry.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
-            predicate(entry));
+        return _modelCatalogPresenter.FindInstalledEntry(ModelCatalogEntries, role, predicate) ??
+            _modelCatalogPresenter.FindInstalledEntry(_modelCatalogService.ListEntries(), role, predicate);
     }
 
     private bool IsSelectedAsrEngineReady()
@@ -372,23 +353,14 @@ public sealed partial class MainWindowViewModel
         };
     }
 
-    private static bool IsUserSelectableAsrEngine(string? engineId)
-    {
-        return engineId is "kotoba-whisper-v2.2-faster"
-            or "whisper-base"
-            or "whisper-small"
-            or "faster-whisper-large-v3-turbo"
-            or "faster-whisper-large-v3";
-    }
-
     private string ResolveInitialAsrEngineId(string? savedEngineId)
     {
-        if (IsUserSelectableAsrEngine(savedEngineId))
+        if (ModelCatalogPresenter.IsUserSelectableAsrEngine(savedEngineId))
         {
             return savedEngineId!;
         }
 
-        if (IsUserSelectableAsrEngine(_setupState.SelectedAsrModelId))
+        if (ModelCatalogPresenter.IsUserSelectableAsrEngine(_setupState.SelectedAsrModelId))
         {
             return _setupState.SelectedAsrModelId!;
         }
@@ -418,12 +390,9 @@ public sealed partial class MainWindowViewModel
     {
         var selectedEngineId = SelectedAsrEngineId;
         AvailableAsrEngines.Clear();
-        foreach (var engine in _asrEngineRegistry.Engines.Where(static engine => IsUserSelectableAsrEngine(engine.EngineId)))
+        foreach (var engine in _modelCatalogPresenter.BuildAsrEngineOptions(_asrEngineRegistry.Engines, IsAsrEngineInstalled))
         {
-            AvailableAsrEngines.Add(new AsrEngineOption(
-                engine.EngineId,
-                engine.DisplayName,
-                IsAsrEngineInstalled(engine.EngineId)));
+            AvailableAsrEngines.Add(engine);
         }
 
         if (!string.IsNullOrWhiteSpace(selectedEngineId))
