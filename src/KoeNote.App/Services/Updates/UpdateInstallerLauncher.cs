@@ -96,6 +96,8 @@ public sealed class UpdateInstallerLauncher(
 
         var helperPath = CopyHelperToTemp();
         var targetExePath = ResolveTargetExePath();
+        var installFolderPath = Path.GetDirectoryName(targetExePath)
+            ?? throw new InvalidOperationException("KoeNote target executable path has no directory.");
         var parentProcessId = _options.ParentProcessId ?? Environment.ProcessId;
         var logPath = CreateUpdateLogPath(fullPath, version, ".log");
         var resultPath = CreateUpdateLogPath(fullPath, version, ".result.json");
@@ -112,6 +114,8 @@ public sealed class UpdateInstallerLauncher(
         startInfo.ArgumentList.Add(verifiedSha256!);
         startInfo.ArgumentList.Add("--target-exe");
         startInfo.ArgumentList.Add(targetExePath);
+        startInfo.ArgumentList.Add("--install-folder");
+        startInfo.ArgumentList.Add(installFolderPath);
         startInfo.ArgumentList.Add("--parent-pid");
         startInfo.ArgumentList.Add(parentProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         startInfo.ArgumentList.Add("--log");

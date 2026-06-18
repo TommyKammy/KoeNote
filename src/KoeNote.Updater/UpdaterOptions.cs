@@ -4,6 +4,7 @@ public sealed record UpdaterOptions(
     string MsiPath,
     string ExpectedSha256,
     string TargetExePath,
+    string InstallFolderPath,
     int ParentProcessId,
     string LogPath,
     string ResultPath,
@@ -11,7 +12,7 @@ public sealed record UpdaterOptions(
 {
     public static string HelpText => """
         Usage:
-          KoeNote.Updater.exe --msi <path> --sha256 <hex> --target-exe <path> --parent-pid <pid> --log <path> --version <version> [--result <path>]
+          KoeNote.Updater.exe --msi <path> --sha256 <hex> --target-exe <path> --install-folder <path> --parent-pid <pid> --log <path> --version <version> [--result <path>]
         """;
 
     public static UpdaterOptions Parse(IReadOnlyList<string> args)
@@ -20,6 +21,11 @@ public sealed record UpdaterOptions(
         var msiPath = Require(values, "--msi");
         var sha256 = Require(values, "--sha256");
         var targetExePath = Require(values, "--target-exe");
+        var installFolderPath = values.TryGetValue("--install-folder", out var explicitInstallFolderPath) &&
+            !string.IsNullOrWhiteSpace(explicitInstallFolderPath)
+            ? explicitInstallFolderPath
+            : Path.GetDirectoryName(Path.GetFullPath(targetExePath))
+                ?? throw new ArgumentException("--install-folder is required when --target-exe has no directory.");
         var parentPidValue = Require(values, "--parent-pid");
         var logPath = Require(values, "--log");
         var version = Require(values, "--version");
@@ -41,6 +47,7 @@ public sealed record UpdaterOptions(
             Path.GetFullPath(msiPath),
             sha256.ToLowerInvariant(),
             Path.GetFullPath(targetExePath),
+            Path.GetFullPath(installFolderPath),
             parentPid,
             Path.GetFullPath(logPath),
             Path.GetFullPath(resultPath),

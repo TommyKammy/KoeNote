@@ -52,6 +52,8 @@ public sealed class UpdateInstallerLauncherTests
         Assert.Contains(ComputeSha256(payload), arguments);
         Assert.Contains("--target-exe", arguments);
         Assert.Contains(Path.GetFullPath(targetExePath), arguments);
+        Assert.Contains("--install-folder", arguments);
+        Assert.Contains(Path.GetFullPath(Path.GetDirectoryName(targetExePath)!), arguments);
         Assert.Contains("--parent-pid", arguments);
         Assert.Contains("1234", arguments);
         Assert.Contains("--log", arguments);

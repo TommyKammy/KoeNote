@@ -13,6 +13,9 @@ public interface IUpdaterProcessRunner
 
 public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
 {
+    private const int MsiSuccess = 0;
+    private const int MsiSuccessRebootRequired = 3010;
+
     public async Task<UpdaterExitCode> ExecuteAsync(UpdaterOptions options, CancellationToken cancellationToken = default)
     {
         if (options.ParentProcessId > 0)
@@ -27,10 +30,18 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
 
         var installExitCode = await processRunner.RunAsync(
             "msiexec.exe",
-            ["/i", options.MsiPath, "/qn", "/norestart", "/L*v", options.LogPath],
+            [
+                "/i",
+                options.MsiPath,
+                "/qn",
+                "/norestart",
+                "/L*v",
+                options.LogPath,
+                $"INSTALLFOLDER={EnsureTrailingDirectorySeparator(options.InstallFolderPath)}"
+            ],
             cancellationToken);
 
-        if (installExitCode != 0)
+        if (installExitCode is not MsiSuccess and not MsiSuccessRebootRequired)
         {
             return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec exited with code {installExitCode}.");
         }
@@ -41,7 +52,10 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.RelaunchFailed, options, "The updated KoeNote executable could not be relaunched.");
         }
 
-        return WriteResult(UpdaterExitCode.Success, options, "Update installed and KoeNote relaunched.");
+        var message = installExitCode == MsiSuccessRebootRequired
+            ? "Update installed and KoeNote relaunched. Windows reported that a restart is required to complete installation."
+            : "Update installed and KoeNote relaunched.";
+        return WriteResult(UpdaterExitCode.Success, options, message);
     }
 
     private static bool VerifyInstaller(string path, string expectedSha256)
@@ -60,6 +74,14 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
     {
         UpdaterResult.Write(options.ResultPath, UpdaterResult.From(exitCode, options, message));
         return exitCode;
+    }
+
+    private static string EnsureTrailingDirectorySeparator(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.EndsWith(Path.DirectorySeparatorChar) || fullPath.EndsWith(Path.AltDirectorySeparatorChar)
+            ? fullPath
+            : fullPath + Path.DirectorySeparatorChar;
     }
 
     private async Task<bool> TryStartAsync(UpdaterOptions options, CancellationToken cancellationToken)

@@ -222,7 +222,8 @@ Write-UpdateLog "release_payload_guard_verified" @{
 
 Invoke-CodeSigningIfConfigured -Paths @(
     (Join-Path $publishDir "KoeNote.App.exe"),
-    (Join-Path $publishDir "KoeNoteCleanup.exe")
+    (Join-Path $publishDir "KoeNoteCleanup.exe"),
+    (Join-Path $publishDir "KoeNote.Updater.exe")
 )
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File $payloadScript -PayloadDir $publishDir -OutputPath $generatedWxs -ComponentGuidSalt $ComponentGuidSalt -ProductRegistryKey $ProductRegistryKey

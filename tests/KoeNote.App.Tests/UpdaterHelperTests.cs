@@ -16,7 +16,8 @@ public sealed class UpdaterHelperTests
         var resultPath = Path.Combine(root, "update.result.json");
         await File.WriteAllTextAsync(msiPath, "installer");
         await File.WriteAllTextAsync(targetExe, "app");
-        var options = new UpdaterOptions(msiPath, ComputeSha256("installer"), targetExe, 1234, logPath, resultPath, "0.20.0");
+        var installFolder = Path.GetDirectoryName(targetExe)!;
+        var options = new UpdaterOptions(msiPath, ComputeSha256("installer"), targetExe, installFolder, 1234, logPath, resultPath, "0.20.0");
         var runner = new RecordingUpdaterProcessRunner();
         var service = new UpdaterService(runner);
 
@@ -26,7 +27,7 @@ public sealed class UpdaterHelperTests
         Assert.Equal(1234, runner.WaitedProcessIds.Single());
         var install = Assert.Single(runner.Runs);
         Assert.Equal("msiexec.exe", install.FileName);
-        Assert.Equal(["/i", msiPath, "/qn", "/norestart", "/L*v", logPath], install.Arguments);
+        Assert.Equal(["/i", msiPath, "/qn", "/norestart", "/L*v", logPath, $"INSTALLFOLDER={installFolder}{Path.DirectorySeparatorChar}"], install.Arguments);
         Assert.Equal(targetExe, runner.Starts.Single());
         var result = ReadResult(resultPath);
         Assert.Equal((int)UpdaterExitCode.Success, result.ExitCode);
@@ -45,6 +46,7 @@ public sealed class UpdaterHelperTests
             msiPath,
             ComputeSha256("original"),
             targetExe,
+            Path.GetDirectoryName(targetExe)!,
             0,
             Path.Combine(root, "update.log"),
             resultPath,
@@ -70,6 +72,7 @@ public sealed class UpdaterHelperTests
             msiPath,
             ComputeSha256("installer"),
             Path.Combine(root, "KoeNote.App.exe"),
+            root,
             0,
             Path.Combine(root, "update.log"),
             Path.Combine(root, "update.result.json"),
@@ -85,6 +88,32 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TreatsRebootRequiredExitCodeAsSuccess()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        var targetExe = Path.Combine(root, "KoeNote.App.exe");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            targetExe,
+            root,
+            0,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var runner = new RecordingUpdaterProcessRunner { InstallExitCode = 3010 };
+        var service = new UpdaterService(runner);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.Success, exitCode);
+        Assert.Equal(targetExe, runner.Starts.Single());
+        Assert.Contains("restart is required", ReadResult(options.ResultPath).Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ReportsRelaunchFailureWhenStartThrows()
     {
         var root = CreateTempRoot();
@@ -94,6 +123,7 @@ public sealed class UpdaterHelperTests
             msiPath,
             ComputeSha256("installer"),
             Path.Combine(root, "missing", "KoeNote.App.exe"),
+            root,
             0,
             Path.Combine(root, "update.log"),
             Path.Combine(root, "update.result.json"),
@@ -114,18 +144,21 @@ public sealed class UpdaterHelperTests
             "--msi", "KoeNote.msi",
             "--sha256", new string('a', 64),
             "--target-exe", "KoeNote.App.exe",
+            "--install-folder", "custom",
             "--parent-pid", "42",
             "--log", "update.log",
             "--version", "0.20.0"
         ]);
 
         Assert.Equal(42, options.ParentProcessId);
+        Assert.EndsWith("custom", options.InstallFolderPath, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("update.result.json", options.ResultPath, StringComparison.OrdinalIgnoreCase);
         Assert.Throws<ArgumentException>(() => UpdaterOptions.Parse(["--msi", "KoeNote.msi"]));
         Assert.Throws<ArgumentException>(() => UpdaterOptions.Parse([
             "--msi", "KoeNote.msi",
             "--sha256", "not-a-sha",
             "--target-exe", "KoeNote.App.exe",
+            "--install-folder", "custom",
             "--parent-pid", "42",
             "--log", "update.log",
             "--version", "0.20.0"
