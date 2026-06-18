@@ -30,9 +30,9 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             }
         }
 
-        if (!VerifyInstaller(options.MsiPath, options.ExpectedSha256))
+        if (!TryVerifyInstaller(options.MsiPath, options.ExpectedSha256, out var verificationFailureMessage))
         {
-            return WriteResult(UpdaterExitCode.VerificationFailed, options, "The MSI did not match the expected SHA256.");
+            return WriteResult(UpdaterExitCode.VerificationFailed, options, verificationFailureMessage);
         }
 
         int installExitCode;
@@ -56,12 +56,17 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec could not be started: {exception.Message}");
         }
 
+        if (installExitCode == MsiSuccessRebootRequired)
+        {
+            return WriteResult(
+                UpdaterExitCode.PendingReboot,
+                options,
+                "Update installed, but Windows reported that a restart is required to complete installation. KoeNote was not relaunched.");
+        }
+
         if (installExitCode != MsiSuccess)
         {
-            var failureMessage = installExitCode == MsiSuccessRebootRequired
-                ? "msiexec exited with code 3010. Windows reported that a restart is required to complete installation, so KoeNote was not relaunched."
-                : $"msiexec exited with code {installExitCode}.";
-            return WriteResult(UpdaterExitCode.InstallFailed, options, failureMessage);
+            return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec exited with code {installExitCode}.");
         }
 
         WriteResult(UpdaterExitCode.Success, options, "Update installed. Relaunching KoeNote.");
@@ -75,16 +80,26 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
         return UpdaterExitCode.Success;
     }
 
-    private static bool VerifyInstaller(string path, string expectedSha256)
+    private static bool TryVerifyInstaller(string path, string expectedSha256, out string failureMessage)
     {
+        failureMessage = "The MSI did not match the expected SHA256.";
         if (!File.Exists(path))
         {
+            failureMessage = "The MSI could not be found for SHA256 verification.";
             return false;
         }
 
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var actualSha256 = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-        return string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var actualSha256 = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+            return string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            failureMessage = $"The MSI could not be read for SHA256 verification: {exception.Message}";
+            return false;
+        }
     }
 
     private static UpdaterExitCode WriteResult(UpdaterExitCode exitCode, UpdaterOptions options, string message)

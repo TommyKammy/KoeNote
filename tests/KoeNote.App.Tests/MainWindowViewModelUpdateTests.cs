@@ -619,6 +619,35 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void Constructor_SurfacesPendingRebootResultAsRestartRequired()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        var resultPath = Path.Combine(paths.UpdateDownloads, "KoeNote-update-0.20.0.result.json");
+        File.WriteAllText(resultPath, """
+            {
+              "Status": "PendingReboot",
+              "ExitCode": 50,
+              "Version": "0.20.0",
+              "InstallerPath": "KoeNote.msi",
+              "TargetExePath": "KoeNote.App.exe",
+              "LogPath": "install.log",
+              "CompletedAt": "2026-06-18T00:00:00Z",
+              "Message": "Update installed, but Windows reported that a restart is required to complete installation."
+            }
+            """);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("Restart required to complete update: KoeNote 0.20.0", viewModel.UpdateNotificationTitle);
+        Assert.Contains("restart is required", viewModel.UpdateNotificationMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Update failed", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.False(File.Exists(resultPath));
+        Assert.True(File.Exists(resultPath + ".seen"));
+    }
+
+    [Fact]
     public async Task StartupUpdateCheckAfterPendingFailurePreservesRetryAction()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

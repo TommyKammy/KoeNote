@@ -33,9 +33,11 @@ public sealed class UpdateResultService(AppPaths paths) : IUpdateResultService
             return null;
         }
 
-        foreach (var resultPath in Directory
+        var resultPaths = Directory
             .EnumerateFiles(paths.UpdateDownloads, "*.result.json", SearchOption.TopDirectoryOnly)
-            .OrderByDescending(File.GetLastWriteTimeUtc))
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .ToArray();
+        foreach (var resultPath in resultPaths)
         {
             if (TryRead(resultPath) is not { } result)
             {
@@ -44,10 +46,24 @@ public sealed class UpdateResultService(AppPaths paths) : IUpdateResultService
             }
 
             MarkSeen(resultPath, ".seen");
+            MarkRemainingSeen(resultPaths, resultPath);
             return result;
         }
 
         return null;
+    }
+
+    private static void MarkRemainingSeen(IReadOnlyList<string> resultPaths, string consumedPath)
+    {
+        foreach (var resultPath in resultPaths)
+        {
+            if (string.Equals(resultPath, consumedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            MarkSeen(resultPath, ".seen");
+        }
     }
 
     private static UpdateInstallerResult? TryRead(string resultPath)

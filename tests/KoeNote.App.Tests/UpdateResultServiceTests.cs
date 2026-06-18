@@ -27,7 +27,8 @@ public sealed class UpdateResultServiceTests
         Assert.Equal(20, result.ExitCode);
         Assert.False(File.Exists(newerPath));
         Assert.True(File.Exists(newerPath + ".seen"));
-        Assert.True(File.Exists(olderPath));
+        Assert.False(File.Exists(olderPath));
+        Assert.True(File.Exists(olderPath + ".seen"));
     }
 
     private static void WriteResult(string path, string version, int exitCode)

@@ -146,7 +146,7 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ReportsRebootRequiredWithoutRelaunching()
+    public async Task ExecuteAsync_ReportsRebootRequiredAsPendingRebootWithoutRelaunching()
     {
         var root = CreateTempRoot();
         var msiPath = Path.Combine(root, "KoeNote.msi");
@@ -166,12 +166,40 @@ public sealed class UpdaterHelperTests
 
         var exitCode = await service.ExecuteAsync(options);
 
-        Assert.Equal(UpdaterExitCode.InstallFailed, exitCode);
+        Assert.Equal(UpdaterExitCode.PendingReboot, exitCode);
         Assert.Empty(runner.Starts);
         var result = ReadResult(options.ResultPath);
-        Assert.Equal((int)UpdaterExitCode.InstallFailed, result.ExitCode);
-        Assert.Contains("3010", result.Message, StringComparison.Ordinal);
+        Assert.Equal((int)UpdaterExitCode.PendingReboot, result.ExitCode);
+        Assert.Equal(nameof(UpdaterExitCode.PendingReboot), result.Status);
         Assert.Contains("restart is required", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WritesVerificationFailureWhenMsiCannotBeRead()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            Path.Combine(root, "KoeNote.App.exe"),
+            root,
+            0,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var runner = new RecordingUpdaterProcessRunner();
+        var service = new UpdaterService(runner);
+        await using var locked = new FileStream(msiPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.VerificationFailed, exitCode);
+        Assert.Empty(runner.Runs);
+        var result = ReadResult(options.ResultPath);
+        Assert.Equal((int)UpdaterExitCode.VerificationFailed, result.ExitCode);
+        Assert.Contains("could not be read", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
