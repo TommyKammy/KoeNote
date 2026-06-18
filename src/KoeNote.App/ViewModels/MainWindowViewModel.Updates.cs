@@ -31,9 +31,9 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public bool HasUpdateNotification =>
-        !string.IsNullOrWhiteSpace(UpdateNotificationTitle) ||
-        !string.IsNullOrWhiteSpace(UpdateNotificationMessage);
+    public bool HasUpdateNotification => _updatePresentationPresenter.HasNotification(
+        UpdateNotificationTitle,
+        UpdateNotificationMessage);
 
     public bool IsUpdateMandatory => _availableUpdate?.Mandatory == true;
 
@@ -76,21 +76,21 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public bool HasVerifiedUpdateInstaller => !string.IsNullOrWhiteSpace(VerifiedUpdateInstallerPath);
+    public bool HasVerifiedUpdateInstaller => _updatePresentationPresenter.HasVerifiedInstaller(VerifiedUpdateInstallerPath);
 
-    public bool CanShowInstallUpdateAction => HasVerifiedUpdateInstaller;
+    public bool CanShowInstallUpdateAction => _updatePresentationPresenter.CanShowInstallAction(VerifiedUpdateInstallerPath);
 
-    public bool CanShowUpdateRestartAction => _availableUpdate is not null;
+    public bool CanShowUpdateRestartAction => _updatePresentationPresenter.CanShowRestartAction(_availableUpdate);
 
-    public string UpdateRestartActionText => IsUpdateDownloadInProgress
-        ? "Downloading update..."
-        : "Update and restart";
+    public string UpdateRestartActionText => _updatePresentationPresenter.GetRestartActionText(IsUpdateDownloadInProgress);
 
-    public string UpdateRestartBlockedReason => _availableUpdate is not null && IsRunInProgress
-        ? "Finish or cancel the current run before updating and restarting."
-        : string.Empty;
+    public string UpdateRestartBlockedReason => _updatePresentationPresenter.GetRestartBlockedReason(
+        _availableUpdate,
+        IsRunInProgress);
 
-    public bool HasUpdateRestartBlockedReason => !string.IsNullOrWhiteSpace(UpdateRestartBlockedReason);
+    public bool HasUpdateRestartBlockedReason => _updatePresentationPresenter.HasRestartBlockedReason(
+        _availableUpdate,
+        IsRunInProgress);
 
     public bool IsUpdateCheckInProgress
     {
@@ -128,7 +128,9 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public bool CanShowUpdateDownloadAction => _availableUpdate is not null && !HasVerifiedUpdateInstaller;
+    public bool CanShowUpdateDownloadAction => _updatePresentationPresenter.CanShowDownloadAction(
+        _availableUpdate,
+        VerifiedUpdateInstallerPath);
 
     private async Task CheckForUpdatesOnStartupAsync()
     {
@@ -268,7 +270,7 @@ public sealed partial class MainWindowViewModel
             {
                 if (IsCurrentUpdateDownload(release, generation))
                 {
-                    UpdateDownloadProgressText = FormatUpdateDownloadProgress(downloadProgress);
+                    UpdateDownloadProgressText = _updatePresentationPresenter.FormatDownloadProgress(downloadProgress);
                 }
             });
             var result = await _updateDownloadService.DownloadAndVerifyAsync(release, progress);
@@ -278,9 +280,8 @@ public sealed partial class MainWindowViewModel
             }
 
             VerifiedUpdateInstallerPath = result.FilePath;
-            UpdateDownloadProgressText = $"SHA256 verified installer: {result.FilePath}";
-            UpdateNotificationTitle = $"Ready to update and restart: KoeNote {release.Version}";
-            UpdateNotificationMessage = "The update package has been downloaded and SHA256 verified. Choose Update and restart to apply it.";
+            UpdateDownloadProgressText = _updatePresentationPresenter.FormatVerifiedInstallerProgress(result.FilePath);
+            ApplyUpdateNotification(_updatePresentationPresenter.CreateReadyToRestartNotification(release.Version));
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
             RecordUpdateHistory("download_verified", release.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
         }
@@ -368,7 +369,10 @@ public sealed partial class MainWindowViewModel
 
     private bool CanDownloadUpdate()
     {
-        return _availableUpdate is not null && !IsUpdateDownloadInProgress && !HasVerifiedUpdateInstaller;
+        return _updatePresentationPresenter.CanDownload(
+            _availableUpdate,
+            IsUpdateDownloadInProgress,
+            VerifiedUpdateInstallerPath);
     }
 
     private static bool IsBackgroundUpdateDownloadDisabled()
@@ -389,12 +393,11 @@ public sealed partial class MainWindowViewModel
 
         _hasPendingUpdateInstallerResult = true;
         var version = string.IsNullOrWhiteSpace(result.Version) ? null : result.Version;
-        if (IsSuccessfulUpdateInstallerResult(result))
+        var presentation = _updatePresentationPresenter.CreateInstallerResultPresentation(result);
+        UpdateNotificationTitle = presentation.Title;
+        UpdateNotificationMessage = presentation.Message;
+        if (presentation.IsSuccessful)
         {
-            UpdateNotificationTitle = string.IsNullOrWhiteSpace(version)
-                ? FormatSuccessfulUpdateInstallerTitle(result)
-                : FormatSuccessfulUpdateInstallerTitle(result, version);
-            UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
             LatestLog = $"Update completed: {result.Message}";
             RecordUpdateHistory("install_completed", version, result.Message, result.InstallerPath);
             RecordUpdateHistory(
@@ -407,51 +410,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        UpdateNotificationTitle = "Update failed";
-        UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
         LatestLog = $"Update failed: {result.Message}";
         RecordUpdateHistory("install_failed", version, result.Message, result.InstallerPath);
     }
 
-    private static string FormatUpdateInstallerResultMessage(UpdateInstallerResult result)
-    {
-        var message = string.IsNullOrWhiteSpace(result.Message)
-            ? $"Updater helper exited with code {result.ExitCode}."
-            : result.Message;
-        return string.IsNullOrWhiteSpace(result.LogPath)
-            ? message
-            : $"{message} Installer log: {result.LogPath}";
-    }
-
-    private static bool IsSuccessfulUpdateInstallerResult(UpdateInstallerResult result)
-    {
-        return result.ExitCode == 0 ||
-            string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string FormatSuccessfulUpdateInstallerTitle(UpdateInstallerResult result)
-    {
-        return string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase)
-            ? "Restart required to complete update"
-            : "Update completed";
-    }
-
-    private static string FormatSuccessfulUpdateInstallerTitle(UpdateInstallerResult result, string version)
-    {
-        if (string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"Restart required to complete update: KoeNote {version}";
-        }
-
-        var versionLabel = version.StartsWith("v", StringComparison.OrdinalIgnoreCase)
-            ? version
-            : "v" + version;
-        return $"KoeNote updated to {versionLabel}";
-    }
-
     private bool CanUpdateAndRestart()
     {
-        return _availableUpdate is not null && !IsUpdateDownloadInProgress && !IsRunInProgress;
+        return _updatePresentationPresenter.CanRestart(
+            _availableUpdate,
+            IsUpdateDownloadInProgress,
+            IsRunInProgress);
     }
 
     private Task InstallVerifiedUpdateAsync()
@@ -468,9 +436,8 @@ public sealed partial class MainWindowViewModel
                 _availableUpdate?.Sha256,
                 AvailableUpdateVersion);
             ClearVerifiedUpdateInstallerState();
-            UpdateDownloadProgressText = $"Update and restart started: {result.InstallerPath}";
-            UpdateNotificationTitle = "Update and restart started";
-            UpdateNotificationMessage = $"KoeNote will close so Windows can apply the verified update. Verification: {result.TrustDescription}.";
+            UpdateDownloadProgressText = _updatePresentationPresenter.FormatInstallStartedProgress(result.InstallerPath);
+            ApplyUpdateNotification(_updatePresentationPresenter.CreateInstallStartedNotification(result.TrustDescription));
             LatestLog = $"Update installer started: {result.InstallerPath}";
             RecordUpdateHistory("install_started", AvailableUpdateVersion, $"Update installer started. Verification: {result.TrustDescription}", result.InstallerPath);
             _shutdownApplication();
@@ -488,7 +455,7 @@ public sealed partial class MainWindowViewModel
 
     private bool CanInstallVerifiedUpdate()
     {
-        return HasVerifiedUpdateInstaller && !IsRunInProgress;
+        return _updatePresentationPresenter.CanInstall(VerifiedUpdateInstallerPath, IsRunInProgress);
     }
 
     private Task OpenUpdateReleaseNotesAsync()
@@ -538,12 +505,7 @@ public sealed partial class MainWindowViewModel
         UpdateDownloadProgressText = string.Empty;
         if (!preserveExistingNotification)
         {
-            UpdateNotificationTitle = result.IsMandatory
-                ? $"Required update: KoeNote {result.LatestRelease.Version}"
-                : $"Update available: KoeNote {result.LatestRelease.Version}";
-            UpdateNotificationMessage = result.IsMandatory
-                ? "A required update is available. Finish current work, then choose Update and restart."
-                : "A newer KoeNote release is available. Choose Update and restart when your current work is saved.";
+            ApplyUpdateNotification(_updatePresentationPresenter.CreateAvailableUpdateNotification(result));
         }
 
         OnPropertyChanged(nameof(IsUpdateMandatory));
@@ -567,15 +529,10 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(UpdateRestartActionText));
     }
 
-    private static string FormatUpdateDownloadProgress(UpdateDownloadProgress progress)
+    private void ApplyUpdateNotification(UpdateNotificationPresentation notification)
     {
-        if (progress.BytesTotal is > 0)
-        {
-            var percent = progress.BytesDownloaded * 100d / progress.BytesTotal.Value;
-            return $"Downloading update: {percent:0}% ({FormatBytes(progress.BytesDownloaded)} / {FormatBytes(progress.BytesTotal.Value)})";
-        }
-
-        return $"Downloading update: {FormatBytes(progress.BytesDownloaded)}";
+        UpdateNotificationTitle = notification.Title;
+        UpdateNotificationMessage = notification.Message;
     }
 
     private void RefreshUpdateCommandStates()

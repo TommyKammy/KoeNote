@@ -90,6 +90,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly MainContentZoomState _mainContentZoomState;
     private readonly ModelCatalogPresenter _modelCatalogPresenter = new();
     private readonly ModelDownloadProgressPresenter _modelDownloadProgressPresenter = new();
+    private readonly UpdatePresentationPresenter _updatePresentationPresenter = new();
     private readonly Action _shutdownApplication;
     private readonly DispatcherTimer _statusRefreshTimer;
     private readonly DispatcherTimer _playbackRefreshTimer;
