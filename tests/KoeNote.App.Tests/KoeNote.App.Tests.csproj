@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\KoeNote.App\KoeNote.App.csproj" />
     <ProjectReference Include="..\..\src\KoeNote.Cleanup\KoeNote.Cleanup.csproj" />
     <ProjectReference Include="..\..\src\KoeNote.EvalBench\KoeNote.EvalBench.csproj" />
+    <ProjectReference Include="..\..\src\KoeNote.Updater\KoeNote.Updater.csproj" />
   </ItemGroup>
 
   <ItemGroup>

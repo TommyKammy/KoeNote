@@ -81,6 +81,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly IUpdateCheckService _updateCheckService;
     private readonly IUpdateDownloadService _updateDownloadService;
     private readonly IUpdateInstallerLauncher _updateInstallerLauncher;
+    private readonly IUpdateResultService _updateResultService;
     private readonly IUpdateHistoryService _updateHistoryService;
     private readonly LlmSettingsSeedService _llmSettingsSeedService;
     private readonly LlmSettingsDisplayService _llmSettingsDisplayService;
@@ -94,6 +95,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly DispatcherTimer _playbackRefreshTimer;
     private readonly DispatcherTimer _modelDownloadNotificationTimer;
     private StatusBarInfo _statusBarInfo;
+    private bool _hasPendingUpdateInstallerResult;
     private bool _isStatusRefreshInProgress;
     private bool _isRefreshingPlaybackPosition;
     private bool _isSelectingSegmentForPlayback;
@@ -251,6 +253,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         _updateCheckService = services.UpdateCheckService;
         _updateDownloadService = services.UpdateDownloadService;
         _updateInstallerLauncher = services.UpdateInstallerLauncher;
+        _updateResultService = services.UpdateResultService;
         _updateHistoryService = services.UpdateHistoryService;
         _llmSettingsSeedService = services.LlmSettingsSeedService;
         _llmSettingsDisplayService = services.LlmSettingsDisplayService;
@@ -334,6 +337,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         RefreshSpeakerFilters();
         RefreshDatabaseMaintenanceSummary();
         RefreshDomainPresetHistory();
+        SurfacePendingUpdateResult();
         _ = CheckForUpdatesOnStartupAsync();
     }
 

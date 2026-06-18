@@ -52,6 +52,7 @@ internal sealed record MainWindowRuntimeServices(
     IUpdateCheckService UpdateCheckService,
     IUpdateDownloadService UpdateDownloadService,
     IUpdateInstallerLauncher UpdateInstallerLauncher,
+    IUpdateResultService UpdateResultService,
     IUpdateHistoryService UpdateHistoryService);
 
 internal static class MainWindowRuntimeComposition
@@ -71,6 +72,7 @@ internal static class MainWindowRuntimeComposition
             new UpdateCheckService(updateHttpClient, UpdateCheckOptions.FromEnvironment()),
             new UpdateDownloadService(updateHttpClient, paths),
             new UpdateInstallerLauncher(),
+            new UpdateResultService(paths),
             new UpdateHistoryService(paths));
     }
 }

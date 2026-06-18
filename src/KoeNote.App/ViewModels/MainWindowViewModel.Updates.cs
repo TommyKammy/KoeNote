@@ -136,7 +136,10 @@ public sealed partial class MainWindowViewModel
         {
             var result = await _updateCheckService.CheckAsync();
             RecordUpdateHistory("check_startup_completed", result.CurrentVersion, result.Message);
-            ApplyUpdateCheckResult(result, showUpToDate: false);
+            ApplyUpdateCheckResult(
+                result,
+                showUpToDate: false,
+                preserveExistingNotification: _hasPendingUpdateInstallerResult);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
@@ -268,6 +271,56 @@ public sealed partial class MainWindowViewModel
         return _availableUpdate is not null && !IsUpdateDownloadInProgress && !HasVerifiedUpdateInstaller;
     }
 
+    private void SurfacePendingUpdateResult()
+    {
+        var result = _updateResultService.ConsumeLatestResult();
+        if (result is null)
+        {
+            return;
+        }
+
+        _hasPendingUpdateInstallerResult = true;
+        var version = string.IsNullOrWhiteSpace(result.Version) ? null : result.Version;
+        if (IsSuccessfulUpdateInstallerResult(result))
+        {
+            UpdateNotificationTitle = string.IsNullOrWhiteSpace(version)
+                ? FormatSuccessfulUpdateInstallerTitle(result)
+                : $"{FormatSuccessfulUpdateInstallerTitle(result)}: KoeNote {version}";
+            UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
+            LatestLog = $"Update completed: {result.Message}";
+            RecordUpdateHistory("install_completed", version, result.Message, result.InstallerPath);
+            return;
+        }
+
+        UpdateNotificationTitle = "Update failed";
+        UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
+        LatestLog = $"Update failed: {result.Message}";
+        RecordUpdateHistory("install_failed", version, result.Message, result.InstallerPath);
+    }
+
+    private static string FormatUpdateInstallerResultMessage(UpdateInstallerResult result)
+    {
+        var message = string.IsNullOrWhiteSpace(result.Message)
+            ? $"Updater helper exited with code {result.ExitCode}."
+            : result.Message;
+        return string.IsNullOrWhiteSpace(result.LogPath)
+            ? message
+            : $"{message} Installer log: {result.LogPath}";
+    }
+
+    private static bool IsSuccessfulUpdateInstallerResult(UpdateInstallerResult result)
+    {
+        return result.ExitCode == 0 ||
+            string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatSuccessfulUpdateInstallerTitle(UpdateInstallerResult result)
+    {
+        return string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase)
+            ? "Restart required to complete update"
+            : "Update completed";
+    }
+
     private bool CanUpdateAndRestart()
     {
         return _availableUpdate is not null && !IsUpdateDownloadInProgress && !IsRunInProgress;
@@ -282,7 +335,10 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var result = _updateInstallerLauncher.Launch(VerifiedUpdateInstallerPath, _availableUpdate?.Sha256);
+            var result = _updateInstallerLauncher.Launch(
+                VerifiedUpdateInstallerPath,
+                _availableUpdate?.Sha256,
+                AvailableUpdateVersion);
             ClearVerifiedUpdateInstallerState();
             UpdateDownloadProgressText = $"Update and restart started: {result.InstallerPath}";
             UpdateNotificationTitle = "Update and restart started";
@@ -317,7 +373,10 @@ public sealed partial class MainWindowViewModel
         return Task.CompletedTask;
     }
 
-    private void ApplyUpdateCheckResult(UpdateCheckResult result, bool showUpToDate)
+    private void ApplyUpdateCheckResult(
+        UpdateCheckResult result,
+        bool showUpToDate,
+        bool preserveExistingNotification = false)
     {
         if (!result.IsConfigured)
         {
@@ -348,12 +407,16 @@ public sealed partial class MainWindowViewModel
         _availableUpdate = result.LatestRelease;
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = string.Empty;
-        UpdateNotificationTitle = result.IsMandatory
-            ? $"Required update: KoeNote {result.LatestRelease.Version}"
-            : $"Update available: KoeNote {result.LatestRelease.Version}";
-        UpdateNotificationMessage = result.IsMandatory
-            ? "A required update is available. Finish current work, then choose Update and restart."
-            : "A newer KoeNote release is available. Choose Update and restart when your current work is saved.";
+        if (!preserveExistingNotification)
+        {
+            UpdateNotificationTitle = result.IsMandatory
+                ? $"Required update: KoeNote {result.LatestRelease.Version}"
+                : $"Update available: KoeNote {result.LatestRelease.Version}";
+            UpdateNotificationMessage = result.IsMandatory
+                ? "A required update is available. Finish current work, then choose Update and restart."
+                : "A newer KoeNote release is available. Choose Update and restart when your current work is saved.";
+        }
+
         OnPropertyChanged(nameof(IsUpdateMandatory));
         OnPropertyChanged(nameof(AvailableUpdateVersion));
         OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
@@ -361,7 +424,10 @@ public sealed partial class MainWindowViewModel
         RefreshUpdateRestartState();
         RefreshUpdateCommandStates();
 
-        LatestLog = result.Message;
+        if (!preserveExistingNotification)
+        {
+            LatestLog = result.Message;
+        }
     }
 
     private void ClearVerifiedUpdateInstallerState()

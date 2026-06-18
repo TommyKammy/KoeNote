@@ -73,6 +73,39 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\KoeNote.Updater\KoeNote.Updater.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="CopyUpdaterHelper" AfterTargets="Build">
+    <ItemGroup>
+      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\KoeNote.Updater.*"
+                           Condition="'$(RuntimeIdentifier)' == ''" />
+      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\KoeNote.Updater.*"
+                           Condition="'$(RuntimeIdentifier)' != ''" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterHelperOutput)"
+          DestinationFolder="$(TargetDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(UpdaterHelperOutput)' != ''" />
+  </Target>
+
+  <Target Name="CopyUpdaterHelperToPublish" AfterTargets="Publish">
+    <MSBuild Projects="..\KoeNote.Updater\KoeNote.Updater.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=true;PublishTrimmed=false;PublishReadyToRun=false;PublishDir=$(PublishDir)"
+             Condition="'$(RuntimeIdentifier)' != ''" />
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == ''">
+      <UpdaterHelperPublishOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\KoeNote.Updater.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterHelperPublishOutput)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'$(RuntimeIdentifier)' == '' And '@(UpdaterHelperPublishOutput)' != ''" />
+  </Target>
+
   <Target Name="CopyLocalRuntimeTools" AfterTargets="Build">
     <ItemGroup>
       <AsrRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\asr\**\*"

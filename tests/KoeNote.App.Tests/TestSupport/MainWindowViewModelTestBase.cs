@@ -378,7 +378,7 @@ public abstract class MainWindowViewModelTestBase
     {
         public string? StartedInstallerPath { get; private set; }
 
-        public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null)
+        public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null, string? version = null)
         {
             StartedInstallerPath = installerPath;
             return new UpdateInstallerLaunchResult(installerPath, DateTimeOffset.Now, "SHA256 verified download", false);
