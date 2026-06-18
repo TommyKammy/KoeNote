@@ -171,7 +171,7 @@ public sealed partial class MainWindowViewModel
             OnPropertyChanged(nameof(IsUpdateMandatory));
             OnPropertyChanged(nameof(AvailableUpdateVersion));
             OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
-            OnPropertyChanged(nameof(CanShowUpdateRestartAction));
+            RefreshUpdateRestartState();
             RefreshUpdateCommandStates();
             LatestLog = $"Update check failed: {exception.Message}";
         }
@@ -193,10 +193,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
         OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
         OnPropertyChanged(nameof(CanShowInstallUpdateAction));
-        OnPropertyChanged(nameof(CanShowUpdateRestartAction));
-        OnPropertyChanged(nameof(UpdateRestartActionText));
-        OnPropertyChanged(nameof(UpdateRestartBlockedReason));
-        OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
+        RefreshUpdateRestartState();
         RefreshUpdateCommandStates();
         return Task.CompletedTask;
     }
@@ -341,10 +338,7 @@ public sealed partial class MainWindowViewModel
                 OnPropertyChanged(nameof(AvailableUpdateVersion));
                 OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
                 OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
-                OnPropertyChanged(nameof(CanShowUpdateRestartAction));
-                OnPropertyChanged(nameof(UpdateRestartActionText));
-                OnPropertyChanged(nameof(UpdateRestartBlockedReason));
-                OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
+                RefreshUpdateRestartState();
                 RefreshUpdateCommandStates();
             }
 
@@ -364,10 +358,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(AvailableUpdateVersion));
         OnPropertyChanged(nameof(AvailableUpdateReleaseNotesUrl));
         OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
-        OnPropertyChanged(nameof(CanShowUpdateRestartAction));
-        OnPropertyChanged(nameof(UpdateRestartActionText));
-        OnPropertyChanged(nameof(UpdateRestartBlockedReason));
-        OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
+        RefreshUpdateRestartState();
         RefreshUpdateCommandStates();
 
         LatestLog = result.Message;
@@ -413,6 +404,14 @@ public sealed partial class MainWindowViewModel
         {
             updateAndRestartCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private void RefreshUpdateRestartState()
+    {
+        OnPropertyChanged(nameof(CanShowUpdateRestartAction));
+        OnPropertyChanged(nameof(UpdateRestartActionText));
+        OnPropertyChanged(nameof(UpdateRestartBlockedReason));
+        OnPropertyChanged(nameof(HasUpdateRestartBlockedReason));
     }
 
     private void RecordUpdateHistory(

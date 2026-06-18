@@ -519,6 +519,33 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task FailedUpdateCheck_ClearsUpdateRestartBlockedReason()
+    {
+        var viewModel = CreateViewModel();
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                CreateUpdateRelease(),
+                "KoeNote 0.15.0 is available."),
+            true);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+        Assert.True(viewModel.HasUpdateRestartBlockedReason);
+        SetPrivateField(viewModel, "_updateCheckService", new ThrowingUpdateCheckService());
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+
+        Assert.False(viewModel.CanShowUpdateRestartAction);
+        Assert.Empty(viewModel.UpdateRestartBlockedReason);
+        Assert.False(viewModel.HasUpdateRestartBlockedReason);
+        Assert.Equal("Update check failed", viewModel.UpdateNotificationTitle);
+    }
+
+    [Fact]
     public async Task UpdateAndRestartCommand_DownloadsUnverifiedUpdateThenStartsInstaller()
     {
         var viewModel = CreateViewModel();
@@ -584,6 +611,14 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 sha256,
                 10,
                 DateTimeOffset.Now));
+        }
+    }
+
+    private sealed class ThrowingUpdateCheckService : IUpdateCheckService
+    {
+        public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("latest.json unavailable");
         }
     }
 
