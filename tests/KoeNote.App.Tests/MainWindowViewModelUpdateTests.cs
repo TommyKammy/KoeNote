@@ -459,8 +459,167 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
         Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
         Assert.False(viewModel.CanShowInstallUpdateAction);
         Assert.False(viewModel.InstallVerifiedUpdateCommand.CanExecute(null));
-        Assert.Contains("Installer started", viewModel.UpdateDownloadProgressText, StringComparison.Ordinal);
+        Assert.Contains("Update and restart started", viewModel.UpdateDownloadProgressText, StringComparison.Ordinal);
         Assert.True(shutdownRequested);
+    }
+
+    [Fact]
+    public void UpdateAndRestartCommand_IsSinglePrimaryActionAndBlocksDuringRuns()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.False(viewModel.CanShowUpdateRestartAction);
+        Assert.False(viewModel.UpdateAndRestartCommand.CanExecute(null));
+
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                CreateUpdateRelease(),
+                "KoeNote 0.15.0 is available."),
+            true);
+
+        Assert.True(viewModel.CanShowUpdateRestartAction);
+        Assert.Equal("Update and restart", viewModel.UpdateRestartActionText);
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+        Assert.Contains("Update and restart", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+
+        Assert.False(viewModel.UpdateAndRestartCommand.CanExecute(null));
+        Assert.True(viewModel.HasUpdateRestartBlockedReason);
+        Assert.Contains("Finish or cancel", viewModel.UpdateRestartBlockedReason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UpdateRestartBlockedReason_StaysHiddenWhenNoUpdateIsAvailable()
+    {
+        var viewModel = CreateViewModel();
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                false,
+                false,
+                "0.15.0",
+                null,
+                "KoeNote is up to date (0.15.0)."),
+            true);
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+
+        Assert.False(viewModel.CanShowUpdateRestartAction);
+        Assert.Empty(viewModel.UpdateRestartBlockedReason);
+        Assert.False(viewModel.HasUpdateRestartBlockedReason);
+    }
+
+    [Fact]
+    public async Task FailedUpdateCheck_ClearsUpdateRestartBlockedReason()
+    {
+        var viewModel = CreateViewModel();
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                CreateUpdateRelease(),
+                "KoeNote 0.15.0 is available."),
+            true);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsRunInProgress), true);
+        Assert.True(viewModel.HasUpdateRestartBlockedReason);
+        SetPrivateField(viewModel, "_updateCheckService", new ThrowingUpdateCheckService());
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+
+        Assert.False(viewModel.CanShowUpdateRestartAction);
+        Assert.Empty(viewModel.UpdateRestartBlockedReason);
+        Assert.False(viewModel.HasUpdateRestartBlockedReason);
+        Assert.Equal("Update check failed", viewModel.UpdateNotificationTitle);
+    }
+
+    [Fact]
+    public async Task UpdateAndRestartCommand_DownloadsUnverifiedUpdateThenStartsInstaller()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var release = CreateUpdateRelease();
+        var downloadService = new RecordingUpdateDownloadService(installerPath, release.Sha256);
+        var launcher = new RecordingUpdateInstallerLauncher();
+        var shutdownRequested = false;
+        Action requestShutdown = () => shutdownRequested = true;
+        SetPrivateField(viewModel, "_updateDownloadService", downloadService);
+        SetPrivateField(viewModel, "_updateInstallerLauncher", launcher);
+        SetPrivateField(viewModel, "_shutdownApplication", requestShutdown);
+        InvokePrivate(
+            viewModel,
+            "ApplyUpdateCheckResult",
+            new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                release,
+                "KoeNote 0.15.0 is available."),
+            true);
+
+        viewModel.UpdateAndRestartCommand.Execute(null);
+        for (var i = 0; i < 20 && launcher.StartedInstallerPath is null; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(1, downloadService.DownloadCount);
+        Assert.Equal(installerPath, launcher.StartedInstallerPath);
+        Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
+        Assert.True(shutdownRequested);
+    }
+
+    private static LatestReleaseInfo CreateUpdateRelease()
+    {
+        return new LatestReleaseInfo(
+            "0.15.0",
+            new Uri("https://example.test/KoeNote-v0.15.0-win-x64.msi"),
+            new string('a', 64),
+            null,
+            new Uri("https://example.test/releases/0.15.0"),
+            false,
+            "win-x64",
+            DateTimeOffset.Parse("2026-06-18T00:00:00Z"));
+    }
+
+    private sealed class RecordingUpdateDownloadService(string installerPath, string sha256) : IUpdateDownloadService
+    {
+        public int DownloadCount { get; private set; }
+
+        public Task<UpdateDownloadResult> DownloadAndVerifyAsync(
+            LatestReleaseInfo release,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            DownloadCount++;
+            progress?.Report(new UpdateDownloadProgress(10, 10));
+            return Task.FromResult(new UpdateDownloadResult(
+                installerPath,
+                sha256,
+                10,
+                DateTimeOffset.Now));
+        }
+    }
+
+    private sealed class ThrowingUpdateCheckService : IUpdateCheckService
+    {
+        public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("latest.json unavailable");
+        }
     }
 
     [Fact]

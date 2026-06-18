@@ -124,6 +124,7 @@ public sealed partial class MainWindowViewModel
         CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
         DownloadUpdateCommand = new RelayCommand(DownloadUpdateAsync, CanDownloadUpdate);
         InstallVerifiedUpdateCommand = new RelayCommand(InstallVerifiedUpdateAsync, CanInstallVerifiedUpdate);
+        UpdateAndRestartCommand = new RelayCommand(UpdateAndRestartAsync, CanUpdateAndRestart);
         DismissUpdateNotificationCommand = new RelayCommand(DismissUpdateNotificationAsync);
         OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
         SaveReadablePolishingPromptSettingsCommand = new RelayCommand(SaveReadablePolishingPromptSettings);
