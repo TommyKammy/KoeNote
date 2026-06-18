@@ -633,8 +633,7 @@ public sealed partial class MainWindowViewModel
             }
             else
             {
-                ModelDownloadProgressPercent = 0;
-                IsModelDownloadProgressIndeterminate = progress.IsIndeterminate;
+                IsModelDownloadProgressIndeterminate = true;
             }
 
             ModelDownloadProgressStageText = progress.StageText;
