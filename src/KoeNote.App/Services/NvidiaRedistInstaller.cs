@@ -383,7 +383,8 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
     {
         var buffer = new byte[81920];
         long downloadedBytes = 0;
-        Report(progress, stageText, message, downloadedBytes, totalBytes);
+        var reporter = new RuntimeInstallProgressReporter(progress);
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, force: true);
 
         while (true)
         {
@@ -395,23 +396,27 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
 
             await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
             downloadedBytes += bytesRead;
-            Report(progress, stageText, message, downloadedBytes, totalBytes);
+            Report(reporter, stageText, message, downloadedBytes, totalBytes);
         }
+
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, force: true);
     }
 
     private static void Report(
-        IProgress<RuntimeInstallProgress>? progress,
+        RuntimeInstallProgressReporter reporter,
         string stageText,
         string message,
         long bytesDownloaded,
-        long? bytesTotal)
+        long? bytesTotal,
+        bool force = false)
     {
-        progress?.Report(new RuntimeInstallProgress(
+        reporter.Report(new RuntimeInstallProgress(
             stageText,
             message,
             BytesDownloaded: bytesDownloaded,
             BytesTotal: bytesTotal,
-            IsIndeterminate: !bytesTotal.HasValue));
+            IsIndeterminate: !bytesTotal.HasValue),
+            force);
     }
 }
 

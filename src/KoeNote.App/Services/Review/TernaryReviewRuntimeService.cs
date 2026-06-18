@@ -103,7 +103,8 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
     {
         var buffer = new byte[81920];
         long downloadedBytes = 0;
-        Report(progress, stageText, message, downloadedBytes, totalBytes, completePercent);
+        var reporter = new RuntimeInstallProgressReporter(progress);
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, completePercent, force: true);
 
         while (true)
         {
@@ -115,8 +116,10 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
 
             await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
             downloadedBytes += bytesRead;
-            Report(progress, stageText, message, downloadedBytes, totalBytes, completePercent);
+            Report(reporter, stageText, message, downloadedBytes, totalBytes, completePercent);
         }
+
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, completePercent, force: true);
     }
 
     private static void ExtractArchive(ZipArchive archive, string installRoot)
@@ -145,23 +148,25 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
     }
 
     private static void Report(
-        IProgress<RuntimeInstallProgress>? progress,
+        RuntimeInstallProgressReporter reporter,
         string stageText,
         string message,
         long bytesDownloaded,
         long? bytesTotal,
-        double completePercent)
+        double completePercent,
+        bool force = false)
     {
         var percent = bytesTotal is > 0 && bytesDownloaded <= bytesTotal.Value
             ? Math.Clamp(bytesDownloaded * completePercent / bytesTotal.Value, 0, completePercent)
             : (double?)null;
-        progress?.Report(new RuntimeInstallProgress(
+        reporter.Report(new RuntimeInstallProgress(
             stageText,
             message,
             percent,
             BytesDownloaded: bytesDownloaded,
             BytesTotal: bytesTotal,
-            IsIndeterminate: !bytesTotal.HasValue));
+            IsIndeterminate: !bytesTotal.HasValue),
+            force);
     }
 }
 
