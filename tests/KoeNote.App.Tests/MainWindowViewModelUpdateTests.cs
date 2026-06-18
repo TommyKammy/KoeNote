@@ -694,6 +694,61 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task CheckForUpdatesAsync_PreservesInFlightBackgroundDownloadForSameRelease()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var release = CreateUpdateRelease();
+        var matchingRelease = release with
+        {
+            PublishedAt = DateTimeOffset.Parse("2026-06-18T00:00:01Z")
+        };
+        var downloadService = new ControlledUpdateDownloadService(installerPath, release.Sha256);
+        SetPrivateField(viewModel, "_updateDownloadService", downloadService);
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                release,
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+        for (var i = 0; i < 20 && !viewModel.IsUpdateDownloadInProgress; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.True(viewModel.IsUpdateDownloadInProgress);
+
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                matchingRelease,
+                "KoeNote 0.15.0 is still available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+        downloadService.Complete();
+        for (var i = 0; i < 20 && !viewModel.HasVerifiedUpdateInstaller; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(installerPath, viewModel.VerifiedUpdateInstallerPath);
+        Assert.Equal("Ready to update and restart: KoeNote 0.15.0", viewModel.UpdateNotificationTitle);
+        Assert.False(viewModel.IsUpdateDownloadInProgress);
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Constructor_SurfacesPendingUpdaterFailureResult()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

@@ -328,7 +328,16 @@ public sealed partial class MainWindowViewModel
 
     private bool IsCurrentUpdateDownload(LatestReleaseInfo release, int generation)
     {
-        return generation == _updateDownloadGeneration && ReferenceEquals(_availableUpdate, release);
+        return generation == _updateDownloadGeneration && IsSameUpdateRelease(_availableUpdate, release);
+    }
+
+    private static bool IsSameUpdateRelease(LatestReleaseInfo? left, LatestReleaseInfo right)
+    {
+        return left is not null &&
+            string.Equals(left.Version, right.Version, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(left.Sha256, right.Sha256, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(left.RuntimeIdentifier, right.RuntimeIdentifier, StringComparison.OrdinalIgnoreCase) &&
+            Equals(left.MsiUrl, right.MsiUrl);
     }
 
     private static bool HasDownloadableUpdate(UpdateCheckResult result)
