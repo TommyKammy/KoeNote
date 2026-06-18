@@ -1,10 +1,9 @@
 ﻿using System.Text;
-using System.Text.RegularExpressions;
 using KoeNote.App.Services.Review;
 
 namespace KoeNote.App.Services.Transcript;
 
-public sealed partial class TranscriptSummaryService(
+public sealed class TranscriptSummaryService(
     TranscriptReadRepository transcriptReadRepository,
     TranscriptDerivativeRepository derivativeRepository,
     ITranscriptSummaryRuntime runtime)
@@ -78,7 +77,7 @@ public sealed partial class TranscriptSummaryService(
                     chunkResults);
             }
 
-            content = NormalizeUserFacingSummary(content);
+            content = SummaryTextNormalizer.NormalizeUserFacingSummary(content);
 
             if (IsUnexpectedlyShort(content, source.Chunks))
             {
@@ -427,20 +426,20 @@ public sealed partial class TranscriptSummaryService(
             return BuildStructuredChunkFallbackSummary(source, segments, reason, usableChunkResults);
         }
 
-        var segmentFallbackBullets = BuildSegmentFallbackBullets(segments, 8);
+        var segmentFallbackBullets = SummaryBulletParser.BuildSegmentFallbackBullets(segments, 8);
         var fallbackActions = BuildFallbackActionItems([], segmentFallbackBullets);
-        var fallbackKeywords = BuildFallbackKeywords([], segmentFallbackBullets, segmentFallbackBullets);
+        var fallbackKeywords = SummaryKeywordExtractor.BuildFallbackKeywords([], segmentFallbackBullets, segmentFallbackBullets);
 
         var builder = new StringBuilder();
         builder
             .AppendLine("## Overview")
             .AppendLine();
-        AppendBullets(builder, segmentFallbackBullets.Take(4));
+        SummaryBulletParser.AppendBullets(builder, segmentFallbackBullets.Take(4));
         builder
             .AppendLine()
             .AppendLine("## Key points")
             .AppendLine();
-        AppendBullets(builder, segmentFallbackBullets);
+        SummaryBulletParser.AppendBullets(builder, segmentFallbackBullets);
 
         builder
             .AppendLine()
@@ -450,7 +449,7 @@ public sealed partial class TranscriptSummaryService(
             .AppendLine()
             .AppendLine("## Action items")
             .AppendLine();
-        AppendBullets(builder, fallbackActions);
+        SummaryBulletParser.AppendBullets(builder, fallbackActions);
         builder
             .AppendLine()
             .AppendLine("## Open questions")
@@ -459,7 +458,7 @@ public sealed partial class TranscriptSummaryService(
             .AppendLine()
             .AppendLine("## Keywords")
             .AppendLine();
-        AppendBullets(builder, fallbackKeywords);
+        SummaryBulletParser.AppendBullets(builder, fallbackKeywords);
 
         return builder.ToString().Trim();
     }
@@ -470,14 +469,14 @@ public sealed partial class TranscriptSummaryService(
         string reason,
         IReadOnlyList<TranscriptSummaryChunkResult> chunkResults)
     {
-        var overviews = ExtractSectionBullets(chunkResults, ["Overview", "概要"], 4);
-        var keyPoints = ExtractSectionBullets(chunkResults, ["Key points", "主な内容"], 9);
-        var decisions = ExtractSectionBullets(chunkResults, ["Decisions", "決定事項"], 4);
-        var actions = ExtractSectionBullets(chunkResults, ["Action items", "アクション項目"], 6);
-        var openQuestions = ExtractSectionBullets(chunkResults, ["Open questions", "未解決の質問"], 4);
-        var segmentFallbackBullets = BuildSegmentFallbackBullets(segments, 8);
-        var keywords = NormalizeKeywordBullets(
-            ExtractSectionBullets(chunkResults, ["Keywords", "キーワード"], 10),
+        var overviews = SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Overview", "概要"], 4);
+        var keyPoints = SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Key points", "主な内容"], 9);
+        var decisions = SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Decisions", "決定事項"], 4);
+        var actions = SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Action items", "アクション項目"], 6);
+        var openQuestions = SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Open questions", "未解決の質問"], 4);
+        var segmentFallbackBullets = SummaryBulletParser.BuildSegmentFallbackBullets(segments, 8);
+        var keywords = SummaryKeywordExtractor.NormalizeKeywordBullets(
+            SummaryBulletParser.ExtractSectionBullets(chunkResults, ["Keywords", "キーワード"], 10),
             overviews.Concat(keyPoints).Concat(segmentFallbackBullets));
         var fallbackActions = actions.Length > 0
             ? actions
@@ -488,7 +487,7 @@ public sealed partial class TranscriptSummaryService(
             .AppendLine("## Overview")
             .AppendLine();
 
-        AppendBullets(builder, overviews.Length > 0
+        SummaryBulletParser.AppendBullets(builder, overviews.Length > 0
             ? overviews
             : keyPoints.Length > 0
                 ? keyPoints.Take(4)
@@ -503,32 +502,32 @@ public sealed partial class TranscriptSummaryService(
             keyPoints = segmentFallbackBullets;
         }
 
-        AppendBullets(builder, keyPoints);
+        SummaryBulletParser.AppendBullets(builder, keyPoints);
         builder
             .AppendLine()
             .AppendLine("## Decisions")
             .AppendLine();
-        AppendBullets(builder, decisions.Length > 0 ? decisions : ["明示された決定事項はありません。"]);
+        SummaryBulletParser.AppendBullets(builder, decisions.Length > 0 ? decisions : ["明示された決定事項はありません。"]);
 
         builder
             .AppendLine()
             .AppendLine("## Action items")
             .AppendLine();
-        AppendBullets(builder, fallbackActions);
+        SummaryBulletParser.AppendBullets(builder, fallbackActions);
 
         builder
             .AppendLine()
             .AppendLine("## Open questions")
             .AppendLine();
-        AppendBullets(builder, openQuestions.Length > 0 ? openQuestions : ["明示された未解決事項はありません。"]);
+        SummaryBulletParser.AppendBullets(builder, openQuestions.Length > 0 ? openQuestions : ["明示された未解決事項はありません。"]);
 
         builder
             .AppendLine()
             .AppendLine("## Keywords")
             .AppendLine();
-        AppendBullets(builder, keywords.Length > 0
+        SummaryBulletParser.AppendBullets(builder, keywords.Length > 0
             ? keywords
-            : BuildFallbackKeywords(overviews, keyPoints, segmentFallbackBullets));
+            : SummaryKeywordExtractor.BuildFallbackKeywords(overviews, keyPoints, segmentFallbackBullets));
 
         return builder.ToString().Trim();
     }
@@ -576,321 +575,6 @@ public sealed partial class TranscriptSummaryService(
         return cues.Any(cue => text.Contains(cue, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string[] BuildFallbackKeywords(
-        IReadOnlyList<string> overviews,
-        IReadOnlyList<string> keyPoints,
-        IReadOnlyList<string> segmentFallbackBullets)
-    {
-        var sourceSentences = overviews
-            .Concat(keyPoints)
-            .Concat(segmentFallbackBullets)
-            .Select(static sentence => NormalizeKeywordComparisonKey(sentence))
-            .Where(static sentence => sentence.Length > 0)
-            .ToHashSet(StringComparer.Ordinal);
-
-        return overviews
-            .Concat(keyPoints)
-            .Concat(segmentFallbackBullets)
-            .SelectMany(SplitKeywordCandidates)
-            .Select(NormalizeKeywordCandidate)
-            .Where(keyword => IsUsefulKeyword(keyword, sourceSentences))
-            .Distinct(StringComparer.Ordinal)
-            .Take(10)
-            .DefaultIfEmpty("summary")
-            .ToArray();
-    }
-
-    private static string[] NormalizeKeywordBullets(
-        IReadOnlyList<string> keywordBullets,
-        IEnumerable<string> sourceSentences)
-    {
-        var sourceSentenceKeys = sourceSentences
-            .Select(static sentence => NormalizeKeywordComparisonKey(sentence))
-            .Where(static sentence => sentence.Length > 0)
-            .ToHashSet(StringComparer.Ordinal);
-
-        return keywordBullets
-            .SelectMany(SplitKeywords)
-            .Select(static keyword => StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ','))
-            .Where(keyword => IsUsefulKeyword(keyword, sourceSentenceKeys))
-            .Distinct(StringComparer.Ordinal)
-            .Take(10)
-            .ToArray();
-    }
-
-    private static string[] BuildSegmentFallbackBullets(
-        IReadOnlyList<TranscriptReadModel> segments,
-        int limit)
-    {
-        return segments
-            .Where(static segment => !string.IsNullOrWhiteSpace(segment.Text))
-            .Select(static segment => TrimForSummary(segment.Text, 140))
-            .Take(limit)
-            .ToArray();
-    }
-
-    private static void AppendBullets(StringBuilder builder, IEnumerable<string> bullets)
-    {
-        foreach (var bullet in DeduplicateBullets(bullets))
-        {
-            builder
-                .Append("- ")
-                .AppendLine(bullet);
-        }
-    }
-
-    private static IEnumerable<string> DeduplicateBullets(IEnumerable<string> bullets)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var bullet in bullets)
-        {
-            var normalized = TrimForSummary(StripSourceReferences(bullet), 220).Trim();
-            if (normalized.Length == 0)
-            {
-                continue;
-            }
-
-            var key = normalized.Replace("\u3002", string.Empty, StringComparison.Ordinal);
-            if (seen.Add(key))
-            {
-                yield return normalized;
-            }
-        }
-    }
-
-    private static string[] ExtractSectionBullets(
-        IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
-        IReadOnlyCollection<string> sectionNames,
-        int limit)
-    {
-        var bullets = new List<string>();
-        foreach (var chunk in chunkResults)
-        {
-            var inSection = false;
-            foreach (var rawLine in chunk.Content.Split('\n'))
-            {
-                var line = rawLine.Trim();
-                if (line.StartsWith("## ", StringComparison.Ordinal))
-                {
-                    var heading = line[3..].Trim();
-                    inSection = sectionNames.Any(sectionName => heading.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
-                    continue;
-                }
-
-                if (!inSection || (!line.StartsWith("- ", StringComparison.Ordinal) && !line.StartsWith("* ", StringComparison.Ordinal)))
-                {
-                    continue;
-                }
-
-                var bullet = line[2..].Trim();
-                if (bullet.Length == 0 || bullet.Equals("Unspecified.", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                bullets.Add(TrimForSummary(bullet, 220));
-                if (bullets.Count >= limit)
-                {
-                    return bullets.ToArray();
-                }
-            }
-        }
-
-        return bullets.ToArray();
-    }
-
-    private static string NormalizeUserFacingSummary(string content)
-    {
-        var normalizedLines = new List<string>();
-        var currentSection = string.Empty;
-        foreach (var rawLine in content.Split('\n'))
-        {
-            var line = rawLine.TrimEnd('\r');
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("## ", StringComparison.Ordinal))
-            {
-                currentSection = trimmed[3..].Trim();
-                normalizedLines.Add(line);
-                continue;
-            }
-
-            if (trimmed.Length == 0)
-            {
-                normalizedLines.Add(line);
-                continue;
-            }
-
-            if (IsUnspecifiedSection(currentSection) && IsUnspecifiedLine(trimmed))
-            {
-                normalizedLines.Add("- Unspecified.");
-                continue;
-            }
-
-            if (IsKeywordSection(currentSection))
-            {
-                AppendKeywordLines(normalizedLines, trimmed);
-                continue;
-            }
-
-            normalizedLines.Add(NormalizeUserFacingSummaryLine(line));
-        }
-
-        return string.Join(Environment.NewLine, normalizedLines).Trim();
-    }
-
-    private static string NormalizeUserFacingSummaryLine(string line)
-    {
-        var trimmed = line.TrimStart();
-        if (!trimmed.StartsWith("- ", StringComparison.Ordinal) &&
-            !trimmed.StartsWith("* ", StringComparison.Ordinal))
-        {
-            return line;
-        }
-
-        var indentLength = line.Length - trimmed.Length;
-        var prefix = line[..indentLength];
-        return prefix + trimmed[..2] + StripSourceReferences(trimmed[2..]);
-    }
-
-    private static bool IsUnspecifiedSection(string section)
-    {
-        return section.Equals("Decisions", StringComparison.OrdinalIgnoreCase) ||
-            section.Equals("Action items", StringComparison.OrdinalIgnoreCase) ||
-            section.Equals("Open questions", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsKeywordSection(string section)
-    {
-        return section.Equals("Keywords", StringComparison.OrdinalIgnoreCase) ||
-            section.Equals("キーワード", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsUnspecifiedLine(string line)
-    {
-        return line.Trim().TrimEnd('.').Equals("Unspecified", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static void AppendKeywordLines(List<string> lines, string line)
-    {
-        var keywordSource = line.StartsWith("- ", StringComparison.Ordinal) || line.StartsWith("* ", StringComparison.Ordinal)
-            ? line[2..]
-            : line;
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var keyword in SplitKeywords(keywordSource))
-        {
-            var normalized = StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ',');
-            if (normalized.Length == 0 || !seen.Add(normalized))
-            {
-                continue;
-            }
-
-            lines.Add("- " + normalized);
-            if (seen.Count >= 12)
-            {
-                return;
-            }
-        }
-    }
-
-    private static IEnumerable<string> SplitKeywords(string text)
-    {
-        return (text ?? string.Empty)
-            .Split([',', '\u3001'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    private static IEnumerable<string> SplitKeywordCandidates(string text)
-    {
-        return (text ?? string.Empty)
-            .Replace(":", " ", StringComparison.Ordinal)
-            .Replace("\uFF1A", " ", StringComparison.Ordinal)
-            .Split([' ', '\t', ',', '.', '\u3001', '\u3002', '\u30fb', '/', '\u3000'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .SelectMany(SplitJapaneseKeywordToken)
-            .Where(static token => !token.Equals("Unspecified", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static IEnumerable<string> SplitJapaneseKeywordToken(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            yield break;
-        }
-
-        yield return token;
-
-        foreach (var part in JapaneseKeywordParticleRegex()
-            .Split(token)
-            .Select(NormalizeKeywordCandidate)
-            .Where(static part => part.Length >= 2))
-        {
-            yield return part;
-        }
-    }
-
-    private static string NormalizeKeywordCandidate(string keyword)
-    {
-        var normalized = StripSourceReferences(keyword).Trim().TrimEnd('\u3002', '.', ',');
-        foreach (var prefix in new[] { "この", "その", "あの" })
-        {
-            if (normalized.StartsWith(prefix, StringComparison.Ordinal) && normalized.Length > prefix.Length + 1)
-            {
-                normalized = normalized[prefix.Length..];
-                break;
-            }
-        }
-
-        return normalized;
-    }
-
-    private static bool IsUsefulKeyword(string keyword, IReadOnlySet<string> sourceSentenceKeys)
-    {
-        var normalized = NormalizeKeywordCandidate(keyword);
-        if (normalized.Length < 2)
-        {
-            return false;
-        }
-
-        if (sourceSentenceKeys.Contains(NormalizeKeywordComparisonKey(normalized)))
-        {
-            return false;
-        }
-
-        return normalized.Length <= 28 &&
-            CountJapaneseParticles(normalized) <= 1 &&
-            !normalized.Contains("です", StringComparison.Ordinal) &&
-            !normalized.Contains("ます", StringComparison.Ordinal);
-    }
-
-    private static string NormalizeKeywordComparisonKey(string text)
-    {
-        return StripSourceReferences(text)
-            .Trim()
-            .TrimStart('-', '*')
-            .Trim()
-            .TrimEnd('\u3002', '.', ',');
-    }
-
-    private static int CountJapaneseParticles(string text)
-    {
-        string[] particles = ["は", "が", "を", "に", "で", "と", "も", "へ", "から", "まで", "より"];
-        return particles.Count(particle => text.Contains(particle, StringComparison.Ordinal));
-    }
-
-    private static string StripSourceReferences(string text)
-    {
-        var withoutSegmentRefs = SourceReferenceRegex().Replace(text ?? string.Empty, string.Empty);
-        var withoutEmphasis = BoldMarkdownRegex().Replace(withoutSegmentRefs, "$1");
-        return string.Join(" ", withoutEmphasis.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).Trim();
-    }
-
-    [GeneratedRegex(@"\s*(?:[\(\uFF08]\s*\[?\s*(?:segment_id:\s*)?\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\]?\s*[\)\uFF09]|\u3010\s*\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\u3011|\[\s*\d+(?:\s*(?:,|-|\u2011|\u2013|\u2014|\u3001|\uFF5E|~)\s*\d+)*\s*\])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex SourceReferenceRegex();
-
-    [GeneratedRegex(@"\*\*([^*]+)\*\*", RegexOptions.CultureInvariant)]
-    private static partial Regex BoldMarkdownRegex();
-
-    [GeneratedRegex("(?:には|では|から|まで|より|という|って|は|が|を|に|で|と|も|へ|の)", RegexOptions.CultureInvariant)]
-    private static partial Regex JapaneseKeywordParticleRegex();
-
     private static string BuildFallbackChunkSummary(TranscriptSummaryChunk chunk)
     {
         return $"""
@@ -900,14 +584,8 @@ public sealed partial class TranscriptSummaryService(
 
             ## 主な内容
 
-            {TrimForSummary(chunk.Content, 1000)}
+            {SummaryTextNormalizer.TrimForSummary(chunk.Content, 1000)}
             """;
-    }
-
-    private static string TrimForSummary(string text, int maxLength)
-    {
-        var normalized = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return normalized.Length <= maxLength ? normalized : normalized[..maxLength] + "...";
     }
 
     private static bool IsUnexpectedlyShort(
