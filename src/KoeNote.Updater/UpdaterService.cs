@@ -41,9 +41,12 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             ],
             cancellationToken);
 
-        if (installExitCode is not MsiSuccess and not MsiSuccessRebootRequired)
+        if (installExitCode != MsiSuccess)
         {
-            return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec exited with code {installExitCode}.");
+            var failureMessage = installExitCode == MsiSuccessRebootRequired
+                ? "msiexec exited with code 3010. Windows reported that a restart is required to complete installation, so KoeNote was not relaunched."
+                : $"msiexec exited with code {installExitCode}.";
+            return WriteResult(UpdaterExitCode.InstallFailed, options, failureMessage);
         }
 
         var relaunched = await TryStartAsync(options, cancellationToken);
@@ -52,10 +55,7 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.RelaunchFailed, options, "The updated KoeNote executable could not be relaunched.");
         }
 
-        var message = installExitCode == MsiSuccessRebootRequired
-            ? "Update installed and KoeNote relaunched. Windows reported that a restart is required to complete installation."
-            : "Update installed and KoeNote relaunched.";
-        return WriteResult(UpdaterExitCode.Success, options, message);
+        return WriteResult(UpdaterExitCode.Success, options, "Update installed and KoeNote relaunched.");
     }
 
     private static bool VerifyInstaller(string path, string expectedSha256)

@@ -136,6 +136,11 @@ public sealed partial class MainWindowViewModel
         {
             var result = await _updateCheckService.CheckAsync();
             RecordUpdateHistory("check_startup_completed", result.CurrentVersion, result.Message);
+            if (_hasPendingUpdateInstallerResult)
+            {
+                return;
+            }
+
             ApplyUpdateCheckResult(result, showUpToDate: false);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
@@ -266,6 +271,43 @@ public sealed partial class MainWindowViewModel
     private bool CanDownloadUpdate()
     {
         return _availableUpdate is not null && !IsUpdateDownloadInProgress && !HasVerifiedUpdateInstaller;
+    }
+
+    private void SurfacePendingUpdateResult()
+    {
+        var result = _updateResultService.ConsumeLatestResult();
+        if (result is null)
+        {
+            return;
+        }
+
+        _hasPendingUpdateInstallerResult = true;
+        var version = string.IsNullOrWhiteSpace(result.Version) ? null : result.Version;
+        if (result.ExitCode == 0)
+        {
+            UpdateNotificationTitle = string.IsNullOrWhiteSpace(version)
+                ? "Update completed"
+                : $"Update completed: KoeNote {version}";
+            UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
+            LatestLog = $"Update completed: {result.Message}";
+            RecordUpdateHistory("install_completed", version, result.Message, result.InstallerPath);
+            return;
+        }
+
+        UpdateNotificationTitle = "Update failed";
+        UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
+        LatestLog = $"Update failed: {result.Message}";
+        RecordUpdateHistory("install_failed", version, result.Message, result.InstallerPath);
+    }
+
+    private static string FormatUpdateInstallerResultMessage(UpdateInstallerResult result)
+    {
+        var message = string.IsNullOrWhiteSpace(result.Message)
+            ? $"Updater helper exited with code {result.ExitCode}."
+            : result.Message;
+        return string.IsNullOrWhiteSpace(result.LogPath)
+            ? message
+            : $"{message} Installer log: {result.LogPath}";
     }
 
     private bool CanUpdateAndRestart()

@@ -582,6 +582,36 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
         Assert.True(shutdownRequested);
     }
 
+    [Fact]
+    public void Constructor_SurfacesPendingUpdaterFailureResult()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        var resultPath = Path.Combine(paths.UpdateDownloads, "KoeNote-update-0.20.0.result.json");
+        File.WriteAllText(resultPath, """
+            {
+              "Status": "InstallFailed",
+              "ExitCode": 20,
+              "Version": "0.20.0",
+              "InstallerPath": "KoeNote.msi",
+              "TargetExePath": "KoeNote.App.exe",
+              "LogPath": "install.log",
+              "CompletedAt": "2026-06-18T00:00:00Z",
+              "Message": "msiexec exited with code 3010. Windows reported that a restart is required."
+            }
+            """);
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("Update failed", viewModel.UpdateNotificationTitle);
+        Assert.Contains("3010", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+        Assert.Contains("install.log", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+        Assert.Contains("Update failed", viewModel.LatestLog, StringComparison.Ordinal);
+        Assert.False(File.Exists(resultPath));
+        Assert.True(File.Exists(resultPath + ".seen"));
+    }
+
     private static LatestReleaseInfo CreateUpdateRelease()
     {
         return new LatestReleaseInfo(

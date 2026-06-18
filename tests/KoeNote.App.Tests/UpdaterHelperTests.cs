@@ -88,7 +88,7 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_TreatsRebootRequiredExitCodeAsSuccess()
+    public async Task ExecuteAsync_ReportsRebootRequiredWithoutRelaunching()
     {
         var root = CreateTempRoot();
         var msiPath = Path.Combine(root, "KoeNote.msi");
@@ -108,9 +108,12 @@ public sealed class UpdaterHelperTests
 
         var exitCode = await service.ExecuteAsync(options);
 
-        Assert.Equal(UpdaterExitCode.Success, exitCode);
-        Assert.Equal(targetExe, runner.Starts.Single());
-        Assert.Contains("restart is required", ReadResult(options.ResultPath).Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(UpdaterExitCode.InstallFailed, exitCode);
+        Assert.Empty(runner.Starts);
+        var result = ReadResult(options.ResultPath);
+        Assert.Equal((int)UpdaterExitCode.InstallFailed, result.ExitCode);
+        Assert.Contains("3010", result.Message, StringComparison.Ordinal);
+        Assert.Contains("restart is required", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
