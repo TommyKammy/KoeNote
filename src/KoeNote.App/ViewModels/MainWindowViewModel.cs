@@ -1531,7 +1531,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public string JobCountSummary => $"合計 {Jobs.Count} 件のジョブ";
 
-    public string DeletedJobCountSummary => $"履歴 {DeletedJobs.Count} 件 / {FormatByteSize(DeletedJobs.Sum(static job => job.StorageBytes))}";
+    public string DeletedJobCountSummary => $"履歴 {DeletedJobs.Count} 件 / {JobPlaybackPresenter.FormatByteSize(DeletedJobs.Sum(static job => job.StorageBytes))}";
 
     public string JobSearchText
     {
@@ -1914,7 +1914,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string PlaybackVolumeIcon => PlaybackVolume <= 0.001 ? "\uE74F" : "\uE767";
 
     public string PlaybackTimeDisplay =>
-        $"{FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackPositionSeconds))} / {FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackDurationSeconds))}";
+        $"{JobPlaybackPresenter.FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackPositionSeconds))} / {JobPlaybackPresenter.FormatPlaybackTime(TimeSpan.FromSeconds(PlaybackDurationSeconds))}";
 
     public bool IsReviewOperationInProgress
     {

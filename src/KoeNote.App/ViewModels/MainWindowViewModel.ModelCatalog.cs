@@ -268,7 +268,7 @@ public sealed partial class MainWindowViewModel
         {
             var result = _modelInstallService.DeleteModelFiles(entry.ModelId);
             var deletedDownloadJobs = _modelDownloadJobRepository.DeleteForModel(entry.ModelId);
-            LatestLog = $"Deleted model files: {entry.DisplayName} ({FormatByteSize(result.DeletedBytes)}, download records {deletedDownloadJobs})";
+            LatestLog = $"Deleted model files: {entry.DisplayName} ({JobPlaybackPresenter.FormatByteSize(result.DeletedBytes)}, download records {deletedDownloadJobs})";
             RefreshModelCatalog();
         }
         catch (InvalidOperationException exception)
