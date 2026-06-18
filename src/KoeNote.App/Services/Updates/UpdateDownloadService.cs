@@ -44,6 +44,19 @@ public sealed class UpdateDownloadService(
         var fileName = GetSafeMsiFileName(release);
         var finalPath = Path.Combine(paths.UpdateDownloads, fileName);
         var tempPath = finalPath + ".download";
+        if (File.Exists(finalPath))
+        {
+            var cachedHash = (await ComputeSha256Async(finalPath, cancellationToken)).ToLowerInvariant();
+            if (string.Equals(cachedHash, release.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                var cachedLength = new FileInfo(finalPath).Length;
+                progress?.Report(new UpdateDownloadProgress(cachedLength, cachedLength));
+                return new UpdateDownloadResult(finalPath, cachedHash, cachedLength, DateTimeOffset.Now);
+            }
+
+            File.Delete(finalPath);
+        }
+
         if (File.Exists(tempPath))
         {
             File.Delete(tempPath);

@@ -589,6 +589,70 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task CheckForUpdatesAsync_StartsBackgroundDownloadAndMarksInstallerReady()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var release = CreateUpdateRelease();
+        var downloadService = new RecordingUpdateDownloadService(installerPath, release.Sha256);
+        SetPrivateField(viewModel, "_updateDownloadService", downloadService);
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                release,
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+
+        for (var i = 0; i < 20 && !viewModel.HasVerifiedUpdateInstaller; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(1, downloadService.DownloadCount);
+        Assert.Equal(installerPath, viewModel.VerifiedUpdateInstallerPath);
+        Assert.Equal("Ready to update and restart: KoeNote 0.15.0", viewModel.UpdateNotificationTitle);
+        Assert.False(viewModel.CanShowUpdateDownloadAction);
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_BackgroundDownloadFailureKeepsManualRetryAvailable()
+    {
+        var viewModel = CreateViewModel();
+        var release = CreateUpdateRelease();
+        SetPrivateField(viewModel, "_updateDownloadService", new ThrowingUpdateDownloadService());
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                release,
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+
+        for (var i = 0; i < 20 && viewModel.IsUpdateDownloadInProgress; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal("Update download failed", viewModel.UpdateNotificationTitle);
+        Assert.Contains("download unavailable", viewModel.UpdateNotificationMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.CanShowUpdateDownloadAction);
+        Assert.True(viewModel.DownloadUpdateCommand.CanExecute(null));
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Constructor_SurfacesPendingUpdaterFailureResult()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -715,6 +779,17 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
                 sha256,
                 10,
                 DateTimeOffset.Now));
+        }
+    }
+
+    private sealed class ThrowingUpdateDownloadService : IUpdateDownloadService
+    {
+        public Task<UpdateDownloadResult> DownloadAndVerifyAsync(
+            LatestReleaseInfo release,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("download unavailable");
         }
     }
 

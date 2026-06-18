@@ -26,6 +26,29 @@ public sealed class UpdateDownloadServiceTests
     }
 
     [Fact]
+    public async Task DownloadAndVerifyAsync_ReusesExistingVerifiedInstaller()
+    {
+        var payload = "cached-msi-bytes"u8.ToArray();
+        var release = CreateRelease(payload);
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        Directory.CreateDirectory(paths.UpdateDownloads);
+        var installerPath = Path.Combine(paths.UpdateDownloads, "KoeNote-v0.14.0-win-x64.msi");
+        await File.WriteAllBytesAsync(installerPath, payload);
+        var service = new UpdateDownloadService(new HttpClient(new ThrowingHandler()), paths);
+        var progressItems = new List<UpdateDownloadProgress>();
+        var progress = new RecordingProgress(progressItems);
+
+        var result = await service.DownloadAndVerifyAsync(release, progress);
+
+        Assert.Equal(installerPath, result.FilePath);
+        Assert.Equal(release.Sha256, result.Sha256);
+        Assert.Equal(payload.Length, result.BytesDownloaded);
+        Assert.NotEmpty(progressItems);
+        Assert.Equal(payload.Length, progressItems[^1].BytesDownloaded);
+    }
+
+    [Fact]
     public async Task DownloadAndVerifyAsync_DeletesTempFileWhenSha256DoesNotMatch()
     {
         var payload = "tampered-msi-bytes"u8.ToArray();
@@ -132,6 +155,22 @@ public sealed class UpdateDownloadServiceTests
             };
             response.Content.Headers.ContentLength = payload.Length;
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class ThrowingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("HTTP should not be used for cached installers.");
+        }
+    }
+
+    private sealed class RecordingProgress(List<UpdateDownloadProgress> items) : IProgress<UpdateDownloadProgress>
+    {
+        public void Report(UpdateDownloadProgress value)
+        {
+            items.Add(value);
         }
     }
 

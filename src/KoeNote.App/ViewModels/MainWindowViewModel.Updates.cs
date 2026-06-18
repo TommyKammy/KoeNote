@@ -140,6 +140,10 @@ public sealed partial class MainWindowViewModel
                 result,
                 showUpToDate: false,
                 preserveExistingNotification: _hasPendingUpdateInstallerResult);
+            if (!_hasPendingUpdateInstallerResult && HasDownloadableUpdate(result))
+            {
+                StartBackgroundUpdateDownloadIfEligible();
+            }
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
@@ -163,6 +167,10 @@ public sealed partial class MainWindowViewModel
             var result = await _updateCheckService.CheckAsync();
             RecordUpdateHistory("check_completed", result.CurrentVersion, result.Message, result.LatestRelease);
             ApplyUpdateCheckResult(result, showUpToDate: true);
+            if (HasDownloadableUpdate(result))
+            {
+                StartBackgroundUpdateDownloadIfEligible();
+            }
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
@@ -225,7 +233,7 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task DownloadUpdateAsync()
+    private async Task DownloadUpdateAsync(bool isBackground = false)
     {
         if (_availableUpdate is null || IsUpdateDownloadInProgress)
         {
@@ -235,8 +243,20 @@ public sealed partial class MainWindowViewModel
         IsUpdateDownloadInProgress = true;
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = "Downloading update...";
-        LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update...";
-        RecordUpdateHistory("download_started", _availableUpdate.Version, "Update download started.");
+        if (isBackground)
+        {
+            UpdateNotificationMessage = "Downloading the update in the background. You can continue working until it is ready to restart.";
+            LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update in the background...";
+        }
+        else
+        {
+            LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update...";
+        }
+
+        RecordUpdateHistory(
+            isBackground ? "download_background_started" : "download_started",
+            _availableUpdate.Version,
+            isBackground ? "Background update download started." : "Update download started.");
         try
         {
             var progress = new Progress<UpdateDownloadProgress>(downloadProgress =>
@@ -266,9 +286,35 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private void StartBackgroundUpdateDownloadIfEligible()
+    {
+        if (_availableUpdate is null ||
+            IsUpdateDownloadInProgress ||
+            HasVerifiedUpdateInstaller ||
+            IsBackgroundUpdateDownloadDisabled())
+        {
+            return;
+        }
+
+        _ = DownloadUpdateAsync(isBackground: true);
+    }
+
+    private static bool HasDownloadableUpdate(UpdateCheckResult result)
+    {
+        return result.IsConfigured && result.IsUpdateAvailable && result.LatestRelease is not null;
+    }
+
     private bool CanDownloadUpdate()
     {
         return _availableUpdate is not null && !IsUpdateDownloadInProgress && !HasVerifiedUpdateInstaller;
+    }
+
+    private static bool IsBackgroundUpdateDownloadDisabled()
+    {
+        var value = Environment.GetEnvironmentVariable("KOENOTE_DISABLE_BACKGROUND_UPDATE_DOWNLOAD");
+        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
     }
 
     private void SurfacePendingUpdateResult()
