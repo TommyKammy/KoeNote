@@ -56,6 +56,7 @@ public sealed class AppPaths
         DefaultModelStorageRoot = InstallScope == InstallScope.AllUsers ? MachineModels : UserModels;
         ModelDownloads = Path.Combine(localAppData, "KoeNote", "model-downloads");
         UpdateDownloads = Path.Combine(localAppData, "KoeNote", "updates");
+        UpdateLogs = Path.Combine(UpdateDownloads, "logs");
         UpdateHistoryPath = Path.Combine(UpdateDownloads, "history.jsonl");
         GpuRuntimes = Path.Combine(localAppData, "KoeNote", "runtimes", "gpu");
         UserDocumentsKoeNoteDirectory = Path.Combine(documents, "KoeNote");
@@ -118,6 +119,8 @@ public sealed class AppPaths
     public string ModelDownloads { get; }
 
     public string UpdateDownloads { get; }
+
+    public string UpdateLogs { get; }
 
     public string UpdateHistoryPath { get; }
 
@@ -197,6 +200,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(UserModels);
         Directory.CreateDirectory(ModelDownloads);
         Directory.CreateDirectory(UpdateDownloads);
+        Directory.CreateDirectory(UpdateLogs);
         Directory.CreateDirectory(GpuRuntimes);
         Directory.CreateDirectory(PythonPackages);
         Directory.CreateDirectory(PythonEnvironments);

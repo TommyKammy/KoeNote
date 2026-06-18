@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.IO;
 using System.Security.Cryptography;
+using KoeNote.App.Services;
 
 namespace KoeNote.App.Services.Updates;
 
@@ -38,12 +39,14 @@ public sealed record UpdateInstallerLaunchOptions(
 public sealed class UpdateInstallerLauncher(
     Func<ProcessStartInfo, Process?>? startProcess = null,
     IUpdateInstallerSignatureVerifier? signatureVerifier = null,
-    UpdateInstallerLaunchOptions? options = null) : IUpdateInstallerLauncher
+    UpdateInstallerLaunchOptions? options = null,
+    AppPaths? paths = null) : IUpdateInstallerLauncher
 {
     private readonly Func<ProcessStartInfo, Process?> _startProcess = startProcess ?? Process.Start;
     private readonly IUpdateInstallerSignatureVerifier _signatureVerifier =
         signatureVerifier ?? new AuthenticodeUpdateInstallerSignatureVerifier();
     private readonly UpdateInstallerLaunchOptions _options = options ?? UpdateInstallerLaunchOptions.FromEnvironment();
+    private readonly AppPaths _paths = paths ?? new AppPaths();
 
     public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null, string? version = null)
     {
@@ -100,8 +103,8 @@ public sealed class UpdateInstallerLauncher(
         var installFolderPath = Path.GetDirectoryName(targetExePath)
             ?? throw new InvalidOperationException("KoeNote target executable path has no directory.");
         var parentProcessId = _options.ParentProcessId ?? Environment.ProcessId;
-        var logPath = CreateUpdateLogPath(fullPath, version, ".log");
-        var resultPath = CreateUpdateLogPath(fullPath, version, ".result.json");
+        var logPath = CreateUpdateArtifactPath(_paths.UpdateLogs, version, ".log");
+        var resultPath = CreateUpdateArtifactPath(_paths.UpdateDownloads, version, ".result.json");
 
         var startInfo = new ProcessStartInfo
         {
@@ -219,9 +222,9 @@ public sealed class UpdateInstallerLauncher(
             ?? Path.Combine(AppContext.BaseDirectory, "KoeNote.App.exe");
     }
 
-    private static string CreateUpdateLogPath(string installerPath, string? version, string extension)
+    private static string CreateUpdateArtifactPath(string directory, string? version, string extension)
     {
-        var directory = Path.GetDirectoryName(installerPath) ?? Path.GetTempPath();
+        Directory.CreateDirectory(directory);
         var safeVersion = string.Concat((string.IsNullOrWhiteSpace(version) ? "unknown" : version)
             .Select(static character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
         return Path.Combine(directory, $"KoeNote-update-{safeVersion}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}{extension}");

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Security.Cryptography;
+using KoeNote.App.Services;
 using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.Tests;
@@ -15,6 +16,7 @@ public sealed class UpdateInstallerLauncherTests
         var helperPath = Path.Combine(root, "app", "KoeNote.Updater.exe");
         var targetExePath = Path.Combine(root, "app", "KoeNote.App.exe");
         var helperWorkingRoot = Path.Combine(root, "helper-work");
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         Directory.CreateDirectory(root);
         Directory.CreateDirectory(Path.GetDirectoryName(helperPath)!);
         var payload = "msi";
@@ -34,7 +36,8 @@ public sealed class UpdateInstallerLauncherTests
                 TargetExePath: targetExePath,
                 HelperWorkingRoot: helperWorkingRoot,
                 ParentProcessId: 1234,
-                ParentExitTimeoutSeconds: 15));
+                ParentExitTimeoutSeconds: 15),
+            paths: paths);
 
         var result = launcher.Launch(installerPath, ComputeSha256(payload), "0.14.0");
 
@@ -61,7 +64,9 @@ public sealed class UpdateInstallerLauncherTests
         Assert.Contains("--parent-timeout-seconds", arguments);
         Assert.Contains("15", arguments);
         Assert.Contains("--log", arguments);
+        Assert.StartsWith(paths.UpdateLogs, arguments[Array.IndexOf(arguments, "--log") + 1], StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--result", arguments);
+        Assert.StartsWith(paths.UpdateDownloads, arguments[Array.IndexOf(arguments, "--result") + 1], StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--version", arguments);
         Assert.Contains("0.14.0", arguments);
         Assert.False(captured.UseShellExecute);
@@ -76,6 +81,7 @@ public sealed class UpdateInstallerLauncherTests
         var helperPath = Path.Combine(root, "app", "KoeNote.Updater.exe");
         var targetExePath = Path.Combine(root, "app", "KoeNote.App.exe");
         var helperWorkingRoot = Path.Combine(root, "helper-work");
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(helperPath)!);
         Directory.CreateDirectory(helperWorkingRoot);
         var oldHelperDirectory = Path.Combine(helperWorkingRoot, "old-helper");
@@ -94,7 +100,8 @@ public sealed class UpdateInstallerLauncherTests
                 RequireAuthenticodeSignature: false,
                 HelperPath: helperPath,
                 TargetExePath: targetExePath,
-                HelperWorkingRoot: helperWorkingRoot));
+                HelperWorkingRoot: helperWorkingRoot),
+            paths: paths);
 
         launcher.Launch(installerPath, ComputeSha256("msi"), "0.14.0");
 
@@ -194,13 +201,15 @@ public sealed class UpdateInstallerLauncherTests
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var installerPath = Path.Combine(root, "KoeNote-v0.14.0-win-x64.msi");
         var helperPath = CreateHelper(root);
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
         Directory.CreateDirectory(root);
         File.WriteAllText(installerPath, "msi");
         var verifier = new RecordingSignatureVerifier();
         var launcher = new UpdateInstallerLauncher(
             _ => new Process(),
             verifier,
-            new UpdateInstallerLaunchOptions(RequireAuthenticodeSignature: true, HelperPath: helperPath));
+            new UpdateInstallerLaunchOptions(RequireAuthenticodeSignature: true, HelperPath: helperPath),
+            paths: paths);
 
         var result = launcher.Launch(installerPath);
 

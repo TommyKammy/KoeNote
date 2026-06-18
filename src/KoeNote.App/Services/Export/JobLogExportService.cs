@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Diagnostics;
 using KoeNote.App.Services.Jobs;
@@ -140,6 +141,20 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
             }
         }
 
+        AppendHeader(builder, "Updater Helper Artifacts");
+        var updaterArtifacts = EnumerateUpdaterHelperArtifacts().ToArray();
+        if (updaterArtifacts.Length == 0)
+        {
+            builder.AppendLine("(no updater helper artifacts found)");
+        }
+        else
+        {
+            foreach (var artifact in updaterArtifacts)
+            {
+                builder.AppendLine(artifact);
+            }
+        }
+
         AppendHeader(builder, "Recent Crash Logs");
         var crashLogs = _crashLogService.ReadRecentCrashLogs();
         if (crashLogs.Count == 0)
@@ -157,7 +172,7 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
         }
 
         builder.AppendLine();
-        builder.AppendLine("Note: This report lists packaged diagnostic log paths, job events, and recent crash logs. Raw transcript, prompt, and worker-output contents are not embedded.");
+        builder.AppendLine("Note: This report lists packaged diagnostic log paths, updater helper artifact references, job events, and recent crash logs. Raw transcript, prompt, installer log, and worker-output contents are not embedded.");
         return builder.ToString();
     }
 
@@ -185,6 +200,38 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
                     CreateZipEntryName("crash-logs", Path.GetFileName(file)));
             }
         }
+    }
+
+    private IEnumerable<string> EnumerateUpdaterHelperArtifacts()
+    {
+        if (Directory.Exists(paths.UpdateDownloads))
+        {
+            foreach (var file in EnumerateUpdaterResultFiles()
+                         .OrderByDescending(File.GetLastWriteTimeUtc)
+                         .Take(10))
+            {
+                yield return FormatUpdaterResultArtifact(file);
+            }
+        }
+
+        if (Directory.Exists(paths.UpdateLogs))
+        {
+            foreach (var file in Directory.EnumerateFiles(paths.UpdateLogs, "*.log", SearchOption.TopDirectoryOnly)
+                         .OrderByDescending(File.GetLastWriteTimeUtc)
+                         .Take(10))
+            {
+                var info = new FileInfo(file);
+                yield return $"Log\tName={info.Name}\tLastWriteUtc={info.LastWriteTimeUtc:o}\tSizeBytes={info.Length}\tPath={info.FullName}";
+            }
+        }
+    }
+
+    private IEnumerable<string> EnumerateUpdaterResultFiles()
+    {
+        return Directory.EnumerateFiles(paths.UpdateDownloads, "*", SearchOption.TopDirectoryOnly)
+            .Where(static file => file.EndsWith(".result.json", StringComparison.OrdinalIgnoreCase) ||
+                file.EndsWith(".result.json.seen", StringComparison.OrdinalIgnoreCase) ||
+                file.EndsWith(".result.json.invalid", StringComparison.OrdinalIgnoreCase));
     }
 
     private IEnumerable<string> EnumerateRuntimeBackendSignals(string jobId)
@@ -220,6 +267,38 @@ public sealed class JobLogExportService(AppPaths paths, JobLogRepository jobLogR
         }
 
         return null;
+    }
+
+    private static string FormatUpdaterResultArtifact(string path)
+    {
+        var info = new FileInfo(path);
+        var marker = path.EndsWith(".seen", StringComparison.OrdinalIgnoreCase)
+            ? "seen"
+            : path.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase)
+                ? "invalid"
+                : "pending";
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            return $"Result\tMarker={marker}\tStatus={GetJsonString(root, "Status")}\tVersion={GetJsonString(root, "Version")}\tExitCode={GetJsonInt(root, "ExitCode")}\tCompletedAt={GetJsonString(root, "CompletedAt")}\tLogPath={GetJsonString(root, "LogPath")}\tPath={info.FullName}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return $"Result\tMarker={marker}\tStatus=unreadable\tLastWriteUtc={info.LastWriteTimeUtc:o}\tSizeBytes={info.Length}\tPath={info.FullName}";
+        }
+    }
+
+    private static string GetJsonString(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) ? property.ToString() : "";
+    }
+
+    private static string GetJsonInt(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value)
+            ? value.ToString(CultureInfo.InvariantCulture)
+            : "";
     }
 
     private static void AddTextEntry(ZipArchive archive, string entryName, string content)

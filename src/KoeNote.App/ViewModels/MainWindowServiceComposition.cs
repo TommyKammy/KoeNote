@@ -71,7 +71,7 @@ internal static class MainWindowRuntimeComposition
             new DatabaseMaintenanceService(paths),
             new UpdateCheckService(updateHttpClient, UpdateCheckOptions.FromEnvironment()),
             new UpdateDownloadService(updateHttpClient, paths),
-            new UpdateInstallerLauncher(),
+            new UpdateInstallerLauncher(paths: paths),
             new UpdateResultService(paths),
             new UpdateHistoryService(paths));
     }

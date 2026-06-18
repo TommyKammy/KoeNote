@@ -393,10 +393,17 @@ public sealed partial class MainWindowViewModel
         {
             UpdateNotificationTitle = string.IsNullOrWhiteSpace(version)
                 ? FormatSuccessfulUpdateInstallerTitle(result)
-                : $"{FormatSuccessfulUpdateInstallerTitle(result)}: KoeNote {version}";
+                : FormatSuccessfulUpdateInstallerTitle(result, version);
             UpdateNotificationMessage = FormatUpdateInstallerResultMessage(result);
             LatestLog = $"Update completed: {result.Message}";
             RecordUpdateHistory("install_completed", version, result.Message, result.InstallerPath);
+            RecordUpdateHistory(
+                string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase)
+                    ? "relaunch_pending_reboot"
+                    : "relaunch_completed",
+                version,
+                result.Message,
+                result.TargetExePath);
             return;
         }
 
@@ -427,6 +434,19 @@ public sealed partial class MainWindowViewModel
         return string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase)
             ? "Restart required to complete update"
             : "Update completed";
+    }
+
+    private static string FormatSuccessfulUpdateInstallerTitle(UpdateInstallerResult result, string version)
+    {
+        if (string.Equals(result.Status, "PendingReboot", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Restart required to complete update: KoeNote {version}";
+        }
+
+        var versionLabel = version.StartsWith("v", StringComparison.OrdinalIgnoreCase)
+            ? version
+            : "v" + version;
+        return $"KoeNote updated to {versionLabel}";
     }
 
     private bool CanUpdateAndRestart()
