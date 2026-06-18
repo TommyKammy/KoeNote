@@ -85,6 +85,29 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ReportsRelaunchFailureWhenStartThrows()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            Path.Combine(root, "missing", "KoeNote.App.exe"),
+            0,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var runner = new RecordingUpdaterProcessRunner { ThrowOnStart = true };
+        var service = new UpdaterService(runner);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.RelaunchFailed, exitCode);
+        Assert.Equal((int)UpdaterExitCode.RelaunchFailed, ReadResult(options.ResultPath).ExitCode);
+    }
+
+    [Fact]
     public void Parse_RequiresValidArgumentsAndDefaultsResultPath()
     {
         var options = UpdaterOptions.Parse([
@@ -131,6 +154,8 @@ public sealed class UpdaterHelperTests
     {
         public int InstallExitCode { get; init; }
 
+        public bool ThrowOnStart { get; init; }
+
         public List<int> WaitedProcessIds { get; } = [];
 
         public List<RunCapture> Runs { get; } = [];
@@ -151,6 +176,11 @@ public sealed class UpdaterHelperTests
 
         public Task<bool> StartAsync(string fileName, CancellationToken cancellationToken)
         {
+            if (ThrowOnStart)
+            {
+                throw new InvalidOperationException("Could not start.");
+            }
+
             Starts.Add(fileName);
             return Task.FromResult(true);
         }

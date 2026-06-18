@@ -81,22 +81,29 @@
 
   <Target Name="CopyUpdaterHelper" AfterTargets="Build">
     <ItemGroup>
-      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.*" />
+      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\KoeNote.Updater.*"
+                           Condition="'$(RuntimeIdentifier)' == ''" />
+      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\KoeNote.Updater.*"
+                           Condition="'$(RuntimeIdentifier)' != ''" />
     </ItemGroup>
     <Copy SourceFiles="@(UpdaterHelperOutput)"
           DestinationFolder="$(TargetDir)"
           SkipUnchangedFiles="true"
-          Condition="Exists('..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.exe')" />
+          Condition="'@(UpdaterHelperOutput)' != ''" />
   </Target>
 
   <Target Name="CopyUpdaterHelperToPublish" AfterTargets="Publish">
-    <ItemGroup>
-      <UpdaterHelperPublishOutput Include="..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.*" />
+    <MSBuild Projects="..\KoeNote.Updater\KoeNote.Updater.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=true;PublishTrimmed=false;PublishReadyToRun=false;PublishDir=$(PublishDir)"
+             Condition="'$(RuntimeIdentifier)' != ''" />
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == ''">
+      <UpdaterHelperPublishOutput Include="..\KoeNote.Updater\bin\$(Configuration)\$(TargetFramework)\KoeNote.Updater.*" />
     </ItemGroup>
     <Copy SourceFiles="@(UpdaterHelperPublishOutput)"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true"
-          Condition="Exists('..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.exe')" />
+          Condition="'$(RuntimeIdentifier)' == '' And '@(UpdaterHelperPublishOutput)' != ''" />
   </Target>
 
   <Target Name="CopyLocalRuntimeTools" AfterTargets="Build">

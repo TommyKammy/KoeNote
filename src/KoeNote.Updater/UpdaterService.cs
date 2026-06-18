@@ -35,7 +35,7 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
             return WriteResult(UpdaterExitCode.InstallFailed, options, $"msiexec exited with code {installExitCode}.");
         }
 
-        var relaunched = await processRunner.StartAsync(options.TargetExePath, cancellationToken);
+        var relaunched = await TryStartAsync(options, cancellationToken);
         if (!relaunched)
         {
             return WriteResult(UpdaterExitCode.RelaunchFailed, options, "The updated KoeNote executable could not be relaunched.");
@@ -60,5 +60,17 @@ public sealed class UpdaterService(IUpdaterProcessRunner processRunner)
     {
         UpdaterResult.Write(options.ResultPath, UpdaterResult.From(exitCode, options, message));
         return exitCode;
+    }
+
+    private async Task<bool> TryStartAsync(UpdaterOptions options, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await processRunner.StartAsync(options.TargetExePath, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 }

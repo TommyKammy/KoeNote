@@ -282,7 +282,10 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var result = _updateInstallerLauncher.Launch(VerifiedUpdateInstallerPath, _availableUpdate?.Sha256);
+            var result = _updateInstallerLauncher.Launch(
+                VerifiedUpdateInstallerPath,
+                _availableUpdate?.Sha256,
+                AvailableUpdateVersion);
             ClearVerifiedUpdateInstallerState();
             UpdateDownloadProgressText = $"Update and restart started: {result.InstallerPath}";
             UpdateNotificationTitle = "Update and restart started";

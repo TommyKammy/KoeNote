@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 
 namespace KoeNote.Updater;
 
@@ -44,14 +45,21 @@ public sealed class SystemUpdaterProcessRunner : IUpdaterProcessRunner
     public Task<bool> StartAsync(string fileName, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var startInfo = new ProcessStartInfo
+        try
         {
-            FileName = fileName,
-            UseShellExecute = true,
-            WorkingDirectory = Path.GetDirectoryName(fileName) ?? string.Empty
-        };
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(fileName) ?? string.Empty
+            };
 
-        using var process = Process.Start(startInfo);
-        return Task.FromResult(process is not null);
+            using var process = Process.Start(startInfo);
+            return Task.FromResult(process is not null);
+        }
+        catch (Exception exception) when (exception is Win32Exception or FileNotFoundException or InvalidOperationException)
+        {
+            return Task.FromResult(false);
+        }
     }
 }

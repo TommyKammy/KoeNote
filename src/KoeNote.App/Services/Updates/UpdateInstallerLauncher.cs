@@ -13,10 +13,15 @@ public sealed record UpdateInstallerLaunchResult(
 
 public interface IUpdateInstallerLauncher
 {
-    UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null);
+    UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null, string? version = null);
 }
 
-public sealed record UpdateInstallerLaunchOptions(bool RequireAuthenticodeSignature)
+public sealed record UpdateInstallerLaunchOptions(
+    bool RequireAuthenticodeSignature,
+    string? HelperPath = null,
+    string? TargetExePath = null,
+    string? HelperWorkingRoot = null,
+    int? ParentProcessId = null)
 {
     public static UpdateInstallerLaunchOptions FromEnvironment()
     {
@@ -39,7 +44,7 @@ public sealed class UpdateInstallerLauncher(
         signatureVerifier ?? new AuthenticodeUpdateInstallerSignatureVerifier();
     private readonly UpdateInstallerLaunchOptions _options = options ?? UpdateInstallerLaunchOptions.FromEnvironment();
 
-    public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null)
+    public UpdateInstallerLaunchResult Launch(string installerPath, string? expectedSha256 = null, string? version = null)
     {
         if (string.IsNullOrWhiteSpace(installerPath))
         {
@@ -57,6 +62,7 @@ public sealed class UpdateInstallerLauncher(
             throw new InvalidOperationException("Verified update installer must be an MSI file.");
         }
 
+        var verifiedSha256 = expectedSha256;
         if (!string.IsNullOrWhiteSpace(expectedSha256))
         {
             var actualSha256 = ComputeSha256(fullPath);
@@ -64,6 +70,10 @@ public sealed class UpdateInstallerLauncher(
             {
                 throw new InvalidOperationException("Verified update installer SHA256 no longer matches the release metadata.");
             }
+        }
+        else
+        {
+            verifiedSha256 = ComputeSha256(fullPath);
         }
 
         var trustDescription = "SHA256 verified download";
@@ -84,15 +94,48 @@ public sealed class UpdateInstallerLauncher(
             signatureVerified = true;
         }
 
+        var helperPath = CopyHelperToTemp();
+        var targetExePath = ResolveTargetExePath();
+        var parentProcessId = _options.ParentProcessId ?? Environment.ProcessId;
+        var logPath = CreateUpdateLogPath(fullPath, version, ".log");
+        var resultPath = CreateUpdateLogPath(fullPath, version, ".result.json");
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = "msiexec.exe",
-            UseShellExecute = false
+            FileName = helperPath,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
-        startInfo.ArgumentList.Add("/i");
+        startInfo.ArgumentList.Add("--msi");
         startInfo.ArgumentList.Add(fullPath);
+        startInfo.ArgumentList.Add("--sha256");
+        startInfo.ArgumentList.Add(verifiedSha256!);
+        startInfo.ArgumentList.Add("--target-exe");
+        startInfo.ArgumentList.Add(targetExePath);
+        startInfo.ArgumentList.Add("--parent-pid");
+        startInfo.ArgumentList.Add(parentProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("--log");
+        startInfo.ArgumentList.Add(logPath);
+        startInfo.ArgumentList.Add("--result");
+        startInfo.ArgumentList.Add(resultPath);
+        startInfo.ArgumentList.Add("--version");
+        startInfo.ArgumentList.Add(string.IsNullOrWhiteSpace(version) ? "unknown" : version);
 
-        _startProcess(startInfo);
+        Process? process;
+        try
+        {
+            process = _startProcess(startInfo);
+        }
+        catch (Win32Exception exception)
+        {
+            throw new InvalidOperationException($"KoeNote updater helper could not be started: {exception.Message}", exception);
+        }
+
+        if (process is null)
+        {
+            throw new InvalidOperationException("KoeNote updater helper could not be started.");
+        }
+
         return new UpdateInstallerLaunchResult(fullPath, DateTimeOffset.Now, trustDescription, signatureVerified);
     }
 
@@ -101,5 +144,53 @@ public sealed class UpdateInstallerLauncher(
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         var hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private string CopyHelperToTemp()
+    {
+        var sourcePath = Path.GetFullPath(_options.HelperPath ?? Path.Combine(AppContext.BaseDirectory, "KoeNote.Updater.exe"));
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException("KoeNote updater helper was not found.", sourcePath);
+        }
+
+        var workingRoot = Path.GetFullPath(_options.HelperWorkingRoot ?? Path.Combine(Path.GetTempPath(), "KoeNote", "updater-helper"));
+        var helperDirectory = Path.Combine(workingRoot, $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(helperDirectory);
+
+        var sourceDirectory = Path.GetDirectoryName(sourcePath)
+            ?? throw new InvalidOperationException("KoeNote updater helper path has no directory.");
+        var helperFilePrefix = Path.GetFileNameWithoutExtension(sourcePath);
+        foreach (var filePath in Directory.EnumerateFiles(sourceDirectory, $"{helperFilePrefix}.*"))
+        {
+            File.Copy(filePath, Path.Combine(helperDirectory, Path.GetFileName(filePath)), overwrite: true);
+        }
+
+        var copiedHelperPath = Path.Combine(helperDirectory, Path.GetFileName(sourcePath));
+        if (!File.Exists(copiedHelperPath))
+        {
+            throw new FileNotFoundException("KoeNote updater helper could not be copied to a temporary location.", copiedHelperPath);
+        }
+
+        return copiedHelperPath;
+    }
+
+    private string ResolveTargetExePath()
+    {
+        if (!string.IsNullOrWhiteSpace(_options.TargetExePath))
+        {
+            return Path.GetFullPath(_options.TargetExePath);
+        }
+
+        return Process.GetCurrentProcess().MainModule?.FileName
+            ?? Path.Combine(AppContext.BaseDirectory, "KoeNote.App.exe");
+    }
+
+    private static string CreateUpdateLogPath(string installerPath, string? version, string extension)
+    {
+        var directory = Path.GetDirectoryName(installerPath) ?? Path.GetTempPath();
+        var safeVersion = string.Concat((string.IsNullOrWhiteSpace(version) ? "unknown" : version)
+            .Select(static character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
+        return Path.Combine(directory, $"KoeNote-update-{safeVersion}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}{extension}");
     }
 }

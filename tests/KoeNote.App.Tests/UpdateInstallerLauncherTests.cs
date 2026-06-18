@@ -8,30 +8,58 @@ namespace KoeNote.App.Tests;
 public sealed class UpdateInstallerLauncherTests
 {
     [Fact]
-    public void Launch_StartsMsiexecWithSha256VerifiedInstallerPath()
+    public void Launch_StartsUpdaterHelperFromTemporaryCopyWithVerifiedInstallerMetadata()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var installerPath = Path.Combine(root, "KoeNote-v0.14.0-win-x64.msi");
+        var helperPath = Path.Combine(root, "app", "KoeNote.Updater.exe");
+        var targetExePath = Path.Combine(root, "app", "KoeNote.App.exe");
+        var helperWorkingRoot = Path.Combine(root, "helper-work");
         Directory.CreateDirectory(root);
+        Directory.CreateDirectory(Path.GetDirectoryName(helperPath)!);
         var payload = "msi";
         File.WriteAllText(installerPath, payload);
+        File.WriteAllText(helperPath, "helper");
+        File.WriteAllText(Path.ChangeExtension(helperPath, ".dll"), "helper dll");
         ProcessStartInfo? captured = null;
         var launcher = new UpdateInstallerLauncher(
             startInfo =>
             {
                 captured = startInfo;
-                return null;
-            });
+                return new Process();
+            },
+            options: new UpdateInstallerLaunchOptions(
+                RequireAuthenticodeSignature: false,
+                HelperPath: helperPath,
+                TargetExePath: targetExePath,
+                HelperWorkingRoot: helperWorkingRoot,
+                ParentProcessId: 1234));
 
-        var result = launcher.Launch(installerPath, ComputeSha256(payload));
+        var result = launcher.Launch(installerPath, ComputeSha256(payload), "0.14.0");
 
         Assert.Equal(Path.GetFullPath(installerPath), result.InstallerPath);
         Assert.Equal("SHA256 verified download", result.TrustDescription);
         Assert.False(result.SignatureVerified);
         Assert.NotNull(captured);
-        Assert.Equal("msiexec.exe", captured.FileName);
-        Assert.Equal(["/i", Path.GetFullPath(installerPath)], captured.ArgumentList.ToArray());
+        Assert.NotEqual(Path.GetFullPath(helperPath), captured.FileName);
+        Assert.StartsWith(Path.GetFullPath(helperWorkingRoot), captured.FileName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("KoeNote.Updater.exe", Path.GetFileName(captured.FileName));
+        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(captured.FileName)!, "KoeNote.Updater.dll")));
+        var arguments = captured.ArgumentList.ToArray();
+        Assert.Contains("--msi", arguments);
+        Assert.Contains(Path.GetFullPath(installerPath), arguments);
+        Assert.Contains("--sha256", arguments);
+        Assert.Contains(ComputeSha256(payload), arguments);
+        Assert.Contains("--target-exe", arguments);
+        Assert.Contains(Path.GetFullPath(targetExePath), arguments);
+        Assert.Contains("--parent-pid", arguments);
+        Assert.Contains("1234", arguments);
+        Assert.Contains("--log", arguments);
+        Assert.Contains("--result", arguments);
+        Assert.Contains("--version", arguments);
+        Assert.Contains("0.14.0", arguments);
         Assert.False(captured.UseShellExecute);
+        Assert.True(captured.CreateNoWindow);
     }
 
     [Fact]
@@ -66,7 +94,7 @@ public sealed class UpdateInstallerLauncherTests
             _ =>
             {
                 started = true;
-                return null;
+                return new Process();
             },
             options: new UpdateInstallerLaunchOptions(RequireAuthenticodeSignature: false));
 
@@ -122,13 +150,14 @@ public sealed class UpdateInstallerLauncherTests
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
         var installerPath = Path.Combine(root, "KoeNote-v0.14.0-win-x64.msi");
+        var helperPath = CreateHelper(root);
         Directory.CreateDirectory(root);
         File.WriteAllText(installerPath, "msi");
         var verifier = new RecordingSignatureVerifier();
         var launcher = new UpdateInstallerLauncher(
-            _ => null,
+            _ => new Process(),
             verifier,
-            new UpdateInstallerLaunchOptions(RequireAuthenticodeSignature: true));
+            new UpdateInstallerLaunchOptions(RequireAuthenticodeSignature: true, HelperPath: helperPath));
 
         var result = launcher.Launch(installerPath);
 
@@ -167,5 +196,13 @@ public sealed class UpdateInstallerLauncherTests
     private static string ComputeSha256(string payload)
     {
         return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+    }
+
+    private static string CreateHelper(string root)
+    {
+        var helperPath = Path.Combine(root, "app", "KoeNote.Updater.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(helperPath)!);
+        File.WriteAllText(helperPath, "helper");
+        return helperPath;
     }
 }
