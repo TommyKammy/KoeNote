@@ -342,7 +342,7 @@ public sealed class ScriptedJsonAsrEngineTests
         File.WriteAllText(audioPath, "");
         Directory.CreateDirectory(modelPath);
         var runner = new CapturingAsrProcessRunner();
-        var engine = CreateEngine(paths, runner);
+        var engine = CreateEngine(paths, runner, sourceName: "faster-whisper");
 
         await engine.TranscribeAsync(
             new AsrInput("job-001", audioPath),
@@ -383,6 +383,35 @@ public sealed class ScriptedJsonAsrEngineTests
     }
 
     [Fact]
+    public async Task TranscribeAsync_ReazonSpeechWorker_DoesNotPassFasterWhisperDiarizationArgument()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var scriptPath = Path.Combine(paths.Root, "reazonspeech_k2_transcribe.py");
+        var audioPath = Path.Combine(paths.Root, "audio.wav");
+        var modelPath = Path.Combine(paths.Root, "model");
+        File.WriteAllText(scriptPath, "print('ok')");
+        File.WriteAllText(audioPath, "");
+        Directory.CreateDirectory(modelPath);
+        var runner = new CapturingAsrProcessRunner();
+        var engine = CreateEngine(paths, runner, sourceName: "reazonspeech-k2");
+
+        await engine.TranscribeAsync(
+            new AsrInput("job-001", audioPath),
+            new AsrEngineConfig(
+                "python",
+                modelPath,
+                Path.Combine(paths.Jobs, "job-001", "asr"),
+                "reazonspeech-k2-v3",
+                scriptPath),
+            new AsrOptions());
+
+        Assert.NotNull(runner.Arguments);
+        Assert.DoesNotContain("--diarization", runner.Arguments);
+    }
+
+    [Fact]
     public async Task TranscribeAsync_ChunkedGpuAsr_SplitsWavAndOffsetsMergedSegments()
     {
         var paths = CreatePaths();
@@ -395,7 +424,7 @@ public sealed class ScriptedJsonAsrEngineTests
         WriteSilentPcmWav(audioPath, sampleRate: 10, durationSeconds: 2.4);
         Directory.CreateDirectory(modelPath);
         var runner = new ChunkedAsrProcessRunner();
-        var engine = CreateEngine(paths, runner);
+        var engine = CreateEngine(paths, runner, sourceName: "faster-whisper");
 
         var result = await engine.TranscribeAsync(
             new AsrInput("job-001", audioPath),
@@ -723,12 +752,15 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Equal(AsrFailureCategory.ProcessFailed, exception.Category);
     }
 
-    private static ScriptedJsonAsrEngine CreateEngine(AppPaths paths, ExternalProcessRunner? processRunner = null)
+    private static ScriptedJsonAsrEngine CreateEngine(
+        AppPaths paths,
+        ExternalProcessRunner? processRunner = null,
+        string sourceName = "scripted")
     {
         return new ScriptedJsonAsrEngine(
             "scripted-test",
             "Scripted test",
-            "scripted",
+            sourceName,
             processRunner ?? new ExternalProcessRunner(),
             new AsrJsonNormalizer(),
             new AsrResultStore(),
