@@ -289,7 +289,9 @@ public sealed partial class MainWindowViewModel
 
                 ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
                 ModelDownloadProgressStageText = "インストール中";
-                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -349,7 +351,9 @@ public sealed partial class MainWindowViewModel
                 {
                     ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
                     ModelDownloadProgressStageText = "インストール中";
-                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(cancellation.Token);
+                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
+                        cancellation.Token,
+                        CreateRuntimeInstallProgress(useDeterminateProgress: false));
                     RefreshSetupWizard();
                     if (!runtimeResult.IsSucceeded)
                     {
@@ -389,7 +393,9 @@ public sealed partial class MainWindowViewModel
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
                 ModelDownloadProgressStageText = "ダウンロード中";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -495,7 +501,7 @@ public sealed partial class MainWindowViewModel
 
             ModelDownloadProgressSummary = "Installing diarize runtime with bundled Python...";
             ModelDownloadProgressStageText = "インストール中";
-            var result = await _setupWizardService.InstallDiarizationRuntimeAsync();
+            var result = await _setupWizardService.InstallDiarizationRuntimeAsync(progress: CreateRuntimeInstallProgress());
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"Speaker diarization runtime installed: {result.InstallPath}"
@@ -589,7 +595,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Installing {presetDisplayName}: {spec.PresetProgressDetail}";
         ModelDownloadProgressStageText = spec.InitialStageText;
         IsModelDownloadProgressIndeterminate = true;
-        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress());
+        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress(useDeterminateProgress: false));
         RefreshSetupWizard();
         if (result.IsSucceeded)
         {
@@ -616,14 +622,36 @@ public sealed partial class MainWindowViewModel
         return false;
     }
 
-    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress()
+    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress(bool useDeterminateProgress = true)
     {
         return new Progress<RuntimeInstallProgress>(progress =>
         {
+            if (useDeterminateProgress && progress.DisplayPercent is { } percent)
+            {
+                ModelDownloadProgressPercent = percent;
+                IsModelDownloadProgressIndeterminate = false;
+            }
+            else
+            {
+                IsModelDownloadProgressIndeterminate = true;
+            }
+
             ModelDownloadProgressStageText = progress.StageText;
-            ModelDownloadProgressSummary = progress.Message;
-            LatestLog = progress.Message;
+            ModelDownloadProgressSummary = BuildRuntimeInstallProgressSummary(progress);
+            LatestLog = ModelDownloadProgressSummary;
         });
+    }
+
+    private static string BuildRuntimeInstallProgressSummary(RuntimeInstallProgress progress)
+    {
+        if (progress.BytesDownloaded is >= 0 && progress.BytesTotal is > 0)
+        {
+            return $"{progress.Message} ({FormatBytes(progress.BytesDownloaded.Value)} / {FormatBytes(progress.BytesTotal.Value)})";
+        }
+
+        return progress.BytesDownloaded is >= 0
+            ? $"{progress.Message} ({FormatBytes(progress.BytesDownloaded.Value)})"
+            : progress.Message;
     }
 
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)

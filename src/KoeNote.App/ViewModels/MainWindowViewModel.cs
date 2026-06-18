@@ -1403,11 +1403,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ModelDownloadProgressText => !string.IsNullOrWhiteSpace(ModelDownloadProgressStageText)
-        ? ModelDownloadProgressStageText
-        : IsModelDownloadProgressIndeterminate
-        ? "確認中"
-        : $"{ModelDownloadProgressPercent:0}%";
+    public string ModelDownloadProgressText
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(ModelDownloadProgressStageText))
+            {
+                return IsModelDownloadProgressIndeterminate
+                    ? ModelDownloadProgressStageText
+                    : $"{ModelDownloadProgressStageText} {ModelDownloadProgressPercent:0}%";
+            }
+
+            return IsModelDownloadProgressIndeterminate
+                ? "確認中"
+                : $"{ModelDownloadProgressPercent:0}%";
+        }
+    }
 
     public string ModelDownloadNotification
     {

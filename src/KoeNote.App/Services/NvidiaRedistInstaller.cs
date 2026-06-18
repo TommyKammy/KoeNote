@@ -19,15 +19,20 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
         IProgress<RuntimeInstallProgress>? progress)
     {
         var manifestHashes = new List<string>();
-        foreach (var source in sources)
+        var sourceList = sources.ToList();
+        for (var index = 0; index < sourceList.Count; index++)
         {
+            var startPercent = index * 80d / sourceList.Count;
+            var endPercent = (index + 1) * 80d / sourceList.Count;
             manifestHashes.Add(await StageSourceAsync(
-                source,
+                sourceList[index],
                 stagingRoot,
                 hashMismatchCategory,
                 archiveInvalidCategory,
+                startPercent,
+                endPercent,
                 cancellationToken,
-                progress));
+                progress).ConfigureAwait(false));
         }
 
         if (!HasRequiredFiles(stagingRoot, requiredFilePatterns))
@@ -187,13 +192,31 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
         return System.IO.Enumeration.FileSystemName.MatchesSimpleExpression(pattern, fileName, ignoreCase: true);
     }
 
-    public async Task DownloadAsync(string url, string tempPath, CancellationToken cancellationToken)
+    public async Task DownloadAsync(
+        string url,
+        string tempPath,
+        CancellationToken cancellationToken,
+        IProgress<RuntimeInstallProgress>? progress = null,
+        string stageText = "ダウンロード中",
+        string? message = null,
+        double? startPercent = null,
+        double? endPercent = null)
     {
-        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var totalBytes = response.Content.Headers.ContentLength;
+        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using var destination = File.Create(tempPath);
-        await source.CopyToAsync(destination, cancellationToken);
+        await CopyToAsync(
+            source,
+            destination,
+            totalBytes,
+            progress,
+            stageText,
+            message ?? $"Downloading {Path.GetFileName(tempPath)}...",
+            startPercent,
+            endPercent,
+            cancellationToken);
     }
 
     public static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
@@ -208,21 +231,43 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
         string stagingRoot,
         string hashMismatchCategory,
         string archiveInvalidCategory,
+        double startPercent,
+        double endPercent,
         CancellationToken cancellationToken,
         IProgress<RuntimeInstallProgress>? progress)
     {
         var manifestPath = Path.Combine(stagingRoot, $"redist-{Guid.NewGuid():N}.json");
+        var manifestEndPercent = startPercent + ((endPercent - startPercent) * 0.1d);
         Report(progress, "ダウンロード中", "NVIDIA redist manifest を取得しています...");
-        await DownloadAsync(source.ManifestUrl, manifestPath, cancellationToken);
+        await DownloadAsync(
+            source.ManifestUrl,
+            manifestPath,
+            cancellationToken,
+            progress,
+            "ダウンロード中",
+            "NVIDIA redist manifest を取得しています...",
+            startPercent,
+            manifestEndPercent).ConfigureAwait(false);
         Report(progress, "検証中", "NVIDIA redist manifest を検証しています...");
         var manifestSha256 = await ComputeSha256Async(manifestPath, cancellationToken);
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath, cancellationToken));
-        foreach (var component in source.Components)
+        for (var index = 0; index < source.Components.Count; index++)
         {
+            var component = source.Components[index];
+            var componentStartPercent = manifestEndPercent + ((endPercent - manifestEndPercent) * index / source.Components.Count);
+            var componentEndPercent = manifestEndPercent + ((endPercent - manifestEndPercent) * (index + 1) / source.Components.Count);
             var package = ResolvePackage(document.RootElement, component, archiveInvalidCategory);
             var packagePath = Path.Combine(stagingRoot, $"{component.Name}-{Guid.NewGuid():N}.zip");
             Report(progress, "ダウンロード中", $"NVIDIA {component.Name} redist を取得しています...");
-            await DownloadAsync(ResolvePackageUrl(source.BaseUrl, package.RelativePath), packagePath, cancellationToken);
+            await DownloadAsync(
+                ResolvePackageUrl(source.BaseUrl, package.RelativePath),
+                packagePath,
+                cancellationToken,
+                progress,
+                "ダウンロード中",
+                $"NVIDIA {component.Name} redist を取得しています...",
+                componentStartPercent,
+                componentEndPercent).ConfigureAwait(false);
             Report(progress, "検証中", $"NVIDIA {component.Name} redist の sha256 を検証しています...");
             var actualSha256 = await ComputeSha256Async(packagePath, cancellationToken);
             if (!actualSha256.Equals(package.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -344,6 +389,64 @@ internal sealed class NvidiaRedistInstaller(HttpClient httpClient)
     private static void Report(IProgress<RuntimeInstallProgress>? progress, string stageText, string message)
     {
         progress?.Report(new RuntimeInstallProgress(stageText, message));
+    }
+
+    private static async Task CopyToAsync(
+        Stream source,
+        Stream destination,
+        long? totalBytes,
+        IProgress<RuntimeInstallProgress>? progress,
+        string stageText,
+        string message,
+        double? startPercent,
+        double? endPercent,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long downloadedBytes = 0;
+        var reporter = new RuntimeInstallProgressReporter(progress);
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, startPercent, endPercent, force: true);
+
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+            downloadedBytes += bytesRead;
+            Report(reporter, stageText, message, downloadedBytes, totalBytes, startPercent, endPercent);
+        }
+
+        Report(reporter, stageText, message, downloadedBytes, totalBytes, startPercent, endPercent, force: true);
+    }
+
+    private static void Report(
+        RuntimeInstallProgressReporter reporter,
+        string stageText,
+        string message,
+        long bytesDownloaded,
+        long? bytesTotal,
+        double? startPercent,
+        double? endPercent,
+        bool force = false)
+    {
+        double? percent = null;
+        if (startPercent is { } start && endPercent is { } end && bytesTotal is > 0 && bytesDownloaded <= bytesTotal.Value)
+        {
+            percent = Math.Clamp(start + (bytesDownloaded * (end - start) / bytesTotal.Value), start, end);
+        }
+
+        reporter.Report(new RuntimeInstallProgress(
+            stageText,
+            message,
+            percent,
+            BytesDownloaded: bytesDownloaded,
+            BytesTotal: bytesTotal,
+            IsIndeterminate: !bytesTotal.HasValue),
+            force);
     }
 }
 

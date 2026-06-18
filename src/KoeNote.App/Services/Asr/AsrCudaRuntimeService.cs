@@ -63,7 +63,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
                     FailureCategoryBundledRuntimeMissing);
             }
 
-            return await InstallLegacyRuntimeAsync(cancellationToken);
+            return await InstallLegacyRuntimeAsync(cancellationToken, progress);
         }
 
         if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrCTranslate2RuntimeDirectory))
@@ -222,7 +222,9 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         }
     }
 
-    private async Task<AsrCudaRuntimeInstallResult> InstallLegacyRuntimeAsync(CancellationToken cancellationToken)
+    private async Task<AsrCudaRuntimeInstallResult> InstallLegacyRuntimeAsync(
+        CancellationToken cancellationToken,
+        IProgress<RuntimeInstallProgress>? progress)
     {
         var tempPath = Path.Combine(Path.GetTempPath(), $"koenote-cuda-asr-runtime-{Guid.NewGuid():N}.zip");
         var stagingRoot = Path.Combine(Path.GetTempPath(), $"koenote-cuda-asr-runtime-{Guid.NewGuid():N}");
@@ -231,7 +233,13 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
 
         try
         {
-            await _redistInstaller.DownloadAsync(_options.LegacyRuntimeUrl!, tempPath, cancellationToken);
+            await _redistInstaller.DownloadAsync(
+                _options.LegacyRuntimeUrl!,
+                tempPath,
+                cancellationToken,
+                progress,
+                "ダウンロード中",
+                "CUDA ASR runtime をダウンロードしています...");
             var actualSha256 = await NvidiaRedistInstaller.ComputeSha256Async(tempPath, cancellationToken);
             if (!string.IsNullOrWhiteSpace(_options.LegacyRuntimeSha256) &&
                 !actualSha256.Equals(_options.LegacyRuntimeSha256, StringComparison.OrdinalIgnoreCase))

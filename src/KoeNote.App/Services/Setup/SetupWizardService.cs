@@ -229,9 +229,11 @@ public sealed class SetupWizardService
         return _installService.DownloadSelectedPresetModelsAsync(progress, cancellationToken);
     }
 
-    public Task<FasterWhisperRuntimeInstallResult> InstallFasterWhisperRuntimeAsync(CancellationToken cancellationToken = default)
+    public Task<FasterWhisperRuntimeInstallResult> InstallFasterWhisperRuntimeAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
-        return _fasterWhisperRuntimeService.InstallAsync(cancellationToken);
+        return _fasterWhisperRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
     public Task<FasterWhisperRuntimePreflightStatus> CheckFasterWhisperRuntimeInstallPreflightAsync(CancellationToken cancellationToken = default)
@@ -251,9 +253,11 @@ public sealed class SetupWizardService
         return _asrCudaRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
-    public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(CancellationToken cancellationToken = default)
+    public Task<DiarizationRuntimeInstallResult> InstallDiarizationRuntimeAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
-        return _diarizationRuntimeService.InstallAsync(cancellationToken);
+        return _diarizationRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
     public Task<DiarizationRuntimePreflightStatus> CheckDiarizationRuntimeInstallPreflightAsync(CancellationToken cancellationToken = default)
@@ -266,9 +270,11 @@ public sealed class SetupWizardService
         return _diarizationRuntimeService.CheckAsync(cancellationToken);
     }
 
-    public Task<TernaryReviewRuntimeInstallResult> InstallTernaryReviewRuntimeAsync(CancellationToken cancellationToken = default)
+    public Task<TernaryReviewRuntimeInstallResult> InstallTernaryReviewRuntimeAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
-        return _ternaryReviewRuntimeService.InstallAsync(cancellationToken);
+        return _ternaryReviewRuntimeService.InstallAsync(cancellationToken, progress);
     }
 
     public Task<CudaReviewRuntimeInstallResult> InstallCudaReviewRuntimeAsync(

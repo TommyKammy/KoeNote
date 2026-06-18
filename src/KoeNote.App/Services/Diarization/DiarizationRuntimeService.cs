@@ -56,10 +56,13 @@ public sealed class DiarizationRuntimeService(
         }
     }
 
-    public async Task<DiarizationRuntimeInstallResult> InstallAsync(CancellationToken cancellationToken = default)
+    public async Task<DiarizationRuntimeInstallResult> InstallAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
         try
         {
+            Report(progress, "確認中", "diarize Python runtime を確認しています...", 5);
             if (IsPipNoIndexEnabled())
             {
                 return DiarizationRuntimeInstallResult.Failed(
@@ -70,7 +73,7 @@ public sealed class DiarizationRuntimeService(
 
             Directory.CreateDirectory(paths.PythonEnvironments);
             RecreateManagedRuntimeIfPackageDataIsMissing();
-            var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken);
+            var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken, progress);
             if (!runtime.IsSucceeded || runtime.Command is null)
             {
                 return DiarizationRuntimeInstallResult.Failed(
@@ -79,6 +82,7 @@ public sealed class DiarizationRuntimeService(
                     runtime.FailureCategory);
             }
 
+            Report(progress, "インストール中", $"{PackageSpec} を pip install しています...", 65);
             var result = await processRunner.RunAsync(
                 runtime.Command.FileName,
                 runtime.Command.BuildArguments(
@@ -101,6 +105,7 @@ public sealed class DiarizationRuntimeService(
                     ClassifyPipInstallFailure(error));
             }
 
+            Report(progress, "検証中", "diarize Python package と runtime data を検証しています...", 90);
             var status = await CheckAsync(cancellationToken);
             return status.IsAvailable
                 ? DiarizationRuntimeInstallResult.Succeeded($"diarize runtime installed: {status.Detail}", paths.DiarizationPythonEnvironment)
@@ -168,10 +173,13 @@ public sealed class DiarizationRuntimeService(
         Directory.Delete(paths.DiarizationPythonEnvironment, recursive: true);
     }
 
-    private async Task<ManagedPythonRuntimeResult> EnsureManagedPythonRuntimeAsync(CancellationToken cancellationToken)
+    private async Task<ManagedPythonRuntimeResult> EnsureManagedPythonRuntimeAsync(
+        CancellationToken cancellationToken,
+        IProgress<RuntimeInstallProgress>? progress)
     {
         if (File.Exists(paths.DiarizationPythonPath))
         {
+            Report(progress, "確認中", "既存の diarize Python venv を確認しています...", 20);
             var runtime = await _pythonRuntimeResolver.ResolveInstalledRuntimeAsync(cancellationToken);
             if (runtime.IsFound && runtime.Command is not null)
             {
@@ -187,6 +195,7 @@ public sealed class DiarizationRuntimeService(
             return ManagedPythonRuntimeResult.Failed(source.Message, FailureCategoryPythonSourceUnavailable);
         }
 
+        Report(progress, "インストール中", "diarize Python venv を作成しています...", 40);
         var createResult = await processRunner.RunAsync(
             source.Command.FileName,
             source.Command.BuildArguments("-m", "venv", paths.DiarizationPythonEnvironment),
@@ -218,6 +227,15 @@ public sealed class DiarizationRuntimeService(
                 $"diarize install failed because pip could not reach the package index. Check the network connection or proxy settings, then retry. Details: {error}",
             _ => $"diarize install failed: {error}"
         };
+    }
+
+    private static void Report(
+        IProgress<RuntimeInstallProgress>? progress,
+        string stageText,
+        string message,
+        double percent)
+    {
+        progress?.Report(new RuntimeInstallProgress(stageText, message, percent, IsIndeterminate: false));
     }
 
     private static bool IsPipNoIndexEnabled()
