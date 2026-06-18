@@ -58,11 +58,16 @@ internal static class JobPlaybackPresenter
         IEnumerable<TranscriptSegmentPreview> segments)
     {
         var durationSeconds = playbackDuration.TotalSeconds;
+        if (durationSeconds > 0)
+        {
+            return durationSeconds;
+        }
+
         var segmentEndSeconds = segments.Any()
             ? segments.Max(static segment => segment.EndSeconds)
             : 0;
 
-        return durationSeconds > 0 ? durationSeconds : segmentEndSeconds;
+        return segmentEndSeconds;
     }
 
     public static string FormatPlaybackTime(TimeSpan value)
