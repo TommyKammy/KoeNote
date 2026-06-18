@@ -156,6 +156,63 @@ public sealed class PythonRuntimeResolverTests
     }
 
     [Fact]
+    public async Task DiarizationRuntimeService_InstallAsync_RecreatesManagedRuntimeWhenDataIsMissing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var appBaseDirectory = Path.Combine(root, "app");
+        var paths = new AppPaths(root, root, appBaseDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.BundledPythonPath)!);
+        File.WriteAllText(paths.BundledPythonPath, string.Empty);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.DiarizationPythonPath)!);
+        File.WriteAllText(paths.DiarizationPythonPath, string.Empty);
+        var markerPath = Path.Combine(paths.DiarizationPythonEnvironment, "corrupt.marker");
+        File.WriteAllText(markerPath, "old");
+        var sitePackages = Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages");
+        Directory.CreateDirectory(Path.Combine(sitePackages, "diarize"));
+        Directory.CreateDirectory(Path.Combine(sitePackages, "diarize-0.1.2.dist-info"));
+        var runner = new FakePythonProcessRunner(new Dictionary<string, ProcessRunResult>(StringComparer.OrdinalIgnoreCase)
+        {
+            [paths.BundledPythonPath] = new(
+                0,
+                TimeSpan.FromMilliseconds(1),
+                $"3.12.10|{paths.BundledPythonPath}",
+                string.Empty),
+            [paths.DiarizationPythonPath] = new(
+                0,
+                TimeSpan.FromMilliseconds(1),
+                $"3.12.10|{paths.DiarizationPythonPath}",
+                string.Empty)
+        })
+        {
+            VersionCheckResult = new ProcessRunResult(0, TimeSpan.FromMilliseconds(1), "0.1.2", string.Empty),
+            PipInstallResult = new ProcessRunResult(0, TimeSpan.FromMilliseconds(1), "installed", string.Empty),
+            OnRun = (_, arguments) =>
+            {
+                if (arguments.SequenceEqual(["-m", "venv", paths.DiarizationPythonEnvironment]))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(paths.DiarizationPythonPath)!);
+                    File.WriteAllText(paths.DiarizationPythonPath, string.Empty);
+                }
+
+                if (arguments.Contains("pip") && arguments.Contains("install"))
+                {
+                    var installedSitePackages = Path.Combine(paths.DiarizationPythonEnvironment, "Lib", "site-packages");
+                    Directory.CreateDirectory(Path.Combine(installedSitePackages, "diarize"));
+                    Directory.CreateDirectory(Path.Combine(installedSitePackages, "diarize-0.1.2.dist-info"));
+                    CreateDiarizationRuntimeData(paths);
+                }
+            }
+        };
+        var service = new DiarizationRuntimeService(paths, runner);
+
+        var result = await service.InstallAsync();
+
+        Assert.True(result.IsSucceeded, $"{result.Message} / {string.Join(" | ", runner.Arguments.Select(arguments => string.Join(" ", arguments)))}");
+        Assert.False(File.Exists(markerPath));
+        Assert.True(DiarizationRuntimeLayout.HasPackage(paths));
+    }
+
+    [Fact]
     public void BuildNoCompatiblePythonMessage_HidesPythonLauncherDiagnostics()
     {
         var message = PythonRuntimeResolver.BuildNoCompatiblePythonMessage(
@@ -413,6 +470,8 @@ public sealed class PythonRuntimeResolverTests
 
         public ProcessRunResult? PipInstallResult { get; init; }
 
+        public Action<string, IReadOnlyList<string>>? OnRun { get; init; }
+
         public override Task<ProcessRunResult> RunAsync(
             string fileName,
             IReadOnlyList<string> arguments,
@@ -422,6 +481,7 @@ public sealed class PythonRuntimeResolverTests
         {
             _fileNames.Add(fileName);
             _arguments.Add(arguments.ToArray());
+            OnRun?.Invoke(fileName, arguments);
             if (arguments.Contains("import importlib.metadata as md; print(md.version('diarize'))") &&
                 VersionCheckResult is not null)
             {

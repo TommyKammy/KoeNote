@@ -215,31 +215,10 @@ internal sealed class SetupReadinessService(
     private SetupSmokeCheck CheckDiarizationRuntime()
     {
         var exists = DiarizationRuntimeLayout.HasPackage(paths);
-        if (!exists)
-        {
-            var missingData = DiarizationRuntimeLayout.GetMissingManagedRuntimeData(paths);
-            if (DiarizationRuntimeLayout.HasManagedPackageMetadata(paths) && missingData.Count > 0)
-            {
-                return new SetupSmokeCheck(
-                    "speaker diarization runtime",
-                    false,
-                    $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missingData)}");
-            }
-
-            var missingLegacyData = DiarizationRuntimeLayout.GetMissingLegacyRuntimeData(paths);
-            if (DiarizationRuntimeLayout.HasLegacyPackageMetadata(paths) && missingLegacyData.Count > 0)
-            {
-                return new SetupSmokeCheck(
-                    "speaker diarization runtime",
-                    false,
-                    $"Runtime package data is missing. Reinstall speaker diarization runtime. Missing: {string.Join("; ", missingLegacyData)}");
-            }
-        }
-
         return new SetupSmokeCheck(
             "speaker diarization runtime",
             exists,
-            exists ? paths.DiarizationPythonEnvironment : $"Not installed: {paths.DiarizationPythonEnvironment}");
+            exists ? paths.DiarizationPythonEnvironment : DiarizationRuntimeLayout.DescribeMissingRuntimeData(paths));
     }
 
     private SetupSmokeCheck CheckCudaReviewRuntime()
