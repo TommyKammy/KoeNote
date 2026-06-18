@@ -2,7 +2,6 @@ using KoeNote.App.Models;
 using KoeNote.App.Services.Dialogs;
 using KoeNote.App.Services.Audio;
 using Microsoft.Win32;
-using System.Globalization;
 using System.IO;
 using System.Windows;
 
@@ -399,29 +398,17 @@ public sealed partial class MainWindowViewModel
 
     private TranscriptSegmentPreview[] GetPlaybackOrderedSegments()
     {
-        return Segments
-            .OrderBy(static segment => segment.StartSeconds)
-            .ToArray();
+        return JobPlaybackPresenter.OrderSegmentsForPlayback(Segments);
     }
 
     private string? ResolveSelectedJobPlaybackPath()
     {
-        if (SelectedJob is null)
-        {
-            return null;
-        }
-
-        return ResolveJobPlaybackPath(SelectedJob);
+        return JobPlaybackPresenter.ResolvePlaybackPath(SelectedJob);
     }
 
     private static string? ResolveJobPlaybackPath(JobSummary job)
     {
-        if (!string.IsNullOrWhiteSpace(job.NormalizedAudioPath) && File.Exists(job.NormalizedAudioPath))
-        {
-            return job.NormalizedAudioPath;
-        }
-
-        return File.Exists(job.SourceAudioPath) ? job.SourceAudioPath : null;
+        return JobPlaybackPresenter.ResolvePlaybackPath(job);
     }
 
     private void SeekPlaybackToSelectedSegment(TranscriptSegmentPreview segment)
@@ -462,12 +449,7 @@ public sealed partial class MainWindowViewModel
         var visibleSegments = Segments
             .Where(segment => FilteredSegments.Contains(segment))
             .ToArray();
-        var segment = visibleSegments
-            .LastOrDefault(segment =>
-                positionSeconds >= segment.StartSeconds &&
-                (segment.EndSeconds <= segment.StartSeconds || positionSeconds < segment.EndSeconds));
-
-        segment ??= visibleSegments.LastOrDefault(segment => positionSeconds >= segment.StartSeconds);
+        var segment = JobPlaybackPresenter.FindSegmentForPlaybackPosition(visibleSegments, positionSeconds);
 
         if (segment is null || EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment))
         {
@@ -543,13 +525,7 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshPlaybackState()
     {
-        var durationSeconds = _audioPlaybackService.Duration.TotalSeconds;
-        if (durationSeconds <= 0 && Segments.Count > 0)
-        {
-            durationSeconds = Segments.Max(static segment => segment.EndSeconds);
-        }
-
-        PlaybackDurationSeconds = durationSeconds;
+        PlaybackDurationSeconds = JobPlaybackPresenter.ResolveDurationSeconds(_audioPlaybackService.Duration, Segments);
 
         _isRefreshingPlaybackPosition = true;
         try
@@ -562,26 +538,14 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private static string FormatPlaybackTime(TimeSpan value)
-    {
-        if (value.TotalHours >= 1)
-        {
-            return value.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-        }
-
-        return value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
-    }
-
     private bool FilterJob(object item)
     {
-        if (item is not JobSummary job || string.IsNullOrWhiteSpace(JobSearchText))
+        if (item is not JobSummary job)
         {
             return true;
         }
 
-        return job.Title.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase)
-            || job.FileName.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase)
-            || job.Status.Contains(JobSearchText, StringComparison.OrdinalIgnoreCase);
+        return JobPlaybackPresenter.MatchesJobSearch(job, JobSearchText);
     }
 
     private static bool IsUnstartedRegisteredJob(JobSummary job)
@@ -600,27 +564,6 @@ public sealed partial class MainWindowViewModel
         }
 
         return Path.GetExtension(path).ToLowerInvariant() is ".wav" or ".mp3" or ".m4a" or ".flac" or ".aac" or ".ogg" or ".opus";
-    }
-
-    private static string FormatByteSize(long bytes)
-    {
-        if (bytes <= 0)
-        {
-            return "0 B";
-        }
-
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        var value = (double)bytes;
-        var unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        return unitIndex == 0
-            ? $"{bytes} {units[unitIndex]}"
-            : $"{value:0.0} {units[unitIndex]}";
     }
 
     private static bool ShowConfirmation(string title, string message)
