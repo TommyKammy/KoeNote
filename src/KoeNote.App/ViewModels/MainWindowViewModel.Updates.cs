@@ -244,6 +244,7 @@ public sealed partial class MainWindowViewModel
         }
 
         var generation = isBackground ? BeginUpdateDownloadSnapshot() : _updateDownloadGeneration;
+        _activeUpdateDownloadRelease = release;
         IsUpdateDownloadInProgress = true;
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = "Downloading update...";
@@ -298,18 +299,37 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
+            if (IsSameUpdateRelease(_activeUpdateDownloadRelease, release))
+            {
+                _activeUpdateDownloadRelease = null;
+            }
+
+            var shouldStartNextBackgroundDownload = _startBackgroundUpdateDownloadAfterCurrentDownload;
+            _startBackgroundUpdateDownloadAfterCurrentDownload = false;
             IsUpdateDownloadInProgress = false;
             OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
+            if (shouldStartNextBackgroundDownload)
+            {
+                StartBackgroundUpdateDownloadIfEligible();
+            }
         }
     }
 
     private void StartBackgroundUpdateDownloadIfEligible()
     {
-        if (_availableUpdate is null ||
-            IsUpdateDownloadInProgress ||
-            HasVerifiedUpdateInstaller ||
-            IsBackgroundUpdateDownloadDisabled())
+        if (_availableUpdate is null || HasVerifiedUpdateInstaller || IsBackgroundUpdateDownloadDisabled())
         {
+            return;
+        }
+
+        if (IsUpdateDownloadInProgress)
+        {
+            if (!IsSameUpdateRelease(_activeUpdateDownloadRelease, _availableUpdate))
+            {
+                InvalidateUpdateDownloadSnapshot();
+                _startBackgroundUpdateDownloadAfterCurrentDownload = true;
+            }
+
             return;
         }
 
@@ -324,6 +344,7 @@ public sealed partial class MainWindowViewModel
     private void InvalidateUpdateDownloadSnapshot()
     {
         _updateDownloadGeneration++;
+        _startBackgroundUpdateDownloadAfterCurrentDownload = false;
     }
 
     private bool IsCurrentUpdateDownload(LatestReleaseInfo release, int generation)

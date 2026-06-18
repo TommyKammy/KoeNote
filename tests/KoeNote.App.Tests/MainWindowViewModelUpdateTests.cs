@@ -749,6 +749,73 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task CheckForUpdatesAsync_ReschedulesBackgroundDownloadForDifferentRelease()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var firstRelease = CreateUpdateRelease();
+        var nextRelease = firstRelease with
+        {
+            Version = "0.16.0",
+            MsiUrl = new Uri("https://example.test/KoeNote-v0.16.0-win-x64.msi"),
+            Sha256 = new string('b', 64),
+            PublishedAt = DateTimeOffset.Parse("2026-06-18T00:00:02Z")
+        };
+        var downloadService = new QueuedUpdateDownloadService(installerPath);
+        SetPrivateField(viewModel, "_updateDownloadService", downloadService);
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                firstRelease,
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+        for (var i = 0; i < 20 && downloadService.DownloadCount == 0; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(1, downloadService.DownloadCount);
+
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                nextRelease,
+                "KoeNote 0.16.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+        downloadService.CompleteNext();
+        for (var i = 0; i < 20 && downloadService.DownloadCount < 2; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(2, downloadService.DownloadCount);
+        Assert.True(viewModel.IsUpdateDownloadInProgress);
+
+        downloadService.CompleteNext();
+        for (var i = 0; i < 20 && !viewModel.HasVerifiedUpdateInstaller; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Equal(installerPath, viewModel.VerifiedUpdateInstallerPath);
+        Assert.Equal("Ready to update and restart: KoeNote 0.16.0", viewModel.UpdateNotificationTitle);
+        Assert.False(viewModel.IsUpdateDownloadInProgress);
+        Assert.True(viewModel.UpdateAndRestartCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Constructor_SurfacesPendingUpdaterFailureResult()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -911,6 +978,36 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
         public void Complete()
         {
             _completion.SetResult();
+        }
+    }
+
+    private sealed class QueuedUpdateDownloadService(string installerPath) : IUpdateDownloadService
+    {
+        private readonly Queue<TaskCompletionSource> _completions = [];
+
+        public int DownloadCount { get; private set; }
+
+        public async Task<UpdateDownloadResult> DownloadAndVerifyAsync(
+            LatestReleaseInfo release,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            DownloadCount++;
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _completions.Enqueue(completion);
+            progress?.Report(new UpdateDownloadProgress(1, 10));
+            await completion.Task.WaitAsync(cancellationToken);
+            progress?.Report(new UpdateDownloadProgress(10, 10));
+            return new UpdateDownloadResult(
+                installerPath,
+                release.Sha256,
+                10,
+                DateTimeOffset.Now);
+        }
+
+        public void CompleteNext()
+        {
+            _completions.Dequeue().SetResult();
         }
     }
 
