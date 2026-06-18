@@ -291,7 +291,9 @@ public sealed class ScriptedJsonAsrEngine(
             "--output-json",
             outputJsonPath,
             "--language",
-            "ja"
+            "ja",
+            "--diarization",
+            "off"
         };
 
         if (!string.IsNullOrWhiteSpace(options.Context))

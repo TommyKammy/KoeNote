@@ -370,9 +370,12 @@ public sealed class ScriptedJsonAsrEngineTests
         Assert.Contains("2", runner.Arguments);
         Assert.Contains("--chunk-seconds", runner.Arguments);
         Assert.Contains("300", runner.Arguments);
+        Assert.Contains("--diarization", runner.Arguments);
+        Assert.Contains("off", runner.Arguments);
 
         var logPath = Assert.Single(Directory.GetFiles(Path.Combine(paths.Jobs, "job-001", "logs"), "asr-*.log"));
         var log = File.ReadAllText(logPath);
+        Assert.Contains("--diarization off", log);
         Assert.Contains("requested_device: cuda", log);
         Assert.Contains("requested_compute_type: float16", log);
         Assert.Contains($"execution_profile_id: {AsrExecutionProfiles.CudaFloat16}", log);
@@ -414,6 +417,8 @@ public sealed class ScriptedJsonAsrEngineTests
         {
             Assert.Contains("--device", arguments);
             Assert.Contains("cuda", arguments);
+            Assert.Contains("--diarization", arguments);
+            Assert.Contains("off", arguments);
             Assert.DoesNotContain("--chunk-seconds", arguments);
         });
         Assert.Equal(3, result.Segments.Count);
