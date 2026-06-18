@@ -61,6 +61,10 @@ public sealed class CudaReviewRuntimeServiceTests
         var result = await service.InstallAsync(progress: progress);
 
         Assert.True(result.IsSucceeded);
+        Assert.Contains(progress.Items, item =>
+            item.BytesTotal.HasValue &&
+            item.BytesDownloaded == item.BytesTotal &&
+            item.DisplayPercent == 100);
         Assert.Contains(progress.Items, item => item.StageText == "ダウンロード中" && item.Message.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(progress.Items, item => item.StageText == "検証中" && item.Message.Contains("sha256", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(progress.Items, item => item.StageText == "展開中");

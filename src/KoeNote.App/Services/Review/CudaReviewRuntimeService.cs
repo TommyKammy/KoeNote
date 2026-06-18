@@ -69,7 +69,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             }
             else
             {
-                return await InstallLegacyRuntimeAsync(cancellationToken);
+                return await InstallLegacyRuntimeAsync(cancellationToken, progress);
             }
         }
 
@@ -183,7 +183,9 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
     }
 
-    private async Task<CudaReviewRuntimeInstallResult> InstallLegacyRuntimeAsync(CancellationToken cancellationToken)
+    private async Task<CudaReviewRuntimeInstallResult> InstallLegacyRuntimeAsync(
+        CancellationToken cancellationToken,
+        IProgress<RuntimeInstallProgress>? progress)
     {
         if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
         {
@@ -200,7 +202,13 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 
         try
         {
-            await _redistInstaller.DownloadAsync(_options.LegacyRuntimeUrl, tempPath, cancellationToken);
+            await _redistInstaller.DownloadAsync(
+                _options.LegacyRuntimeUrl,
+                tempPath,
+                cancellationToken,
+                progress,
+                "ダウンロード中",
+                "CUDA review runtime をダウンロードしています...");
             var actualSha256 = await NvidiaRedistInstaller.ComputeSha256Async(tempPath, cancellationToken);
             if (!string.IsNullOrWhiteSpace(_options.LegacyRuntimeSha256) &&
                 !actualSha256.Equals(_options.LegacyRuntimeSha256, StringComparison.OrdinalIgnoreCase))

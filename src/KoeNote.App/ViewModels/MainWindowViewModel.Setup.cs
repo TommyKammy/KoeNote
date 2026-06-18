@@ -289,7 +289,9 @@ public sealed partial class MainWindowViewModel
 
                 ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
                 ModelDownloadProgressStageText = "インストール中";
-                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress());
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -349,7 +351,9 @@ public sealed partial class MainWindowViewModel
                 {
                     ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
                     ModelDownloadProgressStageText = "インストール中";
-                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(cancellation.Token);
+                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
+                        cancellation.Token,
+                        CreateRuntimeInstallProgress());
                     RefreshSetupWizard();
                     if (!runtimeResult.IsSucceeded)
                     {
@@ -389,7 +393,9 @@ public sealed partial class MainWindowViewModel
                 ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
                 ModelDownloadProgressStageText = "ダウンロード中";
                 IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(cancellation.Token);
+                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
+                    cancellation.Token,
+                    CreateRuntimeInstallProgress());
                 RefreshSetupWizard();
                 if (!runtimeResult.IsSucceeded)
                 {
@@ -495,7 +501,7 @@ public sealed partial class MainWindowViewModel
 
             ModelDownloadProgressSummary = "Installing diarize runtime with bundled Python...";
             ModelDownloadProgressStageText = "インストール中";
-            var result = await _setupWizardService.InstallDiarizationRuntimeAsync();
+            var result = await _setupWizardService.InstallDiarizationRuntimeAsync(progress: CreateRuntimeInstallProgress());
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"Speaker diarization runtime installed: {result.InstallPath}"
@@ -620,10 +626,33 @@ public sealed partial class MainWindowViewModel
     {
         return new Progress<RuntimeInstallProgress>(progress =>
         {
+            if (progress.DisplayPercent is { } percent)
+            {
+                ModelDownloadProgressPercent = percent;
+                IsModelDownloadProgressIndeterminate = false;
+            }
+            else
+            {
+                ModelDownloadProgressPercent = 0;
+                IsModelDownloadProgressIndeterminate = progress.IsIndeterminate;
+            }
+
             ModelDownloadProgressStageText = progress.StageText;
-            ModelDownloadProgressSummary = progress.Message;
-            LatestLog = progress.Message;
+            ModelDownloadProgressSummary = BuildRuntimeInstallProgressSummary(progress);
+            LatestLog = ModelDownloadProgressSummary;
         });
+    }
+
+    private static string BuildRuntimeInstallProgressSummary(RuntimeInstallProgress progress)
+    {
+        if (progress.BytesDownloaded is >= 0 && progress.BytesTotal is > 0)
+        {
+            return $"{progress.Message} ({FormatBytes(progress.BytesDownloaded.Value)} / {FormatBytes(progress.BytesTotal.Value)})";
+        }
+
+        return progress.BytesDownloaded is >= 0
+            ? $"{progress.Message} ({FormatBytes(progress.BytesDownloaded.Value)})"
+            : progress.Message;
     }
 
     private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)

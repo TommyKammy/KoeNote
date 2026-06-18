@@ -91,12 +91,15 @@ public sealed class FasterWhisperRuntimeService(
             string.Empty);
     }
 
-    public async Task<FasterWhisperRuntimeInstallResult> InstallAsync(CancellationToken cancellationToken = default)
+    public async Task<FasterWhisperRuntimeInstallResult> InstallAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RuntimeInstallProgress>? progress = null)
     {
         try
         {
+            Report(progress, "確認中", "ASR Python runtime を確認しています...", 5);
             Directory.CreateDirectory(paths.PythonEnvironments);
-            var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken);
+            var runtime = await EnsureManagedPythonRuntimeAsync(cancellationToken, progress);
             if (!runtime.IsSucceeded)
             {
                 return FasterWhisperRuntimeInstallResult.Failed(
@@ -105,6 +108,7 @@ public sealed class FasterWhisperRuntimeService(
                     runtime.FailureCategory);
             }
 
+            Report(progress, "インストール中", $"{PackageSpec} を pip install しています...", 65);
             var result = await processRunner.RunAsync(
                 paths.AsrPythonPath,
                 ["-m", "pip", "install", "--upgrade", PackageSpec],
@@ -121,6 +125,7 @@ public sealed class FasterWhisperRuntimeService(
                     ClassifyPipInstallFailure(error));
             }
 
+            Report(progress, "検証中", "ASR Python package を検証しています...", 90);
             var status = await CheckAsync(cancellationToken);
             return status.IsAvailable
                 ? FasterWhisperRuntimeInstallResult.Succeeded($"faster-whisper runtime installed: {status.Detail}", paths.AsrPythonEnvironment)
@@ -138,10 +143,13 @@ public sealed class FasterWhisperRuntimeService(
         }
     }
 
-    private async Task<FasterWhisperManagedRuntimeResult> EnsureManagedPythonRuntimeAsync(CancellationToken cancellationToken)
+    private async Task<FasterWhisperManagedRuntimeResult> EnsureManagedPythonRuntimeAsync(
+        CancellationToken cancellationToken,
+        IProgress<RuntimeInstallProgress>? progress)
     {
         if (File.Exists(paths.AsrPythonPath))
         {
+            Report(progress, "確認中", "既存の ASR Python venv を確認しています...", 20);
             var probe = await processRunner.RunAsync(
                 paths.AsrPythonPath,
                 ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"],
@@ -166,6 +174,7 @@ public sealed class FasterWhisperRuntimeService(
             return FasterWhisperManagedRuntimeResult.Failed(source.Message, FailureCategoryPythonSourceUnavailable);
         }
 
+        Report(progress, "インストール中", "ASR Python venv を作成しています...", 40);
         var createResult = await processRunner.RunAsync(
             source.Command.FileName,
             source.Command.BuildArguments("-m", "venv", paths.AsrPythonEnvironment),
@@ -184,6 +193,15 @@ public sealed class FasterWhisperRuntimeService(
         return File.Exists(paths.AsrPythonPath)
             ? FasterWhisperManagedRuntimeResult.Succeeded()
             : FasterWhisperManagedRuntimeResult.Failed("ASR Python venv was created but python.exe was not found.", FailureCategoryVenvCreationFailed);
+    }
+
+    private static void Report(
+        IProgress<RuntimeInstallProgress>? progress,
+        string stageText,
+        string message,
+        double percent)
+    {
+        progress?.Report(new RuntimeInstallProgress(stageText, message, percent, IsIndeterminate: false));
     }
 
     private static string BuildPipInstallFailureMessage(string error)

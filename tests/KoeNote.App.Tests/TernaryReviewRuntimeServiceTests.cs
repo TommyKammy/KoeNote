@@ -16,10 +16,15 @@ public sealed class TernaryReviewRuntimeServiceTests
         paths.EnsureCreated();
         var archive = CreateArchive(("llama-completion.exe", "runtime"), ("ggml.dll", "dll"));
         var service = new TernaryReviewRuntimeService(paths, new HttpClient(new ArchiveHandler(archive)));
+        var progress = new ListProgress();
 
-        var result = await service.InstallAsync();
+        var result = await service.InstallAsync(progress: progress);
 
         Assert.True(result.IsSucceeded);
+        Assert.Contains(progress.Items, item =>
+            item.BytesTotal == archive.Length &&
+            item.BytesDownloaded == archive.Length &&
+            item.DisplayPercent == 100);
         Assert.True(File.Exists(paths.TernaryLlamaCompletionPath));
         Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(paths.TernaryLlamaCompletionPath)!, "ggml.dll")));
     }
@@ -64,6 +69,16 @@ public sealed class TernaryReviewRuntimeServiceTests
             {
                 Content = new ByteArrayContent(archive)
             });
+        }
+    }
+
+    private sealed class ListProgress : IProgress<RuntimeInstallProgress>
+    {
+        public List<RuntimeInstallProgress> Items { get; } = [];
+
+        public void Report(RuntimeInstallProgress value)
+        {
+            Items.Add(value);
         }
     }
 }
