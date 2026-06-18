@@ -11,6 +11,28 @@ namespace KoeNote.App.Tests;
 public sealed class TranscriptEditServiceTests
 {
     [Fact]
+    public void HistoryStore_LoadsSegmentSnapshotAndLatestOperation()
+    {
+        var paths = ArrangeSegment();
+        var service = new TranscriptEditService(paths);
+        service.ApplySegmentEdit("job-001", "segment-001", "manual final");
+
+        using var connection = SqliteConnectionFactory.Open(paths);
+        using var transaction = connection.BeginTransaction();
+
+        var segment = TranscriptEditHistoryStore.LoadSegmentSnapshot(connection, transaction, "job-001", "segment-001");
+        var operation = TranscriptEditHistoryStore.LoadLastSegmentOperation(connection, transaction, "job-001", "segment-001");
+
+        Assert.NotNull(segment);
+        Assert.Equal("manual final", segment.FinalText);
+        Assert.Equal("manually_edited", segment.ReviewState);
+        Assert.NotNull(operation);
+        Assert.Equal("segment_edit", operation.OperationType);
+        Assert.Equal("job-001", operation.JobId);
+        Assert.Equal("segment-001", operation.SegmentId);
+    }
+
+    [Fact]
     public void ApplySegmentEdit_UpdatesFinalTextAndUndoRestoresOriginalState()
     {
         var paths = ArrangeSegment();
