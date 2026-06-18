@@ -221,20 +221,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        CommitSetupSelectionDraft();
-
-        if (!_setupState.LicenseAccepted)
+        if (!EnsureSetupInstallPlanReady())
         {
-            _setupState = _setupWizardService.AcceptLicenses();
-            RefreshSetupWizard();
-            LatestLog = "Setup licenses accepted. Review the installation plan, then start installation.";
-        }
-
-        if (!SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan))
-        {
-            _setupState = _setupWizardService.MoveToInstallPlan();
-            RefreshSetupWizard();
-            LatestLog = "Review the installation plan before installation.";
             return;
         }
 
@@ -247,167 +235,19 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
         SetSetupInstallStatus("文字起こしモデル", "導入中", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
         SetSetupInstallStatus("整文モデル", "導入中", SelectedSetupReviewModel?.DisplayName ?? "Review model");
-        var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
-        {
-            var modelName = FindSetupModelDisplayName(
-                SetupAsrModelChoices.Concat(SetupReviewModelChoices),
-                downloadProgress.ModelId);
-            UpdateModelDownloadProgress(modelName, downloadProgress);
-            RefreshModelCatalogForDownloadProgress(downloadProgress);
-        });
+        var progress = CreateSetupModelDownloadProgress();
 
         try
         {
-            var modelResult = await _setupWizardService.InstallSelectedPresetModelsAsync(progress, cancellation.Token);
-            RefreshSetupWizard();
-            if (!modelResult.IsSucceeded)
-            {
-                SetSetupInstallStatus("文字起こしモデル", "失敗", modelResult.Message);
-                SetSetupInstallStatus("整文モデル", "失敗", modelResult.Message);
-                CompleteSetupModelDownload(displayName, modelResult);
-                return;
-            }
-
-            SetSetupInstallStatus("文字起こしモデル", "完了", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
-            SetSetupInstallStatus("整文モデル", "完了", SelectedSetupReviewModel?.DisplayName ?? "Review model");
-
-            if (!SetupFasterWhisperRuntimeReady)
-            {
-                SetSetupInstallStatus("ASR runtime", "導入中", "文字起こしに必要な実行環境");
-                ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
-                ModelDownloadProgressStageText = "確認中";
-                IsModelDownloadProgressIndeterminate = true;
-                var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync(cancellation.Token);
-                if (!preflight.IsReady)
-                {
-                    var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
-                    SetSetupInstallStatus("ASR runtime", "失敗", message);
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
-                }
-
-                ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
-                ModelDownloadProgressStageText = "インストール中";
-                var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
-                    cancellation.Token,
-                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
-                RefreshSetupWizard();
-                if (!runtimeResult.IsSucceeded)
-                {
-                    var message = BuildFasterWhisperRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
-                    SetSetupInstallStatus("ASR runtime", "失敗", message);
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
-                }
-
-                SetSetupInstallStatus("ASR runtime", "完了", runtimeResult.InstallPath);
-                LatestLog = runtimeResult.Message;
-            }
-            else
-            {
-                SetSetupInstallStatus("ASR runtime", "スキップ", "導入済みです");
-            }
-
-            if (!SetupReviewRuntimeReady)
-            {
-                const string message = "CPU版Review runtimeが見つかりません。tools\\review\\llama-completion.exe を含むKoeNote Core runtimeを配置してから、もう一度セットアップを実行してください。";
-                SetSetupInstallStatus("Review runtime", "失敗", message);
-                CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                LatestLog = message;
-                return;
-            }
-
-            SetSetupInstallStatus("Review runtime", "確認済み", Paths.LlamaCompletionPath);
-
-            if (!await InstallCudaRuntimeForPresetAsync(
-                CreateAsrCudaRuntimeInstallSpec(),
-                displayName,
-                cancellation.Token))
+            if (!await InstallSelectedSetupModelsAsync(displayName, progress, cancellation.Token) ||
+                !await InstallFasterWhisperRuntimeIfNeededAsync(displayName, cancellation.Token) ||
+                !ValidateSetupReviewRuntime(displayName) ||
+                !await InstallCudaRuntimeForPresetAsync(CreateAsrCudaRuntimeInstallSpec(), displayName, cancellation.Token) ||
+                !await InstallDiarizationRuntimeIfNeededAsync(displayName, cancellation.Token) ||
+                !await InstallCudaRuntimeForPresetAsync(CreateCudaReviewRuntimeInstallSpec(), displayName, cancellation.Token) ||
+                !await InstallTernaryReviewRuntimeIfNeededAsync(displayName, cancellation.Token))
             {
                 return;
-            }
-
-            if (!SetupDiarizationRuntimeReady)
-            {
-                SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための必須runtime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
-                ModelDownloadProgressStageText = "確認中";
-                IsModelDownloadProgressIndeterminate = true;
-                var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync(cancellation.Token);
-                if (!preflight.IsReady)
-                {
-                    var message = AppendFailureCategory(
-                        BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory),
-                        preflight.FailureCategory);
-                    SetSetupInstallStatus("話者識別", "失敗", message);
-                    SetupDiarizationRuntimeSummary = message;
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
-                }
-                else
-                {
-                    ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
-                    ModelDownloadProgressStageText = "インストール中";
-                    var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
-                        cancellation.Token,
-                        CreateRuntimeInstallProgress(useDeterminateProgress: false));
-                    RefreshSetupWizard();
-                    if (!runtimeResult.IsSucceeded)
-                    {
-                        var message = AppendFailureCategory(
-                            BuildDiarizationRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory),
-                            runtimeResult.FailureCategory);
-                        SetSetupInstallStatus("話者識別", "失敗", message);
-                        SetupDiarizationRuntimeSummary = message;
-                        CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                        LatestLog = message;
-                        return;
-                    }
-                    else
-                    {
-                        SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
-                        SetSetupInstallStatus("話者識別", "完了", runtimeResult.InstallPath);
-                        LatestLog = runtimeResult.Message;
-                    }
-                }
-            }
-            else
-            {
-                SetSetupInstallStatus("話者識別", "スキップ", "導入済みです");
-            }
-
-            if (!await InstallCudaRuntimeForPresetAsync(
-                CreateCudaReviewRuntimeInstallSpec(),
-                displayName,
-                cancellation.Token))
-            {
-                return;
-            }
-
-            if (!SetupTernaryReviewRuntimeReady)
-            {
-                SetSetupInstallStatus("Ternary review runtime", "導入中", "選択した整文モデルに必要なruntime");
-                ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
-                ModelDownloadProgressStageText = "ダウンロード中";
-                IsModelDownloadProgressIndeterminate = true;
-                var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
-                    cancellation.Token,
-                    CreateRuntimeInstallProgress(useDeterminateProgress: false));
-                RefreshSetupWizard();
-                if (!runtimeResult.IsSucceeded)
-                {
-                    var message = BuildTernaryReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
-                    SetSetupInstallStatus("Ternary review runtime", "失敗", message);
-                    CompleteModelDownloadProgress(displayName, succeeded: false, message);
-                    LatestLog = message;
-                    return;
-                }
-
-                SetSetupInstallStatus("Ternary review runtime", "完了", runtimeResult.InstallPath);
-                LatestLog = runtimeResult.Message;
             }
 
             SetSetupInstallStatus("保存先", "確認済み", SetupStorageRoot);
@@ -435,6 +275,195 @@ public sealed partial class MainWindowViewModel
 
             UpdateSetupDownloadCommandStates();
         }
+    }
+
+    private bool EnsureSetupInstallPlanReady()
+    {
+        CommitSetupSelectionDraft();
+
+        if (!_setupState.LicenseAccepted)
+        {
+            _setupState = _setupWizardService.AcceptLicenses();
+            RefreshSetupWizard();
+            LatestLog = "Setup licenses accepted. Review the installation plan, then start installation.";
+        }
+
+        if (SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan))
+        {
+            return true;
+        }
+
+        _setupState = _setupWizardService.MoveToInstallPlan();
+        RefreshSetupWizard();
+        LatestLog = "Review the installation plan before installation.";
+        return false;
+    }
+
+    private Progress<ModelDownloadProgress> CreateSetupModelDownloadProgress()
+    {
+        return new Progress<ModelDownloadProgress>(downloadProgress =>
+        {
+            var modelName = FindSetupModelDisplayName(
+                SetupAsrModelChoices.Concat(SetupReviewModelChoices),
+                downloadProgress.ModelId);
+            UpdateModelDownloadProgress(modelName, downloadProgress);
+            RefreshModelCatalogForDownloadProgress(downloadProgress);
+        });
+    }
+
+    private async Task<bool> InstallSelectedSetupModelsAsync(
+        string displayName,
+        IProgress<ModelDownloadProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        var modelResult = await _setupWizardService.InstallSelectedPresetModelsAsync(progress, cancellationToken);
+        RefreshSetupWizard();
+        if (!modelResult.IsSucceeded)
+        {
+            SetSetupInstallStatus("文字起こしモデル", "失敗", modelResult.Message);
+            SetSetupInstallStatus("整文モデル", "失敗", modelResult.Message);
+            CompleteSetupModelDownload(displayName, modelResult);
+            return false;
+        }
+
+        SetSetupInstallStatus("文字起こしモデル", "完了", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
+        SetSetupInstallStatus("整文モデル", "完了", SelectedSetupReviewModel?.DisplayName ?? "Review model");
+        return true;
+    }
+
+    private async Task<bool> InstallFasterWhisperRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    {
+        if (SetupFasterWhisperRuntimeReady)
+        {
+            SetSetupInstallStatus("ASR runtime", "スキップ", "導入済みです");
+            return true;
+        }
+
+        SetSetupInstallStatus("ASR runtime", "導入中", "文字起こしに必要な実行環境");
+        ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for ASR runtime...";
+        ModelDownloadProgressStageText = "確認中";
+        IsModelDownloadProgressIndeterminate = true;
+        var preflight = await _setupWizardService.CheckFasterWhisperRuntimeInstallPreflightAsync(cancellationToken);
+        if (!preflight.IsReady)
+        {
+            var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
+            SetSetupInstallStatus("ASR runtime", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+            return false;
+        }
+
+        ModelDownloadProgressSummary = $"Installing {displayName}: installing ASR runtime with bundled Python...";
+        ModelDownloadProgressStageText = "インストール中";
+        var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
+            cancellationToken,
+            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+        RefreshSetupWizard();
+        if (!runtimeResult.IsSucceeded)
+        {
+            var message = BuildFasterWhisperRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+            SetSetupInstallStatus("ASR runtime", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+            return false;
+        }
+
+        SetSetupInstallStatus("ASR runtime", "完了", runtimeResult.InstallPath);
+        LatestLog = runtimeResult.Message;
+        return true;
+    }
+
+    private bool ValidateSetupReviewRuntime(string displayName)
+    {
+        if (SetupReviewRuntimeReady)
+        {
+            SetSetupInstallStatus("Review runtime", "確認済み", Paths.LlamaCompletionPath);
+            return true;
+        }
+
+        const string message = "CPU版Review runtimeが見つかりません。tools\\review\\llama-completion.exe を含むKoeNote Core runtimeを配置してから、もう一度セットアップを実行してください。";
+        SetSetupInstallStatus("Review runtime", "失敗", message);
+        CompleteModelDownloadProgress(displayName, succeeded: false, message);
+        LatestLog = message;
+        return false;
+    }
+
+    private async Task<bool> InstallDiarizationRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    {
+        if (SetupDiarizationRuntimeReady)
+        {
+            SetSetupInstallStatus("話者識別", "スキップ", "導入済みです");
+            return true;
+        }
+
+        SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための必須runtime");
+        ModelDownloadProgressSummary = $"Installing {displayName}: checking bundled Python and pip for speaker diarization...";
+        ModelDownloadProgressStageText = "確認中";
+        IsModelDownloadProgressIndeterminate = true;
+        var preflight = await _setupWizardService.CheckDiarizationRuntimeInstallPreflightAsync(cancellationToken);
+        if (!preflight.IsReady)
+        {
+            var message = AppendFailureCategory(
+                BuildDiarizationRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory),
+                preflight.FailureCategory);
+            SetSetupInstallStatus("話者識別", "失敗", message);
+            SetupDiarizationRuntimeSummary = message;
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+            return false;
+        }
+
+        ModelDownloadProgressSummary = $"Installing {displayName}: installing speaker diarization runtime with bundled Python...";
+        ModelDownloadProgressStageText = "インストール中";
+        var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
+            cancellationToken,
+            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+        RefreshSetupWizard();
+        if (!runtimeResult.IsSucceeded)
+        {
+            var message = AppendFailureCategory(
+                BuildDiarizationRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory),
+                runtimeResult.FailureCategory);
+            SetSetupInstallStatus("話者識別", "失敗", message);
+            SetupDiarizationRuntimeSummary = message;
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+            return false;
+        }
+
+        SetupDiarizationRuntimeSummary = $"Speaker diarization runtime installed: {runtimeResult.InstallPath}";
+        SetSetupInstallStatus("話者識別", "完了", runtimeResult.InstallPath);
+        LatestLog = runtimeResult.Message;
+        return true;
+    }
+
+    private async Task<bool> InstallTernaryReviewRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    {
+        if (SetupTernaryReviewRuntimeReady)
+        {
+            return true;
+        }
+
+        SetSetupInstallStatus("Ternary review runtime", "導入中", "選択した整文モデルに必要なruntime");
+        ModelDownloadProgressSummary = $"Installing {displayName}: downloading Ternary review runtime...";
+        ModelDownloadProgressStageText = "ダウンロード中";
+        IsModelDownloadProgressIndeterminate = true;
+        var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
+            cancellationToken,
+            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+        RefreshSetupWizard();
+        if (!runtimeResult.IsSucceeded)
+        {
+            var message = BuildTernaryReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
+            SetSetupInstallStatus("Ternary review runtime", "失敗", message);
+            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            LatestLog = message;
+            return false;
+        }
+
+        SetSetupInstallStatus("Ternary review runtime", "完了", runtimeResult.InstallPath);
+        LatestLog = runtimeResult.Message;
+        return true;
     }
 
     private async Task SetupDownloadAsrAsync()
@@ -845,57 +874,67 @@ public sealed partial class MainWindowViewModel
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
         var snapshot = _setupFlowCoordinator.BuildSnapshot(_setupSelectionDraft, refreshSmokeChecks);
-        _setupPresetRecommendation = snapshot.Recommendation;
-        _setupState = snapshot.State;
-        _setupSelectionDraft = snapshot.SelectionDraft;
+        ApplySetupWizardPresentation(SetupWizardStatePresenter.Create(snapshot));
         RefreshDiarizationRuntimeSummary();
-        SetupSteps.Clear();
-        foreach (var step in snapshot.StepItems)
-        {
-            SetupSteps.Add(step);
-        }
-
-        SetupAsrModelChoices.Clear();
-        foreach (var entry in snapshot.AsrModelChoices)
-        {
-            SetupAsrModelChoices.Add(entry);
-        }
-
-        SetupReviewModelChoices.Clear();
-        foreach (var entry in snapshot.ReviewModelChoices)
-        {
-            SetupReviewModelChoices.Add(entry);
-        }
-
-        SetupModelPresetChoices.Clear();
-        foreach (var preset in snapshot.PresetChoices)
-        {
-            SetupModelPresetChoices.Add(preset);
-        }
-
-        var displayState = snapshot.DisplayState;
-        _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(displayState.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase)) ??
-            SetupAsrModelChoices.FirstOrDefault();
-        _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(displayState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase)) ??
-            SetupReviewModelChoices.FirstOrDefault();
-        _selectedSettingsReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(_setupState.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase)) ??
-            SetupReviewModelChoices.FirstOrDefault();
-        _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
-            preset.PresetId.Equals(displayState.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
+        ReplaceItems(SetupSteps, snapshot.StepItems);
+        ReplaceItems(SetupAsrModelChoices, snapshot.AsrModelChoices);
+        ReplaceItems(SetupReviewModelChoices, snapshot.ReviewModelChoices);
+        ReplaceItems(SetupModelPresetChoices, snapshot.PresetChoices);
         RefreshAvailableAsrEngines();
 
         if (snapshot.SmokeChecks is not null)
         {
-            SetupSmokeChecks.Clear();
-            foreach (var check in snapshot.SmokeChecks)
-            {
-                SetupSmokeChecks.Add(check);
-            }
+            ReplaceItems(SetupSmokeChecks, snapshot.SmokeChecks);
         }
 
+        RaiseSetupWizardPresentationChanged();
+        OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
+        RefreshAsrCudaRuntimeSummary();
+        OnPropertyChanged(nameof(SetupAsrCudaRuntimeSummary));
+        RefreshCudaReviewRuntimeSummary();
+        OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
+        OnPropertyChanged(nameof(IsSetupComplete));
+        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
+        OnPropertyChanged(nameof(ReviewStageAssetsReady));
+        OnPropertyChanged(nameof(SummaryStageAssetsReady));
+        OnPropertyChanged(nameof(CanRunSelectedJob));
+        OnPropertyChanged(nameof(RunPreflightSummary));
+        OnPropertyChanged(nameof(RunPreflightDetail));
+        ReplaceItems(SetupModelAudits, snapshot.ModelAudits);
+        ReplaceItems(SetupExistingData, snapshot.ExistingData);
+
+        RefreshSetupInstallPlanItems();
+
+        if (RunSelectedJobCommand is RelayCommand runCommand)
+        {
+            runCommand.RaiseCanExecuteChanged();
+        }
+
+        UpdateSetupDownloadCommandStates();
+    }
+
+    private void ApplySetupWizardPresentation(SetupWizardPresentationState presentation)
+    {
+        _setupPresetRecommendation = presentation.Recommendation;
+        _setupState = presentation.State;
+        _setupSelectionDraft = presentation.SelectionDraft;
+        _selectedSetupAsrModel = presentation.SelectedAsrModel;
+        _selectedSetupReviewModel = presentation.SelectedReviewModel;
+        _selectedSettingsReviewModel = presentation.SelectedSettingsReviewModel;
+        _selectedSetupModelPreset = presentation.SelectedModelPreset;
+    }
+
+    private static void ReplaceItems<T>(ICollection<T> target, IEnumerable<T> source)
+    {
+        target.Clear();
+        foreach (var item in source)
+        {
+            target.Add(item);
+        }
+    }
+
+    private void RaiseSetupWizardPresentationChanged()
+    {
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
         OnPropertyChanged(nameof(SelectedSettingsReviewModel));
@@ -938,38 +977,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SetupMode));
         OnPropertyChanged(nameof(SetupStorageRoot));
         OnPropertyChanged(nameof(SetupLicenseAccepted));
-        OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
-        RefreshAsrCudaRuntimeSummary();
-        OnPropertyChanged(nameof(SetupAsrCudaRuntimeSummary));
-        RefreshCudaReviewRuntimeSummary();
-        OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
-        OnPropertyChanged(nameof(IsSetupComplete));
-        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
-        OnPropertyChanged(nameof(ReviewStageAssetsReady));
-        OnPropertyChanged(nameof(SummaryStageAssetsReady));
-        OnPropertyChanged(nameof(CanRunSelectedJob));
-        OnPropertyChanged(nameof(RunPreflightSummary));
-        OnPropertyChanged(nameof(RunPreflightDetail));
-        SetupModelAudits.Clear();
-        foreach (var audit in snapshot.ModelAudits)
-        {
-            SetupModelAudits.Add(audit);
-        }
-
-        SetupExistingData.Clear();
-        foreach (var item in snapshot.ExistingData)
-        {
-            SetupExistingData.Add(item);
-        }
-
-        RefreshSetupInstallPlanItems();
-
-        if (RunSelectedJobCommand is RelayCommand runCommand)
-        {
-            runCommand.RaiseCanExecuteChanged();
-        }
-
-        UpdateSetupDownloadCommandStates();
     }
 
     private void CommitSetupSelectionDraft()
