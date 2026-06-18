@@ -76,7 +76,8 @@ public sealed class AsrCudaRuntimeServiceTests
         Assert.Contains(progress.Items, item =>
             item.BytesTotal.HasValue &&
             item.BytesDownloaded == item.BytesTotal &&
-            item.DisplayPercent == 100);
+            item.DisplayPercent is > 0 and <= 80);
+        AssertPercentIsMonotonic(progress.Items);
         Assert.Contains(progress.Items, item => item.StageText == "ダウンロード中" && item.Message.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(progress.Items, item => item.StageText == "検証中" && item.Message.Contains("sha256", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(progress.Items, item => item.StageText == "展開中");
@@ -352,6 +353,16 @@ public sealed class AsrCudaRuntimeServiceTests
     private static string ComputeSha256(byte[] bytes)
     {
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+    }
+
+    private static void AssertPercentIsMonotonic(IEnumerable<RuntimeInstallProgress> items)
+    {
+        var previous = 0d;
+        foreach (var item in items.Where(item => item.DisplayPercent.HasValue))
+        {
+            Assert.True(item.DisplayPercent >= previous);
+            previous = item.DisplayPercent.Value;
+        }
     }
 
     private sealed class MapHandler(IReadOnlyDictionary<string, byte[]> responses) : HttpMessageHandler

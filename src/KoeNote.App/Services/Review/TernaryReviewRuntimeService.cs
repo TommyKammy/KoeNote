@@ -75,10 +75,10 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
         CancellationToken cancellationToken,
         IProgress<RuntimeInstallProgress>? progress)
     {
-        using var response = await httpClient.GetAsync(RuntimeUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await httpClient.GetAsync(RuntimeUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var totalBytes = response.Content.Headers.ContentLength;
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using var destination = File.Create(tempPath);
         await CopyToAsync(
             source,
@@ -108,13 +108,13 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
 
         while (true)
         {
-            var bytesRead = await source.ReadAsync(buffer, cancellationToken);
+            var bytesRead = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
             {
                 break;
             }
 
-            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
             downloadedBytes += bytesRead;
             Report(reporter, stageText, message, downloadedBytes, totalBytes, completePercent);
         }

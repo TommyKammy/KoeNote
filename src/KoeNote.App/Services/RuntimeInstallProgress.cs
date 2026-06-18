@@ -27,7 +27,7 @@ public sealed record RuntimeInstallProgress(
 internal sealed class RuntimeInstallProgressReporter(IProgress<RuntimeInstallProgress>? progress)
 {
     private static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
-    private const long ByteStep = 1024 * 1024;
+    private const long ByteStep = 8L * 1024 * 1024;
 
     private DateTimeOffset _lastReportedAt = DateTimeOffset.MinValue;
     private long? _lastReportedBytes;
@@ -72,7 +72,7 @@ internal sealed class RuntimeInstallProgressReporter(IProgress<RuntimeInstallPro
             return true;
         }
 
-        if (value.DisplayPercent is { } percent)
+        if (value.BytesDownloaded is null && value.DisplayPercent is { } percent)
         {
             var visiblePercent = (int)Math.Floor(percent);
             if (visiblePercent != _lastReportedPercent)
