@@ -24,7 +24,8 @@ public sealed class TernaryReviewRuntimeServiceTests
         Assert.Contains(progress.Items, item =>
             item.BytesTotal == archive.Length &&
             item.BytesDownloaded == archive.Length &&
-            item.DisplayPercent == 100);
+            item.DisplayPercent == 80);
+        AssertPercentIsMonotonic(progress.Items);
         Assert.True(File.Exists(paths.TernaryLlamaCompletionPath));
         Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(paths.TernaryLlamaCompletionPath)!, "ggml.dll")));
     }
@@ -59,6 +60,16 @@ public sealed class TernaryReviewRuntimeServiceTests
         }
 
         return stream.ToArray();
+    }
+
+    private static void AssertPercentIsMonotonic(IEnumerable<RuntimeInstallProgress> items)
+    {
+        var previous = 0d;
+        foreach (var item in items.Where(item => item.DisplayPercent.HasValue))
+        {
+            Assert.True(item.DisplayPercent >= previous);
+            previous = item.DisplayPercent.Value;
+        }
     }
 
     private sealed class ArchiveHandler(byte[] archive) : HttpMessageHandler

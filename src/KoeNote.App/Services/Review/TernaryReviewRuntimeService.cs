@@ -30,7 +30,7 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
         {
             await DownloadAsync(tempPath, cancellationToken, progress);
 
-            Report(progress, "検証中", "Ternary review runtime archive を検証しています...", 80);
+            Report(progress, "検証中", "Ternary review runtime archive を検証しています...", 85);
             var installRoot = Path.GetDirectoryName(paths.TernaryLlamaCompletionPath)!;
             Directory.CreateDirectory(installRoot);
             using var archive = ZipFile.OpenRead(tempPath);
@@ -43,7 +43,7 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
                 return new TernaryReviewRuntimeInstallResult(false, "Ternary review runtime archive did not contain llama-completion.exe.", installRoot, FailureCategoryArchiveInvalid);
             }
 
-            Report(progress, "展開中", "Ternary review runtime を展開しています...", 90);
+            Report(progress, "展開中", "Ternary review runtime を展開しています...", 95);
             ExtractArchive(archive, installRoot);
             return IsInstalled()
                 ? new TernaryReviewRuntimeInstallResult(true, $"Ternary review runtime installed: {paths.TernaryLlamaCompletionPath}", paths.TernaryLlamaCompletionPath, string.Empty)
@@ -87,6 +87,7 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
             "ダウンロード中",
             "Ternary review runtime をダウンロードしています...",
             progress,
+            80,
             cancellationToken);
     }
 
@@ -97,11 +98,12 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
         string stageText,
         string message,
         IProgress<RuntimeInstallProgress>? progress,
+        double completePercent,
         CancellationToken cancellationToken)
     {
         var buffer = new byte[81920];
         long downloadedBytes = 0;
-        Report(progress, stageText, message, downloadedBytes, totalBytes);
+        Report(progress, stageText, message, downloadedBytes, totalBytes, completePercent);
 
         while (true)
         {
@@ -113,7 +115,7 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
 
             await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
             downloadedBytes += bytesRead;
-            Report(progress, stageText, message, downloadedBytes, totalBytes);
+            Report(progress, stageText, message, downloadedBytes, totalBytes, completePercent);
         }
     }
 
@@ -147,11 +149,16 @@ public sealed class TernaryReviewRuntimeService(AppPaths paths, HttpClient httpC
         string stageText,
         string message,
         long bytesDownloaded,
-        long? bytesTotal)
+        long? bytesTotal,
+        double completePercent)
     {
+        var percent = bytesTotal is > 0 && bytesDownloaded <= bytesTotal.Value
+            ? Math.Clamp(bytesDownloaded * completePercent / bytesTotal.Value, 0, completePercent)
+            : (double?)null;
         progress?.Report(new RuntimeInstallProgress(
             stageText,
             message,
+            percent,
             BytesDownloaded: bytesDownloaded,
             BytesTotal: bytesTotal,
             IsIndeterminate: !bytesTotal.HasValue));
