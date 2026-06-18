@@ -157,6 +157,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _updateDownloadProgressText = string.Empty;
     private string _verifiedUpdateInstallerPath = string.Empty;
     private LatestReleaseInfo? _availableUpdate;
+    private int _updateDownloadGeneration;
     private bool _isDatabaseMaintenanceInProgress;
     private bool _isUpdateCheckInProgress;
     private bool _isUpdateDownloadInProgress;

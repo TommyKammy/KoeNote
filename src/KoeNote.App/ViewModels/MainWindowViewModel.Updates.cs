@@ -175,6 +175,7 @@ public sealed partial class MainWindowViewModel
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
             RecordUpdateHistory("check_failed", null, exception.Message);
+            InvalidateUpdateDownloadSnapshot();
             _availableUpdate = null;
             ClearVerifiedUpdateInstallerState();
             UpdateNotificationTitle = "Update check failed";
@@ -194,6 +195,7 @@ public sealed partial class MainWindowViewModel
 
     private Task DismissUpdateNotificationAsync()
     {
+        InvalidateUpdateDownloadSnapshot();
         _availableUpdate = null;
         UpdateNotificationTitle = string.Empty;
         UpdateNotificationMessage = string.Empty;
@@ -235,45 +237,60 @@ public sealed partial class MainWindowViewModel
 
     private async Task DownloadUpdateAsync(bool isBackground = false)
     {
-        if (_availableUpdate is null || IsUpdateDownloadInProgress)
+        var release = _availableUpdate;
+        if (release is null || IsUpdateDownloadInProgress)
         {
             return;
         }
 
+        var generation = isBackground ? BeginUpdateDownloadSnapshot() : _updateDownloadGeneration;
         IsUpdateDownloadInProgress = true;
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = "Downloading update...";
         if (isBackground)
         {
             UpdateNotificationMessage = "Downloading the update in the background. You can continue working until it is ready to restart.";
-            LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update in the background...";
+            LatestLog = $"Downloading KoeNote {release.Version} update in the background...";
         }
         else
         {
-            LatestLog = $"Downloading KoeNote {AvailableUpdateVersion} update...";
+            LatestLog = $"Downloading KoeNote {release.Version} update...";
         }
 
         RecordUpdateHistory(
             isBackground ? "download_background_started" : "download_started",
-            _availableUpdate.Version,
+            release.Version,
             isBackground ? "Background update download started." : "Update download started.");
         try
         {
             var progress = new Progress<UpdateDownloadProgress>(downloadProgress =>
             {
-                UpdateDownloadProgressText = FormatUpdateDownloadProgress(downloadProgress);
+                if (IsCurrentUpdateDownload(release, generation))
+                {
+                    UpdateDownloadProgressText = FormatUpdateDownloadProgress(downloadProgress);
+                }
             });
-            var result = await _updateDownloadService.DownloadAndVerifyAsync(_availableUpdate, progress);
+            var result = await _updateDownloadService.DownloadAndVerifyAsync(release, progress);
+            if (!IsCurrentUpdateDownload(release, generation))
+            {
+                return;
+            }
+
             VerifiedUpdateInstallerPath = result.FilePath;
             UpdateDownloadProgressText = $"SHA256 verified installer: {result.FilePath}";
-            UpdateNotificationTitle = $"Ready to update and restart: KoeNote {AvailableUpdateVersion}";
+            UpdateNotificationTitle = $"Ready to update and restart: KoeNote {release.Version}";
             UpdateNotificationMessage = "The update package has been downloaded and SHA256 verified. Choose Update and restart to apply it.";
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
-            RecordUpdateHistory("download_verified", _availableUpdate.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
+            RecordUpdateHistory("download_verified", release.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or UnauthorizedAccessException or InvalidOperationException or TaskCanceledException)
         {
-            RecordUpdateHistory("download_failed", _availableUpdate.Version, exception.Message);
+            if (!IsCurrentUpdateDownload(release, generation))
+            {
+                return;
+            }
+
+            RecordUpdateHistory("download_failed", release.Version, exception.Message);
             UpdateDownloadProgressText = string.Empty;
             UpdateNotificationTitle = "Update download failed";
             UpdateNotificationMessage = exception.Message;
@@ -297,6 +314,21 @@ public sealed partial class MainWindowViewModel
         }
 
         _ = DownloadUpdateAsync(isBackground: true);
+    }
+
+    private int BeginUpdateDownloadSnapshot()
+    {
+        return ++_updateDownloadGeneration;
+    }
+
+    private void InvalidateUpdateDownloadSnapshot()
+    {
+        _updateDownloadGeneration++;
+    }
+
+    private bool IsCurrentUpdateDownload(LatestReleaseInfo release, int generation)
+    {
+        return generation == _updateDownloadGeneration && ReferenceEquals(_availableUpdate, release);
     }
 
     private static bool HasDownloadableUpdate(UpdateCheckResult result)
@@ -435,6 +467,7 @@ public sealed partial class MainWindowViewModel
             if (showUpToDate)
             {
                 LatestLog = result.Message;
+                InvalidateUpdateDownloadSnapshot();
                 _availableUpdate = null;
                 ClearVerifiedUpdateInstallerState();
                 UpdateNotificationTitle = "KoeNote is up to date";

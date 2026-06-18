@@ -653,6 +653,47 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task DismissUpdateNotification_IgnoresInFlightBackgroundDownloadCompletion()
+    {
+        var viewModel = CreateViewModel();
+        var installerPath = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "KoeNote.msi");
+        var release = CreateUpdateRelease();
+        var downloadService = new ControlledUpdateDownloadService(installerPath, release.Sha256);
+        SetPrivateField(viewModel, "_updateDownloadService", downloadService);
+        SetPrivateField(
+            viewModel,
+            "_updateCheckService",
+            new ReturningUpdateCheckService(new UpdateCheckResult(
+                true,
+                true,
+                false,
+                "0.14.0",
+                release,
+                "KoeNote 0.15.0 is available.")));
+
+        await InvokePrivate<Task>(viewModel, "CheckForUpdatesAsync");
+        for (var i = 0; i < 20 && !viewModel.IsUpdateDownloadInProgress; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.True(viewModel.IsUpdateDownloadInProgress);
+
+        viewModel.DismissUpdateNotificationCommand.Execute(null);
+        downloadService.Complete();
+        for (var i = 0; i < 20 && viewModel.IsUpdateDownloadInProgress; i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Empty(viewModel.UpdateNotificationTitle);
+        Assert.Empty(viewModel.UpdateNotificationMessage);
+        Assert.Empty(viewModel.UpdateDownloadProgressText);
+        Assert.Empty(viewModel.VerifiedUpdateInstallerPath);
+        Assert.False(viewModel.HasUpdateNotification);
+    }
+
+    [Fact]
     public void Constructor_SurfacesPendingUpdaterFailureResult()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -790,6 +831,31 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
             CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("download unavailable");
+        }
+    }
+
+    private sealed class ControlledUpdateDownloadService(string installerPath, string sha256) : IUpdateDownloadService
+    {
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<UpdateDownloadResult> DownloadAndVerifyAsync(
+            LatestReleaseInfo release,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            progress?.Report(new UpdateDownloadProgress(1, 10));
+            await _completion.Task.WaitAsync(cancellationToken);
+            progress?.Report(new UpdateDownloadProgress(10, 10));
+            return new UpdateDownloadResult(
+                installerPath,
+                sha256,
+                10,
+                DateTimeOffset.Now);
+        }
+
+        public void Complete()
+        {
+            _completion.SetResult();
         }
     }
 
