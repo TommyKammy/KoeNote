@@ -217,8 +217,8 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         }
         finally
         {
-            DeleteDirectoryIfExists(stagingRoot);
-            DeleteDirectoryIfExists(backupRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(stagingRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(backupRoot);
         }
     }
 
@@ -303,9 +303,9 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         }
         finally
         {
-            DeleteIfExists(tempPath);
-            DeleteDirectoryIfExists(stagingRoot);
-            DeleteDirectoryIfExists(backupRoot);
+            RuntimeInstallFileOps.DeleteFileIfExists(tempPath);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(stagingRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(backupRoot);
         }
     }
 
@@ -350,7 +350,8 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
     {
         return archive.Entries.Where(entry =>
             !string.IsNullOrWhiteSpace(entry.Name) &&
-            AsrCudaRuntimeLayout.RequiredFilePatterns.Any(pattern => MatchesPattern(entry.Name, pattern)));
+            AsrCudaRuntimeLayout.RequiredFilePatterns.Any(pattern =>
+                RuntimeInstallFileOps.MatchesPattern(entry.Name, pattern)));
     }
 
     private static void MirrorNvidiaFilesToCTranslate2Runtime(string sourceRoot, string destinationRoot, bool deleteSourceFiles = false)
@@ -360,38 +361,12 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             return;
         }
 
-        Directory.CreateDirectory(destinationRoot);
-        foreach (var sourcePath in Directory.EnumerateFiles(sourceRoot, "*.dll", SearchOption.TopDirectoryOnly)
-                     .Where(static file => AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns.Any(pattern =>
-                         MatchesPattern(Path.GetFileName(file), pattern))))
-        {
-            File.Copy(sourcePath, Path.Combine(destinationRoot, Path.GetFileName(sourcePath)), overwrite: true);
-            if (deleteSourceFiles)
-            {
-                File.Delete(sourcePath);
-            }
-        }
-    }
-
-    private static bool MatchesPattern(string fileName, string pattern)
-    {
-        return NvidiaRedistInstaller.MatchesPattern(fileName, pattern);
-    }
-
-    private static void DeleteIfExists(string path)
-    {
-        if (File.Exists(path))
-        {
-            File.Delete(path);
-        }
-    }
-
-    private static void DeleteDirectoryIfExists(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            Directory.Delete(path, recursive: true);
-        }
+        RuntimeInstallFileOps.CopyMatchingFiles(
+            sourceRoot,
+            destinationRoot,
+            AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns,
+            deleteSourceFiles,
+            searchPattern: "*.dll");
     }
 
     private static void Report(IProgress<RuntimeInstallProgress>? progress, string stageText, string message)

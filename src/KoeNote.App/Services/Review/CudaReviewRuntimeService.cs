@@ -178,8 +178,8 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
         finally
         {
-            DeleteDirectoryIfExists(stagingRoot);
-            DeleteDirectoryIfExists(backupRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(stagingRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(backupRoot);
         }
     }
 
@@ -279,9 +279,9 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
         finally
         {
-            DeleteIfExists(tempPath);
-            DeleteDirectoryIfExists(stagingRoot);
-            DeleteDirectoryIfExists(backupRoot);
+            RuntimeInstallFileOps.DeleteFileIfExists(tempPath);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(stagingRoot);
+            RuntimeInstallFileOps.DeleteDirectoryIfExists(backupRoot);
         }
     }
 
@@ -314,7 +314,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         var patterns = CudaReviewRuntimeLayout.RequiredFilePatterns.Concat(CudaReviewRuntimeLayout.OptionalNvidiaFilePatterns).ToArray();
         return archive.Entries.Where(entry =>
             !string.IsNullOrWhiteSpace(entry.Name) &&
-            patterns.Any(pattern => MatchesPattern(entry.Name, pattern)));
+            patterns.Any(pattern => RuntimeInstallFileOps.MatchesPattern(entry.Name, pattern)));
     }
 
     private static bool HasCudaBridge(string directory)
@@ -364,7 +364,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
     {
         try
         {
-            DeleteMatchingFiles(sourceDirectory, patterns);
+            RuntimeInstallFileOps.DeleteMatchingFiles(sourceDirectory, patterns);
             return null;
         }
         catch (IOException exception)
@@ -387,7 +387,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
     {
         try
         {
-            CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns, deleteSourceFiles: true);
+            RuntimeInstallFileOps.CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns, deleteSourceFiles: true);
             return null;
         }
         catch (IOException exception)
@@ -406,43 +406,6 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
     }
 
-    private static void CopyMatchingFiles(
-        string sourceDirectory,
-        string destinationDirectory,
-        IReadOnlyCollection<string> patterns,
-        bool deleteSourceFiles = false)
-    {
-        if (!Directory.Exists(sourceDirectory))
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(destinationDirectory);
-        foreach (var sourcePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
-                     .Where(file => patterns.Any(pattern => MatchesPattern(Path.GetFileName(file), pattern))))
-        {
-            File.Copy(sourcePath, Path.Combine(destinationDirectory, Path.GetFileName(sourcePath)), overwrite: true);
-            if (deleteSourceFiles)
-            {
-                File.Delete(sourcePath);
-            }
-        }
-    }
-
-    private static void DeleteMatchingFiles(string sourceDirectory, IReadOnlyCollection<string> patterns)
-    {
-        if (!Directory.Exists(sourceDirectory))
-        {
-            return;
-        }
-
-        foreach (var sourcePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
-                     .Where(file => patterns.Any(pattern => MatchesPattern(Path.GetFileName(file), pattern))))
-        {
-            File.Delete(sourcePath);
-        }
-    }
-
     private static bool HasRequiredNvidiaDependencies(string directory)
     {
         return Directory.Exists(directory) &&
@@ -455,27 +418,6 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         return Directory.Exists(directory) &&
             CudaReviewRuntimeLayout.NvidiaFilePatterns.Any(pattern =>
                 Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
-    }
-
-    private static bool MatchesPattern(string fileName, string pattern)
-    {
-        return NvidiaRedistInstaller.MatchesPattern(fileName, pattern);
-    }
-
-    private static void DeleteIfExists(string path)
-    {
-        if (File.Exists(path))
-        {
-            File.Delete(path);
-        }
-    }
-
-    private static void DeleteDirectoryIfExists(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            Directory.Delete(path, recursive: true);
-        }
     }
 
     private static void Report(IProgress<RuntimeInstallProgress>? progress, string stageText, string message)
