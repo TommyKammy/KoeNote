@@ -73,6 +73,32 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\KoeNote.Updater\KoeNote.Updater.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="CopyUpdaterHelper" AfterTargets="Build">
+    <ItemGroup>
+      <UpdaterHelperOutput Include="..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterHelperOutput)"
+          DestinationFolder="$(TargetDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.exe')" />
+  </Target>
+
+  <Target Name="CopyUpdaterHelperToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <UpdaterHelperPublishOutput Include="..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterHelperPublishOutput)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('..\KoeNote.Updater\bin\$(Configuration)\net11.0-windows\KoeNote.Updater.exe')" />
+  </Target>
+
   <Target Name="CopyLocalRuntimeTools" AfterTargets="Build">
     <ItemGroup>
       <AsrRuntimeTool Include="$(MSBuildProjectDirectory)\..\..\tools\asr\**\*"
