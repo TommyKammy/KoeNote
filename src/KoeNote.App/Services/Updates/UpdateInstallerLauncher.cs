@@ -105,6 +105,7 @@ public sealed class UpdateInstallerLauncher(
         var startInfo = new ProcessStartInfo
         {
             FileName = helperPath,
+            WorkingDirectory = Path.GetDirectoryName(helperPath) ?? Path.GetTempPath(),
             UseShellExecute = false,
             CreateNoWindow = true
         };

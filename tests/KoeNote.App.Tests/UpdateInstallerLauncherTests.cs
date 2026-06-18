@@ -44,6 +44,7 @@ public sealed class UpdateInstallerLauncherTests
         Assert.NotEqual(Path.GetFullPath(helperPath), captured.FileName);
         Assert.StartsWith(Path.GetFullPath(helperWorkingRoot), captured.FileName, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("KoeNote.Updater.exe", Path.GetFileName(captured.FileName));
+        Assert.Equal(Path.GetDirectoryName(captured.FileName), captured.WorkingDirectory);
         Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(captured.FileName)!, "KoeNote.Updater.dll")));
         var arguments = captured.ArgumentList.ToArray();
         Assert.Contains("--msi", arguments);
