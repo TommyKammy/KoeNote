@@ -218,6 +218,11 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ColumnDefinition.WidthProperty", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"0\" />", controlsXaml, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"0\"", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(audioPlayerXaml, "ItemsSource=\"{Binding PlaybackRateOptions}\""));
+        Assert.Equal(2, CountOccurrences(audioPlayerXaml, "DisplayMemberPath=\"DisplayText\""));
+        Assert.Equal(2, CountOccurrences(audioPlayerXaml, "SelectedValuePath=\"Value\""));
+        Assert.Equal(2, CountOccurrences(audioPlayerXaml, "SelectedValue=\"{Binding PlaybackRate, Mode=TwoWay}\""));
+        Assert.DoesNotContain("ItemStringFormat=\"{}{0:0.##}x\"", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"実行\"", headerXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("整文まで実行", headerXaml, StringComparison.Ordinal);

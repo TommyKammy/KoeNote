@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -23,6 +24,16 @@ using KoeNote.App.Services.Transcript;
 using KoeNote.App.Services.Updates;
 
 namespace KoeNote.App.ViewModels;
+
+public sealed record PlaybackRateOption(double Value, string DisplayText)
+{
+    public static string Format(double value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture) + "x";
+    }
+
+    public override string ToString() => DisplayText;
+}
 
 public sealed record AsrEngineOption(string EngineId, string DisplayName, bool IsInstalled = false)
 {
@@ -654,6 +665,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool HasLoadedDomainPreset => !string.IsNullOrWhiteSpace(_loadedDomainPresetPath);
 
     public ObservableCollection<double> PlaybackRates { get; } = [1.0, 1.25, 1.5, 2.0];
+
+    public ObservableCollection<PlaybackRateOption> PlaybackRateOptions { get; } =
+    [
+        new(1.0, "1x"),
+        new(1.25, "1.25x"),
+        new(1.5, "1.5x"),
+        new(2.0, "2x")
+    ];
 
     public ObservableCollection<double> PlaybackWaveformSamples { get; } = [];
 
@@ -1890,9 +1909,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
             _playbackRate = value > 0 ? value : 1.0;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(PlaybackRateDisplayText));
             _audioPlaybackService.SetPlaybackRate(_playbackRate);
         }
     }
+
+    public string PlaybackRateDisplayText => PlaybackRateOption.Format(PlaybackRate);
 
     public double PlaybackVolume
     {
