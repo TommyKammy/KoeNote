@@ -324,7 +324,8 @@
                     BorderBrush="{StaticResource BorderBrushSoft}"
                     BorderThickness="1"
                     CornerRadius="6"
-                    Padding="12">
+                    Padding="12"
+                    Visibility="{Binding ShowSetupInstallProgress, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

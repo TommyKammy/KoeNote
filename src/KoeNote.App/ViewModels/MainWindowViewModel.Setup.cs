@@ -231,27 +231,27 @@ public sealed partial class MainWindowViewModel
         using var cancellation = new CancellationTokenSource();
         _modelDownloadCancellation = cancellation;
         ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
+        var operationId = BeginModelDownloadProgress(displayName);
         ModelDownloadProgressSummary = $"Installing {displayName}: checking ASR, Review, and speaker diarization runtime...";
         SetSetupInstallStatus("文字起こしモデル", "導入中", SelectedSetupAsrModel?.DisplayName ?? "ASR model");
         SetSetupInstallStatus("整文モデル", "導入中", SelectedSetupReviewModel?.DisplayName ?? "Review model");
-        var progress = CreateSetupModelDownloadProgress();
+        var progress = CreateSetupModelDownloadProgress(operationId);
 
         try
         {
-            if (!await InstallSelectedSetupModelsAsync(displayName, progress, cancellation.Token) ||
-                !await InstallFasterWhisperRuntimeIfNeededAsync(displayName, cancellation.Token) ||
-                !ValidateSetupReviewRuntime(displayName) ||
-                !await InstallCudaRuntimeForPresetAsync(CreateAsrCudaRuntimeInstallSpec(), displayName, cancellation.Token) ||
-                !await InstallDiarizationRuntimeIfNeededAsync(displayName, cancellation.Token) ||
-                !await InstallCudaRuntimeForPresetAsync(CreateCudaReviewRuntimeInstallSpec(), displayName, cancellation.Token) ||
-                !await InstallTernaryReviewRuntimeIfNeededAsync(displayName, cancellation.Token))
+            if (!await InstallSelectedSetupModelsAsync(operationId, displayName, progress, cancellation.Token) ||
+                !await InstallFasterWhisperRuntimeIfNeededAsync(operationId, displayName, cancellation.Token) ||
+                !ValidateSetupReviewRuntime(operationId, displayName) ||
+                !await InstallCudaRuntimeForPresetAsync(CreateAsrCudaRuntimeInstallSpec(), operationId, displayName, cancellation.Token) ||
+                !await InstallDiarizationRuntimeIfNeededAsync(operationId, displayName, cancellation.Token) ||
+                !await InstallCudaRuntimeForPresetAsync(CreateCudaReviewRuntimeInstallSpec(), operationId, displayName, cancellation.Token) ||
+                !await InstallTernaryReviewRuntimeIfNeededAsync(operationId, displayName, cancellation.Token))
             {
                 return;
             }
 
             SetSetupInstallStatus("保存先", "確認済み", SetupStorageRoot);
-            CompleteModelDownloadProgress(displayName, succeeded: true);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: true);
             ModelDownloadProgressSummary = "導入が完了しました。最終確認へ進めます。";
             ModelDownloadNotification = "導入が完了しました。KoeNoteを使う準備に進めます。";
 
@@ -263,7 +263,7 @@ public sealed partial class MainWindowViewModel
         {
             _setupState = _setupWizardService.MoveToPresetSelection();
             RefreshSetupWizard();
-            CompleteModelDownloadProgress(displayName, succeeded: false, "セットアップ導入をキャンセルしました。別のプリセットを選べます。");
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, "セットアップ導入をキャンセルしました。別のプリセットを選べます。");
             LatestLog = "Setup installation was cancelled. Select a different preset or retry.";
         }
         finally
@@ -299,19 +299,25 @@ public sealed partial class MainWindowViewModel
         return false;
     }
 
-    private Progress<ModelDownloadProgress> CreateSetupModelDownloadProgress()
+    private Progress<ModelDownloadProgress> CreateSetupModelDownloadProgress(int operationId)
     {
         return new Progress<ModelDownloadProgress>(downloadProgress =>
         {
+            if (!IsCurrentModelDownloadProgressOperation(operationId))
+            {
+                return;
+            }
+
             var modelName = FindSetupModelDisplayName(
                 SetupAsrModelChoices.Concat(SetupReviewModelChoices),
                 downloadProgress.ModelId);
-            UpdateModelDownloadProgress(modelName, downloadProgress);
+            UpdateModelDownloadProgress(operationId, modelName, downloadProgress);
             RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
     }
 
     private async Task<bool> InstallSelectedSetupModelsAsync(
+        int operationId,
         string displayName,
         IProgress<ModelDownloadProgress> progress,
         CancellationToken cancellationToken)
@@ -322,7 +328,7 @@ public sealed partial class MainWindowViewModel
         {
             SetSetupInstallStatus("文字起こしモデル", "失敗", modelResult.Message);
             SetSetupInstallStatus("整文モデル", "失敗", modelResult.Message);
-            CompleteSetupModelDownload(displayName, modelResult);
+            CompleteSetupModelDownload(operationId, displayName, modelResult);
             return false;
         }
 
@@ -331,7 +337,7 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-    private async Task<bool> InstallFasterWhisperRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    private async Task<bool> InstallFasterWhisperRuntimeIfNeededAsync(int operationId, string displayName, CancellationToken cancellationToken)
     {
         if (SetupFasterWhisperRuntimeReady)
         {
@@ -348,7 +354,7 @@ public sealed partial class MainWindowViewModel
         {
             var message = BuildFasterWhisperRuntimeSetupFailureMessage(preflight.Message, preflight.FailureCategory);
             SetSetupInstallStatus("ASR runtime", "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
             return false;
         }
@@ -357,13 +363,13 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressStageText = "インストール中";
         var runtimeResult = await _setupWizardService.InstallFasterWhisperRuntimeAsync(
             cancellationToken,
-            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+            CreateRuntimeInstallProgress(operationId, useDeterminateProgress: false));
         RefreshSetupWizard();
         if (!runtimeResult.IsSucceeded)
         {
             var message = BuildFasterWhisperRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
             SetSetupInstallStatus("ASR runtime", "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
             return false;
         }
@@ -373,7 +379,7 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-    private bool ValidateSetupReviewRuntime(string displayName)
+    private bool ValidateSetupReviewRuntime(int operationId, string displayName)
     {
         if (SetupReviewRuntimeReady)
         {
@@ -383,12 +389,12 @@ public sealed partial class MainWindowViewModel
 
         const string message = "CPU版Review runtimeが見つかりません。tools\\review\\llama-completion.exe を含むKoeNote Core runtimeを配置してから、もう一度セットアップを実行してください。";
         SetSetupInstallStatus("Review runtime", "失敗", message);
-        CompleteModelDownloadProgress(displayName, succeeded: false, message);
+        CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
         LatestLog = message;
         return false;
     }
 
-    private async Task<bool> InstallDiarizationRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    private async Task<bool> InstallDiarizationRuntimeIfNeededAsync(int operationId, string displayName, CancellationToken cancellationToken)
     {
         if (SetupDiarizationRuntimeReady)
         {
@@ -408,7 +414,7 @@ public sealed partial class MainWindowViewModel
                 preflight.FailureCategory);
             SetSetupInstallStatus("話者識別", "失敗", message);
             SetupDiarizationRuntimeSummary = message;
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
             return false;
         }
@@ -417,7 +423,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressStageText = "インストール中";
         var runtimeResult = await _setupWizardService.InstallDiarizationRuntimeAsync(
             cancellationToken,
-            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+            CreateRuntimeInstallProgress(operationId, useDeterminateProgress: false));
         RefreshSetupWizard();
         if (!runtimeResult.IsSucceeded)
         {
@@ -426,7 +432,7 @@ public sealed partial class MainWindowViewModel
                 runtimeResult.FailureCategory);
             SetSetupInstallStatus("話者識別", "失敗", message);
             SetupDiarizationRuntimeSummary = message;
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
             return false;
         }
@@ -437,7 +443,7 @@ public sealed partial class MainWindowViewModel
         return true;
     }
 
-    private async Task<bool> InstallTernaryReviewRuntimeIfNeededAsync(string displayName, CancellationToken cancellationToken)
+    private async Task<bool> InstallTernaryReviewRuntimeIfNeededAsync(int operationId, string displayName, CancellationToken cancellationToken)
     {
         if (SetupTernaryReviewRuntimeReady)
         {
@@ -450,13 +456,13 @@ public sealed partial class MainWindowViewModel
         IsModelDownloadProgressIndeterminate = true;
         var runtimeResult = await _setupWizardService.InstallTernaryReviewRuntimeAsync(
             cancellationToken,
-            CreateRuntimeInstallProgress(useDeterminateProgress: false));
+            CreateRuntimeInstallProgress(operationId, useDeterminateProgress: false));
         RefreshSetupWizard();
         if (!runtimeResult.IsSucceeded)
         {
             var message = BuildTernaryReviewRuntimeSetupFailureMessage(runtimeResult.Message, runtimeResult.FailureCategory);
             SetSetupInstallStatus("Ternary review runtime", "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
             return false;
         }
@@ -471,17 +477,22 @@ public sealed partial class MainWindowViewModel
         CommitSetupSelectionDraft();
         var displayName = SelectedSetupAsrModel?.DisplayName ?? "ASR model";
         ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
+        var operationId = BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("文字起こしモデル", "導入中", displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            UpdateModelDownloadProgress(displayName, downloadProgress);
+            if (!IsCurrentModelDownloadProgressOperation(operationId))
+            {
+                return;
+            }
+
+            UpdateModelDownloadProgress(operationId, displayName, downloadProgress);
             RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("asr", progress);
         RefreshSetupWizard();
         SetSetupInstallStatus("文字起こしモデル", result.IsSucceeded ? "完了" : "失敗", result.Message);
-        CompleteSetupModelDownload(displayName, result);
+        CompleteSetupModelDownload(operationId, displayName, result);
     }
 
     private async Task SetupDownloadReviewAsync()
@@ -489,24 +500,29 @@ public sealed partial class MainWindowViewModel
         CommitSetupSelectionDraft();
         var displayName = SelectedSetupReviewModel?.DisplayName ?? "Review LLM model";
         ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
+        var operationId = BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("整文モデル", "導入中", displayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            UpdateModelDownloadProgress(displayName, downloadProgress);
+            if (!IsCurrentModelDownloadProgressOperation(operationId))
+            {
+                return;
+            }
+
+            UpdateModelDownloadProgress(operationId, displayName, downloadProgress);
             RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
         var result = await _setupWizardService.DownloadSelectedModelAsync("review", progress);
         RefreshSetupWizard();
         SetSetupInstallStatus("整文モデル", result.IsSucceeded ? "完了" : "失敗", result.Message);
-        CompleteSetupModelDownload(displayName, result);
+        CompleteSetupModelDownload(operationId, displayName, result);
     }
 
     private async Task SetupInstallDiarizationRuntimeAsync()
     {
         const string displayName = "diarize speaker diarization runtime";
         ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
+        var operationId = BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus("話者識別", "導入中", "話者分離を使うための必須runtime");
         ModelDownloadProgressSummary = "Checking bundled Python and pip for diarize runtime...";
         ModelDownloadProgressStageText = "確認中";
@@ -523,14 +539,14 @@ public sealed partial class MainWindowViewModel
                 RefreshSetupWizard();
                 SetSetupInstallStatus("話者識別", "失敗", preflightMessage);
                 SetupDiarizationRuntimeSummary = preflightMessage;
-                CompleteModelDownloadProgress(displayName, succeeded: false, preflightMessage);
+                CompleteModelDownloadProgress(operationId, displayName, succeeded: false, preflightMessage);
                 LatestLog = preflightMessage;
                 return;
             }
 
             ModelDownloadProgressSummary = "Installing diarize runtime with bundled Python...";
             ModelDownloadProgressStageText = "インストール中";
-            var result = await _setupWizardService.InstallDiarizationRuntimeAsync(progress: CreateRuntimeInstallProgress());
+            var result = await _setupWizardService.InstallDiarizationRuntimeAsync(progress: CreateRuntimeInstallProgress(operationId));
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? $"Speaker diarization runtime installed: {result.InstallPath}"
@@ -539,7 +555,7 @@ public sealed partial class MainWindowViewModel
                     result.FailureCategory);
             SetupDiarizationRuntimeSummary = message;
             SetSetupInstallStatus("話者識別", result.IsSucceeded ? "完了" : "失敗", message);
-            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            CompleteModelDownloadProgress(operationId, displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
             if (result.IsSucceeded)
             {
                 ModelDownloadNotification = "話者識別runtimeの導入が完了しました。";
@@ -551,7 +567,7 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             const string message = "話者識別runtimeの導入を中止しました。Wizardの一括導入から再試行してください。";
             SetSetupInstallStatus("話者識別", "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
         }
     }
@@ -570,7 +586,7 @@ public sealed partial class MainWindowViewModel
     {
         var displayName = spec.DisplayName;
         ResetSetupInstallStatuses();
-        BeginModelDownloadProgress(displayName);
+        var operationId = BeginModelDownloadProgress(displayName);
         SetSetupInstallStatus(spec.InstallPlanItemName, "導入中", spec.InstallPlanSummary);
         ModelDownloadProgressSummary = spec.ProgressSummary;
         ModelDownloadProgressStageText = spec.InitialStageText;
@@ -578,14 +594,14 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var result = await spec.InstallAsync(CancellationToken.None, CreateRuntimeInstallProgress());
+            var result = await spec.InstallAsync(CancellationToken.None, CreateRuntimeInstallProgress(operationId));
             RefreshSetupWizard();
             var message = result.IsSucceeded
                 ? spec.BuildInstalledSummary(result.InstallPath)
                 : spec.BuildFailureMessage(result.Message, result.FailureCategory);
             spec.SetSummary(message);
             SetSetupInstallStatus(spec.InstallPlanItemName, result.IsSucceeded ? "完了" : "失敗", message);
-            CompleteModelDownloadProgress(displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
+            CompleteModelDownloadProgress(operationId, displayName, result.IsSucceeded, result.IsSucceeded ? null : message);
             if (result.IsSucceeded)
             {
                 ModelDownloadNotification = spec.SuccessNotification;
@@ -598,13 +614,14 @@ public sealed partial class MainWindowViewModel
             RefreshSetupWizard();
             var message = spec.CancelledMessage;
             SetSetupInstallStatus(spec.InstallPlanItemName, "失敗", message);
-            CompleteModelDownloadProgress(displayName, succeeded: false, message);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: false, message);
             LatestLog = message;
         }
     }
 
     private async Task<bool> InstallCudaRuntimeForPresetAsync(
         SetupCudaRuntimeInstallSpec spec,
+        int operationId,
         string presetDisplayName,
         CancellationToken cancellationToken,
         string? optionalFailureSuffix = null)
@@ -624,7 +641,7 @@ public sealed partial class MainWindowViewModel
         ModelDownloadProgressSummary = $"Installing {presetDisplayName}: {spec.PresetProgressDetail}";
         ModelDownloadProgressStageText = spec.InitialStageText;
         IsModelDownloadProgressIndeterminate = true;
-        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress(useDeterminateProgress: false));
+        var result = await spec.InstallAsync(cancellationToken, CreateRuntimeInstallProgress(operationId, useDeterminateProgress: false));
         RefreshSetupWizard();
         if (result.IsSucceeded)
         {
@@ -646,15 +663,20 @@ public sealed partial class MainWindowViewModel
 
         SetSetupInstallStatus(spec.InstallPlanItemName, "失敗", message);
         spec.SetSummary(message);
-        CompleteModelDownloadProgress(presetDisplayName, succeeded: false, message);
+        CompleteModelDownloadProgress(operationId, presetDisplayName, succeeded: false, message);
         LatestLog = message;
         return false;
     }
 
-    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress(bool useDeterminateProgress = true)
+    private IProgress<RuntimeInstallProgress> CreateRuntimeInstallProgress(int operationId, bool useDeterminateProgress = true)
     {
         return new Progress<RuntimeInstallProgress>(progress =>
         {
+            if (!IsCurrentModelDownloadProgressOperation(operationId))
+            {
+                return;
+            }
+
             if (useDeterminateProgress && progress.DisplayPercent is { } percent)
             {
                 ModelDownloadProgressPercent = percent;
@@ -683,11 +705,11 @@ public sealed partial class MainWindowViewModel
             : progress.Message;
     }
 
-    private void CompleteSetupModelDownload(string displayName, SetupInstallResult result)
+    private void CompleteSetupModelDownload(int operationId, string displayName, SetupInstallResult result)
     {
         if (result.IsSucceeded)
         {
-            CompleteModelDownloadProgress(displayName, succeeded: true);
+            CompleteModelDownloadProgress(operationId, displayName, succeeded: true);
             if (result.Message.StartsWith("Already installed", StringComparison.OrdinalIgnoreCase))
             {
                 ModelDownloadProgressSummary = result.Message;
@@ -698,7 +720,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        CompleteModelDownloadProgress(displayName, succeeded: false, result.Message);
+        CompleteModelDownloadProgress(operationId, displayName, succeeded: false, result.Message);
     }
 
     private Task SetupRegisterLocalAsrAsync()

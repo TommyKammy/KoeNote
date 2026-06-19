@@ -155,10 +155,15 @@ public sealed partial class MainWindowViewModel
         using var cancellation = new CancellationTokenSource();
         _modelDownloadCancellation = cancellation;
         _activeModelDownloadModelId = entry.ModelId;
-        BeginModelDownloadProgress(entry.DisplayName);
+        var operationId = BeginModelDownloadProgress(entry.DisplayName);
         var progress = new Progress<ModelDownloadProgress>(downloadProgress =>
         {
-            UpdateModelDownloadProgress(entry.DisplayName, downloadProgress);
+            if (!IsCurrentModelDownloadProgressOperation(operationId))
+            {
+                return;
+            }
+
+            UpdateModelDownloadProgress(operationId, entry.DisplayName, downloadProgress);
             RefreshModelCatalogForDownloadProgress(downloadProgress);
         });
 
@@ -176,17 +181,17 @@ public sealed partial class MainWindowViewModel
             }
 
             RefreshModelCatalogKeepingSelection(entry.ModelId);
-            CompleteModelDownloadProgress(entry.DisplayName, succeeded: true);
+            CompleteModelDownloadProgress(operationId, entry.DisplayName, succeeded: true);
         }
         catch (OperationCanceledException)
         {
             RefreshModelCatalogKeepingSelection(entry.ModelId);
-            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, "Model download cancelled.");
+            CompleteModelDownloadProgress(operationId, entry.DisplayName, succeeded: false, "Model download cancelled.");
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or HttpRequestException or UnauthorizedAccessException)
         {
             RefreshModelCatalogKeepingSelection(entry.ModelId);
-            CompleteModelDownloadProgress(entry.DisplayName, succeeded: false, $"Model download failed: {entry.DisplayName}: {exception.Message}");
+            CompleteModelDownloadProgress(operationId, entry.DisplayName, succeeded: false, $"Model download failed: {entry.DisplayName}: {exception.Message}");
         }
         finally
         {
