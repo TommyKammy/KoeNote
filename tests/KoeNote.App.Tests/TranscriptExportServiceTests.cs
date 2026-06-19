@@ -390,19 +390,7 @@ public sealed class TranscriptExportServiceTests
         new TranscriptSegmentRepository(paths).SaveSegments([
             new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
         ]);
-        var derivativeRepository = new TranscriptDerivativeRepository(paths);
-        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
-            "job-001",
-            TranscriptDerivativeKinds.Polished,
-            TranscriptDerivativeFormats.PlainText,
-            "[00:00 - 00:01] Alice: 読みやすい本文です。",
-            TranscriptDerivativeSourceKinds.Raw,
-            derivativeRepository.ComputeCurrentRawTranscriptHash("job-001"),
-            "seg-001..seg-001",
-            null,
-            "model",
-            "prompt",
-            "profile"));
+        SaveReadablePolishedDerivative(paths, "job-001", "[00:00 - 00:01] Alice: 読みやすい本文です。");
         var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
 
         var result = new TranscriptExportService(paths).ExportJob(
@@ -416,9 +404,76 @@ public sealed class TranscriptExportServiceTests
         using var archive = ZipFile.OpenRead(file);
         var worksheet = ReadZipXml(archive, "xl/worksheets/sheet1.xml");
         var cells = ReadInlineStringCells(worksheet);
-        Assert.Equal("整文", cells["A1"]);
-        Assert.Equal("[00:00 - 00:01] Alice: 読みやすい本文です。", cells["A2"]);
-        Assert.False(cells.ContainsKey("B1"));
+        Assert.Equal("開始時刻", cells["A1"]);
+        Assert.Equal("終了時刻", cells["B1"]);
+        Assert.Equal("話者", cells["C1"]);
+        Assert.Equal("整文", cells["D1"]);
+        Assert.Equal("00:00:00.000", cells["A2"]);
+        Assert.Equal("00:00:01.000", cells["B2"]);
+        Assert.Equal("Alice", cells["C2"]);
+        Assert.Equal("読みやすい本文です。", cells["D2"]);
+        Assert.False(cells.ContainsKey("E1"));
+    }
+
+    [Fact]
+    public void ExportJob_WritesReadablePolishedXlsxAsRowsForEachDocumentBlock()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "readable-blocks");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
+        ]);
+        SaveReadablePolishedDerivative(
+            paths,
+            "job-001",
+            "[00:05 - 00:15] Speaker_0: 1つ目の整文です。\n\n[00:15 - 01:03] Speaker_1: 2つ目の整文です。");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished));
+
+        using var archive = ZipFile.OpenRead(Path.Combine(output, "readable-blocks.xlsx"));
+        var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+        Assert.Equal("00:00:05.000", cells["A2"]);
+        Assert.Equal("00:00:15.000", cells["B2"]);
+        Assert.Equal("Speaker_0", cells["C2"]);
+        Assert.Equal("1つ目の整文です。", cells["D2"]);
+        Assert.Equal("00:00:15.000", cells["A3"]);
+        Assert.Equal("00:01:03.000", cells["B3"]);
+        Assert.Equal("Speaker_1", cells["C3"]);
+        Assert.Equal("2つ目の整文です。", cells["D3"]);
+    }
+
+    [Fact]
+    public void ExportJob_WritesReadablePolishedXlsxWithBlankMetadataForPlainBlocks()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "plain-readable");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 0, 1, "spk-1", "raw")
+        ]);
+        SaveReadablePolishedDerivative(paths, "job-001", "時刻や話者のない整文です。\n\n[00:00 - 00:01] Speaker_0: メタありの整文です。");
+        var output = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"), "exports");
+
+        new TranscriptExportService(paths).ExportJob(
+            "job-001",
+            output,
+            [TranscriptExportFormat.Xlsx],
+            new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished));
+
+        using var archive = ZipFile.OpenRead(Path.Combine(output, "plain-readable.xlsx"));
+        var cells = ReadInlineStringCells(ReadZipXml(archive, "xl/worksheets/sheet1.xml"));
+        Assert.Equal("", cells["A2"]);
+        Assert.Equal("", cells["B2"]);
+        Assert.Equal("", cells["C2"]);
+        Assert.Equal("時刻や話者のない整文です。", cells["D2"]);
+        Assert.Equal("00:00:00.000", cells["A3"]);
+        Assert.Equal("00:00:01.000", cells["B3"]);
+        Assert.Equal("Speaker_0", cells["C3"]);
+        Assert.Equal("メタありの整文です。", cells["D3"]);
     }
 
     [Fact]
@@ -670,6 +725,23 @@ public sealed class TranscriptExportServiceTests
         command.Parameters.AddWithValue("$display_name", displayName);
         command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
         command.ExecuteNonQuery();
+    }
+
+    private static void SaveReadablePolishedDerivative(AppPaths paths, string jobId, string content)
+    {
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            jobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            content,
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(jobId),
+            "seg-001..seg-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
     }
 
 }

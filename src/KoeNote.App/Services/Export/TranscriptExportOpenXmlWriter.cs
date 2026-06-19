@@ -2,6 +2,8 @@ using System.IO;
 using System.IO.Compression;
 using System.Security;
 using System.Text;
+using KoeNote.App.Models;
+using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Services.Export;
 
@@ -104,8 +106,17 @@ internal static class TranscriptExportOpenXmlWriter
 
         if (source == TranscriptExportSource.ReadablePolished)
         {
-            AppendXlsxRow(builder, 1, ["整文"], styleId: 1);
-            AppendXlsxRow(builder, 2, [snapshot.DocumentContent ?? string.Empty], styleId: 2);
+            AppendXlsxRow(builder, 1, GetXlsxHeaders(source), styleId: 1);
+            var blocks = ReadableDocumentBlockBuilder.Build(snapshot.DocumentContent ?? string.Empty);
+            for (var i = 0; i < blocks.Count; i++)
+            {
+                AppendXlsxRow(
+                    builder,
+                    i + 2,
+                    GetXlsxReadableBlockValues(blocks[i]),
+                    styleId: 2);
+            }
+
             return builder
                 .AppendLine("  </sheetData>")
                 .AppendLine("</worksheet>")
@@ -132,7 +143,7 @@ internal static class TranscriptExportOpenXmlWriter
     private static string GetXlsxColumns(TranscriptExportSource source)
     {
         return source == TranscriptExportSource.ReadablePolished
-            ? """  <cols><col min="1" max="1" width="120" customWidth="1"/></cols>"""
+            ? """  <cols><col min="1" max="2" width="14" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="64" customWidth="1"/></cols>"""
             : """  <cols><col min="1" max="2" width="14" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="64" customWidth="1"/></cols>""";
     }
 
@@ -142,7 +153,7 @@ internal static class TranscriptExportOpenXmlWriter
         {
             TranscriptExportSource.Raw => ["開始時刻", "終了時刻", "話者", "素起こし"],
             TranscriptExportSource.Polished => ["開始時刻", "終了時刻", "話者", "レビュー候補"],
-            TranscriptExportSource.ReadablePolished => ["整文"],
+            TranscriptExportSource.ReadablePolished => ["開始時刻", "終了時刻", "話者", "整文"],
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
     }
@@ -167,6 +178,24 @@ internal static class TranscriptExportOpenXmlWriter
             ],
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
         };
+    }
+
+    private static string[] GetXlsxReadableBlockValues(ReadableDocumentBlock block)
+    {
+        return
+        [
+            FormatNullableTimestamp(block.StartSeconds),
+            FormatNullableTimestamp(block.EndSeconds),
+            block.Speaker,
+            block.Text
+        ];
+    }
+
+    private static string FormatNullableTimestamp(double? seconds)
+    {
+        return seconds.HasValue
+            ? TimestampFormatter.FormatDisplay(seconds.Value)
+            : string.Empty;
     }
 
     private static void AppendXlsxRow(StringBuilder builder, int rowIndex, IReadOnlyList<string> values, int styleId)
