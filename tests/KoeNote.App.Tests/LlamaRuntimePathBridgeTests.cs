@@ -8,14 +8,14 @@ namespace KoeNote.App.Tests;
 
 public sealed class LlamaRuntimePathBridgeTests
 {
-    private const string UnicodeUserName = "\u5869\u6fa4\u9ebb\u5b50";
+    private const string UnicodePathSegment = "\u65e5\u672c\u8a9e\u30d1\u30b9";
     private const string UnicodeModelFileName = "\u30e2\u30c7\u30eb.gguf";
     private const string UnicodeOutputDirectoryName = "\u65e5\u672c\u8a9e";
 
     [Fact]
     public void Create_MapsUnicodeModelPathToAsciiSafePath()
     {
-        var unicodeRoot = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"));
+        var unicodeRoot = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodePathSegment, Guid.NewGuid().ToString("N"));
         var modelPath = Path.Combine(unicodeRoot, "models", "review", UnicodeModelFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
         File.WriteAllText(modelPath, "model");
@@ -144,9 +144,9 @@ public sealed class LlamaRuntimePathBridgeTests
 
     private static AppPaths CreateUnicodeReadyPaths()
     {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "roaming");
-        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "local");
-        var appBase = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodeUserName, Guid.NewGuid().ToString("N"), "app");
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodePathSegment, Guid.NewGuid().ToString("N"), "roaming");
+        var local = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodePathSegment, Guid.NewGuid().ToString("N"), "local");
+        var appBase = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", UnicodePathSegment, Guid.NewGuid().ToString("N"), "app");
         var paths = new AppPaths(root, local, appBase);
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
