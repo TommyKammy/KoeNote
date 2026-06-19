@@ -242,6 +242,9 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("<Setter Property=\"Width\" Value=\"40\" />", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("Style=\"{StaticResource PlayerSlimPrimaryButton}\"", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"PlayerTimeText\"", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("<ColumnDefinition Width=\"132\" />", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("<Slider Width=\"52\"", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"56\"", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Equal(2, CountOccurrences(audioPlayerXaml, "<controls:AudioWaveformControl Grid.Column=\"2\""));
         Assert.Equal(2, CountOccurrences(audioPlayerXaml, "Text=\"{Binding PlaybackVolumeIcon}\""));
         Assert.Contains("Text=\"KoeNote\"", headerXaml, StringComparison.Ordinal);

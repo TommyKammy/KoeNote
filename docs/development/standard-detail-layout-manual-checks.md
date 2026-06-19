@@ -7,7 +7,7 @@ Use this checklist when changing the B standard layout or C detail layout.
 - The app opens in the standard layout by default.
 - The job rail, document area, AI assist rail, and slim audio player are visible.
 - The `原文` / `整文` selector switches the central document area without opening the detail layout.
-- In `原文`, segment search, speaker filtering, auto-scroll, playback, previous/next segment, waveform seeking, volume, and playback speed remain reachable.
+- In `原文`, segment search, speaker filtering, auto-scroll, playback, previous/next segment, waveform seeking, and volume remain reachable.
 - In `整文`, playback auto-scroll keeps the readable document near the current segment context when readable blocks are available.
 - The standard export button and export menu follow the visible target: `整文` exports the readable document, and `原文` exports raw transcript content.
 - The summary export entry remains reachable from the standard AI rail.

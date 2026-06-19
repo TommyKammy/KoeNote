@@ -111,17 +111,17 @@
                 BorderThickness="1"
                 CornerRadius="0"
                 MinHeight="72"
-                Padding="18,12"
+                Padding="14,12"
                 Style="{StaticResource VisibleWhenFullPlayer}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="132" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                     <Button Style="{StaticResource PlayerRoundButton}"
                             Command="{Binding SkipToPreviousSegmentCommand}"
                             ToolTip="前のセグメントへ">
@@ -145,7 +145,7 @@
 
                 <StackPanel Grid.Column="1"
                             VerticalAlignment="Center"
-                            Margin="0,0,14,0">
+                            Margin="0,0,10,0">
                     <TextBlock Text="{Binding SelectedJobFileName}"
                                FontSize="13"
                                FontWeight="SemiBold"
@@ -169,14 +169,14 @@
                 <StackPanel Grid.Column="3"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="16,0,0,0">
+                            Margin="12,0,0,0">
                     <TextBlock Text="{Binding PlaybackVolumeIcon}"
                                FontFamily="Segoe MDL2 Assets"
                                Foreground="{StaticResource MutedBrush}"
                                FontSize="14"
                                VerticalAlignment="Center"
                                Margin="0,0,5,0" />
-                    <Slider Width="70"
+                    <Slider Width="52"
                             Minimum="0"
                             Maximum="1"
                             Value="{Binding PlaybackVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -191,8 +191,8 @@
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="1"
                 CornerRadius="0,0,10,10"
-                MinHeight="60"
-                Padding="18,9"
+                MinHeight="56"
+                Padding="14,7"
                 Style="{StaticResource VisibleWhenSlimPlayer}">
             <Grid>
                 <Grid.ColumnDefinitions>
