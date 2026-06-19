@@ -218,6 +218,9 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ColumnDefinition.WidthProperty", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"0\" />", controlsXaml, StringComparison.Ordinal);
         Assert.Contains("CornerRadius=\"0\"", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"PlaybackRateComboBox\"", audioPlayerXaml, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(audioPlayerXaml, "Style=\"{StaticResource PlaybackRateComboBox}\""));
+        Assert.Contains("Text=\"{Binding DataContext.PlaybackRateDisplayText, RelativeSource={RelativeSource TemplatedParent}}\"", audioPlayerXaml, StringComparison.Ordinal);
         Assert.Equal(2, CountOccurrences(audioPlayerXaml, "ItemsSource=\"{Binding PlaybackRateOptions}\""));
         Assert.Equal(2, CountOccurrences(audioPlayerXaml, "DisplayMemberPath=\"DisplayText\""));
         Assert.Equal(2, CountOccurrences(audioPlayerXaml, "SelectedValuePath=\"Value\""));
