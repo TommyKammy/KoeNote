@@ -29,6 +29,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 
     private readonly CudaReviewRuntimeOptions _options = options ?? CudaReviewRuntimeOptions.FromEnvironment();
     private readonly NvidiaRedistInstaller _redistInstaller = new(httpClient);
+    private readonly CudaReviewRuntimeFileMaintenance _fileMaintenance = new(paths);
 
     public bool IsInstalled()
     {
@@ -39,8 +40,8 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         CancellationToken cancellationToken = default,
         IProgress<RuntimeInstallProgress>? progress = null)
     {
-        Report(progress, "確認中", "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
-        if (TryRemovePersistedCudaBridge() is { } cleanupFailure)
+        CudaReviewRuntimeProgress.Report(progress, "確認中", "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
+        if (_fileMaintenance.TryRemovePersistedCudaBridge() is { } cleanupFailure)
         {
             return cleanupFailure;
         }
@@ -58,7 +59,8 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 FailureCategoryCpuRuntimeMissing);
         }
 
-        if (!HasCudaBridge(paths.ReviewRuntimeDirectory) && !HasCudaBridge(paths.CudaReviewRuntimeDirectory))
+        if (!CudaReviewRuntimeLayoutProbe.HasCudaBridge(paths.ReviewRuntimeDirectory) &&
+            !CudaReviewRuntimeLayoutProbe.HasCudaBridge(paths.CudaReviewRuntimeDirectory))
         {
             if (string.IsNullOrWhiteSpace(_options.LegacyRuntimeUrl))
             {
@@ -74,20 +76,20 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         }
 
         var migratedFromAppLocalReviewRuntime = false;
-        if (HasNvidiaDependencies(paths.ReviewRuntimeDirectory))
+        if (CudaReviewRuntimeLayoutProbe.HasNvidiaDependencies(paths.ReviewRuntimeDirectory))
         {
-            migratedFromAppLocalReviewRuntime = HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory) &&
-                !HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory);
+            migratedFromAppLocalReviewRuntime = CudaReviewRuntimeLayoutProbe.HasRequiredNvidiaDependencies(paths.ReviewRuntimeDirectory) &&
+                !CudaReviewRuntimeLayoutProbe.HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory);
             var cleanupResult = migratedFromAppLocalReviewRuntime
-                ? TryMigrateMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns)
-                : TryDeleteMatchingFiles(paths.ReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns);
+                ? _fileMaintenance.TryMigrateMatchingFiles(paths.ReviewRuntimeDirectory, paths.CudaReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns)
+                : _fileMaintenance.TryDeleteMatchingFiles(paths.ReviewRuntimeDirectory, CudaReviewRuntimeLayout.NvidiaFilePatterns);
             if (cleanupResult is not null)
             {
                 return cleanupResult;
             }
         }
 
-        if (HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory))
+        if (CudaReviewRuntimeLayoutProbe.HasRequiredNvidiaDependencies(paths.CudaReviewRuntimeDirectory))
         {
             var localMarker = migratedFromAppLocalReviewRuntime
                 ? "nvidia-redist:migrated-from-tools-review"
@@ -123,7 +125,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
         try
         {
             Directory.CreateDirectory(stagingRoot);
-            Report(progress, "確認中", "ローカル CUDA Toolkit に必要な NVIDIA DLL があるか確認しています...");
+            CudaReviewRuntimeProgress.Report(progress, "確認中", "ローカル CUDA Toolkit に必要な NVIDIA DLL があるか確認しています...");
             var stagedResult = TryStageFromLocalCudaInstall(stagingRoot);
             if (stagedResult is null)
             {
@@ -132,10 +134,10 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
 
             Directory.CreateDirectory(paths.CudaReviewRuntimeDirectory);
             Directory.CreateDirectory(backupRoot);
-            Report(progress, "インストール中", $"CUDA review runtime の NVIDIA DLL を {paths.CudaReviewRuntimeDirectory} に配置しています...");
+            CudaReviewRuntimeProgress.Report(progress, "インストール中", $"CUDA review runtime の NVIDIA DLL を {paths.CudaReviewRuntimeDirectory} に配置しています...");
             NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.CudaReviewRuntimeDirectory, backupRoot, copiedFiles, CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns);
 
-            Report(progress, "検証中", "CUDA review runtime の導入結果を検証しています...");
+            CudaReviewRuntimeProgress.Report(progress, "検証中", "CUDA review runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
             File.WriteAllText(paths.CudaReviewRuntimeMarkerPath, marker);
             return IsInstalled()
@@ -223,7 +225,7 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             Directory.CreateDirectory(stagingRoot);
             using (var archive = ZipFile.OpenRead(tempPath))
             {
-                var cudaEntries = GetLegacyCudaEntries(archive).ToList();
+                var cudaEntries = CudaReviewRuntimeLayoutProbe.GetLegacyCudaEntries(archive).ToList();
                 if (cudaEntries.Count == 0)
                 {
                     return CudaReviewRuntimeInstallResult.Failed(
@@ -236,7 +238,8 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
                 NvidiaRedistInstaller.ExtractEntries(cudaEntries, stagingRoot);
             }
 
-            if (!HasCudaBridge(stagingRoot) || !HasRequiredNvidiaDependencies(stagingRoot))
+            if (!CudaReviewRuntimeLayoutProbe.HasCudaBridge(stagingRoot) ||
+                !CudaReviewRuntimeLayoutProbe.HasRequiredNvidiaDependencies(stagingRoot))
             {
                 return CudaReviewRuntimeInstallResult.Failed(
                     "CUDA review runtime archive did not contain the required KoeNote bridge and NVIDIA DLLs.",
@@ -307,122 +310,6 @@ public sealed class CudaReviewRuntimeService(AppPaths paths, HttpClient httpClie
             stagingRoot,
             NvidiaRedistInstaller.EnumerateCudaToolkitSearchRoots(_options.LocalSearchRoots),
             CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns);
-    }
-
-    private static IEnumerable<ZipArchiveEntry> GetLegacyCudaEntries(ZipArchive archive)
-    {
-        var patterns = CudaReviewRuntimeLayout.RequiredFilePatterns.Concat(CudaReviewRuntimeLayout.OptionalNvidiaFilePatterns).ToArray();
-        return archive.Entries.Where(entry =>
-            !string.IsNullOrWhiteSpace(entry.Name) &&
-            patterns.Any(pattern => RuntimeInstallFileOps.MatchesPattern(entry.Name, pattern)));
-    }
-
-    private static bool HasCudaBridge(string directory)
-    {
-        return Directory.Exists(directory) &&
-            Directory.EnumerateFiles(directory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly).Any();
-    }
-
-    private CudaReviewRuntimeInstallResult? TryRemovePersistedCudaBridge()
-    {
-        if (!HasCudaBridge(paths.ReviewRuntimeDirectory))
-        {
-            return null;
-        }
-
-        try
-        {
-            if (!Directory.Exists(paths.CudaReviewRuntimeDirectory))
-            {
-                return null;
-            }
-
-            foreach (var bridgePath in Directory.EnumerateFiles(paths.CudaReviewRuntimeDirectory, "ggml-cuda*.dll", SearchOption.TopDirectoryOnly))
-            {
-                File.Delete(bridgePath);
-            }
-
-            return null;
-        }
-        catch (IOException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime bridge cleanup failed: {exception.Message}",
-                paths.CudaReviewRuntimeDirectory,
-                FailureCategoryInstallFailed);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime bridge cleanup failed: {exception.Message}",
-                paths.CudaReviewRuntimeDirectory,
-                FailureCategoryInstallFailed);
-        }
-    }
-
-    private CudaReviewRuntimeInstallResult? TryDeleteMatchingFiles(string sourceDirectory, IReadOnlyCollection<string> patterns)
-    {
-        try
-        {
-            RuntimeInstallFileOps.DeleteMatchingFiles(sourceDirectory, patterns);
-            return null;
-        }
-        catch (IOException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime cleanup failed: {exception.Message}",
-                paths.CudaReviewRuntimeDirectory,
-                FailureCategoryInstallFailed);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime cleanup failed: {exception.Message}",
-                paths.CudaReviewRuntimeDirectory,
-                FailureCategoryInstallFailed);
-        }
-    }
-
-    private CudaReviewRuntimeInstallResult? TryMigrateMatchingFiles(string sourceDirectory, string destinationDirectory, IReadOnlyCollection<string> patterns)
-    {
-        try
-        {
-            RuntimeInstallFileOps.CopyMatchingFiles(sourceDirectory, destinationDirectory, patterns, deleteSourceFiles: true);
-            return null;
-        }
-        catch (IOException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime migration failed: {exception.Message}",
-                destinationDirectory,
-                FailureCategoryInstallFailed);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return CudaReviewRuntimeInstallResult.Failed(
-                $"CUDA review runtime migration failed: {exception.Message}",
-                destinationDirectory,
-                FailureCategoryInstallFailed);
-        }
-    }
-
-    private static bool HasRequiredNvidiaDependencies(string directory)
-    {
-        return Directory.Exists(directory) &&
-            CudaReviewRuntimeLayout.RequiredNvidiaFilePatterns.All(pattern =>
-                Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
-    }
-
-    private static bool HasNvidiaDependencies(string directory)
-    {
-        return Directory.Exists(directory) &&
-            CudaReviewRuntimeLayout.NvidiaFilePatterns.Any(pattern =>
-                Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Any());
-    }
-
-    private static void Report(IProgress<RuntimeInstallProgress>? progress, string stageText, string message)
-    {
-        progress?.Report(new RuntimeInstallProgress(stageText, message));
     }
 
 }
