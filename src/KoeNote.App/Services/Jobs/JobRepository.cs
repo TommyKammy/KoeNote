@@ -70,24 +70,10 @@ public sealed class JobRepository(AppPaths paths)
         var jobs = new List<JobSummary>();
         while (reader.Read())
         {
-            var sourceAudioPath = reader.GetString(2);
-            var createdAt = reader.GetDateTimeOffset(7);
-            var updatedAt = reader.GetDateTimeOffset(8);
-            jobs.Add(new JobSummary(
-                reader.GetString(0),
-                reader.GetString(1),
-                Path.GetFileName(sourceAudioPath),
-                sourceAudioPath,
-                NormalizeDisplayStatus(reader.GetString(4)),
-                reader.GetInt32(5),
-                reader.GetInt32(6),
-                updatedAt,
-                createdAt,
-                reader.GetNullableString(3),
-                reader.GetInt32(9) != 0,
-                reader.GetNullableDateTimeOffset(10),
-                reader.GetNullableString(11),
-                isDeleted ? CalculateDirectorySize(Path.Combine(paths.Jobs, reader.GetString(0))) : 0));
+            jobs.Add(JobSummaryRowMapper.ReadSummary(
+                reader,
+                isDeleted,
+                jobId => CalculateDirectorySize(Path.Combine(paths.Jobs, jobId))));
         }
 
         return jobs;
@@ -128,21 +114,6 @@ public sealed class JobRepository(AppPaths paths)
         command.Parameters.AddValue("$ready_stage", ReviewCandidateJobStateRules.Ready.CurrentStage);
         command.Parameters.AddValue("$progress_percent", JobRunProgressPlan.Completed);
         command.ExecuteNonQuery();
-    }
-
-    private static string NormalizeDisplayStatus(string status)
-    {
-        return status switch
-        {
-            "レビュー待ち" => "整文待ち",
-            "レビュー完了" => "整文完了",
-            "レビュー済み" => "整文済み",
-            "レビュー中" => "整文中",
-            "レビュー失敗" => "整文失敗",
-            "推敲候補なし" => "整文候補なし",
-            "推敲中" => "整文中",
-            _ => status
-        };
     }
 
     public JobSummary CreateFromAudio(string sourceAudioPath)
