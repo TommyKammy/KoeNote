@@ -77,6 +77,10 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="PlayerSlimPrimaryButton" TargetType="Button" BasedOn="{StaticResource PlayerPrimaryButton}">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+        </Style>
         <Style x:Key="PlayerTimeText" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
             <Setter Property="FontFamily" Value="Consolas" />
             <Setter Property="FontSize" Value="12" />
@@ -204,7 +208,7 @@
                             ToolTip="前のセグメントへ">
                         <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
                     </Button>
-                    <Button Style="{StaticResource PlayerPrimaryButton}"
+                    <Button Style="{StaticResource PlayerSlimPrimaryButton}"
                             Command="{Binding PlayPauseAudioCommand}"
                             ToolTip="{Binding SelectedJobPlaybackPath}"
                             Margin="5,0">
