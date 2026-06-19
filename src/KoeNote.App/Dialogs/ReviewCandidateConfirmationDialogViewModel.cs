@@ -30,6 +30,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 {
     private readonly ReviewCandidateConfirmationRequest _request;
     private readonly AudioPreviewPlaybackController _playbackController;
+    private readonly ReviewCandidateConfirmationListProjection _listProjection = new();
     private readonly DispatcherTimer _playbackTimer;
     private ReviewCandidateConfirmationDialogItem? _selectedItem;
     private string _manualEditText = string.Empty;
@@ -542,26 +543,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     private void RefreshDisplayItems(ReviewCandidateConfirmationDialogItem? preferredSelection)
     {
-        DisplayItems.Clear();
-        if (_filter is ReviewCandidateConfirmationFilter.Pending or ReviewCandidateConfirmationFilter.All)
-        {
-            foreach (var item in Items)
-            {
-                DisplayItems.Add(item);
-            }
-        }
-
-        if (_filter is ReviewCandidateConfirmationFilter.Decided or ReviewCandidateConfirmationFilter.All)
-        {
-            foreach (var item in DecidedItems)
-            {
-                DisplayItems.Add(item);
-            }
-        }
-
-        SelectedItem = preferredSelection is not null && DisplayItems.Contains(preferredSelection)
-            ? preferredSelection
-            : DisplayItems.FirstOrDefault();
+        SelectedItem = _listProjection.Refresh(DisplayItems, Items, DecidedItems, _filter, preferredSelection);
         OnPropertyChanged(nameof(DisplayItems));
     }
 
