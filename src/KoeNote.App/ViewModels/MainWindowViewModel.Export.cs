@@ -43,6 +43,9 @@ public sealed partial class MainWindowViewModel
 
     public bool IsSummaryExportMenuVisible => IsStandardAiRailExpanded || IsDetailLayout;
 
+    public bool IsMergeConsecutiveSpeakersExportOptionVisible =>
+        EffectiveExportTranscriptTabIndex is ExportRawTranscriptTabIndex or ExportReviewCandidateTranscriptTabIndex;
+
     private void NotifyExportMenuTargetChanged()
     {
         OnPropertyChanged(nameof(CurrentExportTargetDisplayName));
@@ -53,6 +56,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsDiffExportMenuVisible));
         OnPropertyChanged(nameof(IsReviewCandidateExportMenuVisible));
         OnPropertyChanged(nameof(IsSummaryExportMenuVisible));
+        OnPropertyChanged(nameof(IsMergeConsecutiveSpeakersExportOptionVisible));
         OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
         UpdateExportCommandStates();
     }
