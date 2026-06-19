@@ -114,9 +114,10 @@
                                   Width="70"
                                   Height="28"
                                   Margin="8,0,0,0"
-                                  ItemsSource="{Binding PlaybackRates}"
-                                  SelectedItem="{Binding PlaybackRate, Mode=TwoWay}"
-                                  ItemStringFormat="{}{0:0.##}x"
+                                  ItemsSource="{Binding PlaybackRateOptions}"
+                                  DisplayMemberPath="DisplayText"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding PlaybackRate, Mode=TwoWay}"
                                   ToolTip="再生速度" />
                     </StackPanel>
                 </Grid>
@@ -258,9 +259,10 @@
                               Width="64"
                               Height="26"
                               Margin="8,0,0,0"
-                              ItemsSource="{Binding PlaybackRates}"
-                              SelectedItem="{Binding PlaybackRate, Mode=TwoWay}"
-                              ItemStringFormat="{}{0:0.##}x"
+                              ItemsSource="{Binding PlaybackRateOptions}"
+                              DisplayMemberPath="DisplayText"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding PlaybackRate, Mode=TwoWay}"
                               ToolTip="再生速度" />
                 </StackPanel>
             </Grid>

@@ -201,6 +201,10 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
 
         Assert.Equal(1.5, viewModel.PlaybackRate);
         Assert.Contains(2.0, viewModel.PlaybackRates);
+        Assert.Equal("1.5x", viewModel.PlaybackRateDisplayText);
+        Assert.Contains(viewModel.PlaybackRateOptions, option => option.Value == 1.0 && option.DisplayText == "1x");
+        Assert.Contains(viewModel.PlaybackRateOptions, option => option.Value == 1.25 && option.DisplayText == "1.25x");
+        Assert.Contains(viewModel.PlaybackRateOptions, option => option.Value == 2.0 && option.DisplayText == "2x");
     }
 
     [Fact]
