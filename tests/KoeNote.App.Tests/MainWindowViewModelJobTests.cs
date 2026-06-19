@@ -501,22 +501,26 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsRawExportMenuVisible);
+        Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
 
         viewModel.ShowRawTranscriptTabCommand.Execute(null);
         Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("素起こし", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsReadableExportMenuVisible);
+        Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
 
         viewModel.ShowDiffTranscriptTabCommand.Execute(null);
         Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("差分", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsDiffExportMenuVisible);
+        Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
 
         viewModel.ShowReviewCandidateTranscriptTabCommand.Execute(null);
         Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("レビュー候補", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReviewCandidateExportMenuVisible);
+        Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
     }
 
     [Fact]
@@ -534,18 +538,21 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsReviewCandidateExportMenuVisible);
+        Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
 
         viewModel.IsStandardRawTranscriptViewSelected = true;
         Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("素起こし", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsReadableExportMenuVisible);
+        Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
 
         viewModel.IsStandardReadableTranscriptViewSelected = true;
         Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("整文", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsRawExportMenuVisible);
+        Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
     }
 
     [Fact]

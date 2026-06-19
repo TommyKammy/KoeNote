@@ -46,6 +46,14 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+            <Style x:Key="VisibleWhenMergeSpeakerExportOptionMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMergeConsecutiveSpeakersExportOptionVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -179,7 +187,7 @@
                             <MenuItem Header="同じ話者をまとめる"
                                       IsCheckable="True"
                                       IsChecked="{Binding MergeConsecutiveSpeakersOnExport, Mode=TwoWay}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
+                                      Style="{StaticResource VisibleWhenMergeSpeakerExportOptionMenuItem}" />
                             <Separator Style="{StaticResource HeaderMenuSeparator}" />
                             <MenuItem Header="出力フォルダーを開く"
                                       Command="{Binding OpenExportFolderCommand}"
