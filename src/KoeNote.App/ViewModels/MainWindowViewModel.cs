@@ -156,8 +156,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
     private string _latestLog;
-    private string _modelDownloadProgressSummary = "No active model download.";
+    private string _modelDownloadProgressSummary = InactiveModelDownloadProgressSummary;
     private string _modelDownloadProgressStageText = string.Empty;
+    private int _modelDownloadProgressOperationId;
     private string _modelDownloadNotification = string.Empty;
     private bool _isModelDownloadNotificationError;
     private string _setupDiarizationRuntimeSummary = "Speaker diarization runtime is required and not installed yet.";
@@ -1360,7 +1361,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public string ModelDownloadProgressSummary
     {
         get => _modelDownloadProgressSummary;
-        private set => SetField(ref _modelDownloadProgressSummary, value);
+        private set
+        {
+            if (SetField(ref _modelDownloadProgressSummary, value))
+            {
+                OnPropertyChanged(nameof(ShowSetupInstallProgress));
+            }
+        }
     }
 
     public string ModelDownloadProgressStageText
@@ -1414,6 +1421,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
                 OnPropertyChanged(nameof(SetupNextActionText));
                 OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
+                OnPropertyChanged(nameof(ShowSetupInstallProgress));
                 OnPropertyChanged(nameof(SetupLicenseNoticeText));
                 OnPropertyChanged(nameof(ShowSetupCompleteAction));
             }
@@ -1428,9 +1436,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _isModelDownloadProgressIndeterminate, value))
             {
                 OnPropertyChanged(nameof(ModelDownloadProgressText));
+                OnPropertyChanged(nameof(ShowSetupInstallProgress));
             }
         }
     }
+
+    public bool ShowSetupInstallProgress =>
+        IsModelDownloadInProgress ||
+        IsModelDownloadNotificationError ||
+        (!IsModelDownloadProgressIndeterminate &&
+            !string.IsNullOrWhiteSpace(ModelDownloadProgressSummary) &&
+            !string.Equals(ModelDownloadProgressSummary, InactiveModelDownloadProgressSummary, StringComparison.Ordinal));
 
     public string ModelDownloadProgressText
     {
@@ -1466,7 +1482,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool IsModelDownloadNotificationError
     {
         get => _isModelDownloadNotificationError;
-        private set => SetField(ref _isModelDownloadNotificationError, value);
+        private set
+        {
+            if (SetField(ref _isModelDownloadNotificationError, value))
+            {
+                OnPropertyChanged(nameof(ShowSetupInstallProgress));
+            }
+        }
     }
 
     public string SetupLocalModelPath

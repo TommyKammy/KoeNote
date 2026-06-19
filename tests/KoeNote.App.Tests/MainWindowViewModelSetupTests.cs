@@ -398,6 +398,49 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public async Task SetupInstallProgress_IgnoresDelayedRuntimeProgressAfterCompletion()
+    {
+        var viewModel = CreateViewModel();
+        var operationId = InvokePrivate<int>(viewModel, "BeginModelDownloadProgress", "CUDA review runtime");
+        var progress = InvokePrivate<IProgress<RuntimeInstallProgress>>(
+            viewModel,
+            "CreateRuntimeInstallProgress",
+            operationId,
+            true);
+
+        InvokePrivate(viewModel, "CompleteModelDownloadProgress", operationId, "CUDA review runtime", true, null!);
+        var completedSummary = viewModel.ModelDownloadProgressSummary;
+
+        progress.Report(new RuntimeInstallProgress(
+            "確認中",
+            "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています..."));
+        await Task.Delay(TimeSpan.FromMilliseconds(150));
+
+        Assert.False(viewModel.IsModelDownloadInProgress);
+        Assert.Equal(completedSummary, viewModel.ModelDownloadProgressSummary);
+        Assert.DoesNotContain("確認しています", viewModel.ModelDownloadProgressSummary, StringComparison.Ordinal);
+        Assert.True(viewModel.ShowSetupInstallProgress);
+    }
+
+    [Fact]
+    public void SetupInstallProgress_HidesStaleIndeterminateProgressWhenNotRunning()
+    {
+        var viewModel = CreateViewModel();
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.ModelDownloadProgressSummary), "CUDA review runtime の同梱ファイルと NVIDIA DLL を確認しています...");
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.ModelDownloadProgressStageText), "確認中");
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsModelDownloadProgressIndeterminate), true);
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsModelDownloadInProgress), false);
+
+        Assert.False(viewModel.ShowSetupInstallProgress);
+
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.ModelDownloadProgressSummary), "導入が完了しました。最終確認へ進めます。");
+        SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsModelDownloadProgressIndeterminate), false);
+
+        Assert.True(viewModel.ShowSetupInstallProgress);
+    }
+
+    [Fact]
     public async Task SetupInstallSelectedPresetCommand_StopsWhenDiarizationRuntimeInstallFails()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

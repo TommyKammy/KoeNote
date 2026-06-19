@@ -4,14 +4,28 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private void BeginModelDownloadProgress(string displayName)
+    private const string InactiveModelDownloadProgressSummary = "No active model download.";
+
+    private int BeginModelDownloadProgress(string displayName)
     {
+        _modelDownloadProgressOperationId++;
         _modelDownloadNotificationTimer.Stop();
         ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Begin(displayName));
+        return _modelDownloadProgressOperationId;
     }
 
-    private void UpdateModelDownloadProgress(string displayName, ModelDownloadProgress progress)
+    private bool IsCurrentModelDownloadProgressOperation(int operationId)
     {
+        return operationId == _modelDownloadProgressOperationId && IsModelDownloadInProgress;
+    }
+
+    private void UpdateModelDownloadProgress(int operationId, string displayName, ModelDownloadProgress progress)
+    {
+        if (!IsCurrentModelDownloadProgressOperation(operationId))
+        {
+            return;
+        }
+
         ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Update(displayName, progress, IsModelDownloadInProgress));
     }
 
@@ -25,9 +39,15 @@ public sealed partial class MainWindowViewModel
         RefreshModelCatalogKeepingSelection(progress.ModelId);
     }
 
-    private void CompleteModelDownloadProgress(string displayName, bool succeeded, string? message = null)
+    private void CompleteModelDownloadProgress(int operationId, string displayName, bool succeeded, string? message = null)
     {
+        if (!IsCurrentModelDownloadProgressOperation(operationId))
+        {
+            return;
+        }
+
         ApplyModelDownloadProgressState(_modelDownloadProgressPresenter.Complete(displayName, succeeded, message));
+        _modelDownloadProgressOperationId++;
         ScheduleModelDownloadNotificationDismiss();
     }
 

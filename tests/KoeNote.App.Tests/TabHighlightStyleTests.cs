@@ -68,6 +68,17 @@ public sealed class TabHighlightStyleTests
     }
 
     [Fact]
+    public void SetupModelSettingsPanel_HidesProgressWhenNoSetupInstallProgressIsActive()
+    {
+        var repoRoot = FindRepoRoot();
+        var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "SetupModelSettingsPanel.xaml"));
+
+        Assert.Contains("Visibility=\"{Binding ShowSetupInstallProgress, Converter={StaticResource BooleanToVisibilityConverter}}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ModelDownloadProgressSummary}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsIndeterminate=\"{Binding IsModelDownloadProgressIndeterminate}\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TranscriptPanel_UsesMeasuredLocalYellowPulseForPolishedTab()
     {
         var repoRoot = FindRepoRoot();
