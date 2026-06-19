@@ -221,7 +221,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         command.Parameters.AddValue("$derivative_id", derivativeId);
 
         using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadDerivative(reader) : null;
+        return reader.Read() ? TranscriptDerivativeRowMapper.ReadDerivative(reader) : null;
     }
 
     public TranscriptDerivative? ReadLatestSuccessful(string jobId, string kind)
@@ -263,7 +263,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         command.Parameters.AddValue("$status", TranscriptDerivativeStatuses.Succeeded);
 
         using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadDerivative(reader) : null;
+        return reader.Read() ? TranscriptDerivativeRowMapper.ReadDerivative(reader) : null;
     }
 
     public TranscriptDerivative? ReadLatestDisplayable(string jobId, string kind)
@@ -306,7 +306,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         command.Parameters.AddValue("$stale", TranscriptDerivativeStatuses.Stale);
 
         using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadDerivative(reader) : null;
+        return reader.Read() ? TranscriptDerivativeRowMapper.ReadDerivative(reader) : null;
     }
 
     public IReadOnlyList<TranscriptDerivativeChunk> ReadChunks(string derivativeId)
@@ -348,7 +348,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         var chunks = new List<TranscriptDerivativeChunk>();
         while (reader.Read())
         {
-            chunks.Add(ReadChunk(reader));
+            chunks.Add(TranscriptDerivativeRowMapper.ReadChunk(reader));
         }
 
         return chunks;
@@ -441,51 +441,7 @@ public sealed class TranscriptDerivativeRepository(AppPaths paths)
         command.Parameters.AddValue("$chunk_id", chunkId);
 
         using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadChunk(reader) : null;
-    }
-
-    private static TranscriptDerivative ReadDerivative(Microsoft.Data.Sqlite.SqliteDataReader reader)
-    {
-        return new TranscriptDerivative(
-            reader.GetString(0),
-            reader.GetString(1),
-            reader.GetString(2),
-            reader.GetString(3),
-            reader.GetString(4),
-            reader.GetString(5),
-            reader.GetString(6),
-            reader.GetNullableString(7),
-            reader.GetNullableString(8),
-            reader.GetNullableString(9),
-            reader.GetString(10),
-            reader.GetString(11),
-            reader.GetString(12),
-            reader.GetNullableString(13),
-            reader.GetDateTimeOffset(14),
-            reader.GetDateTimeOffset(15));
-    }
-
-    private static TranscriptDerivativeChunk ReadChunk(Microsoft.Data.Sqlite.SqliteDataReader reader)
-    {
-        return new TranscriptDerivativeChunk(
-            reader.GetString(0),
-            reader.GetString(1),
-            reader.GetString(2),
-            reader.GetInt32(3),
-            reader.GetString(4),
-            reader.GetString(5),
-            reader.GetNullableDouble(6),
-            reader.GetNullableDouble(7),
-            reader.GetString(8),
-            reader.GetString(9),
-            reader.GetString(10),
-            reader.GetNullableString(11),
-            reader.GetString(12),
-            reader.GetString(13),
-            reader.GetString(14),
-            reader.GetNullableString(15),
-            reader.GetDateTimeOffset(16),
-            reader.GetDateTimeOffset(17));
+        return reader.Read() ? TranscriptDerivativeRowMapper.ReadChunk(reader) : null;
     }
 
     private static void ValidateRequest(TranscriptDerivativeSaveRequest request)
