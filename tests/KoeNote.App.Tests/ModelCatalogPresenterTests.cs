@@ -100,10 +100,24 @@ public sealed class ModelCatalogPresenterTests
             downloadType: "direct",
             downloadUrl: "https://example.com/hidden-failed.gguf",
             latestDownloadJob: CreateDownloadJob("hidden-failed", "failed"));
+        var selectablePaused = CreateEntry(
+            "selectable-paused",
+            downloadType: "direct",
+            downloadUrl: "https://example.com/selectable-paused.gguf",
+            latestDownloadJob: CreateDownloadJob("selectable-paused", "paused"));
+        var hiddenPaused = CreateEntry(
+            "hidden-paused",
+            status: "hidden",
+            downloadType: "direct",
+            downloadUrl: "https://example.com/hidden-paused.gguf",
+            latestDownloadJob: CreateDownloadJob("hidden-paused", "paused"));
 
         Assert.True(presenter.CanDownload(selectable));
         Assert.False(presenter.CanDownload(hidden));
         Assert.False(presenter.CanRetry(hiddenFailed));
+        Assert.True(presenter.CanResume(selectablePaused));
+        Assert.False(presenter.CanResume(hiddenPaused));
+        Assert.True(presenter.CanCancel(hiddenPaused));
     }
 
     private static ModelCatalogEntry CreateEntry(

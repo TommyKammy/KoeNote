@@ -83,7 +83,8 @@ internal sealed class ModelCatalogPresenter
 
     public bool CanResume(ModelCatalogEntry? entry)
     {
-        return entry?.LatestDownloadJob is { Status: "paused" };
+        return entry?.LatestDownloadJob is { Status: "paused" } &&
+            ModelCatalogCompatibility.IsSelectable(entry.CatalogItem);
     }
 
     public bool CanCancel(ModelCatalogEntry? entry)

@@ -157,6 +157,30 @@ public sealed class ModelCatalogServiceTests
     }
 
     [Fact]
+    public void ListEntries_IncludesHiddenModelWithActiveDownloadJobForManagement()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var downloadJobs = new ModelDownloadJobRepository(paths);
+        var downloadId = downloadJobs.Start(
+            catalogItem.ModelId,
+            catalogItem.Download.Url!,
+            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf"),
+            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf.partial"),
+            catalogItem.Download.Sha256);
+        downloadJobs.MarkPaused(downloadId);
+
+        var entry = catalogService.ListEntries().Single(entry => entry.ModelId == catalogItem.ModelId);
+
+        Assert.False(entry.IsInstalled);
+        Assert.Equal("hidden", entry.CatalogItem.Status);
+        Assert.Equal("paused", entry.DownloadState);
+    }
+
+    [Fact]
     public void ListEntries_TreatsInstalledRecordWithMissingFilesAsMissing()
     {
         var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
