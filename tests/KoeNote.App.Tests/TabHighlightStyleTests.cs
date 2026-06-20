@@ -179,8 +179,13 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("BuildReadableBlockRow", code, StringComparison.Ordinal);
         Assert.Contains("BuildMetaPanel", code, StringComparison.Ordinal);
         Assert.Contains("new Table", code, StringComparison.Ordinal);
-        Assert.Contains("new TableColumn { Width = new GridLength(122) }", code, StringComparison.Ordinal);
-        Assert.Contains("new TableColumn { Width = new GridLength(1, GridUnitType.Star) }", code, StringComparison.Ordinal);
+        Assert.Contains("ReadableMetaColumnWidth", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateReadableDocumentLayoutWidth", code, StringComparison.Ordinal);
+        Assert.Contains("GetReadableBodyColumnWidth", code, StringComparison.Ordinal);
+        Assert.Contains("document.PageWidth = contentWidth", code, StringComparison.Ordinal);
+        Assert.Contains("document.ColumnWidth = contentWidth", code, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment = HorizontalAlignment.Left", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("GridUnitType.Star", code, StringComparison.Ordinal);
         Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
         Assert.Contains("BlockUIContainer", code, StringComparison.Ordinal);
         Assert.Contains("_readableBodyParagraphs", code, StringComparison.Ordinal);
@@ -192,7 +197,6 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("PagePadding = new Thickness(0)", code, StringComparison.Ordinal);
         Assert.Contains("FontWeight = FontWeights.Normal", code, StringComparison.Ordinal);
         Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("ColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentSearchText", code, StringComparison.Ordinal);
         Assert.Contains("AddHighlightedRuns", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ReadablePolishedContent, Mode=OneWay}\"", xaml, StringComparison.Ordinal);
