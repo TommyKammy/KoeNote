@@ -41,7 +41,8 @@ public sealed class SpeakerNameConfirmationPreviewPlaybackControllerTests
         Assert.False(controller.Refresh());
         Assert.Null(controller.ActivePreview);
         Assert.False(playback.IsPlaying);
-        Assert.True(playback.StopCount >= 1);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
     }
 
     [Fact]
@@ -73,6 +74,26 @@ public sealed class SpeakerNameConfirmationPreviewPlaybackControllerTests
         Assert.False(isPlaying);
         Assert.Null(controller.ActivePreview);
         Assert.False(playback.IsPlaying);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
+    }
+
+    [Fact]
+    public void Close_ReleasesUnderlyingPlayback()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var controller = new SpeakerNameConfirmationPreviewPlaybackController(playback);
+        var preview = new SpeakerNameConfirmationPreview(5, 7, "hello");
+
+        Assert.True(controller.Toggle(audioPath, preview));
+
+        controller.Close();
+
+        Assert.Null(controller.ActivePreview);
+        Assert.False(playback.IsPlaying);
+        Assert.Null(playback.CurrentPath);
+        Assert.Equal(1, playback.StopCount);
     }
 
     private static string CreateAudioFile()

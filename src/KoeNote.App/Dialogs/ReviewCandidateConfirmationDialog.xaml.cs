@@ -49,7 +49,7 @@ public partial class ReviewCandidateConfirmationDialog : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
-        ViewModel.StopPlayback();
+        ViewModel.ClosePlayback();
     }
 
     private void OnPreviousClick(object sender, RoutedEventArgs e)

@@ -41,7 +41,8 @@ public sealed class AudioPreviewPlaybackControllerTests
         Assert.False(controller.Refresh());
         Assert.Null(controller.ActivePreview);
         Assert.False(playback.IsPlaying);
-        Assert.True(playback.StopCount >= 1);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
     }
 
     [Fact]
@@ -73,6 +74,8 @@ public sealed class AudioPreviewPlaybackControllerTests
         Assert.False(isPlaying);
         Assert.Null(controller.ActivePreview);
         Assert.False(playback.IsPlaying);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
     }
 
     [Fact]
@@ -114,6 +117,51 @@ public sealed class AudioPreviewPlaybackControllerTests
         Assert.Null(controller.ActivePreview);
         Assert.Null(controller.ActiveAudioPath);
         Assert.Equal(0, controller.ProgressPercent);
+    }
+
+    [Fact]
+    public void Toggle_CanPlayAnotherPreviewAfterPreviousPreviewEndsWithoutClosingAudio()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var controller = new AudioPreviewPlaybackController(playback);
+        var firstPreview = new AudioPreviewRange(5, 7, "segment-1");
+        var nextPreview = new AudioPreviewRange(8, 10, "segment-2");
+
+        Assert.True(controller.Toggle(audioPath, firstPreview));
+        playback.Position = TimeSpan.FromSeconds(7);
+        Assert.False(controller.Refresh());
+
+        Assert.False(playback.IsPlaying);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
+
+        Assert.True(controller.Toggle(audioPath, nextPreview));
+
+        Assert.Equal(nextPreview, controller.ActivePreview);
+        Assert.Equal(TimeSpan.FromSeconds(8), playback.SeekPosition);
+        Assert.True(playback.IsPlaying);
+        Assert.Equal(0, playback.StopCount);
+    }
+
+    [Fact]
+    public void Close_ReleasesUnderlyingPlayback()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var controller = new AudioPreviewPlaybackController(playback);
+        var preview = new AudioPreviewRange(5, 7, "segment-1");
+
+        Assert.True(controller.Toggle(audioPath, preview));
+
+        controller.Close();
+
+        Assert.Null(controller.ActivePreview);
+        Assert.Null(controller.ActiveAudioPath);
+        Assert.Equal(0, controller.ProgressPercent);
+        Assert.False(playback.IsPlaying);
+        Assert.Null(playback.CurrentPath);
+        Assert.Equal(1, playback.StopCount);
     }
 
     [Fact]

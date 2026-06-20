@@ -35,6 +35,12 @@ public sealed class SpeakerNameConfirmationPreviewPlaybackController
         ActivePreview = null;
     }
 
+    public void Close()
+    {
+        _playbackController.Close();
+        ActivePreview = null;
+    }
+
     public bool Refresh()
     {
         var isPlaying = _playbackController.Refresh();

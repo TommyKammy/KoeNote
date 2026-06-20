@@ -301,6 +301,13 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         RefreshPlaybackStateProperties();
     }
 
+    public void ClosePlayback()
+    {
+        _playbackTimer.Stop();
+        _playbackController.Close();
+        RefreshPlaybackStateProperties();
+    }
+
     public void SelectPrevious()
     {
         var index = SelectedItem is null ? -1 : DisplayItems.IndexOf(SelectedItem);

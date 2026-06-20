@@ -35,7 +35,7 @@ public partial class SpeakerNameConfirmationDialog : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
-        ViewModel.StopPlayback();
+        ViewModel.ClosePlayback();
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
@@ -162,6 +162,14 @@ internal sealed class SpeakerNameConfirmationDialogViewModel : INotifyPropertyCh
     {
         _playbackTimer.Stop();
         _playbackController.Stop();
+        _activePreviewItem?.SetPlaybackState(false, 0);
+        _activePreviewItem = null;
+    }
+
+    public void ClosePlayback()
+    {
+        _playbackTimer.Stop();
+        _playbackController.Close();
         _activePreviewItem?.SetPlaybackState(false, 0);
         _activePreviewItem = null;
     }
