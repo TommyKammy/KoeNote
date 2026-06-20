@@ -13,12 +13,17 @@ namespace KoeNote.App.Controls;
 public partial class ReadablePolishedPanel : UserControl
 {
     private INotifyPropertyChanged? _subscribedViewModel;
-    private readonly List<FrameworkElement> _readableBlockAnchors = [];
-    private FrameworkElement? _firstSearchMatchAnchor;
+    private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
+    private readonly List<Paragraph> _readableBodyParagraphs = [];
+    private FrameworkContentElement? _firstSearchMatchAnchor;
 
     public ReadablePolishedPanel()
     {
         InitializeComponent();
+        ReadableDocumentRichTextBox.ContextMenu = BuildReadOnlyTextContextMenu(ReadableDocumentRichTextBox);
+        ReadableDocumentRichTextBox.CommandBindings.Add(
+            new CommandBinding(ApplicationCommands.Copy, OnCopyReadableDocumentSelection, CanCopyReadableDocumentSelection));
+        SpellCheck.SetIsEnabled(ReadableDocumentRichTextBox, false);
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
         Unloaded += OnUnloaded;
@@ -116,8 +121,9 @@ public partial class ReadablePolishedPanel : UserControl
     private void RebuildReadableDocument()
     {
         _readableBlockAnchors.Clear();
+        _readableBodyParagraphs.Clear();
         _firstSearchMatchAnchor = null;
-        ReadableDocumentBlocksPanel.Children.Clear();
+        ReadableDocumentRichTextBox.Document = new FlowDocument();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
         {
@@ -128,12 +134,9 @@ public partial class ReadablePolishedPanel : UserControl
         var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
         var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
         var searchText = viewModel.ReadableDocumentSearchText;
+        var document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
 
-        foreach (var block in viewModel.ReadableDocumentBlocks)
-        {
-            ReadableDocumentBlocksPanel.Children.Add(
-                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
-        }
+        ReadableDocumentRichTextBox.Document = document;
 
         if (_firstSearchMatchAnchor is { } firstSearchMatch)
         {
@@ -141,7 +144,43 @@ public partial class ReadablePolishedPanel : UserControl
         }
     }
 
-    private Grid BuildReadableBlockRow(
+    private FlowDocument BuildReadableDocument(
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush mutedBrush,
+        Brush separatorBrush,
+        string searchText)
+    {
+        var document = new FlowDocument
+        {
+            PagePadding = new Thickness(0),
+            FontFamily = new FontFamily("Yu Gothic UI"),
+            FontSize = viewModel.ReadableDocumentFontSize,
+            FontWeight = FontWeights.Normal,
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush,
+            TextAlignment = TextAlignment.Left
+        };
+        var table = new Table
+        {
+            CellSpacing = 0
+        };
+        table.Columns.Add(new TableColumn { Width = new GridLength(122) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var rowGroup = new TableRowGroup();
+        table.RowGroups.Add(rowGroup);
+        document.Blocks.Add(table);
+
+        foreach (var block in viewModel.ReadableDocumentBlocks)
+        {
+            rowGroup.Rows.Add(
+                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
+        }
+
+        return document;
+    }
+
+    private TableRow BuildReadableBlockRow(
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -149,33 +188,59 @@ public partial class ReadablePolishedPanel : UserControl
         Brush separatorBrush,
         string searchText)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(122) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var row = new TableRow();
+        row.Cells.Add(BuildMetaCell(block, viewModel, mutedBrush, separatorBrush));
+        row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText));
 
-        var meta = BuildMetaPanel(block, viewModel, mutedBrush, GetSpeakerPalette(block.Speaker));
-        Grid.SetColumn(meta, 0);
-        Grid.SetRow(meta, 0);
-        row.Children.Add(meta);
-
-        var body = BuildBodyTextBlock(block, viewModel, textBrush, searchText);
-        Grid.SetColumn(body, 1);
-        Grid.SetRow(body, 0);
-        row.Children.Add(body);
-
-        var separator = new Border
+        _readableBlockAnchors.Add(row);
+        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
         {
-            Height = 1,
-            Background = separatorBrush,
-            Margin = new Thickness(0, 20, 0, 26)
-        };
-        Grid.SetColumn(separator, 1);
-        Grid.SetRow(separator, 1);
-        row.Children.Add(separator);
+            _firstSearchMatchAnchor = row;
+        }
 
         return row;
+    }
+
+    private TableCell BuildMetaCell(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush mutedBrush,
+        Brush separatorBrush)
+    {
+        return new TableCell(new BlockUIContainer(BuildMetaPanel(
+            block,
+            viewModel,
+            mutedBrush,
+            GetSpeakerPalette(block.Speaker))))
+        {
+            Padding = new Thickness(0, 3, 20, 26),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
+    }
+
+    private TableCell BuildBodyCell(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush separatorBrush,
+        string searchText)
+    {
+        var paragraph = new Paragraph
+        {
+            Margin = new Thickness(0),
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush
+        };
+        AddHighlightedRuns(paragraph.Inlines, block.Text, searchText);
+        _readableBodyParagraphs.Add(paragraph);
+
+        return new TableCell(paragraph)
+        {
+            Padding = new Thickness(0, 0, 0, 26),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
     }
 
     private StackPanel BuildMetaPanel(
@@ -287,41 +352,80 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
-    private TextBlock BuildBodyTextBlock(
-        ReadableDocumentBlock block,
-        MainWindowViewModel viewModel,
-        Brush textBrush,
-        string searchText)
+    private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)
     {
-        var body = new TextBlock
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem
         {
-            FontFamily = new FontFamily("Yu Gothic UI"),
-            FontSize = viewModel.ReadableDocumentFontSize,
-            FontWeight = FontWeights.Normal,
-            LineHeight = viewModel.ReadableDocumentLineHeight,
-            Foreground = textBrush,
-            TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Left
-        };
-        AddHighlightedRuns(body, block.Text, searchText);
-        _readableBlockAnchors.Add(body);
-        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
+            Header = "コピー",
+            Command = ApplicationCommands.Copy,
+            CommandTarget = body
+        });
+        return menu;
+    }
+
+    private void CanCopyReadableDocumentSelection(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = !ReadableDocumentRichTextBox.Selection.IsEmpty &&
+                       !string.IsNullOrEmpty(GetSelectedReadableBodyText());
+        e.Handled = true;
+    }
+
+    private void OnCopyReadableDocumentSelection(object sender, ExecutedRoutedEventArgs e)
+    {
+        var text = GetSelectedReadableBodyText();
+        if (!string.IsNullOrEmpty(text))
         {
-            _firstSearchMatchAnchor = body;
+            Clipboard.SetText(text);
         }
 
-        return body;
+        e.Handled = true;
     }
+
+    private string GetSelectedReadableBodyText()
+    {
+        var selection = ReadableDocumentRichTextBox.Selection;
+        if (selection.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        var selectedBlocks = new List<string>();
+        foreach (var paragraph in _readableBodyParagraphs)
+        {
+            if (selection.Start.CompareTo(paragraph.ContentEnd) >= 0 ||
+                selection.End.CompareTo(paragraph.ContentStart) <= 0)
+            {
+                continue;
+            }
+
+            var start = MaxTextPointer(selection.Start, paragraph.ContentStart);
+            var end = MinTextPointer(selection.End, paragraph.ContentEnd);
+            var text = new TextRange(start, end).Text.TrimEnd('\r', '\n');
+            if (!string.IsNullOrEmpty(text))
+            {
+                selectedBlocks.Add(text);
+            }
+        }
+
+        return string.Join(Environment.NewLine, selectedBlocks);
+    }
+
+    private static TextPointer MaxTextPointer(TextPointer first, TextPointer second) =>
+        first.CompareTo(second) >= 0 ? first : second;
+
+    private static TextPointer MinTextPointer(TextPointer first, TextPointer second) =>
+        first.CompareTo(second) <= 0 ? first : second;
 
     private static bool ContainsSearchText(string text, string searchText) =>
         !string.IsNullOrWhiteSpace(searchText) &&
         text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
 
-    private static void AddHighlightedRuns(TextBlock textBlock, string text, string searchText)
+    private static void AddHighlightedRuns(InlineCollection inlines, string text, string searchText)
     {
         if (string.IsNullOrWhiteSpace(searchText))
         {
-            textBlock.Inlines.Add(new Run(text));
+            inlines.Add(new Run(text));
             return;
         }
 
@@ -331,16 +435,16 @@ public partial class ReadablePolishedPanel : UserControl
             var matchIndex = text.IndexOf(searchText, startIndex, StringComparison.OrdinalIgnoreCase);
             if (matchIndex < 0)
             {
-                textBlock.Inlines.Add(new Run(text[startIndex..]));
+                inlines.Add(new Run(text[startIndex..]));
                 return;
             }
 
             if (matchIndex > startIndex)
             {
-                textBlock.Inlines.Add(new Run(text[startIndex..matchIndex]));
+                inlines.Add(new Run(text[startIndex..matchIndex]));
             }
 
-            textBlock.Inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
+            inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
             {
                 Background = new SolidColorBrush(Color.FromRgb(0xFE, 0xF3, 0xC7)),
                 FontWeight = FontWeights.SemiBold
