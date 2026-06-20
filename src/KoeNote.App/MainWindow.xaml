@@ -251,16 +251,16 @@
                                     CornerRadius="8"
                                     Padding="2">
                                 <StackPanel Orientation="Horizontal">
-                                    <RadioButton Content="原文"
-                                                 GroupName="StandardTranscriptMode"
-                                                 Style="{StaticResource StandardTranscriptModeRadio}"
-                                                 IsChecked="{Binding IsStandardRawTranscriptViewSelected, Mode=TwoWay}"
-                                                 ToolTip="ASR原文を確認・修正します" />
                                     <RadioButton Content="整文"
                                                  GroupName="StandardTranscriptMode"
                                                  Style="{StaticResource StandardTranscriptModeRadio}"
                                                  IsChecked="{Binding IsStandardReadableTranscriptViewSelected, Mode=TwoWay}"
                                                  ToolTip="整文ビューを表示します" />
+                                    <RadioButton Content="原文"
+                                                 GroupName="StandardTranscriptMode"
+                                                 Style="{StaticResource StandardTranscriptModeRadio}"
+                                                 IsChecked="{Binding IsStandardRawTranscriptViewSelected, Mode=TwoWay}"
+                                                 ToolTip="ASR原文を確認・修正します" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
