@@ -148,7 +148,7 @@ public sealed partial class MainWindowViewModel
         }
 
         var current = _setupSelectionDraft ?? _setupState;
-        _setupSelectionDraft = current with
+        var draft = current with
         {
             IsCompleted = false,
             LastSmokeSucceeded = false,
@@ -157,10 +157,11 @@ public sealed partial class MainWindowViewModel
             SelectedAsrModelId = customPreset.AsrModelId,
             SelectedReviewModelId = customPreset.ReviewModelId
         };
+        _setupSelectionDraft = draft;
         _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(customPreset.AsrModelId, StringComparison.OrdinalIgnoreCase));
+            entry.ModelId.Equals(draft.SelectedAsrModelId, StringComparison.OrdinalIgnoreCase));
         _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
-            entry.ModelId.Equals(customPreset.ReviewModelId, StringComparison.OrdinalIgnoreCase));
+            entry.ModelId.Equals(draft.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase));
         _selectedSetupModelPreset = customPreset;
 
         RefreshSetupSelectionPreview();
@@ -873,7 +874,7 @@ public sealed partial class MainWindowViewModel
             }
 
             var current = _setupSelectionDraft ?? _setupState;
-            _setupSelectionDraft = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
+            var draft = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
                 ? current with
                 {
                     IsCompleted = false,
@@ -892,7 +893,9 @@ public sealed partial class MainWindowViewModel
                     SelectedModelPresetId = null,
                     SelectedReviewModelId = selected.ModelId
                 };
-            _selectedSetupModelPreset = null;
+            _setupSelectionDraft = draft;
+            _selectedSetupModelPreset = CreateCustomSetupModelPreset(draft);
+            ReplaceSyntheticSetupModelPreset(_selectedSetupModelPreset);
             if (role.Equals("asr", StringComparison.OrdinalIgnoreCase))
             {
                 _selectedSetupAsrModel = selected;
@@ -983,6 +986,34 @@ public sealed partial class MainWindowViewModel
         }
 
         SetupModelPresetChoices.Add(selectedPreset);
+    }
+
+    private void ReplaceSyntheticSetupModelPreset(ModelQualityPreset? selectedPreset)
+    {
+        var existing = SetupModelPresetChoices.FirstOrDefault(preset =>
+            preset.PresetId.Equals(SetupWizardStatePresenter.CustomPresetId, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            SetupModelPresetChoices.Remove(existing);
+        }
+
+        AddSyntheticSetupModelPreset(selectedPreset);
+    }
+
+    private static ModelQualityPreset? CreateCustomSetupModelPreset(SetupState state)
+    {
+        return string.IsNullOrWhiteSpace(state.SelectedAsrModelId) ||
+            string.IsNullOrWhiteSpace(state.SelectedReviewModelId)
+            ? null
+            : new ModelQualityPreset(
+                SetupWizardStatePresenter.CustomPresetId,
+                "カスタム",
+                "カスタム",
+                "個別に選択したモデル構成です。",
+                state.SelectedAsrModelId,
+                state.SelectedReviewModelId,
+                [],
+                []);
     }
 
     private void ApplySetupWizardPresentation(SetupWizardPresentationState presentation)
