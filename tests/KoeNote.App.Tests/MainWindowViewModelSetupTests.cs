@@ -1015,9 +1015,11 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
 
         var viewModel = new MainWindowViewModel(paths);
 
-        Assert.Equal(SetupWizardStatePresenter.CustomPresetId, viewModel.SelectedSetupModelPreset?.PresetId);
+        Assert.Equal("カスタム", viewModel.SelectedSetupModelPreset?.DisplayName);
         Assert.Contains(viewModel.SetupModelPresetChoices, preset =>
-            preset.PresetId == SetupWizardStatePresenter.CustomPresetId);
+            preset.DisplayName == "カスタム" &&
+            preset.AsrModelId == "kotoba-whisper-v2.2-faster" &&
+            preset.ReviewModelId == "bonsai-8b-q1-0");
     }
 
     [Fact]
