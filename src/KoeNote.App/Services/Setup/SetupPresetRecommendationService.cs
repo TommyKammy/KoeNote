@@ -62,7 +62,7 @@ internal sealed class SetupPresetRecommendationService(
             return "ultra_lightweight";
         }
 
-        if (resources.MaxGpuMemoryGb >= 8 && totalMemoryGb >= 24)
+        if (resources.MaxGpuMemoryGb >= 12 && totalMemoryGb >= 24)
         {
             return "high_accuracy";
         }

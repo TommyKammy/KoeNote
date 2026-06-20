@@ -33,6 +33,7 @@ public sealed class ModelCatalogServiceTests
             entry.CatalogItem.Family == "gemma" &&
             entry.CatalogItem.Runtime.PackageId == "runtime-llama-cpp" &&
             entry.CatalogItem.SizeBytes == 6975877728 &&
+            entry.CatalogItem.RecommendedFor.Contains("high_vram_recommended") &&
             entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
         Assert.DoesNotContain(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
@@ -69,7 +70,7 @@ public sealed class ModelCatalogServiceTests
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
         Assert.Equal("高精度", highAccuracy.QualityLabel);
         Assert.Equal("faster-whisper-large-v3", highAccuracy.AsrModelId);
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
         Assert.Equal("実験的", experimental.QualityLabel);

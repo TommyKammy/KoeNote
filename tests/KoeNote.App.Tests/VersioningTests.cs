@@ -299,11 +299,11 @@ public sealed class VersioningTests
         Assert.Contains("gemma-4-12b-it-qat-q4-0", script);
         Assert.Contains("gemma-4-12b-it-qat-q4_0.gguf", script);
         Assert.Contains("gemma-4-e4b-it-q4-k-m", script);
-        Assert.Contains("default promotion guard", script);
-        Assert.Contains("nonExperimental12bPresets", script);
-        Assert.Contains("Only the experimental preset selects Gemma 4 12B", script);
-        Assert.Contains("recommended and high_accuracy remain on Gemma 4 E4B", script);
-        Assert.Contains("experimental_only", script);
+        Assert.Contains("high-VRAM promotion guard", script);
+        Assert.Contains("unexpected12bPresets", script);
+        Assert.Contains("High accuracy selects Gemma 4 12B", script);
+        Assert.Contains("recommended remains on Gemma 4 E4B", script);
+        Assert.Contains("high_vram_high_accuracy", script);
         Assert.Contains("RunLocalRuntimeSmoke", script);
         Assert.Contains("X-Linked-Size", script);
         Assert.Contains("X-Xet-Hash", script);
