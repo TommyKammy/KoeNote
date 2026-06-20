@@ -319,46 +319,51 @@ $catalogModel = @($catalog.models | Where-Object { $_.model_id -eq $modelId }) |
 $experimentalPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "experimental" }) | Select-Object -First 1
 $recommendedPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "recommended" }) | Select-Object -First 1
 $highAccuracyPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "high_accuracy" }) | Select-Object -First 1
-$unexpected12bPresets = @($catalog.presets | Where-Object {
-        $_.preset_id -notin @("high_accuracy", "experimental") -and $_.review_model_id -eq $modelId
-    })
+$unexpected12bPresets = @($catalog.presets | Where-Object { $_.review_model_id -eq $modelId })
 
 if ($catalogModel -eq $null) {
     Add-Check "catalog model" "fail" "The Gemma 4 12B model is missing from the catalog."
 }
-elseif ($catalogModel.download.url -ne $modelUrl) {
-    Add-Check "catalog model" "fail" "The Gemma 4 12B catalog URL does not match the expected GGUF URL." $catalogModel.download.url
+elseif ($catalogModel.download.url -ne $modelUrl -or $catalogModel.status -ne "hidden") {
+    Add-Check "catalog model" "fail" "The Gemma 4 12B catalog entry must remain hidden with the expected GGUF URL." @{
+        url = $catalogModel.download.url
+        status = $catalogModel.status
+    }
 }
 else {
-    Add-Check "catalog model" "pass" "The Gemma 4 12B GGUF model is cataloged." @{
+    Add-Check "catalog model" "pass" "The Gemma 4 12B GGUF model is cataloged but hidden from user selection." @{
         model_id = $catalogModel.model_id
         url = $catalogModel.download.url
         size_bytes = $catalogModel.size_bytes
+        status = $catalogModel.status
     }
 }
 
-if ($experimentalPreset -ne $null -and $experimentalPreset.review_model_id -eq $modelId) {
-    Add-Check "experimental preset" "pass" "Experimental preset selects Gemma 4 12B."
+if ($experimentalPreset -ne $null -and $experimentalPreset.review_model_id -eq $defaultReviewModelId) {
+    Add-Check "experimental preset" "pass" "Experimental preset stays on Gemma 4 E4B while 12B is hidden."
 }
 else {
-    Add-Check "experimental preset" "fail" "Experimental preset does not select Gemma 4 12B."
+    Add-Check "experimental preset" "fail" "Experimental preset must not select Gemma 4 12B while the runtime path is unstable." @{
+        expected_review_model_id = $defaultReviewModelId
+        actual_review_model_id = if ($experimentalPreset -eq $null) { $null } else { $experimentalPreset.review_model_id }
+    }
 }
 
 if ($recommendedPreset -ne $null -and
     $highAccuracyPreset -ne $null -and
     $unexpected12bPresets.Count -eq 0 -and
     $recommendedPreset.review_model_id -eq $defaultReviewModelId -and
-    $highAccuracyPreset.review_model_id -eq $modelId) {
-    Add-Check "high-VRAM promotion guard" "pass" "High accuracy selects Gemma 4 12B; recommended remains on Gemma 4 E4B." @{
+    $highAccuracyPreset.review_model_id -eq $defaultReviewModelId) {
+    Add-Check "12B selection guard" "pass" "Recommended and high accuracy presets remain on Gemma 4 E4B; 12B is not user-selectable." @{
         recommended_review_model_id = $recommendedPreset.review_model_id
         high_accuracy_review_model_id = $highAccuracyPreset.review_model_id
         unexpected_12b_preset_ids = @()
     }
 }
 else {
-    Add-Check "high-VRAM promotion guard" "fail" "High accuracy must select Gemma 4 12B, recommended must remain on Gemma 4 E4B, and other non-experimental presets must not select 12B." @{
+    Add-Check "12B selection guard" "fail" "No preset should select Gemma 4 12B until the llama.cpp CUDA/reasoning path is stable." @{
         expected_recommended_review_model_id = $defaultReviewModelId
-        expected_high_accuracy_review_model_id = $modelId
+        expected_high_accuracy_review_model_id = $defaultReviewModelId
         recommended_review_model_id = if ($recommendedPreset -eq $null) { $null } else { $recommendedPreset.review_model_id }
         high_accuracy_review_model_id = if ($highAccuracyPreset -eq $null) { $null } else { $highAccuracyPreset.review_model_id }
         unexpected_12b_preset_ids = @($unexpected12bPresets | ForEach-Object { $_.preset_id })
@@ -494,8 +499,8 @@ $report = [pscustomobject]@{
     issue = 64
     model_id = $modelId
     model_url = $modelUrl
-    release_decision = "high_vram_high_accuracy"
-    release_decision_reason = "Promote Gemma 4 12B to the high_accuracy preset for hosts that meet the 12GB VRAM recommendation while keeping the recommended preset on Gemma 4 E4B."
+    release_decision = "hidden_until_llama_cpp_gemma4_12b_stable"
+    release_decision_reason = "Keep Gemma 4 12B hidden from user selection because current llama.cpp CUDA/reasoning behavior can emit channel tokens or invalid output; keep presets on Gemma 4 E4B."
     checks = $checks
 }
 

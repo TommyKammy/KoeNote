@@ -381,6 +381,18 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_SelectModel_RejectsHiddenGemma12BReviewModel()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        var wizard = CreateWizard(paths);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            wizard.SelectModel("review", "gemma-4-12b-it-qat-q4-0"));
+
+        Assert.Contains("not selectable", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SetupWizard_LoadState_RepairsHiddenTernaryReviewSelection()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
@@ -394,6 +406,31 @@ public sealed class SetupWizardServiceTests
             LicenseAccepted = true,
             SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
             SelectedReviewModelId = "ternary-bonsai-8b-q2-0"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.LoadState();
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_LoadState_RepairsHiddenGemma12BReviewSelection()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            CurrentStep = SetupStep.Complete,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "gemma-4-12b-it-qat-q4-0"
         });
         var wizard = CreateWizard(paths);
 
@@ -594,7 +631,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyForGemma12BVram()
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithoutGemma12B()
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
@@ -609,7 +646,7 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("high_accuracy", recommendation.PresetId);
         Assert.Equal("high_accuracy", state.SelectedModelPresetId);
         Assert.Equal("faster-whisper-large-v3", state.SelectedAsrModelId);
-        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
     }
 
     [Fact]

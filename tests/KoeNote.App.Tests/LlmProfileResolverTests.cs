@@ -124,7 +124,7 @@ public sealed class LlmProfileResolverTests
     }
 
     [Fact]
-    public void Resolve_FallsBackToInstalledDefaultGemmaPathWhenSelectedGemmaModelIsMissing()
+    public void Resolve_FallsBackToInstalledDefaultGemmaPathWhenSelectedGemmaModelIsHidden()
     {
         var paths = TestDatabase.CreateReadyPaths();
         var fallbackPath = Path.Combine(paths.Root, "models", "gemma-e4b.gguf");
@@ -153,7 +153,7 @@ public sealed class LlmProfileResolverTests
 
         var profile = resolver.Resolve(catalog, "gemma-4-12b-it-qat-q4-0");
 
-        Assert.Equal("gemma-4-12b-it-qat-q4-0", profile.ModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", profile.ModelId);
         Assert.Equal(fallbackPath, profile.ModelPath);
     }
 
