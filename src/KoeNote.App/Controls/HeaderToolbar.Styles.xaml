@@ -332,6 +332,12 @@
     <Setter Property="VerticalAlignment" Value="Center" />
 </Style>
 
+<Style x:Key="HeaderExportImageIcon" TargetType="Image">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+</Style>
+
 <Style x:Key="HeaderToolText" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
     <Setter Property="FontSize" Value="12" />

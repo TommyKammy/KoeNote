@@ -271,6 +271,13 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("VisibleWhenCurrentExportTargetCopyMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenCurrentExportTargetToggleMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("CopyCurrentExportTargetCommand", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportTextIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportMarkdownIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportWordIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportCaptionIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportCopyIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("HeaderExportImageIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"HeaderExportImageIcon\"", headerStyles, StringComparison.Ordinal);
         Assert.Contains("ExportRawJsonCommand", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"字幕 SRT\" Tag=\".srt\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"字幕 VTT\" Tag=\".vtt\"", headerXaml, StringComparison.Ordinal);
