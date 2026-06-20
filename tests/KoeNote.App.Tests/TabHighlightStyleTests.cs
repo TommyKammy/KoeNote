@@ -153,15 +153,14 @@ public sealed class TabHighlightStyleTests
         var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
         var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
 
-        Assert.Contains("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
         Assert.Contains("RichTextBox x:Name=\"ReadableDocumentRichTextBox\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsReadOnly=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsDocumentEnabled=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsTabStop=\"False\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("FlowDocumentScrollViewer", xaml, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"ReadableDocumentChrome\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"MaxWidth\" Value=\"1080\" />", xaml, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"10\" />", xaml, StringComparison.Ordinal);
@@ -188,8 +187,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("new CommandBinding(ApplicationCommands.Copy", code, StringComparison.Ordinal);
         Assert.Contains("GetSelectedReadableBodyText", code, StringComparison.Ordinal);
         Assert.Contains("new TextRange(start, end).Text", code, StringComparison.Ordinal);
-        Assert.Contains("ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel", code, StringComparison.Ordinal);
-        Assert.Contains("ReadableDocumentScrollViewer.ScrollToVerticalOffset", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnBodyPreviewMouseWheel", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReadableDocumentScrollViewer.ScrollToVerticalOffset", code, StringComparison.Ordinal);
         Assert.Contains("PagePadding = new Thickness(0)", code, StringComparison.Ordinal);
         Assert.Contains("FontWeight = FontWeights.Normal", code, StringComparison.Ordinal);
         Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);

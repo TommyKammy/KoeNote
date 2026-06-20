@@ -71,25 +71,19 @@
           Background="Transparent">
         <Grid>
             <Border Style="{StaticResource ReadableDocumentVisibleChrome}">
-                <ScrollViewer x:Name="ReadableDocumentScrollViewer"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              Background="Transparent"
-                              BorderThickness="0">
-                    <RichTextBox x:Name="ReadableDocumentRichTextBox"
-                                 Background="Transparent"
-                                 BorderBrush="Transparent"
-                                 BorderThickness="0"
-                                 Padding="0"
-                                 Margin="0"
-                                 IsReadOnly="True"
-                                 IsReadOnlyCaretVisible="False"
-                                 IsDocumentEnabled="True"
-                                 IsTabStop="False"
-                                 VerticalScrollBarVisibility="Disabled"
-                                 HorizontalScrollBarVisibility="Disabled"
-                                 FocusVisualStyle="{x:Null}" />
-                </ScrollViewer>
+                <RichTextBox x:Name="ReadableDocumentRichTextBox"
+                             Background="Transparent"
+                             BorderBrush="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             Margin="0"
+                             IsReadOnly="True"
+                             IsReadOnlyCaretVisible="False"
+                             IsDocumentEnabled="True"
+                             IsTabStop="False"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled"
+                             FocusVisualStyle="{x:Null}" />
             </Border>
 
             <Grid Style="{StaticResource VisibleWhenNoReadableDocumentBlocks}">

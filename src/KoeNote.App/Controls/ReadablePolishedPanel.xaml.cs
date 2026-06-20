@@ -23,7 +23,6 @@ public partial class ReadablePolishedPanel : UserControl
         ReadableDocumentRichTextBox.ContextMenu = BuildReadOnlyTextContextMenu(ReadableDocumentRichTextBox);
         ReadableDocumentRichTextBox.CommandBindings.Add(
             new CommandBinding(ApplicationCommands.Copy, OnCopyReadableDocumentSelection, CanCopyReadableDocumentSelection));
-        ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel;
         SpellCheck.SetIsEnabled(ReadableDocumentRichTextBox, false);
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
@@ -351,13 +350,6 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Background { get; } = new SolidColorBrush(BackgroundColor);
 
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
-    }
-
-    private void OnBodyPreviewMouseWheel(object sender, MouseWheelEventArgs e)
-    {
-        ReadableDocumentScrollViewer.ScrollToVerticalOffset(
-            ReadableDocumentScrollViewer.VerticalOffset - e.Delta);
-        e.Handled = true;
     }
 
     private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)
