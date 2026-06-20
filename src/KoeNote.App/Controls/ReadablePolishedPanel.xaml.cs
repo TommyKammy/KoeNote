@@ -12,10 +12,14 @@ namespace KoeNote.App.Controls;
 
 public partial class ReadablePolishedPanel : UserControl
 {
+    private const double ReadableMetaColumnWidth = 122;
+    private const double ReadableDocumentScrollbarReserve = 24;
+
     private INotifyPropertyChanged? _subscribedViewModel;
     private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
     private readonly List<Paragraph> _readableBodyParagraphs = [];
     private FrameworkContentElement? _firstSearchMatchAnchor;
+    private double _lastReadableDocumentWidth;
 
     public ReadablePolishedPanel()
     {
@@ -23,6 +27,7 @@ public partial class ReadablePolishedPanel : UserControl
         ReadableDocumentRichTextBox.ContextMenu = BuildReadOnlyTextContextMenu(ReadableDocumentRichTextBox);
         ReadableDocumentRichTextBox.CommandBindings.Add(
             new CommandBinding(ApplicationCommands.Copy, OnCopyReadableDocumentSelection, CanCopyReadableDocumentSelection));
+        ReadableDocumentRichTextBox.SizeChanged += OnReadableDocumentRichTextBoxSizeChanged;
         SpellCheck.SetIsEnabled(ReadableDocumentRichTextBox, false);
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
@@ -137,6 +142,7 @@ public partial class ReadablePolishedPanel : UserControl
         var document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
 
         ReadableDocumentRichTextBox.Document = document;
+        UpdateReadableDocumentLayoutWidth();
 
         if (_firstSearchMatchAnchor is { } firstSearchMatch)
         {
@@ -165,8 +171,8 @@ public partial class ReadablePolishedPanel : UserControl
         {
             CellSpacing = 0
         };
-        table.Columns.Add(new TableColumn { Width = new GridLength(122) });
-        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(ReadableMetaColumnWidth) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(GetReadableBodyColumnWidth()) });
         var rowGroup = new TableRowGroup();
         table.RowGroups.Add(rowGroup);
         document.Blocks.Add(table);
@@ -261,6 +267,7 @@ public partial class ReadablePolishedPanel : UserControl
                 Background = speakerPalette.Background,
                 CornerRadius = new CornerRadius(6),
                 Cursor = viewModel.IsRunInProgress ? Cursors.Arrow : Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(8, 3, 8, 3),
                 ToolTip = viewModel.IsRunInProgress ? "実行中は話者名を変更できません" : "話者名を変更",
                 Child = new TextBlock
@@ -350,6 +357,59 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Background { get; } = new SolidColorBrush(BackgroundColor);
 
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
+    }
+
+    private void OnReadableDocumentRichTextBoxSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (Math.Abs(e.NewSize.Width - _lastReadableDocumentWidth) < 1)
+        {
+            return;
+        }
+
+        _lastReadableDocumentWidth = e.NewSize.Width;
+        UpdateReadableDocumentLayoutWidth();
+    }
+
+    private void UpdateReadableDocumentLayoutWidth()
+    {
+        var contentWidth = GetReadableDocumentContentWidth();
+        var document = ReadableDocumentRichTextBox.Document;
+        document.PageWidth = contentWidth;
+        document.ColumnWidth = contentWidth;
+
+        foreach (var block in document.Blocks)
+        {
+            if (block is not Table table || table.Columns.Count < 2)
+            {
+                continue;
+            }
+
+            table.Columns[0].Width = new GridLength(ReadableMetaColumnWidth);
+            table.Columns[1].Width = new GridLength(GetReadableBodyColumnWidth(contentWidth));
+            return;
+        }
+    }
+
+    private double GetReadableBodyColumnWidth() =>
+        GetReadableBodyColumnWidth(GetReadableDocumentContentWidth());
+
+    private static double GetReadableBodyColumnWidth(double contentWidth) =>
+        Math.Max(320, contentWidth - ReadableMetaColumnWidth);
+
+    private double GetReadableDocumentContentWidth()
+    {
+        var width = ReadableDocumentRichTextBox.ActualWidth;
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = ReadableDocumentRichTextBox.RenderSize.Width;
+        }
+
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = 900;
+        }
+
+        return Math.Max(ReadableMetaColumnWidth + 320, width - ReadableDocumentScrollbarReserve);
     }
 
     private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)
