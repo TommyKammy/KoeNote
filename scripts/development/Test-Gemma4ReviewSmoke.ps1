@@ -319,8 +319,8 @@ $catalogModel = @($catalog.models | Where-Object { $_.model_id -eq $modelId }) |
 $experimentalPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "experimental" }) | Select-Object -First 1
 $recommendedPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "recommended" }) | Select-Object -First 1
 $highAccuracyPreset = @($catalog.presets | Where-Object { $_.preset_id -eq "high_accuracy" }) | Select-Object -First 1
-$nonExperimental12bPresets = @($catalog.presets | Where-Object {
-        $_.preset_id -ne "experimental" -and $_.review_model_id -eq $modelId
+$unexpected12bPresets = @($catalog.presets | Where-Object {
+        $_.preset_id -notin @("high_accuracy", "experimental") -and $_.review_model_id -eq $modelId
     })
 
 if ($catalogModel -eq $null) {
@@ -346,21 +346,22 @@ else {
 
 if ($recommendedPreset -ne $null -and
     $highAccuracyPreset -ne $null -and
-    $nonExperimental12bPresets.Count -eq 0 -and
+    $unexpected12bPresets.Count -eq 0 -and
     $recommendedPreset.review_model_id -eq $defaultReviewModelId -and
-    $highAccuracyPreset.review_model_id -eq $defaultReviewModelId) {
-    Add-Check "default promotion guard" "pass" "Only the experimental preset selects Gemma 4 12B; recommended and high_accuracy remain on Gemma 4 E4B." @{
+    $highAccuracyPreset.review_model_id -eq $modelId) {
+    Add-Check "high-VRAM promotion guard" "pass" "High accuracy selects Gemma 4 12B; recommended remains on Gemma 4 E4B." @{
         recommended_review_model_id = $recommendedPreset.review_model_id
         high_accuracy_review_model_id = $highAccuracyPreset.review_model_id
-        non_experimental_12b_preset_ids = @()
+        unexpected_12b_preset_ids = @()
     }
 }
 else {
-    Add-Check "default promotion guard" "fail" "Only experimental may select Gemma 4 12B, and recommended/high_accuracy must remain on Gemma 4 E4B." @{
-        expected_review_model_id = $defaultReviewModelId
+    Add-Check "high-VRAM promotion guard" "fail" "High accuracy must select Gemma 4 12B, recommended must remain on Gemma 4 E4B, and other non-experimental presets must not select 12B." @{
+        expected_recommended_review_model_id = $defaultReviewModelId
+        expected_high_accuracy_review_model_id = $modelId
         recommended_review_model_id = if ($recommendedPreset -eq $null) { $null } else { $recommendedPreset.review_model_id }
         high_accuracy_review_model_id = if ($highAccuracyPreset -eq $null) { $null } else { $highAccuracyPreset.review_model_id }
-        non_experimental_12b_preset_ids = @($nonExperimental12bPresets | ForEach-Object { $_.preset_id })
+        unexpected_12b_preset_ids = @($unexpected12bPresets | ForEach-Object { $_.preset_id })
     }
 }
 
@@ -493,8 +494,8 @@ $report = [pscustomobject]@{
     issue = 64
     model_id = $modelId
     model_url = $modelUrl
-    release_decision = "experimental_only"
-    release_decision_reason = "Keep Gemma 4 12B behind the experimental preset until full local runtime smoke and field memory/load-time data justify promotion."
+    release_decision = "high_vram_high_accuracy"
+    release_decision_reason = "Promote Gemma 4 12B to the high_accuracy preset for hosts that meet the 12GB VRAM recommendation while keeping the recommended preset on Gemma 4 E4B."
     checks = $checks
 }
 

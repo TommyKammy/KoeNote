@@ -575,6 +575,44 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_KeepsRecommendedBelowGemma12BVram()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 24L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 8,
+            nvidiaGpuDetected: true,
+            logicalProcessorCount: 8));
+
+        var recommendation = wizard.GetPresetRecommendation();
+        var state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Equal("recommended", recommendation.PresetId);
+        Assert.Equal("recommended", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3-turbo", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyForGemma12BVram()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 24L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 12,
+            nvidiaGpuDetected: true,
+            logicalProcessorCount: 8));
+
+        var recommendation = wizard.GetPresetRecommendation();
+        var state = wizard.ApplyAutomaticModelPresetRecommendation();
+
+        Assert.Equal("high_accuracy", recommendation.PresetId);
+        Assert.Equal("high_accuracy", state.SelectedModelPresetId);
+        Assert.Equal("faster-whisper-large-v3", state.SelectedAsrModelId);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void SetupWizard_AutomaticPresetRecommendation_DoesNotOverrideManualModelChoice()
     {
         var paths = CreatePaths();
