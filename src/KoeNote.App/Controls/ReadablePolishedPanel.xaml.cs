@@ -14,12 +14,15 @@ public partial class ReadablePolishedPanel : UserControl
 {
     private INotifyPropertyChanged? _subscribedViewModel;
     private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
+    private readonly List<Paragraph> _readableBodyParagraphs = [];
     private FrameworkContentElement? _firstSearchMatchAnchor;
 
     public ReadablePolishedPanel()
     {
         InitializeComponent();
         ReadableDocumentRichTextBox.ContextMenu = BuildReadOnlyTextContextMenu(ReadableDocumentRichTextBox);
+        ReadableDocumentRichTextBox.CommandBindings.Add(
+            new CommandBinding(ApplicationCommands.Copy, OnCopyReadableDocumentSelection, CanCopyReadableDocumentSelection));
         ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel;
         SpellCheck.SetIsEnabled(ReadableDocumentRichTextBox, false);
         Loaded += OnLoaded;
@@ -119,6 +122,7 @@ public partial class ReadablePolishedPanel : UserControl
     private void RebuildReadableDocument()
     {
         _readableBlockAnchors.Clear();
+        _readableBodyParagraphs.Clear();
         _firstSearchMatchAnchor = null;
         ReadableDocumentRichTextBox.Document = new FlowDocument();
 
@@ -230,6 +234,7 @@ public partial class ReadablePolishedPanel : UserControl
             Foreground = textBrush
         };
         AddHighlightedRuns(paragraph.Inlines, block.Text, searchText);
+        _readableBodyParagraphs.Add(paragraph);
 
         return new TableCell(paragraph)
         {
@@ -366,6 +371,59 @@ public partial class ReadablePolishedPanel : UserControl
         });
         return menu;
     }
+
+    private void CanCopyReadableDocumentSelection(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = !ReadableDocumentRichTextBox.Selection.IsEmpty &&
+                       !string.IsNullOrEmpty(GetSelectedReadableBodyText());
+        e.Handled = true;
+    }
+
+    private void OnCopyReadableDocumentSelection(object sender, ExecutedRoutedEventArgs e)
+    {
+        var text = GetSelectedReadableBodyText();
+        if (!string.IsNullOrEmpty(text))
+        {
+            Clipboard.SetText(text);
+        }
+
+        e.Handled = true;
+    }
+
+    private string GetSelectedReadableBodyText()
+    {
+        var selection = ReadableDocumentRichTextBox.Selection;
+        if (selection.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        var selectedBlocks = new List<string>();
+        foreach (var paragraph in _readableBodyParagraphs)
+        {
+            if (selection.Start.CompareTo(paragraph.ContentEnd) >= 0 ||
+                selection.End.CompareTo(paragraph.ContentStart) <= 0)
+            {
+                continue;
+            }
+
+            var start = MaxTextPointer(selection.Start, paragraph.ContentStart);
+            var end = MinTextPointer(selection.End, paragraph.ContentEnd);
+            var text = new TextRange(start, end).Text.TrimEnd('\r', '\n');
+            if (!string.IsNullOrEmpty(text))
+            {
+                selectedBlocks.Add(text);
+            }
+        }
+
+        return string.Join(Environment.NewLine, selectedBlocks);
+    }
+
+    private static TextPointer MaxTextPointer(TextPointer first, TextPointer second) =>
+        first.CompareTo(second) >= 0 ? first : second;
+
+    private static TextPointer MinTextPointer(TextPointer first, TextPointer second) =>
+        first.CompareTo(second) <= 0 ? first : second;
 
     private static bool ContainsSearchText(string text, string searchText) =>
         !string.IsNullOrWhiteSpace(searchText) &&

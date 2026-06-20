@@ -156,6 +156,7 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
         Assert.Contains("RichTextBox x:Name=\"ReadableDocumentRichTextBox\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsReadOnly=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsDocumentEnabled=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsTabStop=\"False\"", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
         Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
@@ -183,6 +184,10 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("new TableColumn { Width = new GridLength(1, GridUnitType.Star) }", code, StringComparison.Ordinal);
         Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
         Assert.Contains("BlockUIContainer", code, StringComparison.Ordinal);
+        Assert.Contains("_readableBodyParagraphs", code, StringComparison.Ordinal);
+        Assert.Contains("new CommandBinding(ApplicationCommands.Copy", code, StringComparison.Ordinal);
+        Assert.Contains("GetSelectedReadableBodyText", code, StringComparison.Ordinal);
+        Assert.Contains("new TextRange(start, end).Text", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentScrollViewer.ScrollToVerticalOffset", code, StringComparison.Ordinal);
         Assert.Contains("PagePadding = new Thickness(0)", code, StringComparison.Ordinal);

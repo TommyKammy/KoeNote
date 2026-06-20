@@ -84,6 +84,7 @@
                                  Margin="0"
                                  IsReadOnly="True"
                                  IsReadOnlyCaretVisible="False"
+                                 IsDocumentEnabled="True"
                                  IsTabStop="False"
                                  VerticalScrollBarVisibility="Disabled"
                                  HorizontalScrollBarVisibility="Disabled"
