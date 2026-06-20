@@ -13,12 +13,15 @@ namespace KoeNote.App.Controls;
 public partial class ReadablePolishedPanel : UserControl
 {
     private INotifyPropertyChanged? _subscribedViewModel;
-    private readonly List<FrameworkElement> _readableBlockAnchors = [];
-    private FrameworkElement? _firstSearchMatchAnchor;
+    private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
+    private FrameworkContentElement? _firstSearchMatchAnchor;
 
     public ReadablePolishedPanel()
     {
         InitializeComponent();
+        ReadableDocumentRichTextBox.ContextMenu = BuildReadOnlyTextContextMenu(ReadableDocumentRichTextBox);
+        ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel;
+        SpellCheck.SetIsEnabled(ReadableDocumentRichTextBox, false);
         Loaded += OnLoaded;
         DataContextChanged += OnDataContextChanged;
         Unloaded += OnUnloaded;
@@ -117,7 +120,7 @@ public partial class ReadablePolishedPanel : UserControl
     {
         _readableBlockAnchors.Clear();
         _firstSearchMatchAnchor = null;
-        ReadableDocumentBlocksPanel.Children.Clear();
+        ReadableDocumentRichTextBox.Document = new FlowDocument();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
         {
@@ -128,12 +131,9 @@ public partial class ReadablePolishedPanel : UserControl
         var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
         var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
         var searchText = viewModel.ReadableDocumentSearchText;
+        var document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
 
-        foreach (var block in viewModel.ReadableDocumentBlocks)
-        {
-            ReadableDocumentBlocksPanel.Children.Add(
-                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
-        }
+        ReadableDocumentRichTextBox.Document = document;
 
         if (_firstSearchMatchAnchor is { } firstSearchMatch)
         {
@@ -141,7 +141,43 @@ public partial class ReadablePolishedPanel : UserControl
         }
     }
 
-    private Grid BuildReadableBlockRow(
+    private FlowDocument BuildReadableDocument(
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush mutedBrush,
+        Brush separatorBrush,
+        string searchText)
+    {
+        var document = new FlowDocument
+        {
+            PagePadding = new Thickness(0),
+            FontFamily = new FontFamily("Yu Gothic UI"),
+            FontSize = viewModel.ReadableDocumentFontSize,
+            FontWeight = FontWeights.Normal,
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush,
+            TextAlignment = TextAlignment.Left
+        };
+        var table = new Table
+        {
+            CellSpacing = 0
+        };
+        table.Columns.Add(new TableColumn { Width = new GridLength(122) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var rowGroup = new TableRowGroup();
+        table.RowGroups.Add(rowGroup);
+        document.Blocks.Add(table);
+
+        foreach (var block in viewModel.ReadableDocumentBlocks)
+        {
+            rowGroup.Rows.Add(
+                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
+        }
+
+        return document;
+    }
+
+    private TableRow BuildReadableBlockRow(
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -149,33 +185,58 @@ public partial class ReadablePolishedPanel : UserControl
         Brush separatorBrush,
         string searchText)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(122) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var row = new TableRow();
+        row.Cells.Add(BuildMetaCell(block, viewModel, mutedBrush, separatorBrush));
+        row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText));
 
-        var meta = BuildMetaPanel(block, viewModel, mutedBrush, GetSpeakerPalette(block.Speaker));
-        Grid.SetColumn(meta, 0);
-        Grid.SetRow(meta, 0);
-        row.Children.Add(meta);
-
-        var body = BuildBodyRichTextBox(block, viewModel, textBrush, searchText);
-        Grid.SetColumn(body, 1);
-        Grid.SetRow(body, 0);
-        row.Children.Add(body);
-
-        var separator = new Border
+        _readableBlockAnchors.Add(row);
+        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
         {
-            Height = 1,
-            Background = separatorBrush,
-            Margin = new Thickness(0, 20, 0, 26)
-        };
-        Grid.SetColumn(separator, 1);
-        Grid.SetRow(separator, 1);
-        row.Children.Add(separator);
+            _firstSearchMatchAnchor = row;
+        }
 
         return row;
+    }
+
+    private TableCell BuildMetaCell(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush mutedBrush,
+        Brush separatorBrush)
+    {
+        return new TableCell(new BlockUIContainer(BuildMetaPanel(
+            block,
+            viewModel,
+            mutedBrush,
+            GetSpeakerPalette(block.Speaker))))
+        {
+            Padding = new Thickness(0, 3, 20, 26),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
+    }
+
+    private TableCell BuildBodyCell(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush separatorBrush,
+        string searchText)
+    {
+        var paragraph = new Paragraph
+        {
+            Margin = new Thickness(0),
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush
+        };
+        AddHighlightedRuns(paragraph.Inlines, block.Text, searchText);
+
+        return new TableCell(paragraph)
+        {
+            Padding = new Thickness(0, 0, 0, 26),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
     }
 
     private StackPanel BuildMetaPanel(
@@ -287,75 +348,11 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
-    private RichTextBox BuildBodyRichTextBox(
-        ReadableDocumentBlock block,
-        MainWindowViewModel viewModel,
-        Brush textBrush,
-        string searchText)
-    {
-        var body = new RichTextBox
-        {
-            FontFamily = new FontFamily("Yu Gothic UI"),
-            FontSize = viewModel.ReadableDocumentFontSize,
-            FontWeight = FontWeights.Normal,
-            Foreground = textBrush,
-            Background = Brushes.Transparent,
-            BorderBrush = Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(0),
-            Margin = new Thickness(0),
-            IsReadOnly = true,
-            IsReadOnlyCaretVisible = false,
-            FocusVisualStyle = null,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-        };
-        body.Document = BuildBodyDocument(block.Text, viewModel, textBrush, searchText);
-        body.ContextMenu = BuildReadOnlyTextContextMenu(body);
-        body.PreviewMouseWheel += OnBodyPreviewMouseWheel;
-        SpellCheck.SetIsEnabled(body, false);
-
-        _readableBlockAnchors.Add(body);
-        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
-        {
-            _firstSearchMatchAnchor = body;
-        }
-
-        return body;
-    }
-
     private void OnBodyPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         ReadableDocumentScrollViewer.ScrollToVerticalOffset(
             ReadableDocumentScrollViewer.VerticalOffset - e.Delta);
         e.Handled = true;
-    }
-
-    private static FlowDocument BuildBodyDocument(
-        string text,
-        MainWindowViewModel viewModel,
-        Brush textBrush,
-        string searchText)
-    {
-        var document = new FlowDocument
-        {
-            PagePadding = new Thickness(0),
-            FontFamily = new FontFamily("Yu Gothic UI"),
-            FontSize = viewModel.ReadableDocumentFontSize,
-            FontWeight = FontWeights.Normal,
-            LineHeight = viewModel.ReadableDocumentLineHeight,
-            Foreground = textBrush,
-            TextAlignment = TextAlignment.Left
-        };
-        var paragraph = new Paragraph
-        {
-            Margin = new Thickness(0),
-            LineHeight = viewModel.ReadableDocumentLineHeight,
-            Foreground = textBrush
-        };
-        AddHighlightedRuns(paragraph.Inlines, text, searchText);
-        document.Blocks.Add(paragraph);
-        return document;
     }
 
     private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)

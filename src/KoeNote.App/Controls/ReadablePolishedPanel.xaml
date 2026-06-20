@@ -76,7 +76,18 @@
                               HorizontalScrollBarVisibility="Disabled"
                               Background="Transparent"
                               BorderThickness="0">
-                    <StackPanel x:Name="ReadableDocumentBlocksPanel" />
+                    <RichTextBox x:Name="ReadableDocumentRichTextBox"
+                                 Background="Transparent"
+                                 BorderBrush="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 Margin="0"
+                                 IsReadOnly="True"
+                                 IsReadOnlyCaretVisible="False"
+                                 IsTabStop="False"
+                                 VerticalScrollBarVisibility="Disabled"
+                                 HorizontalScrollBarVisibility="Disabled"
+                                 FocusVisualStyle="{x:Null}" />
                 </ScrollViewer>
             </Border>
 

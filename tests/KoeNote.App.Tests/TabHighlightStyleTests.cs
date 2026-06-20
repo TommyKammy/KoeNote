@@ -154,7 +154,11 @@ public sealed class TabHighlightStyleTests
         var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
 
         Assert.Contains("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("StackPanel x:Name=\"ReadableDocumentBlocksPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("RichTextBox x:Name=\"ReadableDocumentRichTextBox\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsReadOnly=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsTabStop=\"False\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("FlowDocumentScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"ReadableDocumentChrome\"", xaml, StringComparison.Ordinal);
@@ -171,16 +175,15 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ReadableDocumentStateTitle", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentStateDescription", xaml, StringComparison.Ordinal);
         Assert.Contains("viewModel.ReadableDocumentBlocks", code, StringComparison.Ordinal);
+        Assert.Contains("BuildReadableDocument", code, StringComparison.Ordinal);
         Assert.Contains("BuildReadableBlockRow", code, StringComparison.Ordinal);
         Assert.Contains("BuildMetaPanel", code, StringComparison.Ordinal);
-        Assert.Contains("BuildBodyRichTextBox", code, StringComparison.Ordinal);
-        Assert.Contains("new RichTextBox", code, StringComparison.Ordinal);
-        Assert.Contains("IsReadOnly = true", code, StringComparison.Ordinal);
-        Assert.Contains("BorderThickness = new Thickness(0)", code, StringComparison.Ordinal);
-        Assert.Contains("Background = Brushes.Transparent", code, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollBarVisibility = ScrollBarVisibility.Disabled", code, StringComparison.Ordinal);
-        Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled", code, StringComparison.Ordinal);
-        Assert.Contains("body.PreviewMouseWheel += OnBodyPreviewMouseWheel", code, StringComparison.Ordinal);
+        Assert.Contains("new Table", code, StringComparison.Ordinal);
+        Assert.Contains("new TableColumn { Width = new GridLength(122) }", code, StringComparison.Ordinal);
+        Assert.Contains("new TableColumn { Width = new GridLength(1, GridUnitType.Star) }", code, StringComparison.Ordinal);
+        Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
+        Assert.Contains("BlockUIContainer", code, StringComparison.Ordinal);
+        Assert.Contains("ReadableDocumentRichTextBox.PreviewMouseWheel += OnBodyPreviewMouseWheel", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentScrollViewer.ScrollToVerticalOffset", code, StringComparison.Ordinal);
         Assert.Contains("PagePadding = new Thickness(0)", code, StringComparison.Ordinal);
         Assert.Contains("FontWeight = FontWeights.Normal", code, StringComparison.Ordinal);
