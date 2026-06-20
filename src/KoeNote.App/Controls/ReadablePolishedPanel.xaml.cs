@@ -160,7 +160,7 @@ public partial class ReadablePolishedPanel : UserControl
         Grid.SetRow(meta, 0);
         row.Children.Add(meta);
 
-        var body = BuildBodyTextBlock(block, viewModel, textBrush, searchText);
+        var body = BuildBodyRichTextBox(block, viewModel, textBrush, searchText);
         Grid.SetColumn(body, 1);
         Grid.SetRow(body, 0);
         row.Children.Add(body);
@@ -287,23 +287,34 @@ public partial class ReadablePolishedPanel : UserControl
         public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
-    private TextBlock BuildBodyTextBlock(
+    private RichTextBox BuildBodyRichTextBox(
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
         string searchText)
     {
-        var body = new TextBlock
+        var body = new RichTextBox
         {
             FontFamily = new FontFamily("Yu Gothic UI"),
             FontSize = viewModel.ReadableDocumentFontSize,
             FontWeight = FontWeights.Normal,
-            LineHeight = viewModel.ReadableDocumentLineHeight,
             Foreground = textBrush,
-            TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Left
+            Background = Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            IsReadOnly = true,
+            IsReadOnlyCaretVisible = false,
+            FocusVisualStyle = null,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-        AddHighlightedRuns(body, block.Text, searchText);
+        body.Document = BuildBodyDocument(block.Text, viewModel, textBrush, searchText);
+        body.ContextMenu = BuildReadOnlyTextContextMenu(body);
+        body.PreviewMouseWheel += OnBodyPreviewMouseWheel;
+        SpellCheck.SetIsEnabled(body, false);
+
         _readableBlockAnchors.Add(body);
         if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
         {
@@ -313,15 +324,61 @@ public partial class ReadablePolishedPanel : UserControl
         return body;
     }
 
+    private void OnBodyPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ReadableDocumentScrollViewer.ScrollToVerticalOffset(
+            ReadableDocumentScrollViewer.VerticalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    private static FlowDocument BuildBodyDocument(
+        string text,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        string searchText)
+    {
+        var document = new FlowDocument
+        {
+            PagePadding = new Thickness(0),
+            FontFamily = new FontFamily("Yu Gothic UI"),
+            FontSize = viewModel.ReadableDocumentFontSize,
+            FontWeight = FontWeights.Normal,
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush,
+            TextAlignment = TextAlignment.Left
+        };
+        var paragraph = new Paragraph
+        {
+            Margin = new Thickness(0),
+            LineHeight = viewModel.ReadableDocumentLineHeight,
+            Foreground = textBrush
+        };
+        AddHighlightedRuns(paragraph.Inlines, text, searchText);
+        document.Blocks.Add(paragraph);
+        return document;
+    }
+
+    private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem
+        {
+            Header = "コピー",
+            Command = ApplicationCommands.Copy,
+            CommandTarget = body
+        });
+        return menu;
+    }
+
     private static bool ContainsSearchText(string text, string searchText) =>
         !string.IsNullOrWhiteSpace(searchText) &&
         text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
 
-    private static void AddHighlightedRuns(TextBlock textBlock, string text, string searchText)
+    private static void AddHighlightedRuns(InlineCollection inlines, string text, string searchText)
     {
         if (string.IsNullOrWhiteSpace(searchText))
         {
-            textBlock.Inlines.Add(new Run(text));
+            inlines.Add(new Run(text));
             return;
         }
 
@@ -331,16 +388,16 @@ public partial class ReadablePolishedPanel : UserControl
             var matchIndex = text.IndexOf(searchText, startIndex, StringComparison.OrdinalIgnoreCase);
             if (matchIndex < 0)
             {
-                textBlock.Inlines.Add(new Run(text[startIndex..]));
+                inlines.Add(new Run(text[startIndex..]));
                 return;
             }
 
             if (matchIndex > startIndex)
             {
-                textBlock.Inlines.Add(new Run(text[startIndex..matchIndex]));
+                inlines.Add(new Run(text[startIndex..matchIndex]));
             }
 
-            textBlock.Inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
+            inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
             {
                 Background = new SolidColorBrush(Color.FromRgb(0xFE, 0xF3, 0xC7)),
                 FontWeight = FontWeights.SemiBold
