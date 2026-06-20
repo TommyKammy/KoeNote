@@ -26,17 +26,17 @@ public sealed class ModelCatalogServiceTests
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported && entry.CatalogItem.Status == "available");
         Assert.Contains(entries, entry => entry.ModelId == "gemma-4-e4b-it-q4-k-m" && entry.Role == "review" && entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
-        Assert.Contains(entries, entry =>
-            entry.ModelId == "gemma-4-12b-it-qat-q4-0" &&
-            entry.Role == "review" &&
-            entry.IsDirectDownloadSupported &&
-            entry.CatalogItem.Family == "gemma" &&
-            entry.CatalogItem.Runtime.PackageId == "runtime-llama-cpp" &&
-            entry.CatalogItem.SizeBytes == 6975877728 &&
-            entry.CatalogItem.RecommendedFor.Contains("high_vram_recommended") &&
-            entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
+        Assert.DoesNotContain(entries, entry => entry.ModelId == "gemma-4-12b-it-qat-q4-0");
         Assert.DoesNotContain(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        Assert.Contains(catalog.Models, model =>
+            model.ModelId == "gemma-4-12b-it-qat-q4-0" &&
+            model.Role == "review" &&
+            model.Family == "gemma" &&
+            model.Runtime.PackageId == "runtime-llama-cpp" &&
+            model.SizeBytes == 6975877728 &&
+            model.RecommendedFor.Contains("gemma4_12b_disabled_pending_llama_cpp_fix") &&
+            model.Status == "hidden");
         Assert.Contains(catalog.Models, model => model.ModelId == "ternary-bonsai-8b-q2-0" && model.Status == "hidden");
     }
 
@@ -70,12 +70,12 @@ public sealed class ModelCatalogServiceTests
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
         Assert.Equal("高精度", highAccuracy.QualityLabel);
         Assert.Equal("faster-whisper-large-v3", highAccuracy.AsrModelId);
-        Assert.Equal("gemma-4-12b-it-qat-q4-0", highAccuracy.ReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
         Assert.Equal("実験的", experimental.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", experimental.AsrModelId);
-        Assert.Equal("gemma-4-12b-it-qat-q4-0", experimental.ReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", experimental.ReviewModelId);
     }
 
     [Fact]
@@ -100,6 +100,84 @@ public sealed class ModelCatalogServiceTests
         Assert.Equal("installed", entry.InstallState);
         Assert.Contains("VRAM", entry.RuntimeRequirement, StringComparison.Ordinal);
         Assert.NotEmpty(entry.LicenseName);
+    }
+
+    [Fact]
+    public void ListEntries_IncludesInstalledHiddenModelForManagement()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var repository = new InstalledModelRepository(paths);
+        var installService = new ModelInstallService(paths, repository, new ModelVerificationService());
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var modelPath = installService.GetDefaultInstallPath(catalogItem);
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+        File.WriteAllText(modelPath, "hidden model");
+
+        installService.RegisterLocalModel(catalogItem, modelPath, "download");
+
+        var entry = catalogService.ListEntries().Single(entry => entry.ModelId == catalogItem.ModelId);
+        Assert.True(entry.IsInstalled);
+        Assert.True(entry.IsVerified);
+        Assert.Equal("hidden", entry.CatalogItem.Status);
+    }
+
+    [Fact]
+    public void ListEntries_HidesHiddenModelWhenInstalledFileIsMissing()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var repository = new InstalledModelRepository(paths);
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        repository.UpsertInstalledModel(new InstalledModel(
+            catalogItem.ModelId,
+            catalogItem.Role,
+            catalogItem.EngineId,
+            catalogItem.DisplayName,
+            catalogItem.Family,
+            Version: null,
+            FilePath: Path.Combine(paths.UserModels, "review", "missing.gguf"),
+            ManifestPath: null,
+            SizeBytes: catalogItem.SizeBytes,
+            Sha256: null,
+            Verified: true,
+            LicenseName: catalogItem.License.Name,
+            SourceType: "download",
+            InstalledAt: DateTimeOffset.Now,
+            LastVerifiedAt: DateTimeOffset.Now,
+            Status: "installed"));
+
+        var entries = catalogService.ListEntries();
+
+        Assert.DoesNotContain(entries, entry => entry.ModelId == catalogItem.ModelId);
+    }
+
+    [Fact]
+    public void ListEntries_IncludesHiddenModelWithActiveDownloadJobForManagement()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var downloadJobs = new ModelDownloadJobRepository(paths);
+        var downloadId = downloadJobs.Start(
+            catalogItem.ModelId,
+            catalogItem.Download.Url!,
+            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf"),
+            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf.partial"),
+            catalogItem.Download.Sha256);
+        downloadJobs.MarkPaused(downloadId);
+
+        var entry = catalogService.ListEntries().Single(entry => entry.ModelId == catalogItem.ModelId);
+
+        Assert.False(entry.IsInstalled);
+        Assert.Equal("hidden", entry.CatalogItem.Status);
+        Assert.Equal("paused", entry.DownloadState);
     }
 
     [Fact]

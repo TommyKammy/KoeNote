@@ -22,7 +22,7 @@ public sealed class LlmProfileResolver(
 
         var catalogItem = catalog.Models.FirstOrDefault(model =>
             model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
-        if (catalogItem is null)
+        if (catalogItem is null || IsDisabledForRuntime(catalogItem))
         {
             modelId = ReviewModelSelectionResolver.Resolve(catalog, modelId, selectedPresetId: null);
             catalogItem = catalog.Models.FirstOrDefault(model =>
@@ -92,6 +92,13 @@ public sealed class LlmProfileResolver(
     {
         return !modelId.Equals(FallbackReviewModelId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(catalogItem?.Family, "gemma", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDisabledForRuntime(ModelCatalogItem catalogItem)
+    {
+        return catalogItem.RecommendedFor.Contains(
+            "gemma4_12b_disabled_pending_llama_cpp_fix",
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private string? FindUsableInstalledReviewModel(string modelId)

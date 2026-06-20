@@ -52,11 +52,12 @@ public sealed class ModelCatalogService(AppPaths paths)
 
         return LoadBuiltInCatalog()
             .Models
-            .Where(ModelCatalogCompatibility.IsSelectable)
-            .Select(model => new ModelCatalogEntry(
-                model,
-                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
-                downloadJobs.FindLatestForModel(model.ModelId)))
+            .Select(model => BuildEntryState(model, installed, downloadJobs))
+            .Where(state => ShouldListModel(state.Model, state.InstalledModel, state.LatestDownloadJob))
+            .Select(state => new ModelCatalogEntry(
+                state.Model,
+                state.InstalledModel,
+                state.LatestDownloadJob))
             .OrderBy(static entry => entry.Role, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -70,17 +71,50 @@ public sealed class ModelCatalogService(AppPaths paths)
         var downloadJobs = new ModelDownloadJobRepository(paths);
 
         return catalog.Models
-            .Where(ModelCatalogCompatibility.IsSelectable)
-            .Select(model => new ModelCatalogEntry(
-                model,
-                installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
-                downloadJobs.FindLatestForModel(model.ModelId)))
+            .Select(model => BuildEntryState(model, installed, downloadJobs))
+            .Where(state => ShouldListModel(state.Model, state.InstalledModel, state.LatestDownloadJob))
+            .Select(state => new ModelCatalogEntry(
+                state.Model,
+                state.InstalledModel,
+                state.LatestDownloadJob))
             .OrderBy(static entry => entry.Role, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static entry => entry.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
 
     public static string Serialize(ModelCatalog catalog) => JsonSerializer.Serialize(catalog, JsonOptions);
+
+    private static bool ShouldListModel(
+        ModelCatalogItem model,
+        InstalledModel? installedModel,
+        ModelDownloadJob? latestDownloadJob)
+    {
+        return ModelCatalogCompatibility.IsSelectable(model) ||
+            (installedModel is not null && InstalledModelPathExists(installedModel)) ||
+            IsManageableDownloadJob(latestDownloadJob);
+    }
+
+    private static (
+        ModelCatalogItem Model,
+        InstalledModel? InstalledModel,
+        ModelDownloadJob? LatestDownloadJob) BuildEntryState(
+        ModelCatalogItem model,
+        IReadOnlyDictionary<string, InstalledModel> installed,
+        ModelDownloadJobRepository downloadJobs)
+    {
+        installed.TryGetValue(model.ModelId, out var installedModel);
+        return (model, installedModel, downloadJobs.FindLatestForModel(model.ModelId));
+    }
+
+    private static bool IsManageableDownloadJob(ModelDownloadJob? job)
+    {
+        return job is { Status: "running" or "paused" };
+    }
+
+    private static bool InstalledModelPathExists(InstalledModel installed)
+    {
+        return File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
+    }
 
     private static ModelCatalog ParseCatalog(string json, string source)
     {

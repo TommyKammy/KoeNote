@@ -218,19 +218,20 @@ public sealed partial class MainWindowViewModel
 
     private Task UseSelectedModelAsync()
     {
-        if (SelectedModelCatalogEntry is null)
+        var entry = SelectedModelCatalogEntry;
+        if (entry is null || !ModelCatalogCompatibility.IsSelectable(entry.CatalogItem))
         {
             return Task.CompletedTask;
         }
 
-        if (SelectedModelCatalogEntry.Role.Equals("asr", StringComparison.OrdinalIgnoreCase))
+        if (entry.Role.Equals("asr", StringComparison.OrdinalIgnoreCase))
         {
-            SelectedAsrEngineId = SelectedModelCatalogEntry.EngineId;
-            LatestLog = $"ASR model selected: {SelectedModelCatalogEntry.DisplayName} ({SelectedModelCatalogEntry.EngineId})";
+            SelectedAsrEngineId = entry.EngineId;
+            LatestLog = $"ASR model selected: {entry.DisplayName} ({entry.EngineId})";
         }
         else
         {
-            LatestLog = $"整文モデルを選択しました: {SelectedModelCatalogEntry.DisplayName}";
+            LatestLog = $"整文モデルを選択しました: {entry.DisplayName}";
         }
 
         return Task.CompletedTask;
@@ -540,6 +541,12 @@ public sealed partial class MainWindowViewModel
     private bool CanRetrySelectedModelDownload()
     {
         return _modelCatalogPresenter.CanRetry(SelectedModelCatalogEntry);
+    }
+
+    private bool CanUseSelectedModel()
+    {
+        return SelectedModelCatalogEntry is { } entry &&
+            ModelCatalogCompatibility.IsSelectable(entry.CatalogItem);
     }
 
     private bool CanDeleteSelectedModelFiles()

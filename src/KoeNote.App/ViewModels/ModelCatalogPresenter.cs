@@ -71,6 +71,7 @@ internal sealed class ModelCatalogPresenter
     public bool CanDownload(ModelCatalogEntry? entry)
     {
         return entry is { IsInstalled: false } &&
+            ModelCatalogCompatibility.IsSelectable(entry.CatalogItem) &&
             entry.IsDirectDownloadSupported &&
             !IsDownloadRunning(entry.LatestDownloadJob);
     }
@@ -82,7 +83,8 @@ internal sealed class ModelCatalogPresenter
 
     public bool CanResume(ModelCatalogEntry? entry)
     {
-        return entry?.LatestDownloadJob is { Status: "paused" };
+        return entry?.LatestDownloadJob is { Status: "paused" } &&
+            ModelCatalogCompatibility.IsSelectable(entry.CatalogItem);
     }
 
     public bool CanCancel(ModelCatalogEntry? entry)
@@ -93,6 +95,7 @@ internal sealed class ModelCatalogPresenter
     public bool CanRetry(ModelCatalogEntry? entry)
     {
         return entry is { IsInstalled: false, LatestDownloadJob.Status: "failed" or "cancelled" } &&
+            ModelCatalogCompatibility.IsSelectable(entry.CatalogItem) &&
             entry.IsDirectDownloadSupported;
     }
 

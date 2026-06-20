@@ -38,7 +38,7 @@
       "display_name": "高精度",
       "description": "日本語精度と専門語を重視する構成です。処理時間とメモリ使用量は大きめです。",
       "asr_model_id": "faster-whisper-large-v3",
-      "review_model_id": "gemma-4-12b-it-qat-q4-0",
+      "review_model_id": "gemma-4-e4b-it-q4-k-m",
       "badges": ["高精度"],
       "recommended_for": ["high_accuracy_japanese", "domain_terms"]
     },
@@ -48,7 +48,7 @@
       "display_name": "実験的",
       "description": "標準ASRに実験的な軽量Reviewを組み合わせ、整文品質とJSON安定性を検証する構成です。",
       "asr_model_id": "faster-whisper-large-v3-turbo",
-      "review_model_id": "gemma-4-12b-it-qat-q4-0",
+      "review_model_id": "gemma-4-e4b-it-q4-k-m",
       "badges": ["実験的", "Review検証用"],
       "recommended_for": ["experimental_review", "review_quality_eval"]
     }
@@ -273,7 +273,7 @@
       "engine_id": "llama-cpp",
       "display_name": "Gemma 4 12B it QAT Q4_0",
       "language": ["ja", "multi"],
-      "recommended_for": ["high_accuracy_japanese", "domain_terms", "high_vram_recommended", "experimental_review", "review_quality_eval"],
+      "recommended_for": ["hidden", "gemma4_12b_disabled_pending_llama_cpp_fix"],
       "quality_labels": ["推奨", "高精度"],
       "runtime": {
         "type": "llama-cpp",
@@ -294,7 +294,7 @@
         "recommended_vram_gb": 12,
         "python_required": false
       },
-      "status": "available",
+      "status": "hidden",
       "output_sanitizer_profile": "markdownSectionOnly"
     },
     {
