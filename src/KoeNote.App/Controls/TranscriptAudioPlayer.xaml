@@ -7,16 +7,85 @@
         <Style x:Key="PlayerRoundButton" TargetType="Button" BasedOn="{StaticResource PlayerIconButton}">
             <Setter Property="Width" Value="28" />
             <Setter Property="Height" Value="28" />
-            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="14"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#F8FAFC" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#EEF0F3" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="PlayerPrimaryButton" TargetType="Button" BasedOn="{StaticResource PlayerIconButton}">
-            <Setter Property="Width" Value="36" />
-            <Setter Property="Height" Value="36" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="22"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#16A34A"
+                                                  BlurRadius="8"
+                                                  ShadowDepth="2"
+                                                  Opacity="0.28" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#15803D" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#166534" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PlayerSlimPrimaryButton" TargetType="Button" BasedOn="{StaticResource PlayerPrimaryButton}">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+        </Style>
+        <Style x:Key="PlayerTimeText" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="VisibleWhenSlimPlayer" TargetType="FrameworkElement">
             <Setter Property="Visibility" Value="Collapsed" />
@@ -41,130 +110,80 @@
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="1"
                 CornerRadius="0"
-                MinHeight="88"
-                Padding="12,8"
+                MinHeight="72"
+                Padding="14,12"
                 Style="{StaticResource VisibleWhenFullPlayer}">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="132" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                <Grid Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="26"
-                                Height="26"
-                                CornerRadius="5"
-                                Background="{StaticResource AccentLightBrush}"
-                                Margin="0,0,8,0">
-                            <TextBlock Text="&#xEC4F;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       Foreground="{StaticResource AccentBrush}"
-                                       FontSize="13"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel VerticalAlignment="Center" MinWidth="0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding SelectedJobFileName}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding SelectedJobSourcePath}"
-                                           MaxWidth="320" />
-                                <TextBlock Text="{Binding SelectedJobDirectory}"
-                                           FontSize="11"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Bottom"
-                                           Margin="6,0,0,1"
-                                           MaxWidth="220" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding PlaybackTimeDisplay}"
-                                       Style="{StaticResource MutedText}"
-                                       FontSize="11"
-                                       Margin="0,1,0,0" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Center"
-                                Margin="10,0,0,0">
-                        <TextBlock Text="{Binding PlaybackVolumeIcon}"
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <Button Style="{StaticResource PlayerRoundButton}"
+                            Command="{Binding SkipToPreviousSegmentCommand}"
+                            ToolTip="前のセグメントへ">
+                        <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                    </Button>
+                    <Button Style="{StaticResource PlayerPrimaryButton}"
+                            Command="{Binding PlayPauseAudioCommand}"
+                            ToolTip="{Binding SelectedJobPlaybackPath}"
+                            Margin="6,0">
+                        <TextBlock Text="{Binding PlayPauseAudioIcon}"
                                    FontFamily="Segoe MDL2 Assets"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   FontSize="14"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,5,0" />
-                        <Slider Width="76"
-                                Minimum="0"
-                                Maximum="1"
-                                Value="{Binding PlaybackVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                IsMoveToPointEnabled="True"
-                                VerticalAlignment="Center"
-                                ToolTip="音量" />
-                        <ComboBox Style="{StaticResource ToolbarComboBox}"
-                                  Width="70"
-                                  Height="28"
-                                  Margin="8,0,0,0"
-                                  ItemsSource="{Binding PlaybackRateOptions}"
-                                  DisplayMemberPath="DisplayText"
-                                  SelectedValuePath="Value"
-                                  SelectedValue="{Binding PlaybackRate, Mode=TwoWay}"
-                                  ToolTip="再生速度" />
-                    </StackPanel>
-                </Grid>
+                                   FontSize="17"
+                                   Foreground="#FFFFFF" />
+                    </Button>
+                    <Button Style="{StaticResource PlayerRoundButton}"
+                            Command="{Binding SkipToNextSegmentCommand}"
+                            ToolTip="次のセグメントへ">
+                        <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                    </Button>
+                </StackPanel>
 
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Margin="0,0,10,0">
+                    <TextBlock Text="{Binding SelectedJobFileName}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding SelectedJobSourcePath}" />
+                    <TextBlock Text="{Binding PlaybackTimeDisplay}"
+                               Style="{StaticResource PlayerTimeText}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                        <Button Style="{StaticResource PlayerRoundButton}"
-                                Command="{Binding SkipToPreviousSegmentCommand}"
-                                ToolTip="前のセグメントへ">
-                            <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
-                        </Button>
-                        <Button Style="{StaticResource PlayerPrimaryButton}"
-                                Command="{Binding PlayPauseAudioCommand}"
-                                ToolTip="{Binding SelectedJobPlaybackPath}"
-                                Margin="5,0">
-                            <TextBlock Text="{Binding PlayPauseAudioIcon}"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16"
-                                       Foreground="#FFFFFF" />
-                        </Button>
-                        <Button Style="{StaticResource PlayerRoundButton}"
-                                Command="{Binding SkipToNextSegmentCommand}"
-                                ToolTip="次のセグメントへ">
-                            <TextBlock Text="&#xE893;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
-                        </Button>
-                    </StackPanel>
+                <controls:AudioWaveformControl Grid.Column="2"
+                                                Samples="{Binding PlaybackWaveformSamples}"
+                                                PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                DurationSeconds="{Binding PlaybackDurationSeconds}"
+                                                Height="30"
+                                                Cursor="Hand"
+                                                VerticalAlignment="Center"
+                                                ToolTip="{Binding SelectedJobPlaybackPath}" />
 
-                    <Border Grid.Column="1"
-                            Background="#F8FAFC"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="8,4"
-                            VerticalAlignment="Stretch">
-                        <controls:AudioWaveformControl Samples="{Binding PlaybackWaveformSamples}"
-                                                        PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        DurationSeconds="{Binding PlaybackDurationSeconds}"
-                                                        Height="30"
-                                                        Cursor="Hand"
-                                                        ToolTip="{Binding SelectedJobPlaybackPath}" />
-                    </Border>
-                </Grid>
+                <StackPanel Grid.Column="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="12,0,0,0">
+                    <TextBlock Text="{Binding PlaybackVolumeIcon}"
+                               FontFamily="Segoe MDL2 Assets"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="14"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0" />
+                    <Slider Width="52"
+                            Minimum="0"
+                            Maximum="1"
+                            Value="{Binding PlaybackVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            IsMoveToPointEnabled="True"
+                            VerticalAlignment="Center"
+                            ToolTip="音量" />
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -173,10 +192,11 @@
                 BorderThickness="1"
                 CornerRadius="0,0,10,10"
                 MinHeight="56"
-                Padding="12,6"
+                Padding="14,7"
                 Style="{StaticResource VisibleWhenSlimPlayer}">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -188,13 +208,13 @@
                             ToolTip="前のセグメントへ">
                         <TextBlock Text="&#xE892;" FontFamily="Segoe MDL2 Assets" FontSize="13" />
                     </Button>
-                    <Button Style="{StaticResource PlayerPrimaryButton}"
+                    <Button Style="{StaticResource PlayerSlimPrimaryButton}"
                             Command="{Binding PlayPauseAudioCommand}"
                             ToolTip="{Binding SelectedJobPlaybackPath}"
                             Margin="5,0">
                         <TextBlock Text="{Binding PlayPauseAudioIcon}"
                                    FontFamily="Segoe MDL2 Assets"
-                                   FontSize="16"
+                                   FontSize="17"
                                    Foreground="#FFFFFF" />
                     </Button>
                     <Button Style="{StaticResource PlayerRoundButton}"
@@ -204,44 +224,26 @@
                     </Button>
                 </StackPanel>
 
-                <Grid Grid.Column="1" VerticalAlignment="Center">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="{Binding SelectedJobFileName}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding SelectedJobSourcePath}"
-                               Margin="0,0,0,3" />
-                    <Border Grid.Row="1"
-                            Background="#F8FAFC"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="6,2">
-                        <controls:AudioWaveformControl Samples="{Binding PlaybackWaveformSamples}"
-                                                        PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        DurationSeconds="{Binding PlaybackDurationSeconds}"
-                                                        Height="18"
-                                                        Cursor="Hand"
-                                                        ToolTip="{Binding SelectedJobPlaybackPath}" />
-                    </Border>
-                </Grid>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding PlaybackTimeDisplay}"
+                           Style="{StaticResource PlayerTimeText}"
+                           MinWidth="92"
+                           TextAlignment="Center"
+                           Margin="0,0,14,0" />
 
-                <StackPanel Grid.Column="2"
+                <controls:AudioWaveformControl Grid.Column="2"
+                                                Samples="{Binding PlaybackWaveformSamples}"
+                                                PositionSeconds="{Binding PlaybackPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                DurationSeconds="{Binding PlaybackDurationSeconds}"
+                                                Height="24"
+                                                Cursor="Hand"
+                                                VerticalAlignment="Center"
+                                                ToolTip="{Binding SelectedJobPlaybackPath}" />
+
+                <StackPanel Grid.Column="3"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="10,0,0,0">
-                    <TextBlock Text="{Binding PlaybackTimeDisplay}"
-                               Style="{StaticResource MutedText}"
-                               FontSize="11"
-                               MinWidth="82"
-                               VerticalAlignment="Center"
-                               TextAlignment="Right"
-                               Margin="0,0,8,0" />
+                            Margin="14,0,0,0">
                     <TextBlock Text="{Binding PlaybackVolumeIcon}"
                                FontFamily="Segoe MDL2 Assets"
                                Foreground="{StaticResource MutedBrush}"
@@ -255,15 +257,6 @@
                             IsMoveToPointEnabled="True"
                             VerticalAlignment="Center"
                             ToolTip="音量" />
-                    <ComboBox Style="{StaticResource ToolbarComboBox}"
-                              Width="64"
-                              Height="26"
-                              Margin="8,0,0,0"
-                              ItemsSource="{Binding PlaybackRateOptions}"
-                              DisplayMemberPath="DisplayText"
-                              SelectedValuePath="Value"
-                              SelectedValue="{Binding PlaybackRate, Mode=TwoWay}"
-                              ToolTip="再生速度" />
                 </StackPanel>
             </Grid>
         </Border>

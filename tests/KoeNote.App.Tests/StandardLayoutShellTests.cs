@@ -286,6 +286,8 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("本文幅", layoutManualChecks, StringComparison.Ordinal);
         Assert.Contains("メタ情報", layoutManualChecks, StringComparison.Ordinal);
 
+        Assert.DoesNotContain("playback speed", layoutManualChecks, StringComparison.OrdinalIgnoreCase);
+
         Assert.Contains("public bool IsStandardJobRailExpanded", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("public GridLength StandardJobRailColumnWidth", layoutViewModel, StringComparison.Ordinal);
         Assert.Contains("private Task ToggleStandardJobRailAsync()", layoutViewModel, StringComparison.Ordinal);
