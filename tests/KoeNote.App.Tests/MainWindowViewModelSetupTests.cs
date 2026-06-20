@@ -998,6 +998,83 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SetupWizardRefresh_ShowsCustomPresetWhenCustomModelsDoNotMatchPreset()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal("カスタム", viewModel.SelectedSetupModelPreset?.DisplayName);
+        Assert.Contains(viewModel.SetupModelPresetChoices, preset =>
+            preset.DisplayName == "カスタム" &&
+            preset.AsrModelId == "kotoba-whisper-v2.2-faster" &&
+            preset.ReviewModelId == "bonsai-8b-q1-0");
+    }
+
+    [Fact]
+    public void SetupWizardModelSelection_RefreshesSyntheticCustomPresetAfterModelChange()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var whisperSmall = viewModel.SetupAsrModelChoices.Single(entry => entry.ModelId == "whisper-small");
+
+        viewModel.SelectedSetupAsrModel = whisperSmall;
+
+        var customPreset = viewModel.SetupModelPresetChoices.Single(preset =>
+            preset.DisplayName == "カスタム");
+        Assert.Equal("カスタム", viewModel.SelectedSetupModelPreset?.DisplayName);
+        Assert.Equal("whisper-small", customPreset.AsrModelId);
+        Assert.Equal("bonsai-8b-q1-0", customPreset.ReviewModelId);
+    }
+
+    [Fact]
+    public void SetupWizardPresetSelection_RemovesSyntheticCustomPresetAfterCatalogPresetChange()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+        var lightweight = viewModel.SetupModelPresetChoices.Single(preset => preset.PresetId == "lightweight");
+
+        viewModel.SelectedSetupModelPreset = lightweight;
+
+        Assert.Equal("lightweight", viewModel.SelectedSetupModelPreset?.PresetId);
+        Assert.DoesNotContain(viewModel.SetupModelPresetChoices, preset =>
+            preset.DisplayName == "カスタム");
+    }
+
+    [Fact]
     public void SelectedAsrEngine_FallsBackToInstalledSelectableModelWhenLegacySettingRemains()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
