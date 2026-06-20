@@ -1047,6 +1047,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
         OnPropertyChanged(nameof(SelectedSettingsReviewModel));
+        OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
         OnPropertyChanged(nameof(SelectedSetupModelPreset));
         OnPropertyChanged(nameof(AsrModel));
         OnPropertyChanged(nameof(ReviewModel));
@@ -1110,6 +1111,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedSetupAsrModel));
         OnPropertyChanged(nameof(SelectedSetupReviewModel));
         OnPropertyChanged(nameof(SelectedSettingsReviewModel));
+        OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
         OnPropertyChanged(nameof(SelectedSetupModelPreset));
         OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
         OnPropertyChanged(nameof(SelectedSetupModelPresetModels));

@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Resources/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <converters:SpeakerChipBrushConverter x:Key="SpeakerChipBrushConverter" />
+            <converters:ModelCatalogEntryDisplayConverter x:Key="ModelCatalogEntryDisplayConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
