@@ -157,8 +157,14 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("StackPanel x:Name=\"ReadableDocumentBlocksPanel\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("FlowDocumentScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"1080\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"10\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"ReadableDocumentChrome\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"MaxWidth\" Value=\"1080\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"10\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<DataTrigger Binding=\"{Binding IsDetailLayout}\" Value=\"True\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"MaxWidth\" Value=\"1600\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"BorderThickness\" Value=\"0\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"0\" />", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"ReadableDocumentEmptyChrome\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontFamily=\"Yu Gothic UI\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentFontSize", xaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentLineHeight", xaml, StringComparison.Ordinal);
@@ -168,6 +174,7 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("BuildReadableBlockRow", code, StringComparison.Ordinal);
         Assert.Contains("BuildMetaPanel", code, StringComparison.Ordinal);
         Assert.Contains("BuildBodyTextBlock", code, StringComparison.Ordinal);
+        Assert.Contains("FontWeight = FontWeights.Normal", code, StringComparison.Ordinal);
         Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);
         Assert.Contains("TextWrapping = TextWrapping.Wrap", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ColumnWidth", code, StringComparison.Ordinal);

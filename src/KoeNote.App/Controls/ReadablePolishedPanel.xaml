@@ -18,19 +18,59 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="ReadableDocumentChrome" TargetType="Border">
+            <Setter Property="MaxWidth" Value="1080" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#D6DAE1" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="46,38" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDetailLayout}" Value="True">
+                    <Setter Property="MaxWidth" Value="1600" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="CornerRadius" Value="0" />
+                    <Setter Property="Padding" Value="30,28,30,32" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ReadableDocumentVisibleChrome" TargetType="Border" BasedOn="{StaticResource ReadableDocumentChrome}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasReadableDocumentBlocks}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ReadableDocumentEmptyChrome" TargetType="Border">
+            <Setter Property="MaxWidth" Value="760" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="44,40" />
+            <Setter Property="Background" Value="#FBFCFD" />
+            <Setter Property="BorderBrush" Value="#D6DAE1" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDetailLayout}" Value="True">
+                    <Setter Property="MaxWidth" Value="880" />
+                    <Setter Property="Padding" Value="32,30" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="CornerRadius" Value="0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="0"
           Background="Transparent">
         <Grid>
-            <Border MaxWidth="1080"
-                    HorizontalAlignment="Stretch"
-                    Background="#FFFFFF"
-                    BorderBrush="#D6DAE1"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Padding="46,38"
-                    Style="{StaticResource VisibleWhenReadableDocumentBlocks}">
+            <Border Style="{StaticResource ReadableDocumentVisibleChrome}">
                 <ScrollViewer x:Name="ReadableDocumentScrollViewer"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
@@ -41,14 +81,7 @@
             </Border>
 
             <Grid Style="{StaticResource VisibleWhenNoReadableDocumentBlocks}">
-                <Border MaxWidth="760"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Padding="44,40"
-                        Background="#FBFCFD"
-                        BorderBrush="#D6DAE1"
-                        BorderThickness="1"
-                        CornerRadius="10">
+                <Border Style="{StaticResource ReadableDocumentEmptyChrome}">
                     <StackPanel>
                         <TextBlock Text="{Binding ReadableDocumentStateTitle}"
                                    FontFamily="Yu Gothic UI"

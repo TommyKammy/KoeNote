@@ -297,6 +297,7 @@ public partial class ReadablePolishedPanel : UserControl
         {
             FontFamily = new FontFamily("Yu Gothic UI"),
             FontSize = viewModel.ReadableDocumentFontSize,
+            FontWeight = FontWeights.Normal,
             LineHeight = viewModel.ReadableDocumentLineHeight,
             Foreground = textBrush,
             TextWrapping = TextWrapping.Wrap,
