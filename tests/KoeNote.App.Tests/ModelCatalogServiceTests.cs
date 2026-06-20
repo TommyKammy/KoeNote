@@ -103,6 +103,28 @@ public sealed class ModelCatalogServiceTests
     }
 
     [Fact]
+    public void ListEntries_IncludesInstalledHiddenModelForManagement()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var repository = new InstalledModelRepository(paths);
+        var installService = new ModelInstallService(paths, repository, new ModelVerificationService());
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var modelPath = installService.GetDefaultInstallPath(catalogItem);
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+        File.WriteAllText(modelPath, "hidden model");
+
+        installService.RegisterLocalModel(catalogItem, modelPath, "download");
+
+        var entry = catalogService.ListEntries().Single(entry => entry.ModelId == catalogItem.ModelId);
+        Assert.True(entry.IsInstalled);
+        Assert.True(entry.IsVerified);
+        Assert.Equal("hidden", entry.CatalogItem.Status);
+    }
+
+    [Fact]
     public void ListEntries_TreatsInstalledRecordWithMissingFilesAsMissing()
     {
         var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);

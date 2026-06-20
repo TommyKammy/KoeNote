@@ -124,4 +124,26 @@ public sealed class MainWindowViewModelModelTests : MainWindowViewModelTestBase
         SetPrivateProperty(viewModel, nameof(MainWindowViewModel.IsModelDownloadInProgress), true);
         Assert.False(viewModel.DeleteSelectedModelFilesCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void InstalledHiddenReviewModel_CanBeDeletedButNotSelectedForUse()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+        var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
+        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var reviewPath = installService.GetDefaultInstallPath(reviewItem);
+        Directory.CreateDirectory(Path.GetDirectoryName(reviewPath)!);
+        File.WriteAllText(reviewPath, "review");
+        installService.RegisterLocalModel(reviewItem, reviewPath, "download");
+
+        var viewModel = new MainWindowViewModel(paths);
+        viewModel.SelectedModelCatalogEntry = viewModel.ModelCatalogEntries.Single(entry => entry.ModelId == reviewItem.ModelId);
+
+        Assert.False(viewModel.UseSelectedModelCommand.CanExecute(null));
+        Assert.True(viewModel.DeleteSelectedModelFilesCommand.CanExecute(null));
+    }
 }

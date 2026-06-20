@@ -52,7 +52,7 @@ public sealed class ModelCatalogService(AppPaths paths)
 
         return LoadBuiltInCatalog()
             .Models
-            .Where(ModelCatalogCompatibility.IsSelectable)
+            .Where(model => ShouldListModel(model, installed))
             .Select(model => new ModelCatalogEntry(
                 model,
                 installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
@@ -70,7 +70,7 @@ public sealed class ModelCatalogService(AppPaths paths)
         var downloadJobs = new ModelDownloadJobRepository(paths);
 
         return catalog.Models
-            .Where(ModelCatalogCompatibility.IsSelectable)
+            .Where(model => ShouldListModel(model, installed))
             .Select(model => new ModelCatalogEntry(
                 model,
                 installed.TryGetValue(model.ModelId, out var installedModel) ? installedModel : null,
@@ -81,6 +81,14 @@ public sealed class ModelCatalogService(AppPaths paths)
     }
 
     public static string Serialize(ModelCatalog catalog) => JsonSerializer.Serialize(catalog, JsonOptions);
+
+    private static bool ShouldListModel(
+        ModelCatalogItem model,
+        IReadOnlyDictionary<string, InstalledModel> installed)
+    {
+        return ModelCatalogCompatibility.IsSelectable(model) ||
+            installed.ContainsKey(model.ModelId);
+    }
 
     private static ModelCatalog ParseCatalog(string json, string source)
     {
