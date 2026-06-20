@@ -46,6 +46,8 @@ public sealed partial class MainWindowViewModel
     public bool IsMergeConsecutiveSpeakersExportOptionVisible =>
         EffectiveExportTranscriptTabIndex is ExportRawTranscriptTabIndex or ExportReviewCandidateTranscriptTabIndex;
 
+    public bool IsCurrentExportTargetCopyVisible => GetCurrentExportSource() is not null;
+
     private void NotifyExportMenuTargetChanged()
     {
         OnPropertyChanged(nameof(CurrentExportTargetDisplayName));
@@ -57,6 +59,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(IsReviewCandidateExportMenuVisible));
         OnPropertyChanged(nameof(IsSummaryExportMenuVisible));
         OnPropertyChanged(nameof(IsMergeConsecutiveSpeakersExportOptionVisible));
+        OnPropertyChanged(nameof(IsCurrentExportTargetCopyVisible));
         OnPropertyChanged(nameof(DetailInspectorCurrentTabText));
         UpdateExportCommandStates();
     }
@@ -196,6 +199,34 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    private Task CopyCurrentExportTargetAsync()
+    {
+        if (SelectedJob is null || GetCurrentExportSource() is not { } source)
+        {
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            var content = _transcriptExportService.RenderJob(
+                SelectedJob.JobId,
+                TranscriptExportFormat.Text,
+                new TranscriptExportOptions(
+                    IncludeTimestamps: IncludeExportTimestamps,
+                    Source: source,
+                    MergeConsecutiveSpeakers: MergeConsecutiveSpeakersOnExport));
+            System.Windows.Clipboard.SetText(content);
+            LatestLog = $"{CurrentExportTargetDisplayName}をクリップボードにコピーしました。";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
+        {
+            ExportWarning = $"{CurrentExportTargetDisplayName}のコピーに失敗しました: {exception.Message}";
+            LatestLog = ExportWarning;
+        }
+
+        return Task.CompletedTask;
+    }
+
     private Task OpenExportFolderAsync()
     {
         var exportFolder = GetOpenableExportFolder();
@@ -316,6 +347,7 @@ public sealed partial class MainWindowViewModel
         RaiseExportCommandState(ExportReadablePolishedMarkdownCommand);
         RaiseExportCommandState(ExportReadablePolishedXlsxCommand);
         RaiseExportCommandState(ExportReadablePolishedDocxCommand);
+        RaiseExportCommandState(CopyCurrentExportTargetCommand);
 
         if (ExportSummaryMarkdownCommand is RelayCommand summaryCommand)
         {

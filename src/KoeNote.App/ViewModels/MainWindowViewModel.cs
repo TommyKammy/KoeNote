@@ -893,6 +893,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ExportSummaryTextCommand { get; private set; } = null!;
 
+    public ICommand CopyCurrentExportTargetCommand { get; private set; } = null!;
+
     public ICommand OpenExportFolderCommand { get; private set; } = null!;
 
     public ICommand ZoomOutCommand { get; private set; } = null!;

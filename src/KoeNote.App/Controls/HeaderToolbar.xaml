@@ -6,7 +6,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="HeaderToolbar.Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="VisibleWhenReadableExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenReadableExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsReadableExportMenuVisible}" Value="True">
@@ -14,7 +14,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenRawExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenRawExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsRawExportMenuVisible}" Value="True">
@@ -22,7 +22,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenDiffExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenDiffExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportUtilityMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsDiffExportMenuVisible}" Value="True">
@@ -30,7 +30,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenReviewCandidateExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenReviewCandidateExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsReviewCandidateExportMenuVisible}" Value="True">
@@ -38,7 +38,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenSummaryExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenSummaryExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
@@ -46,10 +46,42 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenMergeSpeakerExportOptionMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenMergeSpeakerExportOptionMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportToggleMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMergeConsecutiveSpeakersExportOptionVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenCurrentExportTargetCopyMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportUtilityMenuItem}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCurrentExportTargetCopyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenCurrentExportTargetToggleMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportToggleMenuItem}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCurrentExportTargetCopyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenSummaryExportSectionLabel" TargetType="TextBlock" BasedOn="{StaticResource HeaderExportSectionLabel}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenSummaryExportSeparator" TargetType="Separator" BasedOn="{StaticResource HeaderMenuSeparator}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
                         <Setter Property="Visibility" Value="Visible" />
                     </DataTrigger>
                 </Style.Triggers>
@@ -144,54 +176,132 @@
                 </ToggleButton>
 
                 <Button x:Name="ExportMenuButton"
-                        Style="{StaticResource HeaderGhostButton}"
-                        MinWidth="132"
+                        Style="{StaticResource HeaderExportButton}"
                         Click="OnExportMenuButtonClick"
                         ToolTip="{Binding ContextualExportMenuToolTip}">
                     <Button.ContextMenu>
                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                                      Style="{StaticResource HeaderDropdownMenu}">
-                            <MenuItem Header="整文" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportReadablePolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <TextBlock Text="書き出し形式" Style="{StaticResource HeaderExportSectionLabel}" />
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#B8A5D9" FontSize="15" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="素起こし" Style="{StaticResource VisibleWhenRawExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportRawXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="JSON" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="SRT" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="#" Foreground="#1F2937" FontSize="15" FontWeight="SemiBold" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="差分" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
-                                <MenuItem Header="差分ビューはエクスポート対象外です" IsEnabled="False" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#64748B" FontSize="15" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="レビュー候補" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportPolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportReadablePolishedXlsxCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" Foreground="#16A34A" FontSize="15" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="要約" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
-                                <MenuItem Header="Markdown" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="TXT" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#B8A5D9" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="#" Foreground="#1F2937" FontSize="15" FontWeight="SemiBold" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#64748B" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportRawXlsxCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" Foreground="#16A34A" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="JSON" Tag=".json" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="JSON" Foreground="#7C5CC0" FontSize="10" FontWeight="SemiBold" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="字幕 SRT" Tag=".srt" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8BD;" FontFamily="Segoe MDL2 Assets" Foreground="#8B93A2" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="字幕 VTT" Tag=".vtt" Command="{Binding ExportRawVttCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8BD;" FontFamily="Segoe MDL2 Assets" Foreground="#8B93A2" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#B8A5D9" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="#" Foreground="#1F2937" FontSize="15" FontWeight="SemiBold" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#64748B" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportPolishedXlsxCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" Foreground="#16A34A" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="差分ビューはエクスポート対象外です" IsEnabled="False" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" Foreground="#8B93A2" FontSize="15" />
+                                </MenuItem.Icon>
                             </MenuItem>
                             <Separator Style="{StaticResource HeaderMenuSeparator}" />
+                            <MenuItem Header="クリップボードにコピー"
+                                      Command="{Binding CopyCurrentExportTargetCommand}"
+                                      Style="{StaticResource VisibleWhenCurrentExportTargetCopyMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" Foreground="#1F2937" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem Header="タイムスタンプを含める"
                                       IsCheckable="True"
                                       IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
+                                      Style="{StaticResource VisibleWhenCurrentExportTargetToggleMenuItem}" />
                             <MenuItem Header="同じ話者をまとめる"
                                       IsCheckable="True"
                                       IsChecked="{Binding MergeConsecutiveSpeakersOnExport, Mode=TwoWay}"
                                       Style="{StaticResource VisibleWhenMergeSpeakerExportOptionMenuItem}" />
-                            <Separator Style="{StaticResource HeaderMenuSeparator}" />
+                            <Separator Style="{StaticResource VisibleWhenSummaryExportSeparator}" />
+                            <TextBlock Text="要約" Style="{StaticResource VisibleWhenSummaryExportSectionLabel}" />
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="#" Foreground="#1F2937" FontSize="15" FontWeight="SemiBold" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" Foreground="#B8A5D9" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator Style="{StaticResource VisibleWhenSummaryExportSeparator}" />
                             <MenuItem Header="出力フォルダーを開く"
                                       Command="{Binding OpenExportFolderCommand}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
+                                      Style="{StaticResource HeaderExportUtilityMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" Foreground="#B67338" FontSize="15" />
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </ContextMenu>
                     </Button.ContextMenu>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
