@@ -96,6 +96,31 @@ public sealed class TranscriptExportServiceTests
     }
 
     [Fact]
+    public void RenderJob_ReturnsPendingDraftMetadata()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        TestDatabase.InsertReviewReadyJob(paths, "job-001", "meeting");
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("seg-001", "job-001", 1, 2.5, "spk-1", "raw one")
+        ]);
+        SetFinalText(paths, "job-001", "seg-001", "final one");
+        new CorrectionDraftRepository(paths).SaveDrafts([
+            new CorrectionDraft("draft-001", "job-001", "seg-001", "wording", "raw", "fixed", "reason", 0.8)
+        ]);
+
+        var result = new TranscriptExportService(paths).RenderJob(
+            "job-001",
+            TranscriptExportFormat.Text,
+            new TranscriptExportOptions(IncludeTimestamps: false, Source: TranscriptExportSource.Polished));
+
+        Assert.Equal("job-001", result.JobId);
+        Assert.Contains("final one", result.Content, StringComparison.Ordinal);
+        Assert.Equal(1, result.SegmentCount);
+        Assert.Equal(1, result.PendingDraftCount);
+        Assert.True(result.HasUnresolvedDrafts);
+    }
+
+    [Fact]
     public void ExportJob_CanUseRawTranscriptSource()
     {
         var paths = TestDatabase.CreateReadyPaths();

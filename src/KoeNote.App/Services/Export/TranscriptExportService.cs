@@ -123,7 +123,7 @@ public sealed class TranscriptExportService(AppPaths paths)
         return result;
     }
 
-    public string RenderJob(
+    public TranscriptExportRenderResult RenderJob(
         string jobId,
         TranscriptExportFormat format,
         TranscriptExportOptions? options = null)
@@ -141,7 +141,13 @@ public sealed class TranscriptExportService(AppPaths paths)
         }
 
         var renderSnapshot = TranscriptExportSegmentMerger.ApplyFormatOptions(snapshot, format, exportOptions);
-        return TranscriptExportContentRenderer.Render(renderSnapshot, format, exportOptions);
+        var content = TranscriptExportContentRenderer.Render(renderSnapshot, format, exportOptions);
+        return new TranscriptExportRenderResult(
+            jobId,
+            content,
+            snapshot.Segments.Count,
+            snapshot.PendingDraftCount,
+            snapshot.PendingDraftCount > 0);
     }
 
     private TranscriptExportSnapshot LoadSnapshot(string jobId, TranscriptExportSource source)

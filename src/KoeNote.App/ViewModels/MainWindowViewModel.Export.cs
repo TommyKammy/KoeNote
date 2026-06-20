@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Input;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
@@ -208,17 +209,18 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var content = _transcriptExportService.RenderJob(
+            var result = _transcriptExportService.RenderJob(
                 SelectedJob.JobId,
                 TranscriptExportFormat.Text,
                 new TranscriptExportOptions(
                     IncludeTimestamps: IncludeExportTimestamps,
                     Source: source,
                     MergeConsecutiveSpeakers: MergeConsecutiveSpeakersOnExport));
-            System.Windows.Clipboard.SetText(content);
+            System.Windows.Clipboard.SetText(result.Content);
+            ExportWarning = CreateExportWarning(result.PendingDraftCount);
             LatestLog = $"{CurrentExportTargetDisplayName}をクリップボードにコピーしました。";
         }
-        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
+        catch (Exception exception) when (IsCopyExportException(exception))
         {
             ExportWarning = $"{CurrentExportTargetDisplayName}のコピーに失敗しました: {exception.Message}";
             LatestLog = ExportWarning;
@@ -300,9 +302,22 @@ public sealed partial class MainWindowViewModel
 
     private static string CreateExportWarning(TranscriptExportResult result)
     {
-        return result.HasUnresolvedDrafts
-            ? $"未処理のレビュー候補が{result.PendingDraftCount}件残っています。確認用として出力しました。"
+        return CreateExportWarning(result.PendingDraftCount);
+    }
+
+    private static string CreateExportWarning(int pendingDraftCount)
+    {
+        return pendingDraftCount > 0
+            ? $"未処理のレビュー候補が{pendingDraftCount}件残っています。確認用として出力しました。"
             : string.Empty;
+    }
+
+    private static bool IsCopyExportException(Exception exception)
+    {
+        return exception is InvalidOperationException
+            or ArgumentException
+            or ExternalException
+            or System.Threading.ThreadStateException;
     }
 
     private void UpdateExportCommandStates()
