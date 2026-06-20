@@ -109,6 +109,12 @@ public sealed partial class MainWindowViewModel
     {
         try
         {
+            if (presetId.Equals(SetupWizardStatePresenter.CustomPresetId, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyCustomSetupModelPresetDraft();
+                return;
+            }
+
             var draft = _setupFlowCoordinator.CreatePresetDraft(
                 _setupSelectionDraft ?? _setupState,
                 presetId,
@@ -130,6 +136,35 @@ public sealed partial class MainWindowViewModel
         {
             LatestLog = $"Setup preset selection failed: {ex.Message}";
         }
+    }
+
+    private void ApplyCustomSetupModelPresetDraft()
+    {
+        var customPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
+            preset.PresetId.Equals(SetupWizardStatePresenter.CustomPresetId, StringComparison.OrdinalIgnoreCase));
+        if (customPreset is null)
+        {
+            return;
+        }
+
+        var current = _setupSelectionDraft ?? _setupState;
+        _setupSelectionDraft = current with
+        {
+            IsCompleted = false,
+            LastSmokeSucceeded = false,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = customPreset.AsrModelId,
+            SelectedReviewModelId = customPreset.ReviewModelId
+        };
+        _selectedSetupAsrModel = SetupAsrModelChoices.FirstOrDefault(entry =>
+            entry.ModelId.Equals(customPreset.AsrModelId, StringComparison.OrdinalIgnoreCase));
+        _selectedSetupReviewModel = SetupReviewModelChoices.FirstOrDefault(entry =>
+            entry.ModelId.Equals(customPreset.ReviewModelId, StringComparison.OrdinalIgnoreCase));
+        _selectedSetupModelPreset = customPreset;
+
+        RefreshSetupSelectionPreview();
+        LatestLog = "Setup custom model preset drafted.";
     }
 
     private Task SetupAcceptLicensesAsync()
@@ -896,12 +931,14 @@ public sealed partial class MainWindowViewModel
     private void RefreshSetupWizard(bool refreshSmokeChecks = true)
     {
         var snapshot = _setupFlowCoordinator.BuildSnapshot(_setupSelectionDraft, refreshSmokeChecks);
-        ApplySetupWizardPresentation(SetupWizardStatePresenter.Create(snapshot));
+        var presentation = SetupWizardStatePresenter.Create(snapshot);
+        ApplySetupWizardPresentation(presentation);
         RefreshDiarizationRuntimeSummary();
         ReplaceItems(SetupSteps, snapshot.StepItems);
         ReplaceItems(SetupAsrModelChoices, snapshot.AsrModelChoices);
         ReplaceItems(SetupReviewModelChoices, snapshot.ReviewModelChoices);
         ReplaceItems(SetupModelPresetChoices, snapshot.PresetChoices);
+        AddSyntheticSetupModelPreset(presentation.SelectedModelPreset);
         RefreshAvailableAsrEngines();
 
         if (snapshot.SmokeChecks is not null)
@@ -933,6 +970,19 @@ public sealed partial class MainWindowViewModel
         }
 
         UpdateSetupDownloadCommandStates();
+    }
+
+    private void AddSyntheticSetupModelPreset(ModelQualityPreset? selectedPreset)
+    {
+        if (selectedPreset is null ||
+            !selectedPreset.PresetId.Equals(SetupWizardStatePresenter.CustomPresetId, StringComparison.OrdinalIgnoreCase) ||
+            SetupModelPresetChoices.Any(preset =>
+                preset.PresetId.Equals(selectedPreset.PresetId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        SetupModelPresetChoices.Add(selectedPreset);
     }
 
     private void ApplySetupWizardPresentation(SetupWizardPresentationState presentation)

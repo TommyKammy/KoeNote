@@ -998,6 +998,29 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SetupWizardRefresh_ShowsCustomPresetWhenCustomModelsDoNotMatchPreset()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.SmokeTest,
+            SetupMode = "custom",
+            SelectedModelPresetId = null,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "bonsai-8b-q1-0"
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.Equal(SetupWizardStatePresenter.CustomPresetId, viewModel.SelectedSetupModelPreset?.PresetId);
+        Assert.Contains(viewModel.SetupModelPresetChoices, preset =>
+            preset.PresetId == SetupWizardStatePresenter.CustomPresetId);
+    }
+
+    [Fact]
     public void SelectedAsrEngine_FallsBackToInstalledSelectableModelWhenLegacySettingRemains()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
