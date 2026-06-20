@@ -128,6 +128,7 @@ public sealed partial class MainWindowViewModel
                 entry.ModelId.Equals(draft.SelectedReviewModelId, StringComparison.OrdinalIgnoreCase));
             _selectedSetupModelPreset = SetupModelPresetChoices.FirstOrDefault(preset =>
                 preset.PresetId.Equals(draft.SelectedModelPresetId, StringComparison.OrdinalIgnoreCase));
+            RemoveSyntheticSetupModelPreset();
 
             RefreshSetupSelectionPreview();
             LatestLog = $"Setup model preset drafted: {presetId}";
@@ -990,14 +991,19 @@ public sealed partial class MainWindowViewModel
 
     private void ReplaceSyntheticSetupModelPreset(ModelQualityPreset? selectedPreset)
     {
+        RemoveSyntheticSetupModelPreset();
+
+        AddSyntheticSetupModelPreset(selectedPreset);
+    }
+
+    private void RemoveSyntheticSetupModelPreset()
+    {
         var existing = SetupModelPresetChoices.FirstOrDefault(preset =>
             preset.PresetId.Equals(SetupWizardStatePresenter.CustomPresetId, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
             SetupModelPresetChoices.Remove(existing);
         }
-
-        AddSyntheticSetupModelPreset(selectedPreset);
     }
 
     private static ModelQualityPreset? CreateCustomSetupModelPreset(SetupState state)
