@@ -87,7 +87,13 @@ public sealed class ModelCatalogService(AppPaths paths)
         IReadOnlyDictionary<string, InstalledModel> installed)
     {
         return ModelCatalogCompatibility.IsSelectable(model) ||
-            installed.ContainsKey(model.ModelId);
+            (installed.TryGetValue(model.ModelId, out var installedModel) &&
+                InstalledModelPathExists(installedModel));
+    }
+
+    private static bool InstalledModelPathExists(InstalledModel installed)
+    {
+        return File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
     }
 
     private static ModelCatalog ParseCatalog(string json, string source)

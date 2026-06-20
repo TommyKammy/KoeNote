@@ -125,6 +125,38 @@ public sealed class ModelCatalogServiceTests
     }
 
     [Fact]
+    public void ListEntries_HidesHiddenModelWhenInstalledFileIsMissing()
+    {
+        var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var catalogService = new ModelCatalogService(paths);
+        var repository = new InstalledModelRepository(paths);
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        repository.UpsertInstalledModel(new InstalledModel(
+            catalogItem.ModelId,
+            catalogItem.Role,
+            catalogItem.EngineId,
+            catalogItem.DisplayName,
+            catalogItem.Family,
+            Version: null,
+            FilePath: Path.Combine(paths.UserModels, "review", "missing.gguf"),
+            ManifestPath: null,
+            SizeBytes: catalogItem.SizeBytes,
+            Sha256: null,
+            Verified: true,
+            LicenseName: catalogItem.License.Name,
+            SourceType: "download",
+            InstalledAt: DateTimeOffset.Now,
+            LastVerifiedAt: DateTimeOffset.Now,
+            Status: "installed"));
+
+        var entries = catalogService.ListEntries();
+
+        Assert.DoesNotContain(entries, entry => entry.ModelId == catalogItem.ModelId);
+    }
+
+    [Fact]
     public void ListEntries_TreatsInstalledRecordWithMissingFilesAsMissing()
     {
         var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);

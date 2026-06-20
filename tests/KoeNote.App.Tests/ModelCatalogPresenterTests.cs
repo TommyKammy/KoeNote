@@ -81,11 +81,40 @@ public sealed class ModelCatalogPresenterTests
         Assert.Same(match, found);
     }
 
+    [Fact]
+    public void CanDownloadAndRetry_RequireSelectableEntry()
+    {
+        var presenter = new ModelCatalogPresenter();
+        var selectable = CreateEntry(
+            "selectable",
+            downloadType: "direct",
+            downloadUrl: "https://example.com/selectable.gguf");
+        var hidden = CreateEntry(
+            "hidden",
+            status: "hidden",
+            downloadType: "direct",
+            downloadUrl: "https://example.com/hidden.gguf");
+        var hiddenFailed = CreateEntry(
+            "hidden-failed",
+            status: "hidden",
+            downloadType: "direct",
+            downloadUrl: "https://example.com/hidden-failed.gguf",
+            latestDownloadJob: CreateDownloadJob("hidden-failed", "failed"));
+
+        Assert.True(presenter.CanDownload(selectable));
+        Assert.False(presenter.CanDownload(hidden));
+        Assert.False(presenter.CanRetry(hiddenFailed));
+    }
+
     private static ModelCatalogEntry CreateEntry(
         string modelId,
         string role = "asr",
         string engineId = "whisper-small",
-        InstalledModel? installedModel = null)
+        InstalledModel? installedModel = null,
+        string status = "available",
+        string downloadType = "manual",
+        string? downloadUrl = null,
+        ModelDownloadJob? latestDownloadJob = null)
     {
         return new ModelCatalogEntry(
             new ModelCatalogItem(
@@ -97,11 +126,30 @@ public sealed class ModelCatalogPresenterTests
                 [],
                 [],
                 new ModelRuntimeSpec("none", "none"),
-                new ModelDownloadSpec("manual", null, null),
+                new ModelDownloadSpec(downloadType, downloadUrl, null),
                 new ModelLicenseSpec("test", null),
                 new ModelRequirements(false, 0, false),
-                "available"),
-            installedModel);
+                status),
+            installedModel,
+            latestDownloadJob);
+    }
+
+    private static ModelDownloadJob CreateDownloadJob(string modelId, string status)
+    {
+        return new ModelDownloadJob(
+            Guid.NewGuid().ToString("N"),
+            modelId,
+            "https://example.com/model.gguf",
+            Path.Combine(Path.GetTempPath(), "model.gguf"),
+            Path.Combine(Path.GetTempPath(), "model.gguf.partial"),
+            status,
+            BytesTotal: null,
+            BytesDownloaded: 0,
+            Sha256Expected: null,
+            Sha256Actual: null,
+            ErrorMessage: null,
+            CreatedAt: DateTimeOffset.Now,
+            UpdatedAt: DateTimeOffset.Now);
     }
 
     private static InstalledModel CreateInstalled(
