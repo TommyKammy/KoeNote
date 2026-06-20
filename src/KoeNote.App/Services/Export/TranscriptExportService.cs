@@ -123,6 +123,33 @@ public sealed class TranscriptExportService(AppPaths paths)
         return result;
     }
 
+    public TranscriptExportRenderResult RenderJob(
+        string jobId,
+        TranscriptExportFormat format,
+        TranscriptExportOptions? options = null)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            throw new ArgumentException("Job id is required.", nameof(jobId));
+        }
+
+        var exportOptions = options ?? new TranscriptExportOptions();
+        var snapshot = LoadSnapshot(jobId, exportOptions.Source);
+        if (snapshot.Segments.Count == 0 && string.IsNullOrWhiteSpace(snapshot.DocumentContent))
+        {
+            throw new InvalidOperationException($"No transcript segments were available for export: {jobId}");
+        }
+
+        var renderSnapshot = TranscriptExportSegmentMerger.ApplyFormatOptions(snapshot, format, exportOptions);
+        var content = TranscriptExportContentRenderer.Render(renderSnapshot, format, exportOptions);
+        return new TranscriptExportRenderResult(
+            jobId,
+            content,
+            snapshot.Segments.Count,
+            snapshot.PendingDraftCount,
+            snapshot.PendingDraftCount > 0);
+    }
+
     private TranscriptExportSnapshot LoadSnapshot(string jobId, TranscriptExportSource source)
     {
         using var connection = SqliteConnectionFactory.Open(paths);

@@ -104,6 +104,14 @@
     <Setter Property="Padding" Value="12,0" />
 </Style>
 
+<Style x:Key="HeaderExportButton" TargetType="Button" BasedOn="{StaticResource HeaderOutlineButton}">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="MinWidth" Value="132" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="BorderBrush" Value="#D7DBE1" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+</Style>
+
 <Style x:Key="HeaderReviewToggle" TargetType="ToggleButton">
     <Setter Property="Foreground" Value="#64748B" />
     <Setter Property="Background" Value="#F8FAFC" />
@@ -324,6 +332,12 @@
     <Setter Property="VerticalAlignment" Value="Center" />
 </Style>
 
+<Style x:Key="HeaderExportImageIcon" TargetType="Image">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+</Style>
+
 <Style x:Key="HeaderToolText" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
     <Setter Property="FontSize" Value="12" />
@@ -446,11 +460,145 @@
     </Setter>
 </Style>
 
+<Style x:Key="HeaderExportSectionLabel" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="#8B93A2" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="12,8,12,7" />
+</Style>
+
+<Style x:Key="HeaderExportFormatMenuItem" TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="MinWidth" Value="250" />
+    <Setter Property="Height" Value="42" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="OverridesDefaultStyle" Value="True" />
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="MenuItem">
+                <Border x:Name="ItemChrome"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="{TemplateBinding Padding}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ContentPresenter ContentSource="Icon"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                        <ContentPresenter Grid.Column="1"
+                                          ContentSource="Header"
+                                          RecognizesAccessKey="True"
+                                          VerticalAlignment="Center"
+                                          Margin="8,0,18,0" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{TemplateBinding Tag}"
+                                   Foreground="#9AA3AF"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True">
+                        <Setter TargetName="ItemChrome" Property="Background" Value="#F4F7F5" />
+                        <Setter TargetName="ItemChrome" Property="BorderBrush" Value="#EEF0F2" />
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.42" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+
+<Style x:Key="HeaderExportUtilityMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
+    <Setter Property="Height" Value="38" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Tag" Value="" />
+</Style>
+
+<Style x:Key="HeaderExportToggleMenuItem" TargetType="MenuItem">
+    <Setter Property="Foreground" Value="#5B6472" />
+    <Setter Property="Background" Value="#FAFBFC" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="MinWidth" Value="250" />
+    <Setter Property="MinHeight" Value="50" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="OverridesDefaultStyle" Value="True" />
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="MenuItem">
+                <Border x:Name="ItemChrome"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="9"
+                        Padding="{TemplateBinding Padding}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="42" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="34"
+                              Height="20"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              ClipToBounds="True">
+                            <Border x:Name="ToggleTrack"
+                                    Background="#DDE5EE"
+                                    CornerRadius="10" />
+                            <Ellipse x:Name="ToggleThumb"
+                                     Width="16"
+                                     Height="16"
+                                     Fill="#FFFFFF"
+                                     HorizontalAlignment="Left"
+                                     Margin="2,2,0,2" />
+                        </Grid>
+                        <ContentPresenter Grid.Column="1"
+                                          ContentSource="Header"
+                                          RecognizesAccessKey="True"
+                                          VerticalAlignment="Center"
+                                          Margin="6,0,0,0" />
+                    </Grid>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsChecked" Value="True">
+                        <Setter TargetName="ToggleTrack" Property="Background" Value="{StaticResource AccentBrush}" />
+                        <Setter TargetName="ToggleThumb" Property="HorizontalAlignment" Value="Right" />
+                        <Setter TargetName="ToggleThumb" Property="Margin" Value="0,2,2,2" />
+                    </Trigger>
+                    <Trigger Property="IsHighlighted" Value="True">
+                        <Setter TargetName="ItemChrome" Property="Background" Value="#F4F7F5" />
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.42" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+
 <Style x:Key="HeaderDropdownMenu" TargetType="ContextMenu">
     <Setter Property="Background" Value="#FFFFFF" />
     <Setter Property="BorderBrush" Value="#DDE5EE" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="6" />
+    <Setter Property="Padding" Value="8" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
     <Setter Property="OverridesDefaultStyle" Value="True" />
     <Setter Property="Template">

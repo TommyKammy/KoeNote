@@ -116,6 +116,7 @@ public sealed partial class MainWindowViewModel
         ExportReadablePolishedDocxCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Docx, TranscriptExportSource.ReadablePolished), CanExportReadablePolishing);
         ExportSummaryMarkdownCommand = new RelayCommand(ExportSummaryMarkdownAsync, CanExportSummaryMarkdown);
         ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
+        CopyCurrentExportTargetCommand = new RelayCommand(CopyCurrentExportTargetAsync, CanExportCurrentTranscriptTarget);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
         ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
         ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);

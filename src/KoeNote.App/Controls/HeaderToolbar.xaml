@@ -6,7 +6,133 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="HeaderToolbar.Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="VisibleWhenReadableExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <DrawingImage x:Key="ExportTextIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#EFE8F8" Geometry="M4,2 L12,2 L15,5 L15,16 L4,16 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#DFD4EE" Thickness="0.7" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M12,2 L15,5 L12,5 Z" />
+                        <GeometryDrawing Geometry="M7,8 L12,8 M7,10.5 L12,10.5 M7,13 L10.5,13">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#9A8DB8" Thickness="1.1" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportMarkdownIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Geometry="M4,4 L4,15 M4,4 L15,4 M15,4 L15,15 M4,15 L15,15 M4,10 L15,10 M9.5,4 L9.5,15">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#1F2937" Thickness="1.1" StartLineCap="Square" EndLineCap="Square" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportWordIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#EEE8F7" Geometry="M4,2 L12,2 L15,5 L15,16 L4,16 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#DDD2EE" Thickness="0.7" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M12,2 L15,5 L12,5 Z" />
+                        <GeometryDrawing Geometry="M7,8 L12,8 M7,10.5 L11,10.5">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#A094B8" Thickness="1" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#F97316" Geometry="M10.2,13.5 L14.1,9.6 L16,11.5 L12.1,15.4 L9.6,16.1 Z" />
+                        <GeometryDrawing Brush="#334155" Geometry="M9.6,16.1 L10.2,13.5 L12.1,15.4 Z" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportExcelIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#E8F7EF" Geometry="M4,2 L12,2 L15,5 L15,16 L4,16 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#B9E7CA" Thickness="0.7" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M12,2 L15,5 L12,5 Z" />
+                        <GeometryDrawing Geometry="M6,8 L13,8 M6,11 L13,11 M8.5,6 L8.5,14 M11,6 L11,14">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#16A34A" Thickness="1" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportJsonIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#F1ECFA" Geometry="M4,2 L12,2 L15,5 L15,16 L4,16 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#DED4F2" Thickness="0.7" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M12,2 L15,5 L12,5 Z" />
+                        <GeometryDrawing Geometry="M8,6 C6.6,6 6.3,7.1 7,8 C6.3,8.9 6.6,10 8,10 M11,6 C12.4,6 12.7,7.1 12,8 C12.7,8.9 12.4,10 11,10">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#7C5CC0" Thickness="1.15" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#7C5CC0" Geometry="M8.8,11.8 A0.8,0.8 0 1 1 8.79,11.8 M11.2,11.8 A0.8,0.8 0 1 1 11.19,11.8" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportCaptionIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#E9DDF8" Geometry="M3,7 C3,4.9 5.2,3.4 8.5,3.4 L10.3,3.4 C13.4,3.4 15.4,4.9 15.4,7 C15.4,9.1 13.4,10.7 10.3,10.7 L8.2,10.7 L5.2,13.1 L6.1,10.5 C4.2,9.9 3,8.7 3,7 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#CDBCEB" Thickness="0.7" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Geometry="M6.2,7.1 L12.2,7.1 M7.2,8.8 L11,8.8">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#8F7EBA" Thickness="0.95" StartLineCap="Round" EndLineCap="Round" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportCopyIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M4,5 L11,5 L11,13 L4,13 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#1F2937" Thickness="1.1" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#FFFFFF" Geometry="M7,8 L14,8 L14,16 L7,16 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#1F2937" Thickness="1.1" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <DrawingImage x:Key="ExportFolderIcon">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <GeometryDrawing Brush="#FFF4DE" Geometry="M2.8,6 L7.4,6 L8.8,7.5 L15.8,7.5 L15,15 L3,15 Z">
+                            <GeometryDrawing.Pen>
+                                <Pen Brush="#F3B755" Thickness="0.8" />
+                            </GeometryDrawing.Pen>
+                        </GeometryDrawing>
+                        <GeometryDrawing Brush="#F59E0B" Geometry="M3,8 L16,8 L14.7,15 L2.3,15 Z" />
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+            <Style x:Key="VisibleWhenReadableExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsReadableExportMenuVisible}" Value="True">
@@ -14,7 +140,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenRawExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenRawExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsRawExportMenuVisible}" Value="True">
@@ -22,7 +148,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenDiffExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenDiffExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportUtilityMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsDiffExportMenuVisible}" Value="True">
@@ -30,7 +156,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenReviewCandidateExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenReviewCandidateExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsReviewCandidateExportMenuVisible}" Value="True">
@@ -38,7 +164,7 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenSummaryExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenSummaryExportMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportFormatMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
@@ -46,10 +172,42 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="VisibleWhenMergeSpeakerExportOptionMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportMenuItem}">
+            <Style x:Key="VisibleWhenMergeSpeakerExportOptionMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportToggleMenuItem}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMergeConsecutiveSpeakersExportOptionVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenCurrentExportTargetCopyMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportUtilityMenuItem}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCurrentExportTargetCopyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenCurrentExportTargetToggleMenuItem" TargetType="MenuItem" BasedOn="{StaticResource HeaderExportToggleMenuItem}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCurrentExportTargetCopyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenSummaryExportSectionLabel" TargetType="TextBlock" BasedOn="{StaticResource HeaderExportSectionLabel}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="VisibleWhenSummaryExportSeparator" TargetType="Separator" BasedOn="{StaticResource HeaderMenuSeparator}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSummaryExportMenuVisible}" Value="True">
                         <Setter Property="Visibility" Value="Visible" />
                     </DataTrigger>
                 </Style.Triggers>
@@ -144,54 +302,132 @@
                 </ToggleButton>
 
                 <Button x:Name="ExportMenuButton"
-                        Style="{StaticResource HeaderGhostButton}"
-                        MinWidth="132"
+                        Style="{StaticResource HeaderExportButton}"
                         Click="OnExportMenuButtonClick"
                         ToolTip="{Binding ContextualExportMenuToolTip}">
                     <Button.ContextMenu>
                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
                                      Style="{StaticResource HeaderDropdownMenu}">
-                            <MenuItem Header="整文" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportReadablePolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <TextBlock Text="書き出し形式" Style="{StaticResource HeaderExportSectionLabel}" />
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportReadablePolishedTxtCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportTextIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="素起こし" Style="{StaticResource VisibleWhenRawExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportRawXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="JSON" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="SRT" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="VTT" Command="{Binding ExportRawVttCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportReadablePolishedMarkdownCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportMarkdownIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="差分" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
-                                <MenuItem Header="差分ビューはエクスポート対象外です" IsEnabled="False" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportReadablePolishedDocxCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportWordIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="レビュー候補" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
-                                <MenuItem Header="TXT" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Markdown" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="Excel" Command="{Binding ExportPolishedXlsxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="DOCX" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportReadablePolishedXlsxCommand}" Style="{StaticResource VisibleWhenReadableExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportExcelIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="要約" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
-                                <MenuItem Header="Markdown" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource HeaderExportMenuItem}" />
-                                <MenuItem Header="TXT" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource HeaderExportMenuItem}" />
+
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportRawTxtCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportTextIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportRawMarkdownCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportMarkdownIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportRawDocxCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportWordIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportRawXlsxCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportExcelIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="JSON" Tag=".json" Command="{Binding ExportRawJsonCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportJsonIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="字幕 SRT" Tag=".srt" Command="{Binding ExportRawSrtCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportCaptionIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="字幕 VTT" Tag=".vtt" Command="{Binding ExportRawVttCommand}" Style="{StaticResource VisibleWhenRawExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportCaptionIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportPolishedTxtCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportTextIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportPolishedMarkdownCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportMarkdownIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Word 文書" Tag=".docx" Command="{Binding ExportPolishedDocxCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportWordIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Excel" Tag=".xlsx" Command="{Binding ExportPolishedXlsxCommand}" Style="{StaticResource VisibleWhenReviewCandidateExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportExcelIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+
+                            <MenuItem Header="差分ビューはエクスポート対象外です" IsEnabled="False" Style="{StaticResource VisibleWhenDiffExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" Foreground="#8B93A2" FontSize="15" />
+                                </MenuItem.Icon>
                             </MenuItem>
                             <Separator Style="{StaticResource HeaderMenuSeparator}" />
+                            <MenuItem Header="クリップボードにコピー"
+                                      Command="{Binding CopyCurrentExportTargetCommand}"
+                                      Style="{StaticResource VisibleWhenCurrentExportTargetCopyMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportCopyIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem Header="タイムスタンプを含める"
                                       IsCheckable="True"
                                       IsChecked="{Binding IncludeExportTimestamps, Mode=TwoWay}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
+                                      Style="{StaticResource VisibleWhenCurrentExportTargetToggleMenuItem}" />
                             <MenuItem Header="同じ話者をまとめる"
                                       IsCheckable="True"
                                       IsChecked="{Binding MergeConsecutiveSpeakersOnExport, Mode=TwoWay}"
                                       Style="{StaticResource VisibleWhenMergeSpeakerExportOptionMenuItem}" />
-                            <Separator Style="{StaticResource HeaderMenuSeparator}" />
+                            <Separator Style="{StaticResource VisibleWhenSummaryExportSeparator}" />
+                            <TextBlock Text="要約" Style="{StaticResource VisibleWhenSummaryExportSectionLabel}" />
+                            <MenuItem Header="Markdown" Tag=".md" Command="{Binding ExportSummaryMarkdownCommand}" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportMarkdownIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="テキスト" Tag=".txt" Command="{Binding ExportSummaryTextCommand}" Style="{StaticResource VisibleWhenSummaryExportMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportTextIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator Style="{StaticResource VisibleWhenSummaryExportSeparator}" />
                             <MenuItem Header="出力フォルダーを開く"
                                       Command="{Binding OpenExportFolderCommand}"
-                                      Style="{StaticResource HeaderExportMenuItem}" />
+                                      Style="{StaticResource HeaderExportUtilityMenuItem}">
+                                <MenuItem.Icon>
+                                    <Image Source="{StaticResource ExportFolderIcon}" Style="{StaticResource HeaderExportImageIcon}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </ContextMenu>
                     </Button.ContextMenu>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

@@ -260,20 +260,41 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ContextualExportMenuHeader", headerXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding CurrentExportTargetDisplayName}\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("ContextualExportMenuToolTip", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource HeaderExportButton}\"", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"書き出し形式\"", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenReadableExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenRawExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenDiffExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenReviewCandidateExportMenuItem", headerXaml, StringComparison.Ordinal);
         Assert.Contains("VisibleWhenSummaryExportMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenSummaryExportSeparator", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenCurrentExportTargetCopyMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("VisibleWhenCurrentExportTargetToggleMenuItem", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("CopyCurrentExportTargetCommand", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportTextIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportMarkdownIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportWordIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportCaptionIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("ExportCopyIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("HeaderExportImageIcon", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"HeaderExportImageIcon\"", headerStyles, StringComparison.Ordinal);
+        Assert.Contains("ExportRawJsonCommand", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"字幕 SRT\" Tag=\".srt\"", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"字幕 VTT\" Tag=\".vtt\"", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"差分ビューはエクスポート対象外です\" IsEnabled=\"False\"", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MenuItem Header=\"整文\" Style=\"{StaticResource VisibleWhenReadableExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MenuItem Header=\"素起こし\" Style=\"{StaticResource VisibleWhenRawExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MenuItem Header=\"レビュー候補\" Style=\"{StaticResource VisibleWhenReviewCandidateExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MenuItem Header=\"要約\" Style=\"{StaticResource VisibleWhenSummaryExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
         Assert.True(
             headerXaml.IndexOf("Style=\"{StaticResource VisibleWhenReadableExportMenuItem}\"", StringComparison.Ordinal) <
             headerXaml.IndexOf("Style=\"{StaticResource VisibleWhenRawExportMenuItem}\"", StringComparison.Ordinal));
         Assert.True(
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedDocxCommand}\"", StringComparison.Ordinal) <
             headerXaml.IndexOf("Command=\"{Binding ExportReadablePolishedXlsxCommand}\"", StringComparison.Ordinal));
-        Assert.Contains("<MenuItem Header=\"差分\" Style=\"{StaticResource VisibleWhenDiffExportMenuItem}\">", headerXaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("<MenuItem Header=\"差分\" IsEnabled=\"False\"", headerXaml, StringComparison.Ordinal);
-        Assert.Contains("差分ビューはエクスポート対象外です", headerXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"HeaderExportFormatMenuItem\"", headerStyles, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"HeaderExportToggleMenuItem\"", headerStyles, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"HeaderExportSectionLabel\"", headerStyles, StringComparison.Ordinal);
         Assert.Contains("HeaderModelBadgeButton", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleTrack", headerXaml, StringComparison.Ordinal);
         Assert.Contains("HeaderToggleThumb", headerXaml, StringComparison.Ordinal);

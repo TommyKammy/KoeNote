@@ -257,6 +257,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         var viewModel = new MainWindowViewModel(paths);
 
         Assert.False(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.False(viewModel.CopyCurrentExportTargetCommand.CanExecute(null));
         Assert.False(viewModel.ExportTxtCommand.CanExecute(null));
         Assert.True(viewModel.ExportJsonCommand.CanExecute(null));
         Assert.True(viewModel.ExportSrtCommand.CanExecute(null));
@@ -267,9 +268,11 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
 
         viewModel.IsStandardRawTranscriptViewSelected = true;
         Assert.True(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.True(viewModel.CopyCurrentExportTargetCommand.CanExecute(null));
 
         viewModel.IsStandardReadableTranscriptViewSelected = true;
         Assert.False(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.False(viewModel.CopyCurrentExportTargetCommand.CanExecute(null));
 
         var derivativeRepository = new TranscriptDerivativeRepository(paths);
         derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
@@ -287,6 +290,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         viewModel.SelectedJob = job;
 
         Assert.True(viewModel.ExportSelectedJobCommand.CanExecute(null));
+        Assert.True(viewModel.CopyCurrentExportTargetCommand.CanExecute(null));
         Assert.True(viewModel.ExportTxtCommand.CanExecute(null));
         Assert.True(viewModel.ExportDocxCommand.CanExecute(null));
         Assert.True(viewModel.ExportReadablePolishedTxtCommand.CanExecute(null));
@@ -502,6 +506,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
 
         viewModel.ShowRawTranscriptTabCommand.Execute(null);
         Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
@@ -509,18 +514,21 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsReadableExportMenuVisible);
         Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
 
         viewModel.ShowDiffTranscriptTabCommand.Execute(null);
         Assert.Equal(2, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("差分", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsDiffExportMenuVisible);
         Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.False(viewModel.IsCurrentExportTargetCopyVisible);
 
         viewModel.ShowReviewCandidateTranscriptTabCommand.Execute(null);
         Assert.Equal(3, viewModel.SelectedTranscriptTabIndex);
         Assert.Equal("レビュー候補", viewModel.CurrentExportTargetDisplayName);
         Assert.True(viewModel.IsReviewCandidateExportMenuVisible);
         Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
     }
 
     [Fact]
@@ -539,6 +547,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsReviewCandidateExportMenuVisible);
         Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
 
         viewModel.IsStandardRawTranscriptViewSelected = true;
         Assert.Equal(1, viewModel.SelectedTranscriptTabIndex);
@@ -546,6 +555,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsReadableExportMenuVisible);
         Assert.True(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
 
         viewModel.IsStandardReadableTranscriptViewSelected = true;
         Assert.Equal(0, viewModel.SelectedTranscriptTabIndex);
@@ -553,6 +563,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         Assert.True(viewModel.IsReadableExportMenuVisible);
         Assert.False(viewModel.IsRawExportMenuVisible);
         Assert.False(viewModel.IsMergeConsecutiveSpeakersExportOptionVisible);
+        Assert.True(viewModel.IsCurrentExportTargetCopyVisible);
     }
 
     [Fact]
