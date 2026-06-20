@@ -215,9 +215,9 @@ public sealed class StandardLayoutShellTests
         Assert.Contains("IsTranscriptAutoScrollEnabled", transcriptSegmentListXaml, StringComparison.Ordinal);
         Assert.Contains("public bool ShowCompactToolbar", transcriptSegmentListCode, StringComparison.Ordinal);
         Assert.Contains("ReadablePolishedPanel", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"1080\"", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("HorizontalAlignment=\"Stretch\"", readablePanelXaml, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"10\"", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"MaxWidth\" Value=\"1080\" />", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"HorizontalAlignment\" Value=\"Stretch\" />", readablePanelXaml, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"10\" />", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentFontSize", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentLineHeight", readablePanelXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding RawTranscriptText}\"", transcriptSegmentListXaml, StringComparison.Ordinal);
