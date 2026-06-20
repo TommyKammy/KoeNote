@@ -26,7 +26,7 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
     {
         if (!CanPlay(audioPath))
         {
-            Stop();
+            Close();
             return false;
         }
 
@@ -42,6 +42,7 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
         Stop();
         if (!audioPlaybackService.Open(audioPath!))
         {
+            Close();
             return false;
         }
 
@@ -60,6 +61,16 @@ public sealed class AudioPreviewPlaybackController(IAudioPlaybackService audioPl
     }
 
     public void Stop()
+    {
+        if (ActiveAudioPath is not null && audioPlaybackService.IsPlaying)
+        {
+            audioPlaybackService.Toggle(ActiveAudioPath);
+        }
+
+        ClearState();
+    }
+
+    public void Close()
     {
         audioPlaybackService.Stop();
         ClearState();

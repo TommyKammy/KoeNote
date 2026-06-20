@@ -350,7 +350,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.False(viewModel.IsPreviewPlaying);
         Assert.False(playback.IsPlaying);
-        Assert.True(playback.StopCount >= 1);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
     }
 
     [Fact]
@@ -377,6 +378,8 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
 
         Assert.False(viewModel.IsPreviewPlaying);
         Assert.False(playback.IsPlaying);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
         Assert.Equal("draft-002", viewModel.SelectedItem?.DraftId);
         Assert.False(viewModel.CanOperate);
     }
@@ -463,7 +466,32 @@ public sealed class ReviewCandidateConfirmationDialogViewModelTests
         Assert.Equal("draft-001", viewModel.SelectedItem?.DraftId);
         Assert.False(viewModel.IsPreviewPlaying);
         Assert.False(playback.IsPlaying);
-        Assert.True(playback.StopCount >= 1);
+        Assert.Equal(0, playback.StopCount);
+        Assert.Equal(audioPath, playback.CurrentPath);
+    }
+
+    [Fact]
+    public async Task Playback_ClosePlaybackReleasesAudio()
+    {
+        var audioPath = CreateAudioFile();
+        var playback = new FakeAudioPlaybackService();
+        var viewModel = new ReviewCandidateConfirmationDialogViewModel(new ReviewCandidateConfirmationRequest(
+            "meeting.wav",
+            [CreateCandidate("draft-001", "segment-001", "raw one", "fixed one")],
+            new FakeReviewCandidateOperations())
+        {
+            AudioPath = audioPath
+        }, playback);
+
+        await viewModel.TogglePreviewAsync();
+        Assert.True(viewModel.IsPreviewPlaying);
+
+        viewModel.ClosePlayback();
+
+        Assert.False(viewModel.IsPreviewPlaying);
+        Assert.False(playback.IsPlaying);
+        Assert.Null(playback.CurrentPath);
+        Assert.Equal(1, playback.StopCount);
     }
 
     [Fact]
