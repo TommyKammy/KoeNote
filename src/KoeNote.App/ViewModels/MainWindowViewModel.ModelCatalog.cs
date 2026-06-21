@@ -336,60 +336,19 @@ public sealed partial class MainWindowViewModel
 
     private bool IsSelectedAsrEngineReady()
     {
-        return SelectedAsrEngineId switch
-        {
-            "kotoba-whisper-v2.2-faster" => File.Exists(Paths.FasterWhisperScriptPath) &&
-                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
-                ModelPathExists("kotoba-whisper-v2.2-faster", Paths.KotobaWhisperFasterModelPath),
-            "whisper-base" => File.Exists(Paths.FasterWhisperScriptPath) &&
-                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
-                ModelPathExists("whisper-base", Paths.WhisperBaseModelPath),
-            "whisper-small" => File.Exists(Paths.FasterWhisperScriptPath) &&
-                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
-                ModelPathExists("whisper-small", Paths.WhisperSmallModelPath),
-            "faster-whisper-large-v3-turbo" => File.Exists(Paths.FasterWhisperScriptPath) &&
-                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
-                ModelPathExists("faster-whisper-large-v3-turbo", Paths.FasterWhisperModelPath),
-            "faster-whisper-large-v3" => File.Exists(Paths.FasterWhisperScriptPath) &&
-                FasterWhisperRuntimeLayout.HasPackage(Paths) &&
-                ModelPathExists("faster-whisper-large-v3", Paths.FasterWhisperLargeV3ModelPath),
-            "reazonspeech-k2-v3" => File.Exists(Paths.ReazonSpeechK2ScriptPath) &&
-                ModelPathExists("reazonspeech-k2-v3-ja", Paths.ReazonSpeechK2ModelPath),
-            _ => false
-        };
+        return MainWindowModelCatalogReadiness.IsSelectedAsrEngineReady(
+            SelectedAsrEngineId,
+            Paths,
+            _installedModelRepository.FindInstalledModel);
     }
 
     private string ResolveInitialAsrEngineId(string? savedEngineId)
     {
-        if (ModelCatalogPresenter.IsUserSelectableAsrEngine(savedEngineId))
-        {
-            return savedEngineId!;
-        }
-
-        if (ModelCatalogPresenter.IsUserSelectableAsrEngine(_setupState.SelectedAsrModelId))
-        {
-            return _setupState.SelectedAsrModelId!;
-        }
-
-        foreach (var candidate in new[]
-        {
-            "faster-whisper-large-v3-turbo",
-            "whisper-base",
-            "whisper-small",
-            "kotoba-whisper-v2.2-faster",
-            "faster-whisper-large-v3"
-        })
-        {
-            var installed = _installedModelRepository.FindInstalledModel(candidate);
-            if (installed is not null &&
-                installed.Verified &&
-                (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
-            {
-                return candidate;
-            }
-        }
-
-        return DefaultSelectableAsrEngineId;
+        return MainWindowModelCatalogReadiness.ResolveInitialAsrEngineId(
+            savedEngineId,
+            _setupState.SelectedAsrModelId,
+            _installedModelRepository.FindInstalledModel,
+            DefaultSelectableAsrEngineId);
     }
 
     private void RefreshAvailableAsrEngines()
@@ -431,17 +390,10 @@ public sealed partial class MainWindowViewModel
     private bool IsReviewModelReady()
     {
         var modelId = ResolveEffectiveReviewModelId();
-
-        if (modelId.Equals(ReviewModelSelectionResolver.LegacyReviewModelId, StringComparison.OrdinalIgnoreCase))
-        {
-            return ModelPathExists(modelId, Paths.ReviewModelPath);
-        }
-
-        var installed = _installedModelRepository.FindInstalledModel(modelId);
-        return installed is not null &&
-            installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-            installed.Verified &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+        return MainWindowModelCatalogReadiness.IsReviewModelReady(
+            modelId,
+            Paths,
+            _installedModelRepository.FindInstalledModel);
     }
 
     private bool IsSelectedReviewRuntimeReady()
@@ -460,19 +412,6 @@ public sealed partial class MainWindowViewModel
     {
         catalog ??= _modelCatalogService.LoadBuiltInCatalog();
         return ReviewModelSelectionResolver.Resolve(catalog, _setupState.SelectedReviewModelId, _setupState.SelectedModelPresetId);
-    }
-
-    private bool ModelPathExists(string modelId, string fallbackPath)
-    {
-        var installed = _installedModelRepository.FindInstalledModel(modelId);
-        if (installed is not null &&
-            installed.Verified &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)))
-        {
-            return true;
-        }
-
-        return File.Exists(fallbackPath) || Directory.Exists(fallbackPath);
     }
 
     private void UpdateModelCatalogCommandStates()
