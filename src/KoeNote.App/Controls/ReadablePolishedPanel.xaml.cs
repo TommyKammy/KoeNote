@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using KoeNote.App.Dialogs;
 using KoeNote.App.Models;
+using KoeNote.App.Services.Clipboard;
 using KoeNote.App.ViewModels;
 
 namespace KoeNote.App.Controls;
@@ -430,7 +431,11 @@ public partial class ReadablePolishedPanel : UserControl
         var text = GetSelectedReadableBodyText();
         if (!string.IsNullOrEmpty(text))
         {
-            Clipboard.SetText(text);
+            var result = ClipboardHelper.TrySetText(text);
+            if (!result.IsSucceeded && DataContext is MainWindowViewModel viewModel)
+            {
+                viewModel.ReportClipboardCopyFailure("整文の選択範囲", result);
+            }
         }
 
         e.Handled = true;

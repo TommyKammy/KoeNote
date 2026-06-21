@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
+using KoeNote.App.Services.Clipboard;
 using KoeNote.App.Services.Export;
 using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Transcript;
@@ -216,7 +217,14 @@ public sealed partial class MainWindowViewModel
                     IncludeTimestamps: IncludeExportTimestamps,
                     Source: source,
                     MergeConsecutiveSpeakers: MergeConsecutiveSpeakersOnExport));
-            System.Windows.Clipboard.SetText(result.Content);
+            var copyResult = ClipboardHelper.TrySetText(result.Content);
+            if (!copyResult.IsSucceeded)
+            {
+                ExportWarning = BuildClipboardCopyFailureMessage(CurrentExportTargetDisplayName, copyResult);
+                LatestLog = ExportWarning;
+                return Task.CompletedTask;
+            }
+
             ExportWarning = CreateExportWarning(result.PendingDraftCount);
             LatestLog = $"{CurrentExportTargetDisplayName}をクリップボードにコピーしました。";
         }
