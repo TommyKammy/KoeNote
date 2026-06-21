@@ -7,6 +7,25 @@ public sealed partial class MainWindowViewModel
 {
     private void InitializeCommands()
     {
+        InitializeJobCommands();
+        InitializePostProcessCommands();
+        InitializeTranscriptNavigationCommands();
+        InitializeRunControlCommands();
+        InitializePlaybackCommands();
+        InitializeShellCommands();
+        InitializeLayoutCommands();
+        InitializeSetupCommands();
+        InitializeModelCatalogCommands();
+        InitializeDraftReviewCommands();
+        InitializeTranscriptEditingCommands();
+        InitializeExportCommands();
+        InitializeZoomAndMaintenanceCommands();
+        InitializeUpdateCommands();
+        InitializeReadablePolishingPromptCommands();
+    }
+
+    private void InitializeJobCommands()
+    {
         AddAudioCommand = new RelayCommand(AddAudioAsync);
         DeleteJobCommand = new RelayCommand<JobSummary>(DeleteJobAsync, job => job is not null && !IsRunInProgress);
         ClearAllJobsCommand = new RelayCommand(ClearAllJobsAsync, () => Jobs.Count > 0 && !IsRunInProgress);
@@ -19,6 +38,10 @@ public sealed partial class MainWindowViewModel
         PermanentlyDeleteJobCommand = new RelayCommand<JobSummary>(PermanentlyDeleteJobAsync, job => job is not null && !IsRunInProgress);
         PermanentlyDeleteAllDeletedJobsCommand = new RelayCommand(PermanentlyDeleteAllDeletedJobsAsync, () => DeletedJobs.Count > 0 && !IsRunInProgress);
         RunSelectedJobCommand = new RelayCommand(RunSelectedJobAsync, () => CanRunSelectedJob);
+    }
+
+    private void InitializePostProcessCommands()
+    {
         RunPostReviewCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewOnly), () => CanRunPostReview);
         RunPostSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.SummaryOnly), () => CanRunPostSummary);
         RunReadablePolishingCommand = new RelayCommand(() => RunReadablePolishingAsync(), () => CanRunReadablePolishing);
@@ -26,16 +49,32 @@ public sealed partial class MainWindowViewModel
             () => RunReadablePolishingAsync(forceSpeakerConfirmation: true),
             () => CanRunReadablePolishing);
         CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
+    }
+
+    private void InitializeTranscriptNavigationCommands()
+    {
         ShowReadableTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReadableTranscriptTabIndex));
         ShowRawTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(RawTranscriptTabIndex));
         ShowDiffTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(DiffTranscriptTabIndex));
         ShowReviewCandidateTranscriptTabCommand = new RelayCommand(() => SelectTranscriptTabAsync(ReviewCandidateTranscriptTabIndex));
+    }
+
+    private void InitializeRunControlCommands()
+    {
         // Compatibility command for non-header callers; the normal UX separates review and summary.
         RunPostReviewAndSummaryCommand = new RelayCommand(() => RequestPostProcessAsync(PostProcessMode.ReviewAndSummary), () => CanRunPostReviewAndSummary);
         CancelCommand = new RelayCommand(CancelRunAsync, () => IsRunInProgress);
+    }
+
+    private void InitializePlaybackCommands()
+    {
         PlayPauseAudioCommand = new RelayCommand(PlayPauseAudioAsync, CanPlaySelectedJobAudio);
         SkipToPreviousSegmentCommand = new RelayCommand(SkipToPreviousSegmentAsync, CanSkipPlaybackSegment);
         SkipToNextSegmentCommand = new RelayCommand(SkipToNextSegmentAsync, CanSkipPlaybackSegment);
+    }
+
+    private void InitializeShellCommands()
+    {
         OpenSettingsCommand = new RelayCommand(OpenSettingsAsync);
         OpenLogsCommand = new RelayCommand(OpenLogsAsync);
         ExportLogsCommand = new RelayCommand(ExportLogsAsync, CanExportLogs);
@@ -48,10 +87,18 @@ public sealed partial class MainWindowViewModel
         CloseSetupWizardModalCommand = new RelayCommand(CloseSetupWizardModalAsync, CanCloseSetupWizardModal);
         OpenSelectedDetailPanelCommand = new RelayCommand(OpenSelectedDetailPanelAsync, CanOpenSelectedDetailPanel);
         CloseDetailPanelCommand = new RelayCommand(CloseDetailPanelAsync);
+    }
+
+    private void InitializeLayoutCommands()
+    {
         UseStandardLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Standard));
         UseDetailLayoutCommand = new RelayCommand(() => SelectMainLayoutModeAsync(KoeNote.App.Services.MainLayoutMode.Detail));
         ToggleStandardJobRailCommand = new RelayCommand(ToggleStandardJobRailAsync);
         ToggleStandardAiRailCommand = new RelayCommand(ToggleStandardAiRailAsync);
+    }
+
+    private void InitializeSetupCommands()
+    {
         SetupBackCommand = new RelayCommand(SetupBackAsync, CanUseSetupBackAction);
         SetupNextCommand = new RelayCommand(SetupNextAsync, CanUseSetupNextAction);
         SetupUseRecommendedCommand = new RelayCommand(SetupUseRecommendedAsync);
@@ -69,6 +116,10 @@ public sealed partial class MainWindowViewModel
         SetupChooseStorageRootCommand = new RelayCommand(SetupChooseStorageRootAsync);
         SetupRunSmokeCommand = new RelayCommand(SetupRunSmokeAsync);
         SetupCompleteCommand = new RelayCommand(SetupCompleteAsync);
+    }
+
+    private void InitializeModelCatalogCommands()
+    {
         ShowModelCatalogCommand = new RelayCommand(ShowModelCatalogAsync);
         RegisterPreinstalledModelsCommand = new RelayCommand(RegisterPreinstalledModelsAsync);
         DownloadSelectedModelCommand = new RelayCommand(DownloadSelectedModelAsync, CanDownloadSelectedModel);
@@ -79,12 +130,20 @@ public sealed partial class MainWindowViewModel
         UseSelectedModelCommand = new RelayCommand(UseSelectedModelAsync, CanUseSelectedModel);
         ShowSelectedModelLicenseCommand = new RelayCommand(ShowSelectedModelLicenseAsync, () => SelectedModelCatalogEntry is not null);
         DeleteSelectedModelFilesCommand = new RelayCommand(DeleteSelectedModelFilesAsync, CanDeleteSelectedModelFiles);
+    }
+
+    private void InitializeDraftReviewCommands()
+    {
         AcceptDraftCommand = new RelayCommand(AcceptSelectedDraftAsync, CanOperateOnSelectedDraft);
         RejectDraftCommand = new RelayCommand(RejectSelectedDraftAsync, CanOperateOnSelectedDraft);
         ApplyManualEditCommand = new RelayCommand(ApplyManualEditAsync, CanOperateOnSelectedDraft);
         SelectPreviousDraftCommand = new RelayCommand(SelectPreviousDraftAsync, CanSelectPreviousDraft);
         SelectNextDraftCommand = new RelayCommand(SelectNextDraftAsync, CanSelectNextDraft);
         FocusSelectedDraftSegmentCommand = new RelayCommand(FocusSelectedDraftSegmentAsync, () => SelectedCorrectionDraft is not null);
+    }
+
+    private void InitializeTranscriptEditingCommands()
+    {
         SaveSegmentEditCommand = new RelayCommand(SaveSegmentEditAsync, CanEditSelectedSegment);
         BeginSegmentInlineEditCommand = new RelayCommand<TranscriptSegmentPreview>(BeginSegmentInlineEditAsync, CanBeginSegmentInlineEdit);
         SaveSegmentInlineEditCommand = new RelayCommand(SaveSegmentInlineEditAsync, CanEditSelectedSegment);
@@ -94,6 +153,10 @@ public sealed partial class MainWindowViewModel
         SaveSpeakerInlineEditCommand = new RelayCommand(SaveSpeakerInlineEditAsync, CanEditSelectedSpeaker);
         SaveSpeakerAliasCommand = new RelayCommand(SaveSpeakerAliasAsync, CanEditSelectedSpeaker);
         UndoLastOperationCommand = new RelayCommand(UndoLastOperationAsync);
+    }
+
+    private void InitializeExportCommands()
+    {
         ExportSelectedJobCommand = new RelayCommand(ExportSelectedJobAsync, CanExportCurrentTranscriptTarget);
         ExportTxtCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Text), CanExportReadablePolishing);
         ExportJsonCommand = new RelayCommand(() => ExportSelectedJobFormatAsync(TranscriptExportFormat.Json, TranscriptExportSource.Polished), CanExportSelectedJob);
@@ -118,16 +181,28 @@ public sealed partial class MainWindowViewModel
         ExportSummaryTextCommand = new RelayCommand(ExportSummaryTextAsync, CanExportSummaryMarkdown);
         CopyCurrentExportTargetCommand = new RelayCommand(CopyCurrentExportTargetAsync, CanExportCurrentTranscriptTarget);
         OpenExportFolderCommand = new RelayCommand(OpenExportFolderAsync, CanOpenExportFolder);
+    }
+
+    private void InitializeZoomAndMaintenanceCommands()
+    {
         ZoomOutCommand = new RelayCommand(ZoomOutAsync, CanZoomOut);
         ZoomInCommand = new RelayCommand(ZoomInAsync, CanZoomIn);
         ResetZoomCommand = new RelayCommand(ResetZoomAsync, () => _mainContentZoomState.CanReset);
         RunDatabaseMaintenanceCommand = new RelayCommand(RunDatabaseMaintenanceAsync, CanRunDatabaseMaintenance);
+    }
+
+    private void InitializeUpdateCommands()
+    {
         CheckForUpdatesCommand = new RelayCommand(CheckForUpdatesAsync, () => !IsUpdateCheckInProgress);
         DownloadUpdateCommand = new RelayCommand(() => DownloadUpdateAsync(), CanDownloadUpdate);
         InstallVerifiedUpdateCommand = new RelayCommand(InstallVerifiedUpdateAsync, CanInstallVerifiedUpdate);
         UpdateAndRestartCommand = new RelayCommand(UpdateAndRestartAsync, CanUpdateAndRestart);
         DismissUpdateNotificationCommand = new RelayCommand(DismissUpdateNotificationAsync);
         OpenUpdateReleaseNotesCommand = new RelayCommand(OpenUpdateReleaseNotesAsync, () => AvailableUpdateReleaseNotesUrl is not null);
+    }
+
+    private void InitializeReadablePolishingPromptCommands()
+    {
         SaveReadablePolishingPromptSettingsCommand = new RelayCommand(SaveReadablePolishingPromptSettings);
         ResetReadablePolishingPromptSettingsCommand = new RelayCommand(ResetReadablePolishingPromptSettings);
         SelectActiveReadablePolishingPromptModelFamilyCommand = new RelayCommand(SelectActiveReadablePolishingPromptModelFamily);
