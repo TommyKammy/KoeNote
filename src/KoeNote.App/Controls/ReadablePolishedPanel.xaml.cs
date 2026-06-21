@@ -111,7 +111,9 @@ public partial class ReadablePolishedPanel : UserControl
             return;
         }
 
-        var blockIndex = FindReadableBlockIndex(viewModel.ReadableDocumentBlocks, segment.StartSeconds);
+        var blockIndex = ReadablePolishedPanelRenderingHelper.FindReadableBlockIndex(
+            viewModel.ReadableDocumentBlocks,
+            segment.StartSeconds);
         if (blockIndex < 0)
         {
             return;
@@ -199,7 +201,7 @@ public partial class ReadablePolishedPanel : UserControl
         row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText));
 
         _readableBlockAnchors.Add(row);
-        if (_firstSearchMatchAnchor is null && ContainsSearchText(block.Text, searchText))
+        if (_firstSearchMatchAnchor is null && ReadablePolishedPanelRenderingHelper.ContainsSearchText(block.Text, searchText))
         {
             _firstSearchMatchAnchor = row;
         }
@@ -217,7 +219,7 @@ public partial class ReadablePolishedPanel : UserControl
             block,
             viewModel,
             mutedBrush,
-            GetSpeakerPalette(block.Speaker))))
+            ReadablePolishedPanelRenderingHelper.GetSpeakerPalette(block.Speaker))))
         {
             Padding = new Thickness(0, 3, 20, 26),
             BorderBrush = separatorBrush,
@@ -253,7 +255,7 @@ public partial class ReadablePolishedPanel : UserControl
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush mutedBrush,
-        SpeakerPalette speakerPalette)
+        ReadableSpeakerPalette speakerPalette)
     {
         var panel = new StackPanel
         {
@@ -326,37 +328,6 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         viewModel.RenameReadableDocumentSpeaker(block.Speaker, dialog.SpeakerName);
-    }
-
-    private static SpeakerPalette GetSpeakerPalette(string speaker)
-    {
-        var palettes = new[]
-        {
-            new SpeakerPalette(Color.FromRgb(0xEA, 0xF1, 0xFA), Color.FromRgb(0x2F, 0x58, 0x96)),
-            new SpeakerPalette(Color.FromRgb(0xF2, 0xEC, 0xFB), Color.FromRgb(0x5F, 0x44, 0xA0)),
-            new SpeakerPalette(Color.FromRgb(0xFB, 0xF1, 0xE7), Color.FromRgb(0x95, 0x57, 0x1F)),
-            new SpeakerPalette(Color.FromRgb(0xED, 0xF0, 0xF3), Color.FromRgb(0x5B, 0x64, 0x72))
-        };
-
-        if (string.IsNullOrWhiteSpace(speaker))
-        {
-            return palettes[^1];
-        }
-
-        var hash = 0;
-        foreach (var character in speaker)
-        {
-            hash = unchecked((hash * 31) + character);
-        }
-
-        return palettes[(hash & int.MaxValue) % palettes.Length];
-    }
-
-    private sealed record SpeakerPalette(Color BackgroundColor, Color ForegroundColor)
-    {
-        public Brush Background { get; } = new SolidColorBrush(BackgroundColor);
-
-        public Brush Foreground { get; } = new SolidColorBrush(ForegroundColor);
     }
 
     private void OnReadableDocumentRichTextBoxSizeChanged(object sender, SizeChangedEventArgs e)
@@ -477,65 +448,18 @@ public partial class ReadablePolishedPanel : UserControl
     private static TextPointer MinTextPointer(TextPointer first, TextPointer second) =>
         first.CompareTo(second) <= 0 ? first : second;
 
-    private static bool ContainsSearchText(string text, string searchText) =>
-        !string.IsNullOrWhiteSpace(searchText) &&
-        text.Contains(searchText, StringComparison.OrdinalIgnoreCase);
-
     private static void AddHighlightedRuns(InlineCollection inlines, string text, string searchText)
     {
-        if (string.IsNullOrWhiteSpace(searchText))
+        foreach (var segment in ReadablePolishedPanelRenderingHelper.BuildHighlightedSegments(text, searchText))
         {
-            inlines.Add(new Run(text));
-            return;
+            var run = new Run(segment.Text);
+            if (segment.IsHighlighted)
+            {
+                run.Background = new SolidColorBrush(Color.FromRgb(0xFE, 0xF3, 0xC7));
+                run.FontWeight = FontWeights.SemiBold;
+            }
+
+            inlines.Add(run);
         }
-
-        var startIndex = 0;
-        while (startIndex < text.Length)
-        {
-            var matchIndex = text.IndexOf(searchText, startIndex, StringComparison.OrdinalIgnoreCase);
-            if (matchIndex < 0)
-            {
-                inlines.Add(new Run(text[startIndex..]));
-                return;
-            }
-
-            if (matchIndex > startIndex)
-            {
-                inlines.Add(new Run(text[startIndex..matchIndex]));
-            }
-
-            inlines.Add(new Run(text.Substring(matchIndex, searchText.Length))
-            {
-                Background = new SolidColorBrush(Color.FromRgb(0xFE, 0xF3, 0xC7)),
-                FontWeight = FontWeights.SemiBold
-            });
-            startIndex = matchIndex + searchText.Length;
-        }
-    }
-
-    private static int FindReadableBlockIndex(IReadOnlyList<ReadableDocumentBlock> blocks, double positionSeconds)
-    {
-        var fallbackIndex = -1;
-        for (var index = 0; index < blocks.Count; index++)
-        {
-            var block = blocks[index];
-            if (block.StartSeconds is not { } startSeconds)
-            {
-                continue;
-            }
-
-            var endSeconds = block.EndSeconds.GetValueOrDefault(double.MaxValue);
-            if (positionSeconds >= startSeconds && positionSeconds < endSeconds)
-            {
-                return index;
-            }
-
-            if (positionSeconds >= startSeconds)
-            {
-                fallbackIndex = index;
-            }
-        }
-
-        return fallbackIndex;
     }
 }
