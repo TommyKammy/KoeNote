@@ -31,7 +31,9 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
     private readonly ReviewCandidateConfirmationRequest _request;
     private readonly AudioPreviewPlaybackController _playbackController;
     private readonly ReviewCandidateConfirmationListProjection _listProjection = new();
+    private readonly ReviewCandidateConfirmationStatePresenter _statePresenter = new();
     private readonly DispatcherTimer _playbackTimer;
+    private ReviewCandidateConfirmationPresentationState _state = ReviewCandidateConfirmationPresentationState.Empty;
     private ReviewCandidateConfirmationDialogItem? _selectedItem;
     private string _manualEditText = string.Empty;
     private string _operationErrorText = string.Empty;
@@ -62,6 +64,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         DecidedItems = [];
         DisplayItems = [];
         RefreshDisplayItems(Items.FirstOrDefault());
+        RefreshStateProperties();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -116,6 +119,7 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
             }
 
             _manualEditText = value;
+            RefreshProjectedState();
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanAcceptSelected));
             OnPropertyChanged(nameof(CanRejectSelected));
@@ -141,55 +145,35 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     public bool HasOperationError => !string.IsNullOrWhiteSpace(OperationErrorText);
 
-    public int PendingCount => Items.Count;
+    public int PendingCount => _state.PendingCount;
 
-    public int DecidedCount => DecidedItems.Count;
+    public int DecidedCount => _state.DecidedCount;
 
-    public string CandidateListTitle => $"候補一覧 ({PendingCount}/{TotalCount})";
+    public string CandidateListTitle => _state.CandidateListTitle;
 
-    public string PendingCountText => $"未処理 {PendingCount}";
+    public string PendingCountText => _state.PendingCountText;
 
-    public string DecidedCountText => $"処理済み {DecidedCount}";
+    public string DecidedCountText => _state.DecidedCountText;
 
-    public string AcceptedCountText => $"採用 {AcceptedCount}";
+    public string AcceptedCountText => _state.AcceptedCountText;
 
-    public string RejectedCountText => $"却下 {RejectedCount}";
+    public string RejectedCountText => _state.RejectedCountText;
 
-    public string EditedCountText => $"手修正 {EditedCount}";
+    public string EditedCountText => _state.EditedCountText;
 
-    public bool IsPendingFilterActive => _filter == ReviewCandidateConfirmationFilter.Pending;
+    public bool IsPendingFilterActive => _state.IsPendingFilterActive;
 
-    public bool IsDecidedFilterActive => _filter == ReviewCandidateConfirmationFilter.Decided;
+    public bool IsDecidedFilterActive => _state.IsDecidedFilterActive;
 
-    public bool IsAllFilterActive => _filter == ReviewCandidateConfirmationFilter.All;
+    public bool IsAllFilterActive => _state.IsAllFilterActive;
 
-    public string DetailTitle => SelectedItem is null
-        ? Items.Count == 0 ? "候補はありません" : "候補を選択してください"
-        : SelectedItem.IssueType;
+    public string DetailTitle => _state.DetailTitle;
 
-    public string DetailSubtitle => SelectedItem is null
-        ? Items.Count == 0 ? "すべての候補を確認しました。" : "一覧から確認する候補を選んでください。"
-        : $"{SelectedItem.TimestampText} / {SelectedItem.SpeakerText}";
+    public string DetailSubtitle => _state.DetailSubtitle;
 
-    public string CurrentPositionText
-    {
-        get
-        {
-            if (SelectedItem is null)
-            {
-                return string.Empty;
-            }
+    public string CurrentPositionText => _state.CurrentPositionText;
 
-            var index = DisplayItems.IndexOf(SelectedItem);
-            return index < 0 ? string.Empty : $"{index + 1} / {DisplayItems.Count}";
-        }
-    }
-
-    public string FooterText => CanContinue
-        ? "すべての整文候補を確認しました。次に話者名確認へ進めます。"
-        : SelectedItem is null
-            ? "未処理の整文候補があります。次に確認する候補を選択してください。"
-            : "未処理の整文候補があります。採用、却下、または手修正を選んでください。";
+    public string FooterText => _state.FooterText;
 
     public bool IsDecisionInputBlocked
     {
@@ -207,51 +191,29 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
         }
     }
 
-    public bool CanOperate => SelectedItem is not null && !IsDecisionInputBlocked;
+    public bool CanOperate => _state.CanOperate;
 
-    public bool CanAcceptSelected => CanOperate && SelectedItem?.DecisionKind != ReviewCandidateDecisionKind.Accepted;
+    public bool CanAcceptSelected => _state.CanAcceptSelected;
 
-    public bool CanRejectSelected => CanOperate && SelectedItem?.DecisionKind != ReviewCandidateDecisionKind.Rejected;
+    public bool CanRejectSelected => _state.CanRejectSelected;
 
-    public bool CanApplyManualEdit => CanOperate && !string.IsNullOrWhiteSpace(ManualEditText);
+    public bool CanApplyManualEdit => _state.CanApplyManualEdit;
 
-    public bool CanPlaySelectedPreview =>
-        SelectedItem?.PlaybackPreview is not null && _playbackController.CanPlay(AudioPath);
+    public bool CanPlaySelectedPreview => _state.CanPlaySelectedPreview;
 
-    public bool IsPreviewPlaying => _playbackController.IsPlaying;
+    public bool IsPreviewPlaying => _state.IsPreviewPlaying;
 
-    public string PlayIcon => IsPreviewPlaying ? "\uE769" : "\uE768";
+    public string PlayIcon => _state.PlayIcon;
 
-    public string PreviewPlaybackStatusText => CanPlaySelectedPreview
-        ? IsPreviewPlaying ? "再生中" : "音声確認"
-        : "音声なし";
+    public string PreviewPlaybackStatusText => _state.PreviewPlaybackStatusText;
 
-    public double PreviewPlaybackProgressPercent => _playbackController.ProgressPercent;
+    public double PreviewPlaybackProgressPercent => _state.PreviewPlaybackProgressPercent;
 
-    public bool CanGoPrevious
-    {
-        get
-        {
-            var index = SelectedItem is null ? -1 : DisplayItems.IndexOf(SelectedItem);
-            return index > 0;
-        }
-    }
+    public bool CanGoPrevious => _state.CanGoPrevious;
 
-    public bool CanGoNext
-    {
-        get
-        {
-            if (SelectedItem is null)
-            {
-                return DisplayItems.Count > 0;
-            }
+    public bool CanGoNext => _state.CanGoNext;
 
-            var index = DisplayItems.IndexOf(SelectedItem);
-            return index >= 0 && index + 1 < DisplayItems.Count;
-        }
-    }
-
-    public bool CanContinue => Items.Count == 0;
+    public bool CanContinue => _state.CanContinue;
 
     public void SetFilter(ReviewCandidateConfirmationFilter filter)
     {
@@ -556,35 +518,47 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     private void RefreshStateProperties()
     {
-        OnPropertyChanged(nameof(PendingCount));
-        OnPropertyChanged(nameof(DecidedCount));
-        OnPropertyChanged(nameof(CandidateListTitle));
-        OnPropertyChanged(nameof(PendingCountText));
-        OnPropertyChanged(nameof(DecidedCountText));
-        OnPropertyChanged(nameof(AcceptedCountText));
-        OnPropertyChanged(nameof(RejectedCountText));
-        OnPropertyChanged(nameof(EditedCountText));
-        OnPropertyChanged(nameof(DetailTitle));
-        OnPropertyChanged(nameof(DetailSubtitle));
-        OnPropertyChanged(nameof(CurrentPositionText));
-        OnPropertyChanged(nameof(FooterText));
-        OnPropertyChanged(nameof(CanOperate));
-        OnPropertyChanged(nameof(CanAcceptSelected));
-        OnPropertyChanged(nameof(CanRejectSelected));
-        OnPropertyChanged(nameof(CanApplyManualEdit));
-        RefreshPlaybackStateProperties();
-        OnPropertyChanged(nameof(CanGoPrevious));
-        OnPropertyChanged(nameof(CanGoNext));
-        OnPropertyChanged(nameof(CanContinue));
+        RefreshProjectedState();
+        foreach (var propertyName in ReviewCandidateConfirmationStatePresenter.StatePropertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
+
+        RefreshTogglePreviewCommandState();
     }
 
     private void RefreshPlaybackStateProperties()
     {
-        OnPropertyChanged(nameof(CanPlaySelectedPreview));
-        OnPropertyChanged(nameof(IsPreviewPlaying));
-        OnPropertyChanged(nameof(PlayIcon));
-        OnPropertyChanged(nameof(PreviewPlaybackStatusText));
-        OnPropertyChanged(nameof(PreviewPlaybackProgressPercent));
+        RefreshProjectedState();
+        foreach (var propertyName in ReviewCandidateConfirmationStatePresenter.PlaybackStatePropertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
+
+        RefreshTogglePreviewCommandState();
+    }
+
+    private void RefreshProjectedState()
+    {
+        _state = _statePresenter.Create(new ReviewCandidateConfirmationStateInput(
+            Items,
+            DecidedItems,
+            DisplayItems,
+            SelectedItem,
+            _filter,
+            TotalCount,
+            AcceptedCount,
+            RejectedCount,
+            EditedCount,
+            IsDecisionInputBlocked,
+            ManualEditText,
+            _playbackController.CanPlay(AudioPath),
+            _playbackController.IsPlaying,
+            _playbackController.ProgressPercent));
+    }
+
+    private void RefreshTogglePreviewCommandState()
+    {
         if (TogglePreviewCommand is RelayCommand command)
         {
             command.RaiseCanExecuteChanged();
@@ -593,9 +567,11 @@ public sealed class ReviewCandidateConfirmationDialogViewModel : INotifyProperty
 
     private void RefreshFilterStateProperties()
     {
-        OnPropertyChanged(nameof(IsPendingFilterActive));
-        OnPropertyChanged(nameof(IsDecidedFilterActive));
-        OnPropertyChanged(nameof(IsAllFilterActive));
+        RefreshProjectedState();
+        foreach (var propertyName in ReviewCandidateConfirmationStatePresenter.FilterStatePropertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
