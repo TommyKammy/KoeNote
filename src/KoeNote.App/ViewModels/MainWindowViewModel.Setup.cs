@@ -11,6 +11,8 @@ namespace KoeNote.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private readonly SetupInstallCoordinator _setupInstallCoordinator = new();
+
     private Task SetupBackAsync()
     {
         _setupState = _setupWizardService.MoveBack();
@@ -276,13 +278,15 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            if (!await InstallSelectedSetupModelsAsync(operationId, displayName, progress, cancellation.Token) ||
-                !await InstallFasterWhisperRuntimeIfNeededAsync(operationId, displayName, cancellation.Token) ||
-                !ValidateSetupReviewRuntime(operationId, displayName) ||
-                !await InstallCudaRuntimeForPresetAsync(CreateAsrCudaRuntimeInstallSpec(), operationId, displayName, cancellation.Token) ||
-                !await InstallDiarizationRuntimeIfNeededAsync(operationId, displayName, cancellation.Token) ||
-                !await InstallCudaRuntimeForPresetAsync(CreateCudaReviewRuntimeInstallSpec(), operationId, displayName, cancellation.Token) ||
-                !await InstallTernaryReviewRuntimeIfNeededAsync(operationId, displayName, cancellation.Token))
+            var installSequence = new SetupInstallSequence(
+                ct => InstallSelectedSetupModelsAsync(operationId, displayName, progress, ct),
+                ct => InstallFasterWhisperRuntimeIfNeededAsync(operationId, displayName, ct),
+                () => ValidateSetupReviewRuntime(operationId, displayName),
+                ct => InstallCudaRuntimeForPresetAsync(CreateAsrCudaRuntimeInstallSpec(), operationId, displayName, ct),
+                ct => InstallDiarizationRuntimeIfNeededAsync(operationId, displayName, ct),
+                ct => InstallCudaRuntimeForPresetAsync(CreateCudaReviewRuntimeInstallSpec(), operationId, displayName, ct),
+                ct => InstallTernaryReviewRuntimeIfNeededAsync(operationId, displayName, ct));
+            if (!await _setupInstallCoordinator.RunPresetInstallAsync(installSequence, cancellation.Token))
             {
                 return;
             }
