@@ -165,7 +165,7 @@ public sealed class TranscriptExportService(AppPaths paths)
             }
 
             var content = IsManualReadableDerivative(derivative)
-                ? derivative.Content.Trim()
+                ? TranscriptPolishingOutputNormalizer.NormalizePreservedDocument(derivative.Content)
                 : TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
             var isUsable = IsManualReadableDerivative(derivative)
                 ? TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out var reason)

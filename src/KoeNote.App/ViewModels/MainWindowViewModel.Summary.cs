@@ -36,8 +36,13 @@ public sealed partial class MainWindowViewModel
             : $"要約済み: {summary.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
 
-    private void LoadReadablePolishedForSelectedJob()
+    private void LoadReadablePolishedForSelectedJob(bool confirmDiscardEdits = true)
     {
+        if (confirmDiscardEdits && !ConfirmDiscardReadableDocumentEditsIfNeeded())
+        {
+            return;
+        }
+
         ResetReadableDocumentEditState();
         if (SelectedJob is null)
         {
@@ -56,14 +61,20 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out var reason))
+        var content = IsManualReadableDerivative(derivative)
+            ? TranscriptPolishingOutputNormalizer.NormalizePreservedDocument(derivative.Content)
+            : TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        var isUsable = IsManualReadableDerivative(derivative)
+            ? TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out var reason)
+            : TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out reason);
+        if (!isUsable)
         {
             ReadablePolishedContent = string.Empty;
             ReadablePolishedStatus = $"整文の最新結果は破損しているため表示できません。再生成してください。({reason})";
             return;
         }
 
-        ReadablePolishedContent = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        ReadablePolishedContent = content;
         ReadablePolishedStatus = _transcriptDerivativeRepository.IsStale(derivative)
             ? "古い整文があります。再生成すると更新できます。"
             : $"整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
@@ -99,6 +110,7 @@ public sealed partial class MainWindowViewModel
 
         _readableDocumentEditedTexts[blockIndex] = text;
         HasReadableDocumentUnsavedEdits = true;
+        ReadableDocumentEditRevision++;
     }
 
     public string GetReadableDocumentEditedText(int blockIndex, string fallback)
@@ -166,6 +178,7 @@ public sealed partial class MainWindowViewModel
 
         var jobId = SelectedJob.JobId;
         var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
+        var editedTextsByKey = BuildReadableEditedTextMap(ReadableDocumentBlocks, editedBlockTexts);
         var wasDerivativeStale = derivative is not null && _transcriptDerivativeRepository.IsStale(derivative);
         var sourceTranscriptHash = derivative is not null && wasDerivativeStale
             ? derivative.SourceTranscriptHash
@@ -184,7 +197,7 @@ public sealed partial class MainWindowViewModel
             "manual-edit",
             derivative?.Status ?? TranscriptDerivativeStatuses.Succeeded,
             derivative?.ErrorMessage));
-        savedDerivative = SaveEditedReadableDerivativeChunks(savedDerivative, derivative);
+        savedDerivative = SaveEditedReadableDerivativeChunks(savedDerivative, derivative, editedTextsByKey);
 
         ReadablePolishedContent = content;
         ReadablePolishedStatus = wasDerivativeStale
@@ -198,7 +211,8 @@ public sealed partial class MainWindowViewModel
 
     private TranscriptDerivative SaveEditedReadableDerivativeChunks(
         TranscriptDerivative savedDerivative,
-        TranscriptDerivative? sourceDerivative)
+        TranscriptDerivative? sourceDerivative,
+        IReadOnlyDictionary<string, string> editedTextsByKey)
     {
         if (sourceDerivative is null)
         {
@@ -214,11 +228,6 @@ public sealed partial class MainWindowViewModel
             return savedDerivative;
         }
 
-        var editedBlocksByKey = ReadableDocumentBlockBuilder.Build(savedDerivative.Content)
-            .Select(static block => (Key: BuildReadableBlockKey(block), Block: block))
-            .Where(static item => item.Key.Length > 0)
-            .GroupBy(static item => item.Key, StringComparer.Ordinal)
-            .ToDictionary(static group => group.Key, static group => group.Last().Block, StringComparer.Ordinal);
         var savedChunkIds = new List<string>(sourceChunks.Length);
         foreach (var chunk in sourceChunks)
         {
@@ -233,8 +242,8 @@ public sealed partial class MainWindowViewModel
                 chunkBlocks.Select(block =>
                 {
                     var key = BuildReadableBlockKey(block);
-                    return key.Length > 0 && editedBlocksByKey.TryGetValue(key, out var editedBlock)
-                        ? editedBlock.Text
+                    return key.Length > 0 && editedTextsByKey.TryGetValue(key, out var editedText)
+                        ? editedText
                         : block.Text;
                 }).ToArray());
             if (!TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(chunkText, out _))
@@ -297,6 +306,23 @@ public sealed partial class MainWindowViewModel
             block.EndSeconds?.ToString("R", CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
+    private static IReadOnlyDictionary<string, string> BuildReadableEditedTextMap(
+        IReadOnlyList<ReadableDocumentBlock> blocks,
+        IReadOnlyList<string> editedTexts)
+    {
+        var editedTextsByKey = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 0; index < blocks.Count && index < editedTexts.Count; index++)
+        {
+            var key = BuildReadableBlockKey(blocks[index]);
+            if (key.Length > 0)
+            {
+                editedTextsByKey[key] = editedTexts[index];
+            }
+        }
+
+        return editedTextsByKey;
+    }
+
     private static string BuildManualReadableChunkId(string derivativeId, int chunkIndex)
     {
         return $"{derivativeId}-chunk-{chunkIndex:000}";
@@ -307,6 +333,31 @@ public sealed partial class MainWindowViewModel
         _readableDocumentEditedTexts.Clear();
         HasReadableDocumentUnsavedEdits = false;
         IsReadableDocumentEditMode = false;
+        ReadableDocumentEditRevision++;
+    }
+
+    private bool ConfirmDiscardReadableDocumentEditsIfNeeded()
+    {
+        if (!HasReadableDocumentUnsavedEdits)
+        {
+            return true;
+        }
+
+        var confirmed = ConfirmAction(
+            "整文の未保存編集を破棄",
+            "整文に未保存の編集があります。現在の操作を続けると編集内容は破棄されます。続けますか？");
+        if (!confirmed)
+        {
+            LatestLog = "整文の未保存編集を保持しました。保存または破棄してから操作を続けてください。";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsManualReadableDerivative(TranscriptDerivative derivative)
+    {
+        return string.Equals(derivative.GenerationProfile, "manual-edit", StringComparison.Ordinal);
     }
 
     private void UpdateReadableDocumentEditCommandStates()

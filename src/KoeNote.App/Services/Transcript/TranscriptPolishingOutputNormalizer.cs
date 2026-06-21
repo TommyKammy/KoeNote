@@ -38,6 +38,17 @@ public static class TranscriptPolishingOutputNormalizer
         return string.Join(Environment.NewLine, TrimBlankEdges(builder)).Trim();
     }
 
+    public static string NormalizePreservedDocument(string content)
+    {
+        var lines = content
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(static line => line.TrimEnd())
+            .ToArray();
+        return string.Join(Environment.NewLine, TrimBlankEdges(lines)).Trim();
+    }
+
     public static bool IsUsableDocument(string content, out string reason)
     {
         var normalized = Normalize(content);

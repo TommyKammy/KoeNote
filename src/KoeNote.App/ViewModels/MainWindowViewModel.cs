@@ -159,6 +159,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool _isReadablePolishingInProgress;
     private bool _isReadableDocumentEditMode;
     private bool _hasReadableDocumentUnsavedEdits;
+    private int _readableDocumentEditRevision;
     private string _latestLog;
     private string _modelDownloadProgressSummary = InactiveModelDownloadProgressSummary;
     private string _modelDownloadProgressStageText = string.Empty;
@@ -936,6 +937,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedJob;
         set
         {
+            if (!Equals(_selectedJob, value) &&
+                !ConfirmDiscardReadableDocumentEditsIfNeeded())
+            {
+                OnPropertyChanged(nameof(SelectedJob));
+                return;
+            }
+
             if (SetField(ref _selectedJob, value))
             {
                 if (RunSelectedJobCommand is RelayCommand command)
@@ -959,7 +967,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
                 LoadSummaryForSelectedJob();
-                LoadReadablePolishedForSelectedJob();
+                LoadReadablePolishedForSelectedJob(confirmDiscardEdits: false);
                 LoadReviewQueue();
                 NotifyStandardLayoutShellChanged();
                 RefreshLogCommandStates();
@@ -2194,6 +2202,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateReadableDocumentEditCommandStates();
             }
         }
+    }
+
+    public int ReadableDocumentEditRevision
+    {
+        get => _readableDocumentEditRevision;
+        private set => SetField(ref _readableDocumentEditRevision, value);
     }
 
     public string ReadableDocumentStateTitle => IsReadablePolishingInProgress

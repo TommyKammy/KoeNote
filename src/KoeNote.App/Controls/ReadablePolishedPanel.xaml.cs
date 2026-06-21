@@ -110,9 +110,20 @@ public partial class ReadablePolishedPanel : UserControl
             nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
             nameof(MainWindowViewModel.IsRunInProgress) or
             nameof(MainWindowViewModel.ReadableDocumentSearchText) or
-            nameof(MainWindowViewModel.IsReadableDocumentEditMode))
+            nameof(MainWindowViewModel.IsReadableDocumentEditMode) or
+            nameof(MainWindowViewModel.IsDetailLayout))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ReadableDocumentEditRevision))
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_readableBodyEditors.Any(static editor => editor.IsKeyboardFocusWithin))
+                {
+                    RebuildReadableDocument();
+                }
+            }));
         }
     }
 
