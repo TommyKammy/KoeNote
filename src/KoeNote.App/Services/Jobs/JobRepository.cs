@@ -43,29 +43,7 @@ public sealed class JobRepository(AppPaths paths)
 
     private static IReadOnlyList<JobSummary> LoadJobs(Microsoft.Data.Sqlite.SqliteConnection connection, AppPaths paths, bool isDeleted, int limit)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                job_id,
-                title,
-                source_audio_path,
-                normalized_audio_path,
-                status,
-                progress_percent,
-                unreviewed_draft_count,
-                created_at,
-                updated_at,
-                is_deleted,
-                deleted_at,
-                delete_reason
-            FROM jobs
-            WHERE is_deleted = $is_deleted
-            ORDER BY updated_at DESC
-            LIMIT $limit;
-            """;
-        command.Parameters.AddValue("$is_deleted", isDeleted ? 1 : 0);
-        command.Parameters.AddValue("$limit", limit);
-
+        using var command = JobRepositoryCommands.CreateLoadJobsCommand(connection, isDeleted, limit);
         using var reader = command.ExecuteReader();
         var jobs = new List<JobSummary>();
         while (reader.Read())
@@ -366,17 +344,10 @@ public sealed class JobRepository(AppPaths paths)
     public void RestoreJob(string jobId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            UPDATE jobs
-            SET is_deleted = 0,
-                deleted_at = NULL,
-                delete_reason = '',
-                updated_at = $updated_at
-            WHERE job_id = $job_id;
-            """;
-        command.Parameters.AddValue("$updated_at", DateTimeOffset.Now.ToString("o"));
-        command.Parameters.AddValue("$job_id", jobId);
+        using var command = JobRepositoryCommands.CreateRestoreJobCommand(
+            connection,
+            jobId,
+            DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
@@ -399,54 +370,25 @@ public sealed class JobRepository(AppPaths paths)
     private void SoftDeleteJob(string jobId, string reason)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            UPDATE jobs
-            SET is_deleted = 1,
-                deleted_at = $deleted_at,
-                delete_reason = $delete_reason,
-                updated_at = $updated_at
-            WHERE job_id = $job_id;
-            """;
-        var now = DateTimeOffset.Now.ToString("o");
-        command.Parameters.AddValue("$deleted_at", now);
-        command.Parameters.AddValue("$delete_reason", reason);
-        command.Parameters.AddValue("$updated_at", now);
-        command.Parameters.AddValue("$job_id", jobId);
+        using var command = JobRepositoryCommands.CreateSoftDeleteJobCommand(
+            connection,
+            jobId,
+            reason,
+            DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
     private bool IsDeletedJob(string jobId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT 1
-            FROM jobs
-            WHERE job_id = $job_id AND is_deleted = 1;
-            """;
-        command.Parameters.AddValue("$job_id", jobId);
+        using var command = JobRepositoryCommands.CreateIsDeletedJobCommand(connection, jobId);
         return command.ExecuteScalar() is not null;
     }
 
     private bool IsUnstartedRegisteredJob(string jobId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT 1
-            FROM jobs
-            WHERE job_id = $job_id
-                AND is_deleted = 0
-                AND current_stage = 'created'
-                AND progress_percent = 0
-                AND normalized_audio_path IS NULL
-                AND NOT EXISTS (SELECT 1 FROM transcript_segments WHERE transcript_segments.job_id = jobs.job_id)
-                AND NOT EXISTS (SELECT 1 FROM correction_drafts WHERE correction_drafts.job_id = jobs.job_id)
-                AND NOT EXISTS (SELECT 1 FROM stage_progress WHERE stage_progress.job_id = jobs.job_id)
-                AND NOT EXISTS (SELECT 1 FROM asr_runs WHERE asr_runs.job_id = jobs.job_id);
-            """;
-        command.Parameters.AddValue("$job_id", jobId);
+        using var command = JobRepositoryCommands.CreateIsUnstartedRegisteredJobCommand(connection, jobId);
         return command.ExecuteScalar() is not null;
     }
 
@@ -462,7 +404,7 @@ public sealed class JobRepository(AppPaths paths)
 
         foreach (var jobId in jobIds)
         {
-            foreach (var sql in DeleteStatements("WHERE job_id = $job_id"))
+            foreach (var sql in JobRepositoryCommands.PermanentDeleteStatementsForJobId())
             {
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
@@ -478,21 +420,6 @@ public sealed class JobRepository(AppPaths paths)
         {
             DeleteJobDirectory(jobId);
         }
-    }
-
-    private static IEnumerable<string> DeleteStatements(string whereClause)
-    {
-        var suffix = string.IsNullOrWhiteSpace(whereClause) ? string.Empty : $" {whereClause}";
-        yield return $"DELETE FROM correction_memory_events{suffix};";
-        yield return $"DELETE FROM review_operation_history{suffix};";
-        yield return $"DELETE FROM review_decisions WHERE draft_id IN (SELECT draft_id FROM correction_drafts{suffix});";
-        yield return $"DELETE FROM correction_drafts{suffix};";
-        yield return $"DELETE FROM speaker_aliases{suffix};";
-        yield return $"DELETE FROM transcript_segments{suffix};";
-        yield return $"DELETE FROM stage_progress{suffix};";
-        yield return $"DELETE FROM job_log_events{suffix};";
-        yield return $"DELETE FROM asr_runs{suffix};";
-        yield return $"DELETE FROM jobs{suffix};";
     }
 
     private static long CalculateDirectorySize(string directory)
