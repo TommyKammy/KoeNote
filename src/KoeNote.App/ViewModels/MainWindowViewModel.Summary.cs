@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Clipboard;
 using KoeNote.App.Services.Transcript;
 using Microsoft.Win32;
 
@@ -72,7 +73,13 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        System.Windows.Clipboard.SetText(ReadablePolishedContent);
+        var result = ClipboardHelper.TrySetText(ReadablePolishedContent);
+        if (!result.IsSucceeded)
+        {
+            ReportClipboardCopyFailure("整文", result);
+            return Task.CompletedTask;
+        }
+
         LatestLog = "整文をクリップボードにコピーしました。";
         return Task.CompletedTask;
     }
