@@ -202,6 +202,8 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("UpdateReadablePlaybackHighlight", code, StringComparison.Ordinal);
         Assert.Contains("ResolveReadablePlaybackBlockIndex", code, StringComparison.Ordinal);
         Assert.Contains("ApplyReadablePlaybackHighlight", code, StringComparison.Ordinal);
+        Assert.Contains("viewModel.ReadableDocumentBlocks.Count != _readableMetaCells.Count", code, StringComparison.Ordinal);
+        Assert.Contains("viewModel.ReadableDocumentBlocks.Count != _readableBodyCells.Count", code, StringComparison.Ordinal);
         Assert.Contains("nameof(MainWindowViewModel.TranscriptAutoScrollRequestId)", code, StringComparison.Ordinal);
         Assert.Contains("nameof(MainWindowViewModel.SelectedSegment)", code, StringComparison.Ordinal);
         Assert.Contains("FindReadableBlockIndex", code, StringComparison.Ordinal);
