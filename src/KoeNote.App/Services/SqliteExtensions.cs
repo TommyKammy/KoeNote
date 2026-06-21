@@ -5,6 +5,24 @@ namespace KoeNote.App.Services;
 
 internal static class SqliteExtensions
 {
+    public static SqliteCommand CreateCommand(this SqliteConnection connection, string commandText)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        return command;
+    }
+
+    public static SqliteCommand AddValue(this SqliteCommand command, string name, object? value)
+    {
+        command.Parameters.AddValue(name, value);
+        return command;
+    }
+
+    public static SqliteCommand AddIsoDateTimeOffset(this SqliteCommand command, string name, DateTimeOffset? value)
+    {
+        return command.AddValue(name, value?.ToString("o"));
+    }
+
     public static void AddValue(this SqliteParameterCollection parameters, string name, object? value)
     {
         parameters.AddWithValue(name, value ?? DBNull.Value);
