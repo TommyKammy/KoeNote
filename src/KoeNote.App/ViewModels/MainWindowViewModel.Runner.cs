@@ -25,6 +25,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return;
+        }
+
         var job = SelectedJob;
         using var cancellation = new CancellationTokenSource();
         _runCancellation = cancellation;

@@ -153,9 +153,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
     private readonly ObservableCollection<ReadableDocumentBlock> _readableDocumentBlocks = [];
+    private readonly List<string> _readableDocumentEditedTexts = [];
     private string _readablePolishedContent = string.Empty;
     private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
+    private bool _isReadableDocumentEditMode;
+    private bool _hasReadableDocumentUnsavedEdits;
+    private int _readableDocumentEditRevision;
     private string _latestLog;
     private string _modelDownloadProgressSummary = InactiveModelDownloadProgressSummary;
     private string _modelDownloadProgressStageText = string.Empty;
@@ -714,6 +718,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand CopyReadablePolishedContentCommand { get; private set; } = null!;
 
+    public ICommand BeginReadableDocumentEditCommand { get; private set; } = null!;
+
+    public ICommand SaveReadableDocumentEditCommand { get; private set; } = null!;
+
+    public ICommand DiscardReadableDocumentEditCommand { get; private set; } = null!;
+
     public ICommand ShowReadableTranscriptTabCommand { get; private set; } = null!;
 
     public ICommand ShowRawTranscriptTabCommand { get; private set; } = null!;
@@ -927,6 +937,13 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         get => _selectedJob;
         set
         {
+            if (!Equals(_selectedJob, value) &&
+                !ConfirmDiscardReadableDocumentEditsIfNeeded())
+            {
+                OnPropertyChanged(nameof(SelectedJob));
+                return;
+            }
+
             if (SetField(ref _selectedJob, value))
             {
                 if (RunSelectedJobCommand is RelayCommand command)
@@ -950,7 +967,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 RefreshLogs();
                 ReloadSegmentsForSelectedJob();
                 LoadSummaryForSelectedJob();
-                LoadReadablePolishedForSelectedJob();
+                LoadReadablePolishedForSelectedJob(confirmDiscardEdits: false);
                 LoadReviewQueue();
                 NotifyStandardLayoutShellChanged();
                 RefreshLogCommandStates();
@@ -1793,6 +1810,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isRunInProgress, value))
             {
+                if (value)
+                {
+                    ResetReadableDocumentEditState();
+                }
+
                 RefreshOptionalStageToggleStatuses();
                 if (CancelCommand is RelayCommand cancelCommand)
                 {
@@ -1849,6 +1871,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateModelCatalogCommandStates();
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
 
                 if (OpenCleanupToolCommand is RelayCommand cleanupCommand)
                 {
@@ -2127,6 +2151,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ReadableDocumentStateDescription));
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
                 if (CopyReadablePolishedContentCommand is RelayCommand copyCommand)
                 {
                     copyCommand.RaiseCanExecuteChanged();
@@ -2146,6 +2172,43 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<ReadableDocumentBlock> ReadableDocumentBlocks => _readableDocumentBlocks;
 
     public bool HasReadableDocumentBlocks => ReadableDocumentBlocks.Count > 0;
+
+    public bool CanEditReadableDocument =>
+        HasReadableDocumentBlocks &&
+        !IsRunInProgress &&
+        !IsReadablePolishingInProgress;
+
+    public bool IsReadableDocumentEditMode
+    {
+        get => _isReadableDocumentEditMode;
+        private set
+        {
+            if (SetField(ref _isReadableDocumentEditMode, value))
+            {
+                OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
+            }
+        }
+    }
+
+    public bool HasReadableDocumentUnsavedEdits
+    {
+        get => _hasReadableDocumentUnsavedEdits;
+        private set
+        {
+            if (SetField(ref _hasReadableDocumentUnsavedEdits, value))
+            {
+                UpdateExportCommandStates();
+                UpdateReadableDocumentEditCommandStates();
+            }
+        }
+    }
+
+    public int ReadableDocumentEditRevision
+    {
+        get => _readableDocumentEditRevision;
+        private set => SetField(ref _readableDocumentEditRevision, value);
+    }
 
     public string ReadableDocumentStateTitle => IsReadablePolishingInProgress
         ? "整文を生成中です"
@@ -2176,10 +2239,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isReadablePolishingInProgress, value))
             {
+                if (value)
+                {
+                    ResetReadableDocumentEditState();
+                }
+
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
                 OnPropertyChanged(nameof(ReadableDocumentStateTitle));
                 OnPropertyChanged(nameof(ReadableDocumentStateDescription));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
                 UpdateExportCommandStates();
             }
         }

@@ -5,6 +5,41 @@ namespace KoeNote.App.Tests;
 public sealed class ReadableDocumentBlockBuilderTests
 {
     [Fact]
+    public void Serialize_RebuildsTimestampedBlocksWithEditedBodies()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build(
+            "[00:00 - 00:05] Speaker_0: Original first.\n\n[00:05 - 00:09] Speaker_1: Original second.");
+
+        var content = ReadableDocumentBlockSerializer.Serialize(
+            blocks,
+            [
+                "Edited first line.\ncontinued.",
+                "Edited second."
+            ]);
+
+        Assert.Equal(
+            "[00:00 - 00:05] Speaker_0: Edited first line.\r\ncontinued.\r\n\r\n[00:05 - 00:09] Speaker_1: Edited second.",
+            content);
+    }
+
+    [Fact]
+    public void Serialize_RemovesBlankLinesInsideTimestampedBlockBody()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build("[00:00 - 00:05] Speaker_0: Original.");
+
+        var content = ReadableDocumentBlockSerializer.Serialize(
+            blocks,
+            ["First paragraph.\n\nSecond paragraph."]);
+
+        Assert.Equal(
+            "[00:00 - 00:05] Speaker_0: First paragraph.\r\nSecond paragraph.",
+            content);
+        var rebuilt = Assert.Single(ReadableDocumentBlockBuilder.Build(content));
+        Assert.Equal("First paragraph.\r\nSecond paragraph.", rebuilt.Text);
+        Assert.True(rebuilt.HasMeta);
+    }
+
+    [Fact]
     public void Build_SeparatesTimestampSpeakerAndBody()
     {
         var blocks = ReadableDocumentBlockBuilder.Build(
@@ -42,6 +77,24 @@ public sealed class ReadableDocumentBlockBuilderTests
         Assert.Equal(string.Empty, block.TimeRange);
         Assert.Equal("Plain paragraph.\ncontinued line.", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
         Assert.False(block.HasMeta);
+    }
+
+    [Fact]
+    public void Build_PreservesIndentedContinuationLines()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build("[00:00 - 00:05] Speaker_0: Notes\n  - indented item\n    code line");
+
+        var block = Assert.Single(blocks);
+        Assert.Equal("Notes\n  - indented item\n    code line", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Build_PreservesIndentedUntimestampedLines()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build("Summary\n  - indented item\n    code line");
+
+        var block = Assert.Single(blocks);
+        Assert.Equal("Summary\n  - indented item\n    code line", block.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -48,6 +48,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return;
+        }
+
         using var cancellation = new CancellationTokenSource();
         _runCancellation = cancellation;
         IsPostProcessInProgress = true;
@@ -141,6 +146,11 @@ public sealed partial class MainWindowViewModel
 
         if (!ConfirmReviewCandidatesBeforeReadablePolishing(job) ||
             !ConfirmSpeakerNamesBeforeReadablePolishing(job, forceSpeakerConfirmation))
+        {
+            return;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return;
         }

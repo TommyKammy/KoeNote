@@ -22,9 +22,11 @@ public partial class ReadablePolishedPanel : UserControl
     private readonly List<TableCell> _readableMetaCells = [];
     private readonly List<TableCell> _readableBodyCells = [];
     private readonly List<Paragraph> _readableBodyParagraphs = [];
+    private readonly List<TextBox> _readableBodyEditors = [];
     private FrameworkContentElement? _firstSearchMatchAnchor;
     private int _activeReadablePlaybackBlockIndex = -1;
     private double _lastReadableDocumentWidth;
+    private bool _isBuildingReadableDocument;
 
     public ReadablePolishedPanel()
     {
@@ -107,9 +109,21 @@ public partial class ReadablePolishedPanel : UserControl
             nameof(MainWindowViewModel.ReadableDocumentFontSize) or
             nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
             nameof(MainWindowViewModel.IsRunInProgress) or
-            nameof(MainWindowViewModel.ReadableDocumentSearchText))
+            nameof(MainWindowViewModel.ReadableDocumentSearchText) or
+            nameof(MainWindowViewModel.IsReadableDocumentEditMode) or
+            nameof(MainWindowViewModel.IsDetailLayout))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ReadableDocumentEditRevision))
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_readableBodyEditors.Any(static editor => editor.IsKeyboardFocusWithin))
+                {
+                    RebuildReadableDocument();
+                }
+            }));
         }
     }
 
@@ -122,7 +136,9 @@ public partial class ReadablePolishedPanel : UserControl
                 HasReadableDocumentBlocks: true
             } viewModel ||
             (!viewModel.IsStandardReadableTranscriptVisible &&
-             viewModel.SelectedTranscriptTabIndex != 0))
+             viewModel.SelectedTranscriptTabIndex != 0) ||
+            (viewModel.IsReadableDocumentEditMode &&
+             _readableBodyEditors.Any(static editor => editor.IsKeyboardFocusWithin)))
         {
             return;
         }
@@ -180,9 +196,11 @@ public partial class ReadablePolishedPanel : UserControl
         _readableMetaCells.Clear();
         _readableBodyCells.Clear();
         _readableBodyParagraphs.Clear();
+        _readableBodyEditors.Clear();
         _firstSearchMatchAnchor = null;
         _activeReadablePlaybackBlockIndex = -1;
         ReadableDocumentRichTextBox.Document = new FlowDocument();
+        UpdateReadableDocumentHostEditState();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
         {
@@ -193,9 +211,19 @@ public partial class ReadablePolishedPanel : UserControl
         var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
         var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
         var searchText = viewModel.ReadableDocumentSearchText;
-        var document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
+        FlowDocument document;
+        try
+        {
+            _isBuildingReadableDocument = true;
+            document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
+        }
+        finally
+        {
+            _isBuildingReadableDocument = false;
+        }
 
         ReadableDocumentRichTextBox.Document = document;
+        UpdateReadableDocumentHostEditState();
         UpdateReadableDocumentLayoutWidth();
 
         if (_firstSearchMatchAnchor is { } firstSearchMatch)
@@ -233,16 +261,17 @@ public partial class ReadablePolishedPanel : UserControl
         table.RowGroups.Add(rowGroup);
         document.Blocks.Add(table);
 
-        foreach (var block in viewModel.ReadableDocumentBlocks)
+        for (var index = 0; index < viewModel.ReadableDocumentBlocks.Count; index++)
         {
             rowGroup.Rows.Add(
-                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
+                BuildReadableBlockRow(index, viewModel.ReadableDocumentBlocks[index], viewModel, textBrush, mutedBrush, separatorBrush, searchText));
         }
 
         return document;
     }
 
     private TableRow BuildReadableBlockRow(
+        int blockIndex,
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -252,7 +281,7 @@ public partial class ReadablePolishedPanel : UserControl
     {
         var row = new TableRow();
         var metaCell = BuildMetaCell(block, viewModel, mutedBrush, separatorBrush);
-        var bodyCell = BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText);
+        var bodyCell = BuildBodyCell(blockIndex, block, viewModel, textBrush, separatorBrush, searchText);
         row.Cells.Add(metaCell);
         row.Cells.Add(bodyCell);
 
@@ -286,12 +315,18 @@ public partial class ReadablePolishedPanel : UserControl
     }
 
     private TableCell BuildBodyCell(
+        int blockIndex,
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
         Brush separatorBrush,
         string searchText)
     {
+        if (viewModel.IsReadableDocumentEditMode)
+        {
+            return BuildEditableBodyCell(blockIndex, block, viewModel, textBrush, separatorBrush);
+        }
+
         var paragraph = new Paragraph
         {
             Margin = new Thickness(0),
@@ -309,6 +344,54 @@ public partial class ReadablePolishedPanel : UserControl
         };
     }
 
+    private TableCell BuildEditableBodyCell(
+        int blockIndex,
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush separatorBrush)
+    {
+        var editor = new TextBox
+        {
+            Text = viewModel.GetReadableDocumentEditedText(blockIndex, block.Text),
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = true,
+            IsReadOnly = false,
+            IsTabStop = true,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xBF, 0xDB, 0xFE)),
+            BorderThickness = new Thickness(1),
+            Background = new SolidColorBrush(Color.FromRgb(0xFB, 0xFD, 0xFF)),
+            Foreground = textBrush,
+            FontFamily = new FontFamily("Yu Gothic UI"),
+            FontSize = viewModel.ReadableDocumentFontSize,
+            Padding = new Thickness(8, 6, 8, 6),
+            MinHeight = Math.Max(42, viewModel.ReadableDocumentLineHeight * 2),
+            ToolTip = "本文を編集"
+        };
+        editor.Tag = blockIndex;
+        editor.TextChanged += OnReadableBodyEditorTextChanged;
+        editor.PreviewMouseLeftButtonDown += OnReadableBodyEditorPreviewMouseLeftButtonDown;
+        _readableBodyEditors.Add(editor);
+
+        return new TableCell(new BlockUIContainer(editor))
+        {
+            Padding = new Thickness(0, 0, 0, 20),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
+    }
+
+    private void UpdateReadableDocumentHostEditState()
+    {
+        var isEditing = DataContext is MainWindowViewModel { IsReadableDocumentEditMode: true };
+        ReadableDocumentRichTextBox.IsReadOnly = !isEditing;
+        ReadableDocumentRichTextBox.Focusable = !isEditing;
+    }
+
     private StackPanel BuildMetaPanel(
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
@@ -322,11 +405,12 @@ public partial class ReadablePolishedPanel : UserControl
 
         if (block.HasSpeaker)
         {
+            var canRenameSpeaker = !viewModel.IsRunInProgress && !viewModel.IsReadableDocumentEditMode;
             var speakerBorder = new Border
             {
                 Background = speakerPalette.Background,
                 CornerRadius = new CornerRadius(6),
-                Cursor = viewModel.IsRunInProgress ? Cursors.Arrow : Cursors.Hand,
+                Cursor = canRenameSpeaker ? Cursors.Hand : Cursors.Arrow,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(8, 3, 8, 3),
                 ToolTip = viewModel.IsRunInProgress ? "実行中は話者名を変更できません" : "話者名を変更",
@@ -341,7 +425,7 @@ public partial class ReadablePolishedPanel : UserControl
                     MaxWidth = 92
                 }
             };
-            if (!viewModel.IsRunInProgress)
+            if (canRenameSpeaker)
             {
                 speakerBorder.MouseLeftButtonUp += (_, e) =>
                 {
@@ -386,6 +470,29 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         viewModel.RenameReadableDocumentSpeaker(block.Speaker, dialog.SpeakerName);
+    }
+
+    private void OnReadableBodyEditorTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isBuildingReadableDocument)
+        {
+            return;
+        }
+
+        if (sender is TextBox { Tag: int blockIndex } editor &&
+            DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.UpdateReadableDocumentEditedText(blockIndex, editor.Text);
+        }
+    }
+
+    private static void OnReadableBodyEditorPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is TextBox editor && !editor.IsKeyboardFocusWithin)
+        {
+            editor.Focus();
+            e.Handled = true;
+        }
     }
 
     private void OnReadableDocumentRichTextBoxSizeChanged(object sender, SizeChangedEventArgs e)

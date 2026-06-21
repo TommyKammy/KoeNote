@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.IO;
+using KoeNote.App.Models;
 using KoeNote.App.Services.Clipboard;
 using KoeNote.App.Services.Transcript;
 using Microsoft.Win32;
@@ -34,8 +36,14 @@ public sealed partial class MainWindowViewModel
             : $"要約済み: {summary.UpdatedAt:yyyy/MM/dd HH:mm}";
     }
 
-    private void LoadReadablePolishedForSelectedJob()
+    private void LoadReadablePolishedForSelectedJob(bool confirmDiscardEdits = true)
     {
+        if (confirmDiscardEdits && !ConfirmDiscardReadableDocumentEditsIfNeeded())
+        {
+            return;
+        }
+
+        ResetReadableDocumentEditState();
         if (SelectedJob is null)
         {
             ReadablePolishedContent = string.Empty;
@@ -53,17 +61,362 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out var reason))
+        var content = IsManualReadableDerivative(derivative)
+            ? TranscriptPolishingOutputNormalizer.NormalizePreservedDocument(derivative.Content)
+            : TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        var isUsable = IsManualReadableDerivative(derivative)
+            ? TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out var reason)
+            : TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out reason);
+        if (!isUsable)
         {
             ReadablePolishedContent = string.Empty;
             ReadablePolishedStatus = $"整文の最新結果は破損しているため表示できません。再生成してください。({reason})";
             return;
         }
 
-        ReadablePolishedContent = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        ReadablePolishedContent = content;
         ReadablePolishedStatus = _transcriptDerivativeRepository.IsStale(derivative)
             ? "古い整文があります。再生成すると更新できます。"
             : $"整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+    }
+
+    public bool BeginReadableDocumentEdit()
+    {
+        if (!CanEditReadableDocument)
+        {
+            return false;
+        }
+
+        _readableDocumentEditedTexts.Clear();
+        _readableDocumentEditedTexts.AddRange(ReadableDocumentBlocks.Select(static block => block.Text));
+        IsReadableDocumentEditMode = true;
+        HasReadableDocumentUnsavedEdits = false;
+        return true;
+    }
+
+    public void UpdateReadableDocumentEditedText(int blockIndex, string text)
+    {
+        if (!IsReadableDocumentEditMode ||
+            blockIndex < 0 ||
+            blockIndex >= _readableDocumentEditedTexts.Count)
+        {
+            return;
+        }
+
+        if (string.Equals(_readableDocumentEditedTexts[blockIndex], text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _readableDocumentEditedTexts[blockIndex] = text;
+        HasReadableDocumentUnsavedEdits = true;
+        ReadableDocumentEditRevision++;
+    }
+
+    public string GetReadableDocumentEditedText(int blockIndex, string fallback)
+    {
+        if (!IsReadableDocumentEditMode ||
+            blockIndex < 0 ||
+            blockIndex >= _readableDocumentEditedTexts.Count)
+        {
+            return fallback;
+        }
+
+        return _readableDocumentEditedTexts[blockIndex];
+    }
+
+    public void MarkReadableDocumentEditDirty()
+    {
+        if (IsReadableDocumentEditMode)
+        {
+            HasReadableDocumentUnsavedEdits = true;
+        }
+    }
+
+    public bool DiscardReadableDocumentEdits()
+    {
+        if (!IsReadableDocumentEditMode)
+        {
+            return false;
+        }
+
+        ResetReadableDocumentEditState();
+        return true;
+    }
+
+    public bool SaveReadableDocumentEdits()
+    {
+        return SaveReadableDocumentEdits(_readableDocumentEditedTexts);
+    }
+
+    public bool SaveReadableDocumentEdits(IReadOnlyList<string> editedBlockTexts)
+    {
+        ArgumentNullException.ThrowIfNull(editedBlockTexts);
+        if (SelectedJob is null ||
+            !IsReadableDocumentEditMode ||
+            IsRunInProgress ||
+            IsReadablePolishingInProgress ||
+            editedBlockTexts.Count != ReadableDocumentBlocks.Count)
+        {
+            return false;
+        }
+
+        var content = ReadableDocumentBlockSerializer.Serialize(
+            ReadableDocumentBlocks.ToArray(),
+            editedBlockTexts);
+        if (!TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out var reason))
+        {
+            LatestLog = $"整文の保存に失敗しました。内容を確認してください。({reason})";
+            return false;
+        }
+
+        if (string.Equals(content, ReadablePolishedContent, StringComparison.Ordinal))
+        {
+            ResetReadableDocumentEditState();
+            return true;
+        }
+
+        var jobId = SelectedJob.JobId;
+        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
+        var wasDerivativeStale = derivative is not null && _transcriptDerivativeRepository.IsStale(derivative);
+        var sourceTranscriptHash = derivative is not null && wasDerivativeStale
+            ? derivative.SourceTranscriptHash
+            : _transcriptDerivativeRepository.ComputeCurrentRawTranscriptHash(jobId);
+        var savedDerivative = _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            jobId,
+            TranscriptDerivativeKinds.Polished,
+            derivative?.ContentFormat ?? TranscriptDerivativeFormats.PlainText,
+            content,
+            derivative?.SourceKind ?? TranscriptDerivativeSourceKinds.Raw,
+            sourceTranscriptHash,
+            derivative?.SourceSegmentRange,
+            null,
+            derivative?.ModelId,
+            derivative?.PromptVersion ?? "manual-edit",
+            "manual-edit",
+            derivative?.Status ?? TranscriptDerivativeStatuses.Succeeded,
+            derivative?.ErrorMessage));
+        savedDerivative = SaveEditedReadableDerivativeChunks(savedDerivative, derivative, ReadableDocumentBlocks, editedBlockTexts);
+
+        ReadablePolishedContent = content;
+        ReadablePolishedStatus = wasDerivativeStale
+            ? "古い整文があります。再生成すると更新できます。"
+            : $"整文を手修正しました: {savedDerivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+        ResetReadableDocumentEditState();
+        RefreshSummaryAfterReadableDocumentChanged(jobId);
+        LatestLog = "整文の手修正を保存しました。";
+        return true;
+    }
+
+    private TranscriptDerivative SaveEditedReadableDerivativeChunks(
+        TranscriptDerivative savedDerivative,
+        TranscriptDerivative? sourceDerivative,
+        IReadOnlyList<ReadableDocumentBlock> readableBlocks,
+        IReadOnlyList<string> editedBlockTexts)
+    {
+        if (sourceDerivative is null)
+        {
+            return savedDerivative;
+        }
+
+        var sourceChunks = _transcriptDerivativeRepository.ReadChunks(sourceDerivative.DerivativeId)
+            .Where(static chunk => string.Equals(chunk.Status, TranscriptDerivativeStatuses.Succeeded, StringComparison.Ordinal))
+            .OrderBy(static chunk => chunk.ChunkIndex)
+            .ToArray();
+        if (sourceChunks.Length == 0)
+        {
+            return savedDerivative;
+        }
+
+        var savedChunkIds = new List<string>(sourceChunks.Length);
+        var readableBlockIndex = 0;
+        foreach (var chunk in sourceChunks)
+        {
+            var chunkBlocks = ReadableDocumentBlockBuilder.Build(chunk.Content);
+            if (chunkBlocks.Count == 0)
+            {
+                continue;
+            }
+
+            var chunkText = ReadableDocumentBlockSerializer.Serialize(
+                chunkBlocks,
+                chunkBlocks.Select(block =>
+                {
+                    return TryGetEditedReadableBlockText(block, readableBlocks, editedBlockTexts, ref readableBlockIndex, out var editedText)
+                        ? editedText
+                        : block.Text;
+                }).ToArray());
+            if (!TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(chunkText, out _))
+            {
+                continue;
+            }
+
+            var chunkId = BuildManualReadableChunkId(savedDerivative.DerivativeId, chunk.ChunkIndex);
+            _transcriptDerivativeRepository.SaveChunk(new TranscriptDerivativeChunkSaveRequest(
+                savedDerivative.DerivativeId,
+                savedDerivative.JobId,
+                chunk.ChunkIndex,
+                chunk.SourceKind,
+                chunk.SourceSegmentIds,
+                chunk.SourceStartSeconds,
+                chunk.SourceEndSeconds,
+                savedDerivative.SourceTranscriptHash,
+                savedDerivative.ContentFormat,
+                chunkText,
+                savedDerivative.ModelId,
+                savedDerivative.PromptVersion,
+                savedDerivative.GenerationProfile,
+                chunk.Status,
+                chunk.ErrorMessage,
+                chunkId));
+            savedChunkIds.Add(chunkId);
+        }
+
+        return savedChunkIds.Count == 0
+            ? savedDerivative
+            : _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+                savedDerivative.JobId,
+                savedDerivative.Kind,
+                savedDerivative.ContentFormat,
+                savedDerivative.Content,
+                savedDerivative.SourceKind,
+                savedDerivative.SourceTranscriptHash,
+                savedDerivative.SourceSegmentRange,
+                string.Join(",", savedChunkIds),
+                savedDerivative.ModelId,
+                savedDerivative.PromptVersion,
+                savedDerivative.GenerationProfile,
+                savedDerivative.Status,
+                savedDerivative.ErrorMessage,
+                savedDerivative.DerivativeId));
+    }
+
+    private static string BuildReadableBlockKey(ReadableDocumentBlock block)
+    {
+        if (!block.HasTimeRange)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            "|",
+            block.Speaker.Trim(),
+            block.TimeRange.Trim(),
+            block.StartSeconds?.ToString("R", CultureInfo.InvariantCulture) ?? string.Empty,
+            block.EndSeconds?.ToString("R", CultureInfo.InvariantCulture) ?? string.Empty);
+    }
+
+    private static bool TryGetEditedReadableBlockText(
+        ReadableDocumentBlock sourceBlock,
+        IReadOnlyList<ReadableDocumentBlock> blocks,
+        IReadOnlyList<string> editedTexts,
+        ref int blockIndex,
+        out string editedText)
+    {
+        var sourceKey = BuildReadableBlockKey(sourceBlock);
+        for (var index = Math.Max(0, blockIndex); index < blocks.Count && index < editedTexts.Count; index++)
+        {
+            if (IsSameReadableSourceBlock(sourceBlock, sourceKey, blocks[index]))
+            {
+                blockIndex = index + 1;
+                editedText = editedTexts[index];
+                return true;
+            }
+        }
+
+        editedText = string.Empty;
+        return false;
+    }
+
+    private static bool IsSameReadableSourceBlock(
+        ReadableDocumentBlock sourceBlock,
+        string sourceKey,
+        ReadableDocumentBlock candidateBlock)
+    {
+        if (sourceKey.Length > 0)
+        {
+            return string.Equals(sourceKey, BuildReadableBlockKey(candidateBlock), StringComparison.Ordinal);
+        }
+
+        return !candidateBlock.HasTimeRange &&
+            string.Equals(sourceBlock.Speaker, candidateBlock.Speaker, StringComparison.Ordinal) &&
+            string.Equals(sourceBlock.TimeRange, candidateBlock.TimeRange, StringComparison.Ordinal) &&
+            string.Equals(sourceBlock.Text, candidateBlock.Text, StringComparison.Ordinal);
+    }
+
+    private static string BuildManualReadableChunkId(string derivativeId, int chunkIndex)
+    {
+        return $"{derivativeId}-chunk-{chunkIndex:000}";
+    }
+
+    private void ResetReadableDocumentEditState()
+    {
+        _readableDocumentEditedTexts.Clear();
+        HasReadableDocumentUnsavedEdits = false;
+        IsReadableDocumentEditMode = false;
+        ReadableDocumentEditRevision++;
+    }
+
+    private bool ConfirmDiscardReadableDocumentEditsIfNeeded()
+    {
+        if (!HasReadableDocumentUnsavedEdits)
+        {
+            return true;
+        }
+
+        var confirmed = ConfirmAction(
+            "整文の未保存編集を破棄",
+            "整文に未保存の編集があります。現在の操作を続けると編集内容は破棄されます。続けますか？");
+        if (!confirmed)
+        {
+            LatestLog = "整文の未保存編集を保持しました。保存または破棄してから操作を続けてください。";
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool ConfirmDiscardReadableDocumentEditsForClose()
+    {
+        return ConfirmDiscardReadableDocumentEditsIfNeeded();
+    }
+
+    private bool ConfirmAndResetReadableDocumentEditsIfNeeded()
+    {
+        if (!ConfirmDiscardReadableDocumentEditsIfNeeded())
+        {
+            return false;
+        }
+
+        if (IsReadableDocumentEditMode)
+        {
+            ResetReadableDocumentEditState();
+        }
+
+        return true;
+    }
+
+    private static bool IsManualReadableDerivative(TranscriptDerivative derivative)
+    {
+        return string.Equals(derivative.GenerationProfile, "manual-edit", StringComparison.Ordinal);
+    }
+
+    private void UpdateReadableDocumentEditCommandStates()
+    {
+        if (BeginReadableDocumentEditCommand is RelayCommand beginCommand)
+        {
+            beginCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SaveReadableDocumentEditCommand is RelayCommand saveCommand)
+        {
+            saveCommand.RaiseCanExecuteChanged();
+        }
+
+        if (DiscardReadableDocumentEditCommand is RelayCommand discardCommand)
+        {
+            discardCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private Task CopyReadablePolishedContentAsync()
@@ -104,6 +457,7 @@ public sealed partial class MainWindowViewModel
             string.IsNullOrWhiteSpace(currentSpeaker) ||
             string.IsNullOrWhiteSpace(replacementSpeaker) ||
             IsRunInProgress ||
+            IsReadableDocumentEditMode ||
             !HasReadablePolishedContent)
         {
             return false;

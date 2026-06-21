@@ -324,6 +324,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="話者:"
                                                Foreground="{StaticResource MutedBrush}"
@@ -448,7 +449,21 @@
                                         </StackPanel>
                                     </ToggleButton>
 
-                                    <Button Grid.Column="4"
+                                    <controls:ReadableDocumentEditBar Grid.Column="4"
+                                                                       Margin="10,0,0,0">
+                                        <controls:ReadableDocumentEditBar.Style>
+                                            <Style TargetType="controls:ReadableDocumentEditBar">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedTranscriptTabIndex}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </controls:ReadableDocumentEditBar.Style>
+                                    </controls:ReadableDocumentEditBar>
+
+                                    <Button Grid.Column="5"
                                             Command="{Binding RunReadablePolishingCommand}"
                                             ToolTip="{Binding ReadablePolishedActionToolTip}"
                                             VerticalAlignment="Center">

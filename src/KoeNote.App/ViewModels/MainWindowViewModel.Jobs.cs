@@ -87,6 +87,12 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
+        if (SelectedJob?.JobId == job.JobId &&
+            !ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return Task.CompletedTask;
+        }
+
         var movedToHistory = _jobRepository.DeleteJob(job.JobId);
         Jobs.Remove(job);
         if (movedToHistory)
@@ -141,6 +147,11 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return Task.CompletedTask;
+        }
+
         var movedToHistoryIds = _jobRepository.DeleteAllJobs();
         var deletedAt = DateTimeOffset.Now;
         foreach (var job in Jobs.ToArray())
@@ -176,6 +187,11 @@ public sealed partial class MainWindowViewModel
     private Task RestoreJobAsync(JobSummary? job)
     {
         if (job is null || IsRunInProgress)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return Task.CompletedTask;
         }

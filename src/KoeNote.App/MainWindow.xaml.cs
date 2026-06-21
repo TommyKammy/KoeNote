@@ -36,7 +36,15 @@ public partial class MainWindow : Window
 
     private void OnWindowClosing(object? sender, CancelEventArgs e)
     {
-        var isRunning = DataContext is MainWindowViewModel { IsRunInProgress: true };
+        var viewModel = DataContext as MainWindowViewModel;
+        if (viewModel is { HasReadableDocumentUnsavedEdits: true } &&
+            !viewModel.ConfirmDiscardReadableDocumentEditsForClose())
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        var isRunning = viewModel is { IsRunInProgress: true };
         e.Cancel = !ConfirmationDialogService.Default.Confirm(
             this,
             ConfirmationDialogRequest.Exit(isRunning));

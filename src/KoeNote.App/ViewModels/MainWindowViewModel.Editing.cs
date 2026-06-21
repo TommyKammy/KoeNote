@@ -98,6 +98,11 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return Task.CompletedTask;
+        }
+
         var reverted = IsRawTranscriptEditingMode
             ? _transcriptEditService.UndoLastRawSegmentEdit(SelectedJob.JobId, segment.SegmentId)
             : _transcriptEditService.UndoLastSegmentEdit(SelectedJob.JobId, segment.SegmentId);
@@ -134,6 +139,11 @@ public sealed partial class MainWindowViewModel
         {
             IsSegmentInlineEditActive = false;
             return true;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return false;
         }
 
         if (useRawTranscript)
@@ -209,6 +219,11 @@ public sealed partial class MainWindowViewModel
         {
             IsSpeakerInlineEditActive = false;
             return true;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return false;
         }
 
         _transcriptEditService.ApplySpeakerAlias(
@@ -310,6 +325,11 @@ public sealed partial class MainWindowViewModel
         }
 
         var selectedSegmentId = SelectedSegment?.SegmentId;
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return Task.CompletedTask;
+        }
+
         if (_transcriptEditService.UndoLast(SelectedJob.JobId))
         {
             LatestLog = "直前の操作を取り消しました。";

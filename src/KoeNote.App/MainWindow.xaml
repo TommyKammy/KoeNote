@@ -263,6 +263,18 @@
                                                  ToolTip="ASR原文を確認・修正します" />
                                 </StackPanel>
                             </Border>
+                            <controls:ReadableDocumentEditBar Margin="10,0,0,0">
+                                <controls:ReadableDocumentEditBar.Style>
+                                    <Style TargetType="controls:ReadableDocumentEditBar">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsStandardReadableTranscriptVisible}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </controls:ReadableDocumentEditBar.Style>
+                            </controls:ReadableDocumentEditBar>
                         </StackPanel>
                     </Grid>
                 </Border>
