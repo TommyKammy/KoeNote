@@ -342,7 +342,7 @@ public partial class ReadablePolishedPanel : UserControl
     {
         var editor = new TextBox
         {
-            Text = block.Text,
+            Text = viewModel.GetReadableDocumentEditedText(blockIndex, block.Text),
             AcceptsReturn = true,
             AcceptsTab = true,
             TextWrapping = TextWrapping.Wrap,

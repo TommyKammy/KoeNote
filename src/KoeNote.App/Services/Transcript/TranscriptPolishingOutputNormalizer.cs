@@ -77,6 +77,30 @@ public static class TranscriptPolishingOutputNormalizer
         return true;
     }
 
+    public static bool IsUsablePreservedDocument(string content, out string reason)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            reason = "empty";
+            return false;
+        }
+
+        if (content.Contains('\uFFFD', StringComparison.Ordinal))
+        {
+            reason = "contains replacement characters";
+            return false;
+        }
+
+        if (!HasTranscriptBlockLine(content))
+        {
+            reason = "missing timestamped speaker block";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private static string? ExtractMarkedBlocks(string content)
     {
         var normalized = content

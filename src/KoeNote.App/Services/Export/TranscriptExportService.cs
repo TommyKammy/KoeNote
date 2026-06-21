@@ -164,8 +164,13 @@ public sealed class TranscriptExportService(AppPaths paths)
                 throw new InvalidOperationException($"No readable polished transcript was available for export: {jobId}");
             }
 
-            var content = TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
-            if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out var reason))
+            var content = IsManualReadableDerivative(derivative)
+                ? derivative.Content.Trim()
+                : TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+            var isUsable = IsManualReadableDerivative(derivative)
+                ? TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out var reason)
+                : TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out reason);
+            if (!isUsable)
             {
                 throw new InvalidOperationException($"Readable polished transcript is not usable and must be regenerated: {reason}");
             }
@@ -190,6 +195,11 @@ public sealed class TranscriptExportService(AppPaths paths)
                 string.IsNullOrWhiteSpace(segment.FinalText) ? string.Empty : segment.FinalText))
             .ToArray();
         return new TranscriptExportSnapshot(jobId, title, pendingDraftCount, segments);
+    }
+
+    private static bool IsManualReadableDerivative(TranscriptDerivative derivative)
+    {
+        return string.Equals(derivative.GenerationProfile, "manual-edit", StringComparison.Ordinal);
     }
 
     private static string SelectExportText(TranscriptReadModel segment, TranscriptExportSource source)
