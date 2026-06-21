@@ -140,7 +140,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private PostProcessMode? _lastRequestedPostProcessMode;
     private bool _isSelectingSegmentForDraft;
     private bool _isAudioPlaying;
-    private bool _isTranscriptAutoScrollEnabled;
+    private bool _isTranscriptAutoScrollEnabled = true;
     private bool _rememberCorrection = true;
     private double _playbackPositionSeconds;
     private double _playbackDurationSeconds;
@@ -1899,7 +1899,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isTranscriptAutoScrollEnabled, value) && value)
             {
-                SelectSegmentForPlaybackPosition(PlaybackPositionSeconds);
+                RequestPlaybackAutoScrollToCurrentPosition(force: true);
             }
         }
     }

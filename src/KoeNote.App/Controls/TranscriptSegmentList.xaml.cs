@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using KoeNote.App.Models;
 using KoeNote.App.ViewModels;
 
@@ -72,7 +73,9 @@ public partial class TranscriptSegmentList : UserControl
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.TranscriptAutoScrollRequestId))
         {
-            Dispatcher.BeginInvoke(ScrollSelectedSegmentIntoView);
+            Dispatcher.BeginInvoke(
+                new Action(ScrollSelectedSegmentIntoView),
+                DispatcherPriority.ContextIdle);
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.IsSegmentInlineEditActive))
         {
@@ -152,13 +155,19 @@ public partial class TranscriptSegmentList : UserControl
 
     private void ScrollSelectedSegmentIntoView()
     {
-        if (SegmentList.SelectedItem is null)
+        var selectedItem = SegmentList.SelectedItem;
+        if (selectedItem is null)
         {
             return;
         }
 
         SegmentList.UpdateLayout();
-        SegmentList.ScrollIntoView(SegmentList.SelectedItem);
+        SegmentList.ScrollIntoView(selectedItem);
+        SegmentList.UpdateLayout();
+        if (SegmentList.ItemContainerGenerator.ContainerFromItem(selectedItem) is FrameworkElement container)
+        {
+            container.BringIntoView();
+        }
     }
 
     private void FocusInlineSegmentEditor()

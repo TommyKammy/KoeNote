@@ -344,6 +344,11 @@ public sealed partial class MainWindowViewModel
         }
 
         IsAudioPlaying = _audioPlaybackService.Toggle(audioPath);
+        if (IsAudioPlaying)
+        {
+            RequestPlaybackAutoScrollToCurrentPosition(force: true);
+        }
+
         LatestLog = IsAudioPlaying
             ? $"Playing audio: {audioPath}"
             : "Audio playback paused.";
@@ -441,6 +446,16 @@ public sealed partial class MainWindowViewModel
 
     private void SelectSegmentForPlaybackPosition(double positionSeconds)
     {
+        RequestPlaybackAutoScrollToPosition(positionSeconds, force: false);
+    }
+
+    private void RequestPlaybackAutoScrollToCurrentPosition(bool force)
+    {
+        RequestPlaybackAutoScrollToPosition(PlaybackPositionSeconds, force);
+    }
+
+    private void RequestPlaybackAutoScrollToPosition(double positionSeconds, bool force)
+    {
         if (!IsTranscriptAutoScrollEnabled || Segments.Count == 0 || HasPendingSelectedSegmentEdit())
         {
             return;
@@ -451,22 +466,29 @@ public sealed partial class MainWindowViewModel
             .ToArray();
         var segment = JobPlaybackPresenter.FindSegmentForPlaybackPosition(visibleSegments, positionSeconds);
 
-        if (segment is null || EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment))
+        if (segment is null)
         {
             return;
         }
 
-        _isSelectingSegmentForPlayback = true;
-        try
+        var isSameSegment = EqualityComparer<TranscriptSegmentPreview>.Default.Equals(SelectedSegment, segment);
+        if (!isSameSegment)
         {
-            SelectedSegment = segment;
-        }
-        finally
-        {
-            _isSelectingSegmentForPlayback = false;
+            _isSelectingSegmentForPlayback = true;
+            try
+            {
+                SelectedSegment = segment;
+            }
+            finally
+            {
+                _isSelectingSegmentForPlayback = false;
+            }
         }
 
-        TranscriptAutoScrollRequestId++;
+        if (force || !isSameSegment)
+        {
+            TranscriptAutoScrollRequestId++;
+        }
     }
 
     private bool HasPendingSelectedSegmentEdit()

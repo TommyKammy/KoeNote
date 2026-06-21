@@ -152,6 +152,7 @@ public sealed class TabHighlightStyleTests
         var repoRoot = FindRepoRoot();
         var xaml = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml"));
         var code = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "ReadablePolishedPanel.xaml.cs"));
+        var segmentListCode = File.ReadAllText(Path.Combine(repoRoot, "src", "KoeNote.App", "Controls", "TranscriptSegmentList.xaml.cs"));
 
         Assert.DoesNotContain("ScrollViewer x:Name=\"ReadableDocumentScrollViewer\"", xaml, StringComparison.Ordinal);
         Assert.Contains("RichTextBox x:Name=\"ReadableDocumentRichTextBox\"", xaml, StringComparison.Ordinal);
@@ -204,6 +205,11 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("ApplyReadablePlaybackHighlight", code, StringComparison.Ordinal);
         Assert.Contains("viewModel.ReadableDocumentBlocks.Count != _readableMetaCells.Count", code, StringComparison.Ordinal);
         Assert.Contains("viewModel.ReadableDocumentBlocks.Count != _readableBodyCells.Count", code, StringComparison.Ordinal);
+        Assert.Contains("ScrollReadableDocumentBlockIntoView", code, StringComparison.Ordinal);
+        Assert.Contains("FindVisualChild<ScrollViewer>", code, StringComparison.Ordinal);
+        Assert.Contains("ScrollToVerticalOffset", code, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.ContextIdle", segmentListCode, StringComparison.Ordinal);
+        Assert.Contains("SegmentList.ItemContainerGenerator.ContainerFromItem(selectedItem)", segmentListCode, StringComparison.Ordinal);
         Assert.Contains("nameof(MainWindowViewModel.TranscriptAutoScrollRequestId)", code, StringComparison.Ordinal);
         Assert.Contains("nameof(MainWindowViewModel.SelectedSegment)", code, StringComparison.Ordinal);
         Assert.Contains("FindReadableBlockIndex", code, StringComparison.Ordinal);
