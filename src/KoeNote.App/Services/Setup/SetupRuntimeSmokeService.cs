@@ -37,7 +37,7 @@ public sealed class SetupRuntimeSmokeService(
             asrRuntimeSmoke,
             asrRuntimeSmoke.IsOk
                 ? CheckAsrGpuRuntimeReadiness(state, nvidiaGpuDetected)
-                : CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
+                : SetupRuntimeSmokeResultProjector.CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -60,7 +60,7 @@ public sealed class SetupRuntimeSmokeService(
             asrRuntimeSmoke,
             asrRuntimeSmoke.IsOk
                 ? await CheckAsrGpuRuntimeProbeAsync(state, nvidiaGpuDetected, cancellationToken)
-                : CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
+                : SetupRuntimeSmokeResultProjector.CreateSkippedAsrGpuSmokeCheck(asrRuntimeSmoke),
             CheckReviewRuntimePathBridge(state),
             CheckDiarizationRuntimeData()
         ];
@@ -127,38 +127,26 @@ public sealed class SetupRuntimeSmokeService(
             try
             {
                 var attempt = await RunAsrGpuSmokeProfileAsync(installed.FilePath, profile, index + 1, cancellationToken);
-                if (attempt.Result.ExitCode == 0 && File.Exists(attempt.OutputJsonPath))
+                var outputJsonCreated = File.Exists(attempt.OutputJsonPath);
+                if (attempt.Result.ExitCode == 0 && outputJsonCreated)
                 {
                     var current = _asrSettingsRepository.Load();
                     _asrSettingsRepository.Save(current with { ExecutionProfileId = profile.ProfileId });
-                    return new SetupSmokeCheck(
-                        "ASR GPU profile smoke",
-                        true,
-                        $"GPU ASR smoke passed with profile {profile.ProfileId}.");
+                    return SetupRuntimeSmokeResultProjector.CreatePassedAsrGpuSmokeCheck(profile);
                 }
 
-                failures.Add(attempt.Result.ExitCode == 0
-                    ? $"{profile.ProfileId}: process succeeded but output JSON was not created"
-                    : SummarizeProfileFailure(profile, attempt.Result.ExitCode, attempt.Result.StandardOutput, attempt.Result.StandardError));
+                failures.Add(SetupRuntimeSmokeResultProjector.SummarizeProfileAttempt(
+                    profile,
+                    attempt.Result,
+                    outputJsonCreated));
             }
             catch (Exception exception) when (exception is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
             {
-                failures.Add($"{profile.ProfileId}: {exception.GetType().Name} - {exception.Message}");
+                failures.Add(SetupRuntimeSmokeResultProjector.SummarizeProfileException(profile, exception));
             }
         }
 
-        return new SetupSmokeCheck(
-            "ASR GPU profile smoke",
-            false,
-            $"GPU ASR smoke failed for all CUDA profiles. {string.Join(" | ", failures)}");
-    }
-
-    private static SetupSmokeCheck CreateSkippedAsrGpuSmokeCheck(SetupSmokeCheck asrRuntimeSmoke)
-    {
-        return new SetupSmokeCheck(
-            "ASR GPU profile smoke",
-            false,
-            $"Skipped because ASR runtime smoke failed: {asrRuntimeSmoke.Detail}");
+        return SetupRuntimeSmokeResultProjector.CreateFailedAsrGpuSmokeCheck(failures);
     }
 
     private SetupSmokeCheck CheckAsrGpuRuntimeReadiness(SetupState state, bool nvidiaGpuDetected)
@@ -387,62 +375,6 @@ public sealed class SetupRuntimeSmokeService(
         writer.Write(Encoding.ASCII.GetBytes("data"));
         writer.Write(dataSize);
         writer.Write(new byte[dataSize]);
-    }
-
-    private static string SummarizeProfileFailure(
-        AsrExecutionProfile profile,
-        int exitCode,
-        string standardOutput,
-        string standardError)
-    {
-        var output = string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError;
-        var category = ClassifySmokeFailure(exitCode, output);
-        return $"{profile.ProfileId}: {category} (exit {exitCode}) {Trim(output, 500)}";
-    }
-
-    private static string ClassifySmokeFailure(int exitCode, string output)
-    {
-        if (exitCode < 0)
-        {
-            return "native crash";
-        }
-
-        if (MentionsCudaRuntimeDll(output) &&
-            (output.Contains("could not load", StringComparison.OrdinalIgnoreCase) ||
-             output.Contains("failed to load", StringComparison.OrdinalIgnoreCase) ||
-             output.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
-             output.Contains("specified module could not be found", StringComparison.OrdinalIgnoreCase)))
-        {
-            return "missing CUDA runtime";
-        }
-
-        if (output.Contains("out of memory", StringComparison.OrdinalIgnoreCase))
-        {
-            return "VRAM or compute-type failure";
-        }
-
-        if (output.Contains("compute capability", StringComparison.OrdinalIgnoreCase) ||
-            output.Contains("no kernel image", StringComparison.OrdinalIgnoreCase) ||
-            output.Contains("unsupported", StringComparison.OrdinalIgnoreCase))
-        {
-            return "unsupported CUDA or compute type";
-        }
-
-        return "process failed";
-    }
-
-    private static bool MentionsCudaRuntimeDll(string output)
-    {
-        return output.Contains("cublas", StringComparison.OrdinalIgnoreCase) ||
-            output.Contains("cudnn", StringComparison.OrdinalIgnoreCase) ||
-            output.Contains("cudart", StringComparison.OrdinalIgnoreCase) ||
-            output.Contains("zlibwapi", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string Trim(string value, int maxLength)
-    {
-        var normalized = value.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal).Trim();
-        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
     }
 
     private static bool ShouldUseExplicitFasterWhisperProfile(string? modelId)
