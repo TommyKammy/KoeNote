@@ -21,7 +21,11 @@ public sealed class TranscriptSummaryService(
         }
 
         var sourceHash = TranscriptDerivativeRepository.ComputeSourceTranscriptHash(segments);
-        var source = ResolveSource(options.JobId, segments, options.ChunkSegmentCount);
+        var source = TranscriptSummarySourceBuilder.ResolveSource(
+            options.JobId,
+            segments,
+            options.ChunkSegmentCount,
+            derivativeRepository);
         var duration = TimeSpan.Zero;
         var chunkResults = new List<TranscriptSummaryChunkResult>(source.Chunks.Count);
 
@@ -79,7 +83,7 @@ public sealed class TranscriptSummaryService(
 
             content = SummaryTextNormalizer.NormalizeUserFacingSummary(content);
 
-            if (IsUnexpectedlyShort(content, source.Chunks))
+            if (TranscriptSummarySourceBuilder.IsUnexpectedlyShort(content, source.Chunks))
             {
                 return SaveFallback(
                     options,
@@ -156,50 +160,6 @@ public sealed class TranscriptSummaryService(
         }
     }
 
-    private SummarySource ResolveSource(
-        string jobId,
-        IReadOnlyList<TranscriptReadModel> segments,
-        int chunkSegmentCount)
-    {
-        var polished = derivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
-        if (polished is not null && !derivativeRepository.IsStale(polished))
-        {
-            var polishedChunks = derivativeRepository.ReadChunks(polished.DerivativeId)
-                .Where(static chunk => string.Equals(chunk.Status, TranscriptDerivativeStatuses.Succeeded, StringComparison.Ordinal))
-                .OrderBy(static chunk => chunk.ChunkIndex)
-                .ToArray();
-
-            if (polishedChunks.Length > 0)
-            {
-                return new SummarySource(
-                    TranscriptDerivativeSourceKinds.Polished,
-                    polishedChunks.Select(static chunk => new TranscriptSummaryChunk(
-                        chunk.ChunkIndex,
-                        TranscriptDerivativeSourceKinds.Polished,
-                        chunk.SourceSegmentIds,
-                        chunk.SourceStartSeconds,
-                        chunk.SourceEndSeconds,
-                        chunk.Content)).ToArray());
-            }
-
-            return new SummarySource(
-                TranscriptDerivativeSourceKinds.Polished,
-                [
-                    new TranscriptSummaryChunk(
-                        1,
-                        TranscriptDerivativeSourceKinds.Polished,
-                        string.Join(",", segments.Select(static segment => segment.SegmentId)),
-                        segments.Min(static segment => segment.StartSeconds),
-                        segments.Max(static segment => segment.EndSeconds),
-                        polished.Content)
-                ]);
-        }
-
-        return new SummarySource(
-            TranscriptDerivativeSourceKinds.Raw,
-            BuildRawChunks(segments, chunkSegmentCount).ToArray());
-    }
-
     private TranscriptSummaryResult SaveFailed(
         TranscriptSummaryOptions options,
         string sourceKind,
@@ -234,7 +194,7 @@ public sealed class TranscriptSummaryService(
 
     private TranscriptSummaryResult SaveFallback(
         TranscriptSummaryOptions options,
-        SummarySource source,
+        TranscriptSummarySource source,
         string sourceHash,
         IReadOnlyList<TranscriptReadModel> segments,
         string reason,
@@ -283,23 +243,6 @@ public sealed class TranscriptSummaryService(
             sourceHash,
             source.Chunks.Count,
             TimeSpan.Zero);
-    }
-
-    private static IEnumerable<TranscriptSummaryChunk> BuildRawChunks(
-        IReadOnlyList<TranscriptReadModel> segments,
-        int chunkSegmentCount)
-    {
-        for (var index = 0; index < segments.Count; index += chunkSegmentCount)
-        {
-            var chunkSegments = segments.Skip(index).Take(chunkSegmentCount).ToArray();
-            yield return new TranscriptSummaryChunk(
-                (index / chunkSegmentCount) + 1,
-                TranscriptDerivativeSourceKinds.Raw,
-                string.Join(",", chunkSegments.Select(static segment => segment.SegmentId)),
-                chunkSegments.Min(static segment => segment.StartSeconds),
-                chunkSegments.Max(static segment => segment.EndSeconds),
-                BuildRawChunkContent(chunkSegments));
-        }
     }
 
     private async Task<TranscriptSummaryChunkResult> SummarizeChunkWithRetryAsync(
@@ -398,29 +341,6 @@ public sealed class TranscriptSummaryService(
             requireStructuredSections);
     }
 
-    private static string BuildRawChunkContent(IReadOnlyList<TranscriptReadModel> segments)
-    {
-        var builder = new StringBuilder();
-        foreach (var segment in segments)
-        {
-            builder
-                .Append("- segment_id: ").Append(segment.SegmentId).AppendLine()
-                .Append("  timestamp: ").Append(TranscriptSummaryFallbackBuilder.FormatTimestamp(segment.StartSeconds)).AppendLine()
-                .Append("  speaker: ").Append(segment.Speaker).AppendLine()
-                .Append("  text: ").Append(segment.Text).AppendLine();
-        }
-
-        return builder.ToString().Trim();
-    }
-
-    private static bool IsUnexpectedlyShort(
-        string finalSummary,
-        IReadOnlyList<TranscriptSummaryChunk> sourceChunks)
-    {
-        var sourceLength = sourceChunks.Sum(static chunk => chunk.Content.Length);
-        return sourceLength >= 1000 && finalSummary.Trim().Length < 80;
-    }
-
     private static void ValidateOptions(TranscriptSummaryOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -439,10 +359,6 @@ public sealed class TranscriptSummaryService(
             throw new ArgumentOutOfRangeException(nameof(options), "Chunk segment count must be greater than zero.");
         }
     }
-
-    private sealed record SummarySource(
-        string SourceKind,
-        IReadOnlyList<TranscriptSummaryChunk> Chunks);
 
     private sealed record MergeSummaryResult(string Content, TimeSpan Duration);
 }
