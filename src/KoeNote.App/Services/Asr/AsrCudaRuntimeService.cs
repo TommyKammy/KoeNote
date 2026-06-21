@@ -35,7 +35,7 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         new("cudnn", "windows-x86_64", "cuda12", ["cudnn*.dll"])
     ];
 
-    private readonly AsrCudaRuntimeOptions _options = options ?? AsrCudaRuntimeOptions.FromEnvironment();
+    private readonly AsrCudaRuntimeOptions _options = options ?? AsrCudaRuntimeInstallProjection.ResolveOptionsFromEnvironment();
     private readonly NvidiaRedistInstaller _redistInstaller = new(httpClient);
 
     public bool IsInstalled()
@@ -70,13 +70,14 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
         {
             var marker = "nvidia-redist:existing";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
-            return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime is already installed.", paths.AsrCTranslate2RuntimeDirectory, marker)
-                : AsrCudaRuntimeInstallResult.Failed(
-                    "CUDA ASR runtime files were present, but installation verification failed.",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    marker);
+            return AsrCudaRuntimeInstallProjection.VerifyInstallResult(
+                IsInstalled(),
+                "CUDA ASR runtime is already installed.",
+                "CUDA ASR runtime files were present, but installation verification failed.",
+                paths.AsrCTranslate2RuntimeDirectory,
+                paths.AsrRuntimeDirectory,
+                FailureCategoryInstallFailed,
+                marker);
         }
 
         var legacyCTranslate2RuntimeDirectory = Path.Combine(paths.RuntimeTools, "asr-ctranslate2-cuda");
@@ -88,28 +89,23 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             }
             catch (IOException exception)
             {
-                return AsrCudaRuntimeInstallResult.Failed(
-                    $"CUDA ASR runtime migration failed: {exception.Message}",
-                    paths.AsrCTranslate2RuntimeDirectory,
-                    FailureCategoryInstallFailed);
+                return AsrCudaRuntimeInstallProjection.MigrationFailed(exception, paths.AsrCTranslate2RuntimeDirectory);
             }
             catch (UnauthorizedAccessException exception)
             {
-                return AsrCudaRuntimeInstallResult.Failed(
-                    $"CUDA ASR runtime migration failed: {exception.Message}",
-                    paths.AsrCTranslate2RuntimeDirectory,
-                    FailureCategoryInstallFailed);
+                return AsrCudaRuntimeInstallProjection.MigrationFailed(exception, paths.AsrCTranslate2RuntimeDirectory);
             }
 
             var marker = "nvidia-redist:migrated-from-tools-asr-ctranslate2-cuda";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
-            return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime migrated from legacy CTranslate2 CUDA directory.", paths.AsrCTranslate2RuntimeDirectory, marker)
-                : AsrCudaRuntimeInstallResult.Failed(
-                    "CUDA ASR runtime files were present in the legacy CTranslate2 CUDA directory, but migration failed.",
-                    paths.AsrCTranslate2RuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    marker);
+            return AsrCudaRuntimeInstallProjection.VerifyInstallResult(
+                IsInstalled(),
+                "CUDA ASR runtime migrated from legacy CTranslate2 CUDA directory.",
+                "CUDA ASR runtime files were present in the legacy CTranslate2 CUDA directory, but migration failed.",
+                paths.AsrCTranslate2RuntimeDirectory,
+                paths.AsrCTranslate2RuntimeDirectory,
+                FailureCategoryInstallFailed,
+                marker);
         }
 
         if (AsrCudaRuntimeLayout.HasNvidiaRuntimeFiles(paths.AsrRuntimeDirectory))
@@ -120,39 +116,28 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             }
             catch (IOException exception)
             {
-                return AsrCudaRuntimeInstallResult.Failed(
-                    $"CUDA ASR runtime migration failed: {exception.Message}",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed);
+                return AsrCudaRuntimeInstallProjection.MigrationFailed(exception, paths.AsrRuntimeDirectory);
             }
             catch (UnauthorizedAccessException exception)
             {
-                return AsrCudaRuntimeInstallResult.Failed(
-                    $"CUDA ASR runtime migration failed: {exception.Message}",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed);
+                return AsrCudaRuntimeInstallProjection.MigrationFailed(exception, paths.AsrRuntimeDirectory);
             }
 
             var marker = "nvidia-redist:migrated-from-tools-asr";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
-            return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded("CUDA ASR runtime migrated to dedicated CTranslate2 CUDA directory.", paths.AsrCTranslate2RuntimeDirectory, marker)
-                : AsrCudaRuntimeInstallResult.Failed(
-                    "CUDA ASR runtime files were present, but migration to the dedicated CTranslate2 CUDA directory failed.",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    marker);
+            return AsrCudaRuntimeInstallProjection.VerifyInstallResult(
+                IsInstalled(),
+                "CUDA ASR runtime migrated to dedicated CTranslate2 CUDA directory.",
+                "CUDA ASR runtime files were present, but migration to the dedicated CTranslate2 CUDA directory failed.",
+                paths.AsrCTranslate2RuntimeDirectory,
+                paths.AsrRuntimeDirectory,
+                FailureCategoryInstallFailed,
+                marker);
         }
 
-        if (string.IsNullOrWhiteSpace(_options.CudaRedistManifestUrl) ||
-            string.IsNullOrWhiteSpace(_options.CudaRedistBaseUrl) ||
-            string.IsNullOrWhiteSpace(_options.CudnnRedistManifestUrl) ||
-            string.IsNullOrWhiteSpace(_options.CudnnRedistBaseUrl))
+        if (!AsrCudaRuntimeInstallProjection.HasNvidiaRedistSources(_options))
         {
-            return AsrCudaRuntimeInstallResult.Failed(
-                $"NVIDIA redistributable source is not configured. Set {CudaRedistManifestUrlEnvironmentVariable}, {CudaRedistBaseUrlEnvironmentVariable}, {CudnnRedistManifestUrlEnvironmentVariable}, and {CudnnRedistBaseUrlEnvironmentVariable} before installing.",
-                paths.AsrRuntimeDirectory,
-                FailureCategoryConfigurationMissing);
+            return AsrCudaRuntimeInstallProjection.MissingNvidiaRedistSources(paths);
         }
 
         var stagingRoot = Path.Combine(Path.GetTempPath(), $"koenote-cuda-asr-redist-{Guid.NewGuid():N}");
@@ -177,13 +162,14 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             Report(progress, "検証中", "CUDA ASR runtime の導入結果を検証しています...");
             var marker = $"nvidia-redist:{stagedResult.Source};{stagedResult.Sha256}";
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, marker);
-            return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}", paths.AsrCTranslate2RuntimeDirectory, stagedResult.Sha256)
-                : AsrCudaRuntimeInstallResult.Failed(
-                    "CUDA ASR runtime files were copied, but installation verification failed.",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    stagedResult.Sha256);
+            return AsrCudaRuntimeInstallProjection.VerifyInstallResult(
+                IsInstalled(),
+                $"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}",
+                "CUDA ASR runtime files were copied, but installation verification failed.",
+                paths.AsrCTranslate2RuntimeDirectory,
+                paths.AsrRuntimeDirectory,
+                FailureCategoryInstallFailed,
+                stagedResult.Sha256);
         }
         catch (NvidiaRedistInstallException exception) when (exception.FailureCategory is FailureCategoryHashMismatch or FailureCategoryArchiveInvalid)
         {
@@ -274,13 +260,14 @@ public sealed class AsrCudaRuntimeService(AppPaths paths, HttpClient httpClient,
             NvidiaRedistInstaller.CopyStagedFiles(stagingRoot, paths.AsrCTranslate2RuntimeDirectory, backupRoot, copiedFiles, AsrCudaRuntimeLayout.RequiredNvidiaFilePatterns);
 
             File.WriteAllText(paths.AsrCudaRuntimeMarkerPath, actualSha256);
-            return IsInstalled()
-                ? AsrCudaRuntimeInstallResult.Succeeded($"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}", paths.AsrCTranslate2RuntimeDirectory, actualSha256)
-                : AsrCudaRuntimeInstallResult.Failed(
-                    "CUDA ASR runtime files were copied, but installation verification failed.",
-                    paths.AsrRuntimeDirectory,
-                    FailureCategoryInstallFailed,
-                    actualSha256);
+            return AsrCudaRuntimeInstallProjection.VerifyInstallResult(
+                IsInstalled(),
+                $"CUDA ASR runtime installed: {paths.AsrCTranslate2RuntimeDirectory}",
+                "CUDA ASR runtime files were copied, but installation verification failed.",
+                paths.AsrCTranslate2RuntimeDirectory,
+                paths.AsrRuntimeDirectory,
+                FailureCategoryInstallFailed,
+                actualSha256);
         }
         catch (HttpRequestException exception)
         {
@@ -387,17 +374,7 @@ public sealed record AsrCudaRuntimeOptions(
 {
     public static AsrCudaRuntimeOptions FromEnvironment()
     {
-        return new AsrCudaRuntimeOptions(
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.CudaRedistManifestUrlEnvironmentVariable) ??
-                AsrCudaRuntimeService.DefaultCudaRedistManifestUrl,
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.CudaRedistBaseUrlEnvironmentVariable) ??
-                AsrCudaRuntimeService.DefaultCudaRedistBaseUrl,
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.CudnnRedistManifestUrlEnvironmentVariable) ??
-                AsrCudaRuntimeService.DefaultCudnnRedistManifestUrl,
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.CudnnRedistBaseUrlEnvironmentVariable) ??
-                AsrCudaRuntimeService.DefaultCudnnRedistBaseUrl,
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.RuntimeUrlEnvironmentVariable),
-            Environment.GetEnvironmentVariable(AsrCudaRuntimeService.RuntimeSha256EnvironmentVariable));
+        return AsrCudaRuntimeInstallProjection.ResolveOptionsFromEnvironment();
     }
 }
 
