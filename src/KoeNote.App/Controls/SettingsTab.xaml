@@ -70,10 +70,15 @@
                         <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
                                   SelectedItem="{Binding SelectedSettingsReviewModel, Mode=TwoWay}"
-                                  DisplayMemberPath="SetupDisplayName"
                                   MinHeight="32"
                                   ToolTip="{Binding SelectedSettingsReviewModel.SetupDisplayName}"
-                                  TextSearch.TextPath="SetupDisplayName" />
+                                  TextSearch.TextPath="SetupDisplayName">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource ModelCatalogEntryDisplayConverter}}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
                         <TextBlock Text="Active LLM profile" Style="{StaticResource SettingsFieldLabel}" Margin="0,12,0,4" />
                         <TextBlock Text="{Binding LlmActiveProfileSummary}"

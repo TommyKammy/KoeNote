@@ -51,6 +51,31 @@ public sealed class MainWindowViewModelUpdateTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SettingsReviewModelIdSelection_UpdatesCommittedReviewModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            CurrentStep = SetupStep.ReviewModel,
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var viewModel = new MainWindowViewModel(paths);
+
+        viewModel.SelectedSettingsReviewModelId = "gemma-4-e4b-it-q4-k-m";
+
+        var state = new SetupStateService(paths).Load();
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", viewModel.SelectedSettingsReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", viewModel.SelectedSettingsReviewModel?.ModelId);
+        Assert.Contains(
+            viewModel.SetupReviewModelChoices,
+            entry => entry.ModelId == viewModel.SelectedSettingsReviewModelId);
+    }
+
+    [Fact]
     public async Task DeleteAndRestoreJob_UpdatesActiveAndHistoryLists()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

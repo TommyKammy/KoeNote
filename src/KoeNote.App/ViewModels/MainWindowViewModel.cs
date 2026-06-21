@@ -1298,6 +1298,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (value is null)
             {
+                OnPropertyChanged(nameof(SelectedSettingsReviewModel));
+                OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
                 return;
             }
 
@@ -1305,6 +1307,28 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             {
                 ApplySettingsReviewModelSelection(value.ModelId);
             }
+        }
+    }
+
+    public string? SelectedSettingsReviewModelId
+    {
+        get => _setupState.SelectedReviewModelId;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
+                OnPropertyChanged(nameof(SelectedSettingsReviewModel));
+                return;
+            }
+
+            if (string.Equals(_setupState.SelectedReviewModelId, value, StringComparison.OrdinalIgnoreCase))
+            {
+                OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
+                return;
+            }
+
+            ApplySettingsReviewModelSelection(value);
         }
     }
 
