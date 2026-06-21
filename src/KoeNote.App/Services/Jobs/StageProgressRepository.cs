@@ -1,3 +1,5 @@
+using KoeNote.App.Services;
+
 namespace KoeNote.App.Services.Jobs;
 
 public sealed class StageProgressRepository(AppPaths paths)
@@ -15,8 +17,7 @@ public sealed class StageProgressRepository(AppPaths paths)
         string? logPath = null)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
+        using var command = connection.CreateCommand("""
             INSERT INTO stage_progress (
                 stage_id,
                 job_id,
@@ -51,18 +52,19 @@ public sealed class StageProgressRepository(AppPaths paths)
                 exit_code = excluded.exit_code,
                 error_category = excluded.error_category,
                 log_path = excluded.log_path;
-            """;
-        command.Parameters.AddWithValue("$stage_id", $"{jobId}-{stage}");
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$stage", stage);
-        command.Parameters.AddWithValue("$status", status);
-        command.Parameters.AddWithValue("$progress_percent", progressPercent);
-        command.Parameters.AddWithValue("$started_at", (object?)startedAt?.ToString("o") ?? DBNull.Value);
-        command.Parameters.AddWithValue("$finished_at", (object?)finishedAt?.ToString("o") ?? DBNull.Value);
-        command.Parameters.AddWithValue("$duration_seconds", (object?)durationSeconds ?? DBNull.Value);
-        command.Parameters.AddWithValue("$exit_code", (object?)exitCode ?? DBNull.Value);
-        command.Parameters.AddWithValue("$error_category", (object?)errorCategory ?? DBNull.Value);
-        command.Parameters.AddWithValue("$log_path", (object?)logPath ?? DBNull.Value);
+            """);
+        command
+            .AddValue("$stage_id", $"{jobId}-{stage}")
+            .AddValue("$job_id", jobId)
+            .AddValue("$stage", stage)
+            .AddValue("$status", status)
+            .AddValue("$progress_percent", progressPercent)
+            .AddIsoDateTimeOffset("$started_at", startedAt)
+            .AddIsoDateTimeOffset("$finished_at", finishedAt)
+            .AddValue("$duration_seconds", durationSeconds)
+            .AddValue("$exit_code", exitCode)
+            .AddValue("$error_category", errorCategory)
+            .AddValue("$log_path", logPath);
         command.ExecuteNonQuery();
     }
 
