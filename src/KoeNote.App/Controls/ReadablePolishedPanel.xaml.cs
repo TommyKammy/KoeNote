@@ -22,9 +22,11 @@ public partial class ReadablePolishedPanel : UserControl
     private readonly List<TableCell> _readableMetaCells = [];
     private readonly List<TableCell> _readableBodyCells = [];
     private readonly List<Paragraph> _readableBodyParagraphs = [];
+    private readonly List<TextBox> _readableBodyEditors = [];
     private FrameworkContentElement? _firstSearchMatchAnchor;
     private int _activeReadablePlaybackBlockIndex = -1;
     private double _lastReadableDocumentWidth;
+    private bool _isBuildingReadableDocument;
 
     public ReadablePolishedPanel()
     {
@@ -107,7 +109,8 @@ public partial class ReadablePolishedPanel : UserControl
             nameof(MainWindowViewModel.ReadableDocumentFontSize) or
             nameof(MainWindowViewModel.ReadableDocumentLineHeight) or
             nameof(MainWindowViewModel.IsRunInProgress) or
-            nameof(MainWindowViewModel.ReadableDocumentSearchText))
+            nameof(MainWindowViewModel.ReadableDocumentSearchText) or
+            nameof(MainWindowViewModel.IsReadableDocumentEditMode))
         {
             Dispatcher.BeginInvoke(RebuildReadableDocument);
         }
@@ -122,7 +125,9 @@ public partial class ReadablePolishedPanel : UserControl
                 HasReadableDocumentBlocks: true
             } viewModel ||
             (!viewModel.IsStandardReadableTranscriptVisible &&
-             viewModel.SelectedTranscriptTabIndex != 0))
+             viewModel.SelectedTranscriptTabIndex != 0) ||
+            (viewModel.IsReadableDocumentEditMode &&
+             _readableBodyEditors.Any(static editor => editor.IsKeyboardFocusWithin)))
         {
             return;
         }
@@ -180,6 +185,7 @@ public partial class ReadablePolishedPanel : UserControl
         _readableMetaCells.Clear();
         _readableBodyCells.Clear();
         _readableBodyParagraphs.Clear();
+        _readableBodyEditors.Clear();
         _firstSearchMatchAnchor = null;
         _activeReadablePlaybackBlockIndex = -1;
         ReadableDocumentRichTextBox.Document = new FlowDocument();
@@ -193,7 +199,16 @@ public partial class ReadablePolishedPanel : UserControl
         var mutedBrush = new SolidColorBrush(Color.FromRgb(0x64, 0x6C, 0x7B));
         var separatorBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
         var searchText = viewModel.ReadableDocumentSearchText;
-        var document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
+        FlowDocument document;
+        try
+        {
+            _isBuildingReadableDocument = true;
+            document = BuildReadableDocument(viewModel, textBrush, mutedBrush, separatorBrush, searchText);
+        }
+        finally
+        {
+            _isBuildingReadableDocument = false;
+        }
 
         ReadableDocumentRichTextBox.Document = document;
         UpdateReadableDocumentLayoutWidth();
@@ -292,6 +307,11 @@ public partial class ReadablePolishedPanel : UserControl
         Brush separatorBrush,
         string searchText)
     {
+        if (viewModel.IsReadableDocumentEditMode)
+        {
+            return BuildEditableBodyCell(block, viewModel, textBrush, separatorBrush);
+        }
+
         var paragraph = new Paragraph
         {
             Margin = new Thickness(0),
@@ -304,6 +324,41 @@ public partial class ReadablePolishedPanel : UserControl
         return new TableCell(paragraph)
         {
             Padding = new Thickness(0, 0, 0, 26),
+            BorderBrush = separatorBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1)
+        };
+    }
+
+    private TableCell BuildEditableBodyCell(
+        ReadableDocumentBlock block,
+        MainWindowViewModel viewModel,
+        Brush textBrush,
+        Brush separatorBrush)
+    {
+        var editor = new TextBox
+        {
+            Text = block.Text,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xBF, 0xDB, 0xFE)),
+            BorderThickness = new Thickness(1),
+            Background = new SolidColorBrush(Color.FromRgb(0xFB, 0xFD, 0xFF)),
+            Foreground = textBrush,
+            FontFamily = new FontFamily("Yu Gothic UI"),
+            FontSize = viewModel.ReadableDocumentFontSize,
+            Padding = new Thickness(8, 6, 8, 6),
+            MinHeight = Math.Max(42, viewModel.ReadableDocumentLineHeight * 2),
+            ToolTip = "本文を編集"
+        };
+        editor.TextChanged += OnReadableBodyEditorTextChanged;
+        _readableBodyEditors.Add(editor);
+
+        return new TableCell(new BlockUIContainer(editor))
+        {
+            Padding = new Thickness(0, 0, 0, 20),
             BorderBrush = separatorBrush,
             BorderThickness = new Thickness(0, 0, 0, 1)
         };
@@ -386,6 +441,45 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         viewModel.RenameReadableDocumentSpeaker(block.Speaker, dialog.SpeakerName);
+    }
+
+    private void OnBeginReadableDocumentEditClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.BeginReadableDocumentEdit();
+        }
+    }
+
+    private void OnSaveReadableDocumentEditClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SaveReadableDocumentEdits(_readableBodyEditors.Select(static editor => editor.Text).ToArray());
+    }
+
+    private void OnDiscardReadableDocumentEditClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.DiscardReadableDocumentEdits();
+        }
+    }
+
+    private void OnReadableBodyEditorTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isBuildingReadableDocument)
+        {
+            return;
+        }
+
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.MarkReadableDocumentEditDirty();
+        }
     }
 
     private void OnReadableDocumentRichTextBoxSizeChanged(object sender, SizeChangedEventArgs e)

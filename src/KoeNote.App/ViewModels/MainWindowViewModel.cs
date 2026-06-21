@@ -156,6 +156,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _readablePolishedContent = string.Empty;
     private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
+    private bool _isReadableDocumentEditMode;
+    private bool _hasReadableDocumentUnsavedEdits;
     private string _latestLog;
     private string _modelDownloadProgressSummary = InactiveModelDownloadProgressSummary;
     private string _modelDownloadProgressStageText = string.Empty;
@@ -1793,6 +1795,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isRunInProgress, value))
             {
+                if (value)
+                {
+                    ResetReadableDocumentEditState();
+                }
+
                 RefreshOptionalStageToggleStatuses();
                 if (CancelCommand is RelayCommand cancelCommand)
                 {
@@ -1849,6 +1856,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateModelCatalogCommandStates();
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
 
                 if (OpenCleanupToolCommand is RelayCommand cleanupCommand)
                 {
@@ -2127,6 +2135,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ReadableDocumentStateDescription));
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
                 if (CopyReadablePolishedContentCommand is RelayCommand copyCommand)
                 {
                     copyCommand.RaiseCanExecuteChanged();
@@ -2146,6 +2155,35 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<ReadableDocumentBlock> ReadableDocumentBlocks => _readableDocumentBlocks;
 
     public bool HasReadableDocumentBlocks => ReadableDocumentBlocks.Count > 0;
+
+    public bool CanEditReadableDocument =>
+        HasReadableDocumentBlocks &&
+        !IsRunInProgress &&
+        !IsReadablePolishingInProgress;
+
+    public bool IsReadableDocumentEditMode
+    {
+        get => _isReadableDocumentEditMode;
+        private set
+        {
+            if (SetField(ref _isReadableDocumentEditMode, value))
+            {
+                OnPropertyChanged(nameof(CanEditReadableDocument));
+            }
+        }
+    }
+
+    public bool HasReadableDocumentUnsavedEdits
+    {
+        get => _hasReadableDocumentUnsavedEdits;
+        private set
+        {
+            if (SetField(ref _hasReadableDocumentUnsavedEdits, value))
+            {
+                UpdateExportCommandStates();
+            }
+        }
+    }
 
     public string ReadableDocumentStateTitle => IsReadablePolishingInProgress
         ? "整文を生成中です"
@@ -2176,10 +2214,16 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isReadablePolishingInProgress, value))
             {
+                if (value)
+                {
+                    ResetReadableDocumentEditState();
+                }
+
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
                 OnPropertyChanged(nameof(ReadableDocumentStateTitle));
                 OnPropertyChanged(nameof(ReadableDocumentStateDescription));
+                OnPropertyChanged(nameof(CanEditReadableDocument));
                 UpdateExportCommandStates();
             }
         }

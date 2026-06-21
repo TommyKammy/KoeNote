@@ -258,7 +258,9 @@ public sealed partial class MainWindowViewModel
 
     private bool CanExportReadablePolishing()
     {
-        if (SelectedJob is null || IsRunInProgress)
+        if (SelectedJob is null ||
+            IsRunInProgress ||
+            HasReadableDocumentUnsavedEdits)
         {
             return false;
         }

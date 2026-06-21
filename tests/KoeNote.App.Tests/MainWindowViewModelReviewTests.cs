@@ -366,6 +366,52 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void ReadablePolishedTab_SaveEditsStoresLatestDerivativeForExport()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: Original readable body.",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.BeginReadableDocumentEdit());
+        viewModel.MarkReadableDocumentEditDirty();
+        Assert.True(viewModel.HasReadableDocumentUnsavedEdits);
+
+        Assert.True(viewModel.SaveReadableDocumentEdits(["Corrected readable body."]));
+
+        Assert.False(viewModel.IsReadableDocumentEditMode);
+        Assert.False(viewModel.HasReadableDocumentUnsavedEdits);
+        Assert.Contains("Corrected readable body.", viewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        var latest = derivativeRepository.ReadLatestSuccessful(job.JobId, TranscriptDerivativeKinds.Polished);
+        Assert.NotNull(latest);
+        Assert.Contains("Corrected readable body.", latest.Content, StringComparison.Ordinal);
+        var export = new TranscriptExportService(paths).RenderJob(
+            job.JobId,
+            TranscriptExportFormat.Text,
+            new TranscriptExportOptions(Source: TranscriptExportSource.ReadablePolished));
+        Assert.Contains("Corrected readable body.", export.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Original readable body.", export.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReadablePolishedTab_RejectsBrokenSuccessfulDerivative()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

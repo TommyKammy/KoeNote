@@ -5,6 +5,24 @@ namespace KoeNote.App.Tests;
 public sealed class ReadableDocumentBlockBuilderTests
 {
     [Fact]
+    public void Serialize_RebuildsTimestampedBlocksWithEditedBodies()
+    {
+        var blocks = ReadableDocumentBlockBuilder.Build(
+            "[00:00 - 00:05] Speaker_0: Original first.\n\n[00:05 - 00:09] Speaker_1: Original second.");
+
+        var content = ReadableDocumentBlockSerializer.Serialize(
+            blocks,
+            [
+                "Edited first line.\ncontinued.",
+                "Edited second."
+            ]);
+
+        Assert.Equal(
+            "[00:00 - 00:05] Speaker_0: Edited first line.\r\ncontinued.\r\n\r\n[00:05 - 00:09] Speaker_1: Edited second.",
+            content);
+    }
+
+    [Fact]
     public void Build_SeparatesTimestampSpeakerAndBody()
     {
         var blocks = ReadableDocumentBlockBuilder.Build(

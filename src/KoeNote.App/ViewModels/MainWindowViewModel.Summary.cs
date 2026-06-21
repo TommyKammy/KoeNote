@@ -36,6 +36,7 @@ public sealed partial class MainWindowViewModel
 
     private void LoadReadablePolishedForSelectedJob()
     {
+        ResetReadableDocumentEditState();
         if (SelectedJob is null)
         {
             ReadablePolishedContent = string.Empty;
@@ -64,6 +65,95 @@ public sealed partial class MainWindowViewModel
         ReadablePolishedStatus = _transcriptDerivativeRepository.IsStale(derivative)
             ? "古い整文があります。再生成すると更新できます。"
             : $"整文済み: {derivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+    }
+
+    public bool BeginReadableDocumentEdit()
+    {
+        if (!CanEditReadableDocument)
+        {
+            return false;
+        }
+
+        IsReadableDocumentEditMode = true;
+        HasReadableDocumentUnsavedEdits = false;
+        return true;
+    }
+
+    public void MarkReadableDocumentEditDirty()
+    {
+        if (IsReadableDocumentEditMode)
+        {
+            HasReadableDocumentUnsavedEdits = true;
+        }
+    }
+
+    public bool DiscardReadableDocumentEdits()
+    {
+        if (!IsReadableDocumentEditMode)
+        {
+            return false;
+        }
+
+        ResetReadableDocumentEditState();
+        return true;
+    }
+
+    public bool SaveReadableDocumentEdits(IReadOnlyList<string> editedBlockTexts)
+    {
+        ArgumentNullException.ThrowIfNull(editedBlockTexts);
+        if (SelectedJob is null ||
+            !IsReadableDocumentEditMode ||
+            IsRunInProgress ||
+            IsReadablePolishingInProgress ||
+            editedBlockTexts.Count != ReadableDocumentBlocks.Count)
+        {
+            return false;
+        }
+
+        var content = ReadableDocumentBlockSerializer.Serialize(
+            ReadableDocumentBlocks.ToArray(),
+            editedBlockTexts);
+        if (!TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out var reason))
+        {
+            LatestLog = $"整文の保存に失敗しました。内容を確認してください。({reason})";
+            return false;
+        }
+
+        var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(content);
+        if (string.Equals(normalizedContent, ReadablePolishedContent, StringComparison.Ordinal))
+        {
+            ResetReadableDocumentEditState();
+            return true;
+        }
+
+        var jobId = SelectedJob.JobId;
+        var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
+        var sourceTranscriptHash = _transcriptDerivativeRepository.ComputeCurrentRawTranscriptHash(jobId);
+        var savedDerivative = _transcriptDerivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            jobId,
+            TranscriptDerivativeKinds.Polished,
+            derivative?.ContentFormat ?? TranscriptDerivativeFormats.PlainText,
+            normalizedContent,
+            derivative?.SourceKind ?? TranscriptDerivativeSourceKinds.Raw,
+            sourceTranscriptHash,
+            derivative?.SourceSegmentRange,
+            derivative?.SourceChunkIds,
+            derivative?.ModelId,
+            derivative?.PromptVersion ?? "manual-edit",
+            "manual-edit"));
+
+        ReadablePolishedContent = normalizedContent;
+        ReadablePolishedStatus = $"整文を手修正しました: {savedDerivative.UpdatedAt:yyyy/MM/dd HH:mm}";
+        ResetReadableDocumentEditState();
+        RefreshSummaryAfterReadableDocumentChanged(jobId);
+        LatestLog = "整文の手修正を保存しました。";
+        return true;
+    }
+
+    private void ResetReadableDocumentEditState()
+    {
+        HasReadableDocumentUnsavedEdits = false;
+        IsReadableDocumentEditMode = false;
     }
 
     private Task CopyReadablePolishedContentAsync()
