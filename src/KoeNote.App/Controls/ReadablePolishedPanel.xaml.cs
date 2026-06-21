@@ -17,8 +17,11 @@ public partial class ReadablePolishedPanel : UserControl
 
     private INotifyPropertyChanged? _subscribedViewModel;
     private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
+    private readonly List<TableCell> _readableMetaCells = [];
+    private readonly List<TableCell> _readableBodyCells = [];
     private readonly List<Paragraph> _readableBodyParagraphs = [];
     private FrameworkContentElement? _firstSearchMatchAnchor;
+    private int _activeReadablePlaybackBlockIndex = -1;
     private double _lastReadableDocumentWidth;
 
     public ReadablePolishedPanel()
@@ -83,7 +86,18 @@ public partial class ReadablePolishedPanel : UserControl
     {
         if (e.PropertyName == nameof(MainWindowViewModel.TranscriptAutoScrollRequestId))
         {
-            Dispatcher.BeginInvoke(ScrollReadableDocumentToPlaybackPosition);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UpdateReadablePlaybackHighlight();
+                ScrollReadableDocumentToPlaybackPosition();
+            }));
+        }
+        else if (e.PropertyName is nameof(MainWindowViewModel.SelectedSegment) or
+                 nameof(MainWindowViewModel.SelectedTranscriptTabIndex) or
+                 nameof(MainWindowViewModel.IsStandardReadableTranscriptVisible) or
+                 nameof(MainWindowViewModel.IsTranscriptAutoScrollEnabled))
+        {
+            Dispatcher.BeginInvoke(new Action(UpdateReadablePlaybackHighlight));
         }
 
         if (e.PropertyName is nameof(MainWindowViewModel.ReadablePolishedContent) or
@@ -128,8 +142,11 @@ public partial class ReadablePolishedPanel : UserControl
     private void RebuildReadableDocument()
     {
         _readableBlockAnchors.Clear();
+        _readableMetaCells.Clear();
+        _readableBodyCells.Clear();
         _readableBodyParagraphs.Clear();
         _firstSearchMatchAnchor = null;
+        _activeReadablePlaybackBlockIndex = -1;
         ReadableDocumentRichTextBox.Document = new FlowDocument();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
@@ -150,6 +167,8 @@ public partial class ReadablePolishedPanel : UserControl
         {
             Dispatcher.BeginInvoke(new Action(firstSearchMatch.BringIntoView));
         }
+
+        UpdateReadablePlaybackHighlight();
     }
 
     private FlowDocument BuildReadableDocument(
@@ -197,10 +216,14 @@ public partial class ReadablePolishedPanel : UserControl
         string searchText)
     {
         var row = new TableRow();
-        row.Cells.Add(BuildMetaCell(block, viewModel, mutedBrush, separatorBrush));
-        row.Cells.Add(BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText));
+        var metaCell = BuildMetaCell(block, viewModel, mutedBrush, separatorBrush);
+        var bodyCell = BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText);
+        row.Cells.Add(metaCell);
+        row.Cells.Add(bodyCell);
 
         _readableBlockAnchors.Add(row);
+        _readableMetaCells.Add(metaCell);
+        _readableBodyCells.Add(bodyCell);
         if (_firstSearchMatchAnchor is null && ReadablePolishedPanelRenderingHelper.ContainsSearchText(block.Text, searchText))
         {
             _firstSearchMatchAnchor = row;
@@ -440,6 +463,66 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         return string.Join(Environment.NewLine, selectedBlocks);
+    }
+
+    private void UpdateReadablePlaybackHighlight()
+    {
+        var activeIndex = ResolveReadablePlaybackBlockIndex();
+        if (activeIndex == _activeReadablePlaybackBlockIndex)
+        {
+            return;
+        }
+
+        ApplyReadablePlaybackHighlight(_activeReadablePlaybackBlockIndex, isActive: false);
+        ApplyReadablePlaybackHighlight(activeIndex, isActive: true);
+        _activeReadablePlaybackBlockIndex = activeIndex;
+    }
+
+    private int ResolveReadablePlaybackBlockIndex()
+    {
+        if (DataContext is not MainWindowViewModel
+            {
+                IsTranscriptAutoScrollEnabled: true,
+                SelectedSegment: { } segment,
+                HasReadableDocumentBlocks: true
+            } viewModel ||
+            (!viewModel.IsStandardReadableTranscriptVisible &&
+             viewModel.SelectedTranscriptTabIndex != 0))
+        {
+            return -1;
+        }
+
+        return ReadablePolishedPanelRenderingHelper.FindReadableBlockIndex(
+            viewModel.ReadableDocumentBlocks,
+            segment.StartSeconds);
+    }
+
+    private void ApplyReadablePlaybackHighlight(int blockIndex, bool isActive)
+    {
+        if (blockIndex < 0 ||
+            blockIndex >= _readableMetaCells.Count ||
+            blockIndex >= _readableBodyCells.Count)
+        {
+            return;
+        }
+
+        var background = isActive
+            ? new SolidColorBrush(Color.FromRgb(0xEC, 0xFD, 0xF3))
+            : Brushes.Transparent;
+        var borderBrush = isActive
+            ? new SolidColorBrush(Color.FromRgb(0x22, 0xC5, 0x5E))
+            : new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xEE));
+        var metaCell = _readableMetaCells[blockIndex];
+        var bodyCell = _readableBodyCells[blockIndex];
+
+        metaCell.Background = background;
+        bodyCell.Background = background;
+        metaCell.BorderBrush = borderBrush;
+        bodyCell.BorderBrush = borderBrush;
+        metaCell.BorderThickness = isActive
+            ? new Thickness(3, 0, 0, 1)
+            : new Thickness(0, 0, 0, 1);
+        bodyCell.BorderThickness = new Thickness(0, 0, 0, 1);
     }
 
     private static TextPointer MaxTextPointer(TextPointer first, TextPointer second) =>

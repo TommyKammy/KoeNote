@@ -199,6 +199,14 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("LineHeight = viewModel.ReadableDocumentLineHeight", code, StringComparison.Ordinal);
         Assert.Contains("ReadableDocumentSearchText", code, StringComparison.Ordinal);
         Assert.Contains("AddHighlightedRuns", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateReadablePlaybackHighlight", code, StringComparison.Ordinal);
+        Assert.Contains("ResolveReadablePlaybackBlockIndex", code, StringComparison.Ordinal);
+        Assert.Contains("ApplyReadablePlaybackHighlight", code, StringComparison.Ordinal);
+        Assert.Contains("nameof(MainWindowViewModel.TranscriptAutoScrollRequestId)", code, StringComparison.Ordinal);
+        Assert.Contains("nameof(MainWindowViewModel.SelectedSegment)", code, StringComparison.Ordinal);
+        Assert.Contains("FindReadableBlockIndex", code, StringComparison.Ordinal);
+        Assert.Contains("Color.FromRgb(0xEC, 0xFD, 0xF3)", code, StringComparison.Ordinal);
+        Assert.Contains("new Thickness(3, 0, 0, 1)", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ReadablePolishedContent, Mode=OneWay}\"", xaml, StringComparison.Ordinal);
     }
 
