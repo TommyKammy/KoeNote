@@ -27,16 +27,13 @@ public sealed class LlmSettingsRepository(AppPaths paths)
 
         if (isActive)
         {
-            using var clearCommand = connection.CreateCommand();
-            clearCommand.Transaction = transaction;
-            clearCommand.CommandText = "UPDATE llm_profiles SET is_active = 0, updated_at = $updated_at;";
-            clearCommand.Parameters.AddWithValue("$updated_at", now.ToString("o"));
+            using var clearCommand = connection
+                .CreateCommand(transaction, "UPDATE llm_profiles SET is_active = 0, updated_at = $updated_at;")
+                .AddIsoDateTimeOffset("$updated_at", now);
             clearCommand.ExecuteNonQuery();
         }
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             INSERT INTO llm_profiles (
                 profile_id, model_id, model_family, display_name, runtime_kind, runtime_package_id,
                 model_path, llama_completion_path, context_size, gpu_layers, threads, threads_batch,
@@ -65,7 +62,7 @@ public sealed class LlmSettingsRepository(AppPaths paths)
                 is_active = excluded.is_active,
                 source = excluded.source,
                 updated_at = excluded.updated_at;
-            """;
+            """);
         AddProfileParameters(command, profile, isActive, source, now);
         command.ExecuteNonQuery();
         transaction.Commit();
@@ -74,9 +71,9 @@ public sealed class LlmSettingsRepository(AppPaths paths)
     public PersistedLlmRuntimeProfile? FindProfile(string profileId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = $"{ProfileSelectSql} WHERE profile_id = $profile_id;";
-        command.Parameters.AddWithValue("$profile_id", profileId);
+        using var command = connection
+            .CreateCommand($"{ProfileSelectSql} WHERE profile_id = $profile_id;")
+            .AddValue("$profile_id", profileId);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadProfile(reader) : null;
@@ -85,8 +82,8 @@ public sealed class LlmSettingsRepository(AppPaths paths)
     public PersistedLlmRuntimeProfile? FindActiveProfile()
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = $"{ProfileSelectSql} WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1;";
+        using var command = connection.CreateCommand(
+            $"{ProfileSelectSql} WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1;");
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadProfile(reader) : null;
@@ -95,8 +92,8 @@ public sealed class LlmSettingsRepository(AppPaths paths)
     public IReadOnlyList<PersistedLlmRuntimeProfile> ListProfiles()
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = $"{ProfileSelectSql} ORDER BY is_active DESC, updated_at DESC;";
+        using var command = connection.CreateCommand(
+            $"{ProfileSelectSql} ORDER BY is_active DESC, updated_at DESC;");
 
         using var reader = command.ExecuteReader();
         var profiles = new List<PersistedLlmRuntimeProfile>();
@@ -113,8 +110,7 @@ public sealed class LlmSettingsRepository(AppPaths paths)
         ArgumentNullException.ThrowIfNull(settings);
         var now = DateTimeOffset.Now;
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = """
+        using var command = connection.CreateCommand("""
             INSERT INTO llm_task_settings (
                 settings_id, profile_id, task_kind, prompt_template_id, prompt_version, generation_profile,
                 temperature, top_p, top_k, repeat_penalty, max_tokens, chunk_segment_count, chunk_overlap,
@@ -140,7 +136,7 @@ public sealed class LlmSettingsRepository(AppPaths paths)
                 enable_repair = excluded.enable_repair,
                 validation_mode = excluded.validation_mode,
                 updated_at = excluded.updated_at;
-            """;
+            """);
         AddTaskSettingsParameters(command, profileId, settings, now);
         command.ExecuteNonQuery();
     }
@@ -148,10 +144,10 @@ public sealed class LlmSettingsRepository(AppPaths paths)
     public PersistedLlmTaskSettings? FindTaskSettings(string profileId, LlmTaskKind taskKind)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = $"{TaskSettingsSelectSql} WHERE profile_id = $profile_id AND task_kind = $task_kind;";
-        command.Parameters.AddWithValue("$profile_id", profileId);
-        command.Parameters.AddWithValue("$task_kind", ToDbTaskKind(taskKind));
+        using var command = connection
+            .CreateCommand($"{TaskSettingsSelectSql} WHERE profile_id = $profile_id AND task_kind = $task_kind;")
+            .AddValue("$profile_id", profileId)
+            .AddValue("$task_kind", ToDbTaskKind(taskKind));
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadTaskSettings(reader) : null;
@@ -160,9 +156,9 @@ public sealed class LlmSettingsRepository(AppPaths paths)
     public IReadOnlyList<PersistedLlmTaskSettings> ListTaskSettings(string profileId)
     {
         using var connection = SqliteConnectionFactory.Open(paths);
-        using var command = connection.CreateCommand();
-        command.CommandText = $"{TaskSettingsSelectSql} WHERE profile_id = $profile_id ORDER BY task_kind;";
-        command.Parameters.AddWithValue("$profile_id", profileId);
+        using var command = connection
+            .CreateCommand($"{TaskSettingsSelectSql} WHERE profile_id = $profile_id ORDER BY task_kind;")
+            .AddValue("$profile_id", profileId);
 
         using var reader = command.ExecuteReader();
         var settings = new List<PersistedLlmTaskSettings>();
@@ -246,25 +242,26 @@ public sealed class LlmSettingsRepository(AppPaths paths)
         string source,
         DateTimeOffset now)
     {
-        command.Parameters.AddWithValue("$profile_id", profile.ProfileId);
-        command.Parameters.AddWithValue("$model_id", profile.ModelId);
-        command.Parameters.AddWithValue("$model_family", (object?)profile.ModelFamily ?? DBNull.Value);
-        command.Parameters.AddWithValue("$display_name", profile.DisplayName);
-        command.Parameters.AddWithValue("$runtime_kind", profile.RuntimeKind);
-        command.Parameters.AddWithValue("$runtime_package_id", profile.RuntimePackageId);
-        command.Parameters.AddWithValue("$model_path", profile.ModelPath);
-        command.Parameters.AddWithValue("$llama_completion_path", profile.LlamaCompletionPath);
-        command.Parameters.AddWithValue("$context_size", profile.ContextSize);
-        command.Parameters.AddWithValue("$gpu_layers", profile.GpuLayers);
-        command.Parameters.AddWithValue("$threads", (object?)profile.Threads ?? DBNull.Value);
-        command.Parameters.AddWithValue("$threads_batch", (object?)profile.ThreadsBatch ?? DBNull.Value);
-        command.Parameters.AddWithValue("$no_conversation", profile.NoConversation ? 1 : 0);
-        command.Parameters.AddWithValue("$output_sanitizer_profile", profile.OutputSanitizerProfile);
-        command.Parameters.AddWithValue("$timeout_seconds", (int)Math.Ceiling(profile.Timeout.TotalSeconds));
-        command.Parameters.AddWithValue("$is_active", isActive ? 1 : 0);
-        command.Parameters.AddWithValue("$source", source);
-        command.Parameters.AddWithValue("$created_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
+        command
+            .AddValue("$profile_id", profile.ProfileId)
+            .AddValue("$model_id", profile.ModelId)
+            .AddValue("$model_family", profile.ModelFamily)
+            .AddValue("$display_name", profile.DisplayName)
+            .AddValue("$runtime_kind", profile.RuntimeKind)
+            .AddValue("$runtime_package_id", profile.RuntimePackageId)
+            .AddValue("$model_path", profile.ModelPath)
+            .AddValue("$llama_completion_path", profile.LlamaCompletionPath)
+            .AddValue("$context_size", profile.ContextSize)
+            .AddValue("$gpu_layers", profile.GpuLayers)
+            .AddValue("$threads", profile.Threads)
+            .AddValue("$threads_batch", profile.ThreadsBatch)
+            .AddValue("$no_conversation", profile.NoConversation ? 1 : 0)
+            .AddValue("$output_sanitizer_profile", profile.OutputSanitizerProfile)
+            .AddValue("$timeout_seconds", (int)Math.Ceiling(profile.Timeout.TotalSeconds))
+            .AddValue("$is_active", isActive ? 1 : 0)
+            .AddValue("$source", source)
+            .AddIsoDateTimeOffset("$created_at", now)
+            .AddIsoDateTimeOffset("$updated_at", now);
     }
 
     private static void AddTaskSettingsParameters(
@@ -273,24 +270,25 @@ public sealed class LlmSettingsRepository(AppPaths paths)
         LlmTaskSettings settings,
         DateTimeOffset now)
     {
-        command.Parameters.AddWithValue("$settings_id", $"{profileId}:{ToDbTaskKind(settings.TaskKind)}");
-        command.Parameters.AddWithValue("$profile_id", profileId);
-        command.Parameters.AddWithValue("$task_kind", ToDbTaskKind(settings.TaskKind));
-        command.Parameters.AddWithValue("$prompt_template_id", settings.PromptTemplateId);
-        command.Parameters.AddWithValue("$prompt_version", settings.PromptVersion);
-        command.Parameters.AddWithValue("$generation_profile", settings.GenerationProfile);
-        command.Parameters.AddWithValue("$temperature", settings.Temperature);
-        command.Parameters.AddWithValue("$top_p", (object?)settings.TopP ?? DBNull.Value);
-        command.Parameters.AddWithValue("$top_k", (object?)settings.TopK ?? DBNull.Value);
-        command.Parameters.AddWithValue("$repeat_penalty", (object?)settings.RepeatPenalty ?? DBNull.Value);
-        command.Parameters.AddWithValue("$max_tokens", settings.MaxTokens);
-        command.Parameters.AddWithValue("$chunk_segment_count", settings.ChunkSegmentCount);
-        command.Parameters.AddWithValue("$chunk_overlap", settings.ChunkOverlap);
-        command.Parameters.AddWithValue("$use_json_schema", settings.UseJsonSchema ? 1 : 0);
-        command.Parameters.AddWithValue("$enable_repair", settings.EnableRepair ? 1 : 0);
-        command.Parameters.AddWithValue("$validation_mode", settings.ValidationMode);
-        command.Parameters.AddWithValue("$created_at", now.ToString("o"));
-        command.Parameters.AddWithValue("$updated_at", now.ToString("o"));
+        command
+            .AddValue("$settings_id", $"{profileId}:{ToDbTaskKind(settings.TaskKind)}")
+            .AddValue("$profile_id", profileId)
+            .AddValue("$task_kind", ToDbTaskKind(settings.TaskKind))
+            .AddValue("$prompt_template_id", settings.PromptTemplateId)
+            .AddValue("$prompt_version", settings.PromptVersion)
+            .AddValue("$generation_profile", settings.GenerationProfile)
+            .AddValue("$temperature", settings.Temperature)
+            .AddValue("$top_p", settings.TopP)
+            .AddValue("$top_k", settings.TopK)
+            .AddValue("$repeat_penalty", settings.RepeatPenalty)
+            .AddValue("$max_tokens", settings.MaxTokens)
+            .AddValue("$chunk_segment_count", settings.ChunkSegmentCount)
+            .AddValue("$chunk_overlap", settings.ChunkOverlap)
+            .AddValue("$use_json_schema", settings.UseJsonSchema ? 1 : 0)
+            .AddValue("$enable_repair", settings.EnableRepair ? 1 : 0)
+            .AddValue("$validation_mode", settings.ValidationMode)
+            .AddIsoDateTimeOffset("$created_at", now)
+            .AddIsoDateTimeOffset("$updated_at", now);
     }
 
     private static string ToDbTaskKind(LlmTaskKind taskKind)
