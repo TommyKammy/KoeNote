@@ -119,12 +119,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
             return;
         }
 
-        if (Duration > TimeSpan.Zero)
-        {
-            position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds, 0, Duration.TotalSeconds));
-        }
-
-        var targetPosition = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+        var targetPosition = ClampToDuration(position);
         _clockPosition = ClampToDuration(targetPosition);
         if (_mediaOpened)
         {
@@ -144,7 +139,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
     {
         _clockPosition = Position;
         _clockStartedAt = IsPlaying ? DateTimeOffset.UtcNow : null;
-        _playbackRate = rate > 0 ? rate : 1.0;
+        _playbackRate = AudioPlaybackStateCalculator.NormalizePlaybackRate(rate);
         try
         {
             _player.SpeedRatio = _playbackRate;
@@ -205,7 +200,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
         }
 
         var playerPosition = ReadPlayerPosition();
-        _clockPosition = ClampToDuration(playerPosition > TimeSpan.Zero ? playerPosition : _clockPosition);
+        _clockPosition = AudioPlaybackStateCalculator.SelectPlaybackStartPosition(playerPosition, _clockPosition, Duration);
         _clockStartedAt = DateTimeOffset.UtcNow;
         try
         {
@@ -256,18 +251,17 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
 
     private TimeSpan EstimatePlaybackPosition()
     {
-        if (_clockStartedAt is null)
+        var duration = Duration;
+        var position = AudioPlaybackStateCalculator.EstimatePosition(
+            _clockPosition,
+            _clockStartedAt,
+            DateTimeOffset.UtcNow,
+            _playbackRate,
+            ReadPlayerPosition(),
+            duration);
+        if (AudioPlaybackStateCalculator.HasReachedDuration(position, duration))
         {
-            return ClampToDuration(_clockPosition);
-        }
-
-        var elapsed = DateTimeOffset.UtcNow - _clockStartedAt.Value;
-        var estimatedPosition = _clockPosition + TimeSpan.FromSeconds(elapsed.TotalSeconds * _playbackRate);
-        var playerPosition = ReadPlayerPosition();
-        var position = ClampToDuration(playerPosition > estimatedPosition ? playerPosition : estimatedPosition);
-        if (Duration > TimeSpan.Zero && position >= Duration)
-        {
-            _clockPosition = Duration;
+            _clockPosition = duration;
             _clockStartedAt = null;
             SetIsPlaying(false);
         }
@@ -277,13 +271,7 @@ public sealed class AudioPlaybackService : IAudioPlaybackService
 
     private TimeSpan ClampToDuration(TimeSpan position)
     {
-        if (position < TimeSpan.Zero)
-        {
-            return TimeSpan.Zero;
-        }
-
-        var duration = Duration;
-        return duration > TimeSpan.Zero && position > duration ? duration : position;
+        return AudioPlaybackStateCalculator.ClampToDuration(position, Duration);
     }
 
     private void ResetPlaybackClock()

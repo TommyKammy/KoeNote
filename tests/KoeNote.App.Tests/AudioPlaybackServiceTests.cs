@@ -5,6 +5,68 @@ namespace KoeNote.App.Tests;
 public sealed class AudioPlaybackServiceTests
 {
     [Fact]
+    public void ClampToDuration_ClampsNegativeAndKnownDurationOnly()
+    {
+        Assert.Equal(TimeSpan.Zero, AudioPlaybackStateCalculator.ClampToDuration(TimeSpan.FromSeconds(-1), TimeSpan.Zero));
+        Assert.Equal(TimeSpan.FromSeconds(12), AudioPlaybackStateCalculator.ClampToDuration(TimeSpan.FromSeconds(12), TimeSpan.Zero));
+        Assert.Equal(TimeSpan.FromSeconds(10), AudioPlaybackStateCalculator.ClampToDuration(TimeSpan.FromSeconds(12), TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void EstimatePosition_UsesRateAndPlayerPositionFallback()
+    {
+        var startedAt = new DateTimeOffset(2026, 6, 21, 12, 0, 0, TimeSpan.Zero);
+        var now = startedAt.AddSeconds(2);
+
+        var estimated = AudioPlaybackStateCalculator.EstimatePosition(
+            TimeSpan.FromSeconds(5),
+            startedAt,
+            now,
+            1.5,
+            TimeSpan.FromSeconds(20),
+            TimeSpan.FromSeconds(30));
+
+        Assert.Equal(TimeSpan.FromSeconds(20), estimated);
+    }
+
+    [Fact]
+    public void EstimatePosition_ClampsToDurationAndNormalizesRate()
+    {
+        var startedAt = new DateTimeOffset(2026, 6, 21, 12, 0, 0, TimeSpan.Zero);
+        var now = startedAt.AddSeconds(10);
+
+        var estimated = AudioPlaybackStateCalculator.EstimatePosition(
+            TimeSpan.FromSeconds(5),
+            startedAt,
+            now,
+            -1,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(8));
+
+        Assert.Equal(TimeSpan.FromSeconds(8), estimated);
+        Assert.True(AudioPlaybackStateCalculator.HasReachedDuration(estimated, TimeSpan.FromSeconds(8)));
+        Assert.False(AudioPlaybackStateCalculator.HasReachedDuration(estimated, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void SelectPlaybackStartPosition_PrefersPositivePlayerPosition()
+    {
+        Assert.Equal(
+            TimeSpan.FromSeconds(3),
+            AudioPlaybackStateCalculator.SelectPlaybackStartPosition(
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromSeconds(10)));
+
+        Assert.Equal(
+            TimeSpan.FromSeconds(8),
+            AudioPlaybackStateCalculator.SelectPlaybackStartPosition(
+                TimeSpan.FromSeconds(12),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromSeconds(8)));
+    }
+
+    [Fact]
     public void SeekBeforeMediaOpened_StartsClockAtRequestedPositionAndReappliesWhenOpened()
     {
         var audioPath = CreateAudioFile();
