@@ -472,6 +472,13 @@ public partial class ReadablePolishedPanel : UserControl
 
     private void UpdateReadablePlaybackHighlight()
     {
+        if (DataContext is MainWindowViewModel viewModel &&
+            (viewModel.ReadableDocumentBlocks.Count != _readableMetaCells.Count ||
+             viewModel.ReadableDocumentBlocks.Count != _readableBodyCells.Count))
+        {
+            return;
+        }
+
         var activeIndex = ResolveReadablePlaybackBlockIndex();
         if (activeIndex == _activeReadablePlaybackBlockIndex)
         {
