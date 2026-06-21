@@ -466,7 +466,8 @@
                                FontSize="11"
                                Foreground="#2563EB"
                                TextWrapping="Wrap"
-                               Margin="0,0,0,8" />
+                               Margin="0,0,0,8"
+                               Visibility="{Binding HasUpdateDownloadProgressText, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <TextBlock Text="{Binding UpdateRestartBlockedReason}"
                                FontSize="11"
                                Foreground="#B91C1C"

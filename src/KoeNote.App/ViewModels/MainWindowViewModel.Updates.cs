@@ -31,9 +31,10 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    public bool HasUpdateNotification => _updatePresentationPresenter.HasNotification(
+    public bool HasUpdateNotification => _updatePresentationPresenter.HasForegroundNotification(
         UpdateNotificationTitle,
-        UpdateNotificationMessage);
+        UpdateNotificationMessage,
+        IsUpdateDownloadInProgress);
 
     public bool IsUpdateMandatory => _availableUpdate?.Mandatory == true;
 
@@ -44,8 +45,16 @@ public sealed partial class MainWindowViewModel
     public string UpdateDownloadProgressText
     {
         get => _updateDownloadProgressText;
-        private set => SetField(ref _updateDownloadProgressText, value ?? string.Empty);
+        private set
+        {
+            if (SetField(ref _updateDownloadProgressText, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(HasUpdateDownloadProgressText));
+            }
+        }
     }
+
+    public bool HasUpdateDownloadProgressText => !string.IsNullOrWhiteSpace(UpdateDownloadProgressText);
 
     public string VerifiedUpdateInstallerPath
     {
@@ -124,6 +133,7 @@ public sealed partial class MainWindowViewModel
 
                 OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
                 OnPropertyChanged(nameof(UpdateRestartActionText));
+                OnPropertyChanged(nameof(HasUpdateNotification));
             }
         }
     }
@@ -249,10 +259,9 @@ public sealed partial class MainWindowViewModel
         _activeUpdateDownloadRelease = release;
         IsUpdateDownloadInProgress = true;
         VerifiedUpdateInstallerPath = string.Empty;
-        UpdateDownloadProgressText = "Downloading update...";
+        UpdateDownloadProgressText = isBackground ? string.Empty : "Downloading update...";
         if (isBackground)
         {
-            UpdateNotificationMessage = "Downloading the update in the background. You can continue working until it is ready to restart.";
             LatestLog = $"Downloading KoeNote {release.Version} update in the background...";
         }
         else
@@ -268,7 +277,7 @@ public sealed partial class MainWindowViewModel
         {
             var progress = new Progress<UpdateDownloadProgress>(downloadProgress =>
             {
-                if (IsCurrentUpdateDownload(release, generation))
+                if (!isBackground && IsCurrentUpdateDownload(release, generation))
                 {
                     UpdateDownloadProgressText = _updatePresentationPresenter.FormatDownloadProgress(downloadProgress);
                 }
@@ -280,7 +289,9 @@ public sealed partial class MainWindowViewModel
             }
 
             VerifiedUpdateInstallerPath = result.FilePath;
-            UpdateDownloadProgressText = _updatePresentationPresenter.FormatVerifiedInstallerProgress(result.FilePath);
+            UpdateDownloadProgressText = isBackground
+                ? string.Empty
+                : _updatePresentationPresenter.FormatVerifiedInstallerProgress(result.FilePath);
             ApplyUpdateNotification(_updatePresentationPresenter.CreateReadyToRestartNotification(release.Version));
             LatestLog = $"Update downloaded and verified: {result.FilePath}";
             RecordUpdateHistory("download_verified", release.Version, "Update installer downloaded and SHA256 verified.", result.FilePath, result.Sha256);

@@ -26,6 +26,16 @@ public sealed class UpdatePresentationPresenterTests
     }
 
     [Fact]
+    public void HasForegroundNotification_HidesNotificationWhileDownloadIsInProgress()
+    {
+        var presenter = new UpdatePresentationPresenter();
+
+        Assert.True(presenter.HasForegroundNotification("Update available", "Ready when you are.", isDownloadInProgress: false));
+        Assert.False(presenter.HasForegroundNotification("Update available", "Downloading quietly.", isDownloadInProgress: true));
+        Assert.False(presenter.HasForegroundNotification(string.Empty, string.Empty, isDownloadInProgress: false));
+    }
+
+    [Fact]
     public void ActionVisibility_ReflectsUpdateInstallerAndRunState()
     {
         var presenter = new UpdatePresentationPresenter();

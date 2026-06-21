@@ -10,6 +10,11 @@ internal sealed class UpdatePresentationPresenter
             !string.IsNullOrWhiteSpace(message);
     }
 
+    public bool HasForegroundNotification(string title, string message, bool isDownloadInProgress)
+    {
+        return !isDownloadInProgress && HasNotification(title, message);
+    }
+
     public bool HasVerifiedInstaller(string installerPath)
     {
         return !string.IsNullOrWhiteSpace(installerPath);
