@@ -17,6 +17,19 @@ public sealed class SqliteExtensionsTests
     }
 
     [Fact]
+    public void CreateCommand_WithTransaction_SetsCommandTextAndTransaction()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+
+        using var command = connection.CreateCommand(transaction, "SELECT 1;");
+
+        Assert.Equal("SELECT 1;", command.CommandText);
+        Assert.Same(transaction, command.Transaction);
+    }
+
+    [Fact]
     public void AddValue_BindsNullAsDbNullAndSupportsChaining()
     {
         using var connection = new SqliteConnection("Data Source=:memory:");

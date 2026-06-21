@@ -30,18 +30,17 @@ public sealed class TranscriptEditService(AppPaths paths)
             ?? throw new KeyNotFoundException($"Transcript segment was not found: {jobId}/{segmentId}");
         var after = before with { FinalText = finalText, ReviewState = "manually_edited" };
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE transcript_segments
             SET final_text = $final_text,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$segment_id", segmentId);
-        command.Parameters.AddWithValue("$final_text", finalText);
-        command.Parameters.AddWithValue("$review_state", after.ReviewState);
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$segment_id", segmentId)
+            .AddValue("$final_text", finalText)
+            .AddValue("$review_state", after.ReviewState);
         command.ExecuteNonQuery();
 
         InsertHistory(
@@ -88,20 +87,19 @@ public sealed class TranscriptEditService(AppPaths paths)
             PendingDraftIds = []
         };
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE transcript_segments
             SET raw_text = $raw_text,
                 normalized_text = NULL,
                 final_text = NULL,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$segment_id", segmentId);
-        command.Parameters.AddWithValue("$raw_text", rawText);
-        command.Parameters.AddWithValue("$review_state", after.ReviewState);
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$segment_id", segmentId)
+            .AddValue("$raw_text", rawText)
+            .AddValue("$review_state", after.ReviewState);
         command.ExecuteNonQuery();
 
         InvalidatePendingDraftsForSegment(connection, transaction, jobId, segmentId);
@@ -143,19 +141,18 @@ public sealed class TranscriptEditService(AppPaths paths)
         var before = TranscriptEditHistoryStore.LoadSpeakerAliasSnapshot(connection, transaction, jobId, speakerId);
         var after = new SpeakerAliasSnapshot(jobId, speakerId, displayName, Exists: true);
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             INSERT INTO speaker_aliases (job_id, speaker_id, display_name, updated_at)
             VALUES ($job_id, $speaker_id, $display_name, $updated_at)
             ON CONFLICT(job_id, speaker_id) DO UPDATE SET
                 display_name = excluded.display_name,
                 updated_at = excluded.updated_at;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$speaker_id", speakerId);
-        command.Parameters.AddWithValue("$display_name", displayName);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$speaker_id", speakerId)
+            .AddValue("$display_name", displayName)
+            .AddIsoDateTimeOffset("$updated_at", DateTimeOffset.Now);
         command.ExecuteNonQuery();
 
         if (recordHistory)
@@ -276,9 +273,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         TBefore before,
         TAfter after)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             INSERT INTO review_operation_history (
                 operation_id,
                 job_id,
@@ -299,15 +294,16 @@ public sealed class TranscriptEditService(AppPaths paths)
                 $after_json,
                 $created_at
             );
-            """;
-        command.Parameters.AddWithValue("$operation_id", Guid.NewGuid().ToString("N"));
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$draft_id", (object?)draftId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$segment_id", (object?)segmentId ?? DBNull.Value);
-        command.Parameters.AddWithValue("$operation_type", operationType);
-        command.Parameters.AddWithValue("$before_json", JsonSerializer.Serialize(before));
-        command.Parameters.AddWithValue("$after_json", JsonSerializer.Serialize(after));
-        command.Parameters.AddWithValue("$created_at", DateTimeOffset.Now.ToString("o"));
+            """);
+        command
+            .AddValue("$operation_id", Guid.NewGuid().ToString("N"))
+            .AddValue("$job_id", jobId)
+            .AddValue("$draft_id", draftId)
+            .AddValue("$segment_id", segmentId)
+            .AddValue("$operation_type", operationType)
+            .AddValue("$before_json", JsonSerializer.Serialize(before))
+            .AddValue("$after_json", JsonSerializer.Serialize(after))
+            .AddIsoDateTimeOffset("$created_at", DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
@@ -318,20 +314,21 @@ public sealed class TranscriptEditService(AppPaths paths)
         var after = JsonSerializer.Deserialize<ReviewDecisionHistorySnapshot>(operation.AfterJson)
             ?? throw new InvalidOperationException("Invalid review decision redo snapshot.");
 
-        using (var deleteDecision = connection.CreateCommand())
+        using (var deleteDecision = connection.CreateCommand(
+            transaction,
+            "DELETE FROM review_decisions WHERE decision_id = $decision_id;"))
         {
-            deleteDecision.Transaction = transaction;
-            deleteDecision.CommandText = "DELETE FROM review_decisions WHERE decision_id = $decision_id;";
-            deleteDecision.Parameters.AddWithValue("$decision_id", after.DecisionId);
+            deleteDecision.AddValue("$decision_id", after.DecisionId);
             deleteDecision.ExecuteNonQuery();
         }
 
-        using (var draftCommand = connection.CreateCommand())
+        using (var draftCommand = connection.CreateCommand(
+            transaction,
+            "UPDATE correction_drafts SET status = $status WHERE draft_id = $draft_id;"))
         {
-            draftCommand.Transaction = transaction;
-            draftCommand.CommandText = "UPDATE correction_drafts SET status = $status WHERE draft_id = $draft_id;";
-            draftCommand.Parameters.AddWithValue("$status", before.DraftStatus);
-            draftCommand.Parameters.AddWithValue("$draft_id", before.DraftId);
+            draftCommand
+                .AddValue("$status", before.DraftStatus)
+                .AddValue("$draft_id", before.DraftId);
             draftCommand.ExecuteNonQuery();
         }
 
@@ -399,16 +396,18 @@ public sealed class TranscriptEditService(AppPaths paths)
                     display_name = excluded.display_name,
                     updated_at = excluded.updated_at;
                 """;
-            command.Parameters.AddWithValue("$display_name", before.DisplayName);
-            command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            command
+                .AddValue("$display_name", before.DisplayName)
+                .AddIsoDateTimeOffset("$updated_at", DateTimeOffset.Now);
         }
         else
         {
             command.CommandText = "DELETE FROM speaker_aliases WHERE job_id = $job_id AND speaker_id = $speaker_id;";
         }
 
-        command.Parameters.AddWithValue("$job_id", before.JobId);
-        command.Parameters.AddWithValue("$speaker_id", before.SpeakerId);
+        command
+            .AddValue("$job_id", before.JobId)
+            .AddValue("$speaker_id", before.SpeakerId);
         command.ExecuteNonQuery();
     }
 
@@ -420,18 +419,17 @@ public sealed class TranscriptEditService(AppPaths paths)
         string? finalText,
         string reviewState)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE transcript_segments
             SET final_text = $final_text,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$segment_id", segmentId);
-        command.Parameters.AddWithValue("$final_text", (object?)finalText ?? DBNull.Value);
-        command.Parameters.AddWithValue("$review_state", reviewState);
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$segment_id", segmentId)
+            .AddValue("$final_text", finalText)
+            .AddValue("$review_state", reviewState);
         command.ExecuteNonQuery();
     }
 
@@ -445,22 +443,21 @@ public sealed class TranscriptEditService(AppPaths paths)
         string? finalText,
         string reviewState)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE transcript_segments
             SET raw_text = $raw_text,
                 normalized_text = $normalized_text,
                 final_text = $final_text,
                 review_state = $review_state
             WHERE job_id = $job_id AND segment_id = $segment_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$segment_id", segmentId);
-        command.Parameters.AddWithValue("$raw_text", rawText);
-        command.Parameters.AddWithValue("$normalized_text", (object?)normalizedText ?? DBNull.Value);
-        command.Parameters.AddWithValue("$final_text", (object?)finalText ?? DBNull.Value);
-        command.Parameters.AddWithValue("$review_state", reviewState);
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$segment_id", segmentId)
+            .AddValue("$raw_text", rawText)
+            .AddValue("$normalized_text", normalizedText)
+            .AddValue("$final_text", finalText)
+            .AddValue("$review_state", reviewState);
         command.ExecuteNonQuery();
     }
 
@@ -470,17 +467,16 @@ public sealed class TranscriptEditService(AppPaths paths)
         string jobId,
         string segmentId)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE correction_drafts
             SET status = 'invalidated'
             WHERE job_id = $job_id
               AND segment_id = $segment_id
               AND status = 'pending';
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$segment_id", segmentId);
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$segment_id", segmentId);
         command.ExecuteNonQuery();
     }
 
@@ -494,13 +490,11 @@ public sealed class TranscriptEditService(AppPaths paths)
             return;
         }
 
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE correction_drafts
             SET status = 'pending'
             WHERE draft_id = $draft_id;
-            """;
+            """);
         var parameter = command.Parameters.Add("$draft_id", SqliteType.Text);
 
         foreach (var draftId in draftIds)
@@ -512,14 +506,12 @@ public sealed class TranscriptEditService(AppPaths paths)
 
     private static int CountPendingDrafts(SqliteConnection connection, SqliteTransaction transaction, string jobId)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             SELECT COUNT(*)
             FROM correction_drafts
             WHERE job_id = $job_id AND status = 'pending';
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
+            """);
+        command.AddValue("$job_id", jobId);
         return Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -528,9 +520,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         SqliteTransaction transaction,
         string jobId)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             WITH pending(value) AS (
                 SELECT COUNT(*)
                 FROM correction_drafts
@@ -561,11 +551,12 @@ public sealed class TranscriptEditService(AppPaths paths)
                 END,
                 updated_at = $updated_at
             WHERE job_id = $job_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$review_ready_status", ReviewCandidateJobStateRules.Ready.Status);
-        command.Parameters.AddWithValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$review_ready_status", ReviewCandidateJobStateRules.Ready.Status)
+            .AddValue("$progress_percent", JobRunProgressPlan.ReviewSucceeded)
+            .AddIsoDateTimeOffset("$updated_at", DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
@@ -578,9 +569,7 @@ public sealed class TranscriptEditService(AppPaths paths)
         string? currentStage,
         int progressPercent)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE jobs
             SET unreviewed_draft_count = $pending_count,
                 status = $status,
@@ -588,29 +577,29 @@ public sealed class TranscriptEditService(AppPaths paths)
                 progress_percent = $progress_percent,
                 updated_at = $updated_at
             WHERE job_id = $job_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$pending_count", pendingCount);
-        command.Parameters.AddWithValue("$status", status);
-        command.Parameters.AddWithValue("$current_stage", (object?)currentStage ?? DBNull.Value);
-        command.Parameters.AddWithValue("$progress_percent", progressPercent);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$pending_count", pendingCount)
+            .AddValue("$status", status)
+            .AddValue("$current_stage", currentStage)
+            .AddValue("$progress_percent", progressPercent)
+            .AddIsoDateTimeOffset("$updated_at", DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
     private static void RestoreJobPendingCount(SqliteConnection connection, SqliteTransaction transaction, string jobId, int pendingCount)
     {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        using var command = connection.CreateCommand(transaction, """
             UPDATE jobs
             SET unreviewed_draft_count = $pending_count,
                 updated_at = $updated_at
             WHERE job_id = $job_id;
-            """;
-        command.Parameters.AddWithValue("$job_id", jobId);
-        command.Parameters.AddWithValue("$pending_count", pendingCount);
-        command.Parameters.AddWithValue("$updated_at", DateTimeOffset.Now.ToString("o"));
+            """);
+        command
+            .AddValue("$job_id", jobId)
+            .AddValue("$pending_count", pendingCount)
+            .AddIsoDateTimeOffset("$updated_at", DateTimeOffset.Now);
         command.ExecuteNonQuery();
     }
 
