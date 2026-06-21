@@ -12,6 +12,16 @@ internal static class SqliteExtensions
         return command;
     }
 
+    public static SqliteCommand CreateCommand(
+        this SqliteConnection connection,
+        SqliteTransaction transaction,
+        string commandText)
+    {
+        var command = connection.CreateCommand(commandText);
+        command.Transaction = transaction;
+        return command;
+    }
+
     public static SqliteCommand AddValue(this SqliteCommand command, string name, object? value)
     {
         command.Parameters.AddValue(name, value);
