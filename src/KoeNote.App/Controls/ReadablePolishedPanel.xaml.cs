@@ -189,6 +189,7 @@ public partial class ReadablePolishedPanel : UserControl
         _firstSearchMatchAnchor = null;
         _activeReadablePlaybackBlockIndex = -1;
         ReadableDocumentRichTextBox.Document = new FlowDocument();
+        UpdateReadableDocumentHostEditState();
 
         if (DataContext is not MainWindowViewModel viewModel || !viewModel.HasReadableDocumentBlocks)
         {
@@ -211,6 +212,7 @@ public partial class ReadablePolishedPanel : UserControl
         }
 
         ReadableDocumentRichTextBox.Document = document;
+        UpdateReadableDocumentHostEditState();
         UpdateReadableDocumentLayoutWidth();
 
         if (_firstSearchMatchAnchor is { } firstSearchMatch)
@@ -346,6 +348,9 @@ public partial class ReadablePolishedPanel : UserControl
             TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = true,
+            IsReadOnly = false,
+            IsTabStop = true,
             BorderBrush = new SolidColorBrush(Color.FromRgb(0xBF, 0xDB, 0xFE)),
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(Color.FromRgb(0xFB, 0xFD, 0xFF)),
@@ -358,6 +363,7 @@ public partial class ReadablePolishedPanel : UserControl
         };
         editor.Tag = blockIndex;
         editor.TextChanged += OnReadableBodyEditorTextChanged;
+        editor.PreviewMouseLeftButtonDown += OnReadableBodyEditorPreviewMouseLeftButtonDown;
         _readableBodyEditors.Add(editor);
 
         return new TableCell(new BlockUIContainer(editor))
@@ -366,6 +372,13 @@ public partial class ReadablePolishedPanel : UserControl
             BorderBrush = separatorBrush,
             BorderThickness = new Thickness(0, 0, 0, 1)
         };
+    }
+
+    private void UpdateReadableDocumentHostEditState()
+    {
+        var isEditing = DataContext is MainWindowViewModel { IsReadableDocumentEditMode: true };
+        ReadableDocumentRichTextBox.IsReadOnly = !isEditing;
+        ReadableDocumentRichTextBox.Focusable = !isEditing;
     }
 
     private StackPanel BuildMetaPanel(
@@ -458,6 +471,15 @@ public partial class ReadablePolishedPanel : UserControl
             DataContext is MainWindowViewModel viewModel)
         {
             viewModel.UpdateReadableDocumentEditedText(blockIndex, editor.Text);
+        }
+    }
+
+    private static void OnReadableBodyEditorPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is TextBox editor && !editor.IsKeyboardFocusWithin)
+        {
+            editor.Focus();
+            e.Handled = true;
         }
     }
 
