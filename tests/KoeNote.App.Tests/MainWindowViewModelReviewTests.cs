@@ -614,6 +614,45 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void ReadablePolishedTab_SaveEditsPreservesUntouchedIndentedBlockText()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw"),
+            new TranscriptSegment("segment-002", job.JobId, 1, 2, "Speaker_1", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: Original first.\n\n[00:01 - 00:02] Speaker_1: Notes\n  - keep indentation\n    code line",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-002",
+            null,
+            "model",
+            "prompt",
+            "manual-edit"));
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.True(viewModel.BeginReadableDocumentEdit());
+        Assert.True(viewModel.SaveReadableDocumentEdits([
+            "Edited first.",
+            viewModel.GetReadableDocumentEditedText(1, string.Empty)
+        ]));
+
+        var latest = derivativeRepository.ReadLatestSuccessful(job.JobId, TranscriptDerivativeKinds.Polished);
+        Assert.NotNull(latest);
+        Assert.Contains("  - keep indentation", latest.Content, StringComparison.Ordinal);
+        Assert.Contains("    code line", latest.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReadablePolishedTab_CancelJobSwitchKeepsUnsavedEdits()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
@@ -705,6 +744,128 @@ public sealed class MainWindowViewModelReviewTests : MainWindowViewModelTestBase
         Assert.Same(selectedJob, viewModel.SelectedJob);
         Assert.Contains(selectedJob, viewModel.Jobs);
         Assert.Contains(new JobRepository(paths).LoadRecent(), loaded => loaded.JobId == selectedJob.JobId);
+        Assert.True(viewModel.HasReadableDocumentUnsavedEdits);
+        Assert.Equal("Unsaved body.", viewModel.GetReadableDocumentEditedText(0, string.Empty));
+    }
+
+    [Fact]
+    public async Task ReadablePolishedTab_CancelDiscardAfterDeleteConfirmationKeepsUnsavedEditsAndJob()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: Body.",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var confirmCallCount = 0;
+        var viewModel = new MainWindowViewModel(paths)
+        {
+            ConfirmAction = (_, _) => ++confirmCallCount == 1
+        };
+        var selectedJob = Assert.Single(viewModel.Jobs);
+        Assert.True(viewModel.BeginReadableDocumentEdit());
+        viewModel.UpdateReadableDocumentEditedText(0, "Unsaved body.");
+
+        await InvokePrivate<Task>(viewModel, "DeleteJobAsync", selectedJob);
+
+        Assert.Equal(2, confirmCallCount);
+        Assert.Same(selectedJob, viewModel.SelectedJob);
+        Assert.Contains(selectedJob, viewModel.Jobs);
+        Assert.True(viewModel.HasReadableDocumentUnsavedEdits);
+        Assert.Equal("Unsaved body.", viewModel.GetReadableDocumentEditedText(0, string.Empty));
+    }
+
+    [Fact]
+    public void ReadablePolishedTab_BlocksSpeakerRenameWhileEditingDocumentBody()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        new TranscriptSegmentRepository(paths).SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: Body.",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths);
+        Assert.True(viewModel.BeginReadableDocumentEdit());
+        viewModel.UpdateReadableDocumentEditedText(0, "Unsaved body.");
+
+        var renamed = viewModel.RenameReadableDocumentSpeaker("Speaker_0", "Host");
+
+        Assert.False(renamed);
+        Assert.Contains("Speaker_0", viewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("Host", viewModel.ReadablePolishedContent, StringComparison.Ordinal);
+        Assert.True(viewModel.HasReadableDocumentUnsavedEdits);
+    }
+
+    [Fact]
+    public void ReadablePolishedTab_CancelTranscriptEditKeepsUnsavedReadableEditsAndRawText()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var job = new JobRepository(paths).CreateFromAudio(Path.Combine(root, "meeting.wav"));
+        var segmentRepository = new TranscriptSegmentRepository(paths);
+        segmentRepository.SaveSegments([
+            new TranscriptSegment("segment-001", job.JobId, 0, 1, "Speaker_0", "raw before")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(paths);
+        derivativeRepository.Save(new TranscriptDerivativeSaveRequest(
+            job.JobId,
+            TranscriptDerivativeKinds.Polished,
+            TranscriptDerivativeFormats.PlainText,
+            "[00:00 - 00:01] Speaker_0: Body.",
+            TranscriptDerivativeSourceKinds.Raw,
+            derivativeRepository.ComputeCurrentRawTranscriptHash(job.JobId),
+            "segment-001..segment-001",
+            null,
+            "model",
+            "prompt",
+            "profile"));
+        var viewModel = new MainWindowViewModel(paths)
+        {
+            ConfirmAction = (_, _) => false
+        };
+        var segment = Assert.Single(viewModel.Segments);
+        Assert.True(viewModel.BeginReadableDocumentEdit());
+        viewModel.UpdateReadableDocumentEditedText(0, "Unsaved body.");
+        viewModel.SelectedTranscriptTabIndex = 1;
+        viewModel.BeginSegmentInlineEditCommand.Execute(segment);
+        viewModel.SelectedSegmentEditText = "raw after";
+
+        viewModel.SaveSegmentInlineEditCommand.Execute(null);
+
+        var storedSegment = Assert.Single(segmentRepository.ReadSegments(job.JobId));
+        Assert.Equal("raw before", storedSegment.RawText);
         Assert.True(viewModel.HasReadableDocumentUnsavedEdits);
         Assert.Equal("Unsaved body.", viewModel.GetReadableDocumentEditedText(0, string.Empty));
     }

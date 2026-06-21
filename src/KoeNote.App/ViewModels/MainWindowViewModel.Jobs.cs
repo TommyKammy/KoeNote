@@ -78,17 +78,17 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        if (SelectedJob?.JobId == job.JobId &&
-            !ConfirmAndResetReadableDocumentEditsIfNeeded())
-        {
-            return Task.CompletedTask;
-        }
-
         var willMoveToHistory = !IsUnstartedRegisteredJob(job);
         var confirmationMessage = willMoveToHistory
             ? $"「{job.Title}」をクリア履歴へ移動します。後から復元できます。"
             : $"「{job.Title}」は文字起こし未実施のため、クリア履歴に残さず一覧から削除します。";
         if (!ConfirmAction("ジョブのクリア", confirmationMessage))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (SelectedJob?.JobId == job.JobId &&
+            !ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return Task.CompletedTask;
         }
@@ -134,11 +134,6 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
-        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
-        {
-            return Task.CompletedTask;
-        }
-
         var unstartedCount = Jobs.Count(IsUnstartedRegisteredJob);
         var restorableCount = Jobs.Count - unstartedCount;
         var confirmationMessage = (unstartedCount, restorableCount) switch
@@ -148,6 +143,11 @@ public sealed partial class MainWindowViewModel
             _ => $"{Jobs.Count} 件のジョブをクリアします。文字起こし未実施の {unstartedCount} 件は履歴に残さず削除し、実行済みの {restorableCount} 件はクリア履歴へ移動します。"
         };
         if (!ConfirmAction("ジョブ一覧のクリア", confirmationMessage))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return Task.CompletedTask;
         }

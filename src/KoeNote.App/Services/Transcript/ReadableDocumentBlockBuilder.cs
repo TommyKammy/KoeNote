@@ -61,24 +61,24 @@ public static class ReadableDocumentBlockBuilder
 
     private static void AddBlock(ICollection<ReadableDocumentBlock> blocks, IReadOnlyList<string> lines, int sourceLineIndex)
     {
-        var trimmedLines = lines
-            .Select(static line => line.Trim())
-            .Where(static line => line.Length > 0)
+        var contentLines = lines
+            .Select(static line => line.TrimEnd())
+            .Where(static line => !string.IsNullOrWhiteSpace(line))
             .ToArray();
-        if (trimmedLines.Length == 0)
+        if (contentLines.Length == 0)
         {
             return;
         }
 
-        var firstLine = trimmedLines[0];
+        var firstLine = contentLines[0];
         if (TryMatchTimestampedBlock(firstLine, out var match))
         {
-            var textLines = new List<string>(trimmedLines.Length)
+            var textLines = new List<string>(contentLines.Length)
             {
-                match.Groups["text"].Value.Trim()
+                match.Groups["text"].Value.TrimEnd()
             };
-            textLines.AddRange(trimmedLines.Skip(1));
-            var text = string.Join(Environment.NewLine, textLines.Where(static line => line.Length > 0)).Trim();
+            textLines.AddRange(contentLines.Skip(1));
+            var text = string.Join(Environment.NewLine, textLines.Where(static line => !string.IsNullOrWhiteSpace(line))).TrimEnd();
             if (text.Length > 0)
             {
                 var startText = match.Groups["start"].Value;
@@ -97,7 +97,7 @@ public static class ReadableDocumentBlockBuilder
         blocks.Add(new ReadableDocumentBlock(
             string.Empty,
             string.Empty,
-            string.Join(Environment.NewLine, trimmedLines).Trim(),
+            string.Join(Environment.NewLine, contentLines).TrimEnd(),
             sourceLineIndex,
             null,
             null));

@@ -457,6 +457,7 @@ public sealed partial class MainWindowViewModel
             string.IsNullOrWhiteSpace(currentSpeaker) ||
             string.IsNullOrWhiteSpace(replacementSpeaker) ||
             IsRunInProgress ||
+            IsReadableDocumentEditMode ||
             !HasReadablePolishedContent)
         {
             return false;

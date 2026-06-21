@@ -405,11 +405,12 @@ public partial class ReadablePolishedPanel : UserControl
 
         if (block.HasSpeaker)
         {
+            var canRenameSpeaker = !viewModel.IsRunInProgress && !viewModel.IsReadableDocumentEditMode;
             var speakerBorder = new Border
             {
                 Background = speakerPalette.Background,
                 CornerRadius = new CornerRadius(6),
-                Cursor = viewModel.IsRunInProgress ? Cursors.Arrow : Cursors.Hand,
+                Cursor = canRenameSpeaker ? Cursors.Hand : Cursors.Arrow,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(8, 3, 8, 3),
                 ToolTip = viewModel.IsRunInProgress ? "実行中は話者名を変更できません" : "話者名を変更",
@@ -424,7 +425,7 @@ public partial class ReadablePolishedPanel : UserControl
                     MaxWidth = 92
                 }
             };
-            if (!viewModel.IsRunInProgress)
+            if (canRenameSpeaker)
             {
                 speakerBorder.MouseLeftButtonUp += (_, e) =>
                 {

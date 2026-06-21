@@ -42,7 +42,9 @@ public static class ReadableDocumentBlockSerializer
             .Replace('\r', '\n')
             .Split('\n');
         var firstLine = lines.FirstOrDefault() ?? string.Empty;
-        var remainingLines = lines.Skip(1);
+        var remainingLines = lines
+            .Skip(1)
+            .Where(static line => !string.IsNullOrWhiteSpace(line));
         var prefix = block.HasTimeRange ? $"[{block.TimeRange}] " : string.Empty;
         if (block.HasSpeaker)
         {
@@ -78,6 +80,6 @@ public static class ReadableDocumentBlockSerializer
             lines.RemoveAt(lines.Count - 1);
         }
 
-        return string.Join(Environment.NewLine, lines).Trim();
+        return string.Join(Environment.NewLine, lines).TrimEnd();
     }
 }
