@@ -1899,7 +1899,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isTranscriptAutoScrollEnabled, value) && value)
             {
-                SelectSegmentForPlaybackPosition(PlaybackPositionSeconds);
+                RequestPlaybackAutoScrollToCurrentPosition(force: true);
             }
         }
     }

@@ -619,6 +619,39 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void PlaybackAutoScroll_CanRequestScrollForCurrentSegment()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:00.000",
+            "00:00:05.000",
+            "Speaker_0",
+            "first",
+            "",
+            "segment-001",
+            StartSeconds: 0,
+            EndSeconds: 5));
+        viewModel.Segments.Add(new TranscriptSegmentPreview(
+            "00:00:05.000",
+            "00:00:10.000",
+            "Speaker_1",
+            "second",
+            "",
+            "segment-002",
+            StartSeconds: 5,
+            EndSeconds: 10));
+        viewModel.PlaybackPositionSeconds = 6;
+        viewModel.IsTranscriptAutoScrollEnabled = true;
+        var requestId = viewModel.TranscriptAutoScrollRequestId;
+
+        InvokePrivate(viewModel, "RequestPlaybackAutoScrollToCurrentPosition", true);
+
+        Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
+        Assert.Equal(requestId + 1, viewModel.TranscriptAutoScrollRequestId);
+        Assert.Equal(6, viewModel.PlaybackPositionSeconds, 2);
+    }
+
+    [Fact]
     public void PlaybackPosition_DoesNotAutoSelectFilteredOutSegment()
     {
         var viewModel = CreateViewModel();

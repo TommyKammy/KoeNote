@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using KoeNote.App.Dialogs;
 using KoeNote.App.Models;
 using KoeNote.App.Services.Clipboard;
@@ -134,10 +135,43 @@ public partial class ReadablePolishedPanel : UserControl
             return;
         }
 
-        if (blockIndex < _readableBlockAnchors.Count)
+        if (blockIndex < _readableBodyParagraphs.Count)
         {
-            _readableBlockAnchors[blockIndex].BringIntoView();
+            Dispatcher.BeginInvoke(
+                new Action(() => ScrollReadableDocumentBlockIntoView(blockIndex)),
+                DispatcherPriority.ContextIdle);
         }
+        else if (blockIndex < _readableBlockAnchors.Count)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(_readableBlockAnchors[blockIndex].BringIntoView),
+                DispatcherPriority.ContextIdle);
+        }
+    }
+
+    private void ScrollReadableDocumentBlockIntoView(int blockIndex)
+    {
+        if (blockIndex < 0 || blockIndex >= _readableBodyParagraphs.Count)
+        {
+            return;
+        }
+
+        ReadableDocumentRichTextBox.UpdateLayout();
+        var paragraph = _readableBodyParagraphs[blockIndex];
+        var rect = paragraph.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        var scroller = FindVisualChild<ScrollViewer>(ReadableDocumentRichTextBox);
+        if (scroller is null ||
+            rect.IsEmpty ||
+            double.IsNaN(rect.Top) ||
+            double.IsInfinity(rect.Top))
+        {
+            paragraph.BringIntoView();
+            return;
+        }
+
+        var contextOffset = Math.Min(80, Math.Max(24, scroller.ViewportHeight * 0.2));
+        var targetOffset = Math.Max(0, scroller.VerticalOffset + rect.Top - contextOffset);
+        scroller.ScrollToVerticalOffset(targetOffset);
     }
 
     private void RebuildReadableDocument()
@@ -542,6 +576,28 @@ public partial class ReadablePolishedPanel : UserControl
 
     private static TextPointer MinTextPointer(TextPointer first, TextPointer second) =>
         first.CompareTo(second) <= 0 ? first : second;
+
+    private static T? FindVisualChild<T>(DependencyObject parent)
+        where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild)
+            {
+                return typedChild;
+            }
+
+            var descendant = FindVisualChild<T>(child);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
 
     private static void AddHighlightedRuns(InlineCollection inlines, string text, string searchText)
     {
