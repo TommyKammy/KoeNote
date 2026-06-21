@@ -99,6 +99,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly ReadablePolishingPromptSettingsRepository _readablePolishingPromptSettingsRepository;
     private readonly UiPreferencesService _uiPreferencesService;
     private readonly MainContentZoomState _mainContentZoomState;
+    private readonly DetailPanelState _detailPanelState = new();
     private readonly ModelCatalogPresenter _modelCatalogPresenter = new();
     private readonly ModelDownloadProgressPresenter _modelDownloadProgressPresenter = new();
     private readonly UpdatePresentationPresenter _updatePresentationPresenter = new();
@@ -186,8 +187,6 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private MainLayoutMode _mainLayoutMode = MainLayoutMode.Standard;
     private int _selectedTranscriptTabIndex;
     private int _selectedLogPanelTabIndex;
-    private int _selectedDetailPanelTabIndex;
-    private bool _isDetailPanelOpen;
     private bool _isStandardJobRailExpanded;
     private bool _isSetupWizardModalOpen;
     private string? _activeModelDownloadModelId;
@@ -1725,13 +1724,14 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public int SelectedDetailPanelTabIndex
     {
-        get => _selectedDetailPanelTabIndex;
+        get => _detailPanelState.SelectedTabIndex;
         set
         {
-            if (SetField(ref _selectedDetailPanelTabIndex, Math.Clamp(value, 0, 4)))
+            if (_detailPanelState.SetSelectedTabIndex(value))
             {
+                OnPropertyChanged();
                 OnPropertyChanged(nameof(DetailPanelTitle));
-                SelectedLogPanelTabIndex = _selectedDetailPanelTabIndex;
+                SelectedLogPanelTabIndex = _detailPanelState.SelectedTabIndex;
             }
         }
     }
@@ -1762,19 +1762,17 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
 
     public bool IsDetailPanelOpen
     {
-        get => _isDetailPanelOpen;
-        private set => SetField(ref _isDetailPanelOpen, value);
+        get => _detailPanelState.IsOpen;
+        private set
+        {
+            if (_detailPanelState.SetOpen(value))
+            {
+                OnPropertyChanged();
+            }
+        }
     }
 
-    public string DetailPanelTitle => SelectedDetailPanelTabIndex switch
-    {
-        0 => "設定",
-        1 => "辞書プリセット",
-        2 => "モデル",
-        3 => "セットアップ / モデル導入",
-        4 => "ログ",
-        _ => "詳細"
-    };
+    public string DetailPanelTitle => _detailPanelState.Title;
 
     public string SelectedSpeakerFilter
     {
