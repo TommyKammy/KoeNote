@@ -69,7 +69,8 @@
 
                         <TextBlock Text="整文モデル" Style="{StaticResource SettingsFieldLabel}" />
                         <ComboBox ItemsSource="{Binding SetupReviewModelChoices}"
-                                  SelectedItem="{Binding SelectedSettingsReviewModel, Mode=TwoWay}"
+                                  SelectedValue="{Binding SelectedSettingsReviewModelId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectedValuePath="ModelId"
                                   MinHeight="32"
                                   ToolTip="{Binding SelectedSettingsReviewModel.SetupDisplayName}"
                                   TextSearch.TextPath="SetupDisplayName">
