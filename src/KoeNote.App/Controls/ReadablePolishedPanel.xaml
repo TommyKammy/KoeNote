@@ -18,47 +18,6 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="VisibleWhenReadableDocumentEditing" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsReadableDocumentEditMode}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="VisibleWhenReadableDocumentDirty" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding HasReadableDocumentUnsavedEdits}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="ReadableDocumentEditButton" TargetType="Button">
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Padding" Value="12,0" />
-            <Setter Property="Margin" Value="6,0,0,0" />
-            <Setter Property="FontFamily" Value="Yu Gothic UI" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style x:Key="ReadableDocumentEditButtonWhenEditing" TargetType="Button" BasedOn="{StaticResource ReadableDocumentEditButton}">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsReadableDocumentEditMode}" Value="True">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="ReadableDocumentEditButtonWhenNotEditing" TargetType="Button" BasedOn="{StaticResource ReadableDocumentEditButton}">
-            <Setter Property="Visibility" Value="Visible" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsReadableDocumentEditMode}" Value="True">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
         <Style x:Key="ReadableDocumentChrome" TargetType="Border">
             <Setter Property="MaxWidth" Value="1080" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -110,35 +69,7 @@
 
     <Grid Margin="0"
           Background="Transparent">
-        <DockPanel>
-            <Border DockPanel.Dock="Top"
-                    Padding="0,0,0,8"
-                    Style="{StaticResource VisibleWhenReadableDocumentBlocks}">
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="未保存"
-                               VerticalAlignment="Center"
-                               Foreground="#B45309"
-                               FontFamily="Yu Gothic UI"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Style="{StaticResource VisibleWhenReadableDocumentDirty}" />
-                    <Button Content="編集"
-                            Click="OnBeginReadableDocumentEditClick"
-                            IsEnabled="{Binding CanEditReadableDocument}"
-                            Style="{StaticResource ReadableDocumentEditButtonWhenNotEditing}" />
-                    <Button Content="保存"
-                            Click="OnSaveReadableDocumentEditClick"
-                            IsEnabled="{Binding HasReadableDocumentUnsavedEdits}"
-                            Style="{StaticResource ReadableDocumentEditButtonWhenEditing}" />
-                    <Button Content="破棄"
-                            Click="OnDiscardReadableDocumentEditClick"
-                            Style="{StaticResource ReadableDocumentEditButtonWhenEditing}" />
-                </StackPanel>
-            </Border>
-
-            <Grid>
+        <Grid>
             <Border Style="{StaticResource ReadableDocumentVisibleChrome}">
                 <RichTextBox x:Name="ReadableDocumentRichTextBox"
                              Background="Transparent"
@@ -175,7 +106,6 @@
                     </StackPanel>
                 </Border>
             </Grid>
-            </Grid>
-        </DockPanel>
+        </Grid>
     </Grid>
 </UserControl>

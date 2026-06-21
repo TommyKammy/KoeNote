@@ -49,6 +49,27 @@ public sealed partial class MainWindowViewModel
             () => RunReadablePolishingAsync(forceSpeakerConfirmation: true),
             () => CanRunReadablePolishing);
         CopyReadablePolishedContentCommand = new RelayCommand(CopyReadablePolishedContentAsync, () => HasReadablePolishedContent);
+        BeginReadableDocumentEditCommand = new RelayCommand(
+            () =>
+            {
+                BeginReadableDocumentEdit();
+                return Task.CompletedTask;
+            },
+            () => CanEditReadableDocument && !IsReadableDocumentEditMode);
+        SaveReadableDocumentEditCommand = new RelayCommand(
+            () =>
+            {
+                SaveReadableDocumentEdits();
+                return Task.CompletedTask;
+            },
+            () => HasReadableDocumentUnsavedEdits);
+        DiscardReadableDocumentEditCommand = new RelayCommand(
+            () =>
+            {
+                DiscardReadableDocumentEdits();
+                return Task.CompletedTask;
+            },
+            () => IsReadableDocumentEditMode);
     }
 
     private void InitializeTranscriptNavigationCommands()

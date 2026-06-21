@@ -74,9 +74,29 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
+        _readableDocumentEditedTexts.Clear();
+        _readableDocumentEditedTexts.AddRange(ReadableDocumentBlocks.Select(static block => block.Text));
         IsReadableDocumentEditMode = true;
         HasReadableDocumentUnsavedEdits = false;
         return true;
+    }
+
+    public void UpdateReadableDocumentEditedText(int blockIndex, string text)
+    {
+        if (!IsReadableDocumentEditMode ||
+            blockIndex < 0 ||
+            blockIndex >= _readableDocumentEditedTexts.Count)
+        {
+            return;
+        }
+
+        if (string.Equals(_readableDocumentEditedTexts[blockIndex], text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _readableDocumentEditedTexts[blockIndex] = text;
+        HasReadableDocumentUnsavedEdits = true;
     }
 
     public void MarkReadableDocumentEditDirty()
@@ -96,6 +116,11 @@ public sealed partial class MainWindowViewModel
 
         ResetReadableDocumentEditState();
         return true;
+    }
+
+    public bool SaveReadableDocumentEdits()
+    {
+        return SaveReadableDocumentEdits(_readableDocumentEditedTexts);
     }
 
     public bool SaveReadableDocumentEdits(IReadOnlyList<string> editedBlockTexts)
@@ -152,8 +177,27 @@ public sealed partial class MainWindowViewModel
 
     private void ResetReadableDocumentEditState()
     {
+        _readableDocumentEditedTexts.Clear();
         HasReadableDocumentUnsavedEdits = false;
         IsReadableDocumentEditMode = false;
+    }
+
+    private void UpdateReadableDocumentEditCommandStates()
+    {
+        if (BeginReadableDocumentEditCommand is RelayCommand beginCommand)
+        {
+            beginCommand.RaiseCanExecuteChanged();
+        }
+
+        if (SaveReadableDocumentEditCommand is RelayCommand saveCommand)
+        {
+            saveCommand.RaiseCanExecuteChanged();
+        }
+
+        if (DiscardReadableDocumentEditCommand is RelayCommand discardCommand)
+        {
+            discardCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private Task CopyReadablePolishedContentAsync()

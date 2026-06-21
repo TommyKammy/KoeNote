@@ -153,6 +153,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private string _summaryContent = string.Empty;
     private string _summaryStatus = "要約はまだありません。";
     private readonly ObservableCollection<ReadableDocumentBlock> _readableDocumentBlocks = [];
+    private readonly List<string> _readableDocumentEditedTexts = [];
     private string _readablePolishedContent = string.Empty;
     private string _readablePolishedStatus = "整文はまだ生成されていません。";
     private bool _isReadablePolishingInProgress;
@@ -715,6 +716,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ConfirmSpeakerNamesAndRunReadablePolishingCommand { get; private set; } = null!;
 
     public ICommand CopyReadablePolishedContentCommand { get; private set; } = null!;
+
+    public ICommand BeginReadableDocumentEditCommand { get; private set; } = null!;
+
+    public ICommand SaveReadableDocumentEditCommand { get; private set; } = null!;
+
+    public ICommand DiscardReadableDocumentEditCommand { get; private set; } = null!;
 
     public ICommand ShowReadableTranscriptTabCommand { get; private set; } = null!;
 
@@ -1857,6 +1864,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RunPreflightSummary));
                 OnPropertyChanged(nameof(RunPreflightDetail));
                 OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
 
                 if (OpenCleanupToolCommand is RelayCommand cleanupCommand)
                 {
@@ -2136,6 +2144,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ReadablePolishedActionText));
                 OnPropertyChanged(nameof(ReadablePolishedActionToolTip));
                 OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
                 if (CopyReadablePolishedContentCommand is RelayCommand copyCommand)
                 {
                     copyCommand.RaiseCanExecuteChanged();
@@ -2169,6 +2178,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _isReadableDocumentEditMode, value))
             {
                 OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
             }
         }
     }
@@ -2181,6 +2191,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             if (SetField(ref _hasReadableDocumentUnsavedEdits, value))
             {
                 UpdateExportCommandStates();
+                UpdateReadableDocumentEditCommandStates();
             }
         }
     }
@@ -2224,6 +2235,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ReadableDocumentStateTitle));
                 OnPropertyChanged(nameof(ReadableDocumentStateDescription));
                 OnPropertyChanged(nameof(CanEditReadableDocument));
+                UpdateReadableDocumentEditCommandStates();
                 UpdateExportCommandStates();
             }
         }

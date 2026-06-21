@@ -248,16 +248,17 @@ public partial class ReadablePolishedPanel : UserControl
         table.RowGroups.Add(rowGroup);
         document.Blocks.Add(table);
 
-        foreach (var block in viewModel.ReadableDocumentBlocks)
+        for (var index = 0; index < viewModel.ReadableDocumentBlocks.Count; index++)
         {
             rowGroup.Rows.Add(
-                BuildReadableBlockRow(block, viewModel, textBrush, mutedBrush, separatorBrush, searchText));
+                BuildReadableBlockRow(index, viewModel.ReadableDocumentBlocks[index], viewModel, textBrush, mutedBrush, separatorBrush, searchText));
         }
 
         return document;
     }
 
     private TableRow BuildReadableBlockRow(
+        int blockIndex,
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -267,7 +268,7 @@ public partial class ReadablePolishedPanel : UserControl
     {
         var row = new TableRow();
         var metaCell = BuildMetaCell(block, viewModel, mutedBrush, separatorBrush);
-        var bodyCell = BuildBodyCell(block, viewModel, textBrush, separatorBrush, searchText);
+        var bodyCell = BuildBodyCell(blockIndex, block, viewModel, textBrush, separatorBrush, searchText);
         row.Cells.Add(metaCell);
         row.Cells.Add(bodyCell);
 
@@ -301,6 +302,7 @@ public partial class ReadablePolishedPanel : UserControl
     }
 
     private TableCell BuildBodyCell(
+        int blockIndex,
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -309,7 +311,7 @@ public partial class ReadablePolishedPanel : UserControl
     {
         if (viewModel.IsReadableDocumentEditMode)
         {
-            return BuildEditableBodyCell(block, viewModel, textBrush, separatorBrush);
+            return BuildEditableBodyCell(blockIndex, block, viewModel, textBrush, separatorBrush);
         }
 
         var paragraph = new Paragraph
@@ -330,6 +332,7 @@ public partial class ReadablePolishedPanel : UserControl
     }
 
     private TableCell BuildEditableBodyCell(
+        int blockIndex,
         ReadableDocumentBlock block,
         MainWindowViewModel viewModel,
         Brush textBrush,
@@ -353,6 +356,7 @@ public partial class ReadablePolishedPanel : UserControl
             MinHeight = Math.Max(42, viewModel.ReadableDocumentLineHeight * 2),
             ToolTip = "本文を編集"
         };
+        editor.Tag = blockIndex;
         editor.TextChanged += OnReadableBodyEditorTextChanged;
         _readableBodyEditors.Add(editor);
 
@@ -443,32 +447,6 @@ public partial class ReadablePolishedPanel : UserControl
         viewModel.RenameReadableDocumentSpeaker(block.Speaker, dialog.SpeakerName);
     }
 
-    private void OnBeginReadableDocumentEditClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.BeginReadableDocumentEdit();
-        }
-    }
-
-    private void OnSaveReadableDocumentEditClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.SaveReadableDocumentEdits(_readableBodyEditors.Select(static editor => editor.Text).ToArray());
-    }
-
-    private void OnDiscardReadableDocumentEditClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.DiscardReadableDocumentEdits();
-        }
-    }
-
     private void OnReadableBodyEditorTextChanged(object sender, TextChangedEventArgs e)
     {
         if (_isBuildingReadableDocument)
@@ -476,9 +454,10 @@ public partial class ReadablePolishedPanel : UserControl
             return;
         }
 
-        if (DataContext is MainWindowViewModel viewModel)
+        if (sender is TextBox { Tag: int blockIndex } editor &&
+            DataContext is MainWindowViewModel viewModel)
         {
-            viewModel.MarkReadableDocumentEditDirty();
+            viewModel.UpdateReadableDocumentEditedText(blockIndex, editor.Text);
         }
     }
 
