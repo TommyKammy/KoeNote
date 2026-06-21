@@ -950,19 +950,11 @@ public sealed partial class MainWindowViewModel
             ReplaceItems(SetupSmokeChecks, snapshot.SmokeChecks);
         }
 
-        RaiseSetupWizardPresentationChanged();
-        OnPropertyChanged(nameof(SetupDiarizationRuntimeSummary));
+        SetupWizardPresentationInvalidator.RaisePresentationChanged(OnPropertyChanged);
         RefreshAsrCudaRuntimeSummary();
-        OnPropertyChanged(nameof(SetupAsrCudaRuntimeSummary));
         RefreshCudaReviewRuntimeSummary();
-        OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
-        OnPropertyChanged(nameof(IsSetupComplete));
-        OnPropertyChanged(nameof(RequiredRuntimeAssetsReady));
-        OnPropertyChanged(nameof(ReviewStageAssetsReady));
-        OnPropertyChanged(nameof(SummaryStageAssetsReady));
-        OnPropertyChanged(nameof(CanRunSelectedJob));
-        OnPropertyChanged(nameof(RunPreflightSummary));
-        OnPropertyChanged(nameof(RunPreflightDetail));
+        SetupWizardPresentationInvalidator.RaiseRuntimeSummaryChanged(OnPropertyChanged);
+        SetupWizardPresentationInvalidator.RaiseRunPreflightChanged(OnPropertyChanged);
         ReplaceItems(SetupModelAudits, snapshot.ModelAudits);
         ReplaceItems(SetupExistingData, snapshot.ExistingData);
 
@@ -1024,13 +1016,14 @@ public sealed partial class MainWindowViewModel
 
     private void ApplySetupWizardPresentation(SetupWizardPresentationState presentation)
     {
-        _setupPresetRecommendation = presentation.Recommendation;
-        _setupState = presentation.State;
-        _setupSelectionDraft = presentation.SelectionDraft;
-        _selectedSetupAsrModel = presentation.SelectedAsrModel;
-        _selectedSetupReviewModel = presentation.SelectedReviewModel;
-        _selectedSettingsReviewModel = presentation.SelectedSettingsReviewModel;
-        _selectedSetupModelPreset = presentation.SelectedModelPreset;
+        var applied = SetupWizardPresentationApplier.Apply(presentation);
+        _setupPresetRecommendation = applied.Recommendation;
+        _setupState = applied.State;
+        _setupSelectionDraft = applied.SelectionDraft;
+        _selectedSetupAsrModel = applied.SelectedAsrModel;
+        _selectedSetupReviewModel = applied.SelectedReviewModel;
+        _selectedSettingsReviewModel = applied.SelectedSettingsReviewModel;
+        _selectedSetupModelPreset = applied.SelectedModelPreset;
     }
 
     private static void ReplaceItems<T>(ICollection<T> target, IEnumerable<T> source)
@@ -1040,53 +1033,6 @@ public sealed partial class MainWindowViewModel
         {
             target.Add(item);
         }
-    }
-
-    private void RaiseSetupWizardPresentationChanged()
-    {
-        OnPropertyChanged(nameof(SelectedSetupAsrModel));
-        OnPropertyChanged(nameof(SelectedSetupReviewModel));
-        OnPropertyChanged(nameof(SelectedSettingsReviewModel));
-        OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
-        OnPropertyChanged(nameof(SelectedSetupModelPreset));
-        OnPropertyChanged(nameof(AsrModel));
-        OnPropertyChanged(nameof(ReviewModel));
-        OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
-        OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
-        OnPropertyChanged(nameof(SelectedSetupModelsReady));
-        OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
-        OnPropertyChanged(nameof(SetupReviewRuntimeReady));
-        OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
-        OnPropertyChanged(nameof(SetupAsrCudaRuntimeRecommended));
-        OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));
-        OnPropertyChanged(nameof(SetupAsrCudaRuntimeActionText));
-        OnPropertyChanged(nameof(SetupCudaReviewRuntimeRecommended));
-        OnPropertyChanged(nameof(SetupCudaReviewRuntimeReady));
-        OnPropertyChanged(nameof(SetupCudaReviewRuntimeActionText));
-        OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
-        OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
-        OnPropertyChanged(nameof(SetupGpuRuntimeRequiredButMissing));
-        OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
-        OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
-        OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
-        OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
-        OnPropertyChanged(nameof(SetupNextActionText));
-        OnPropertyChanged(nameof(ShowSetupInlineInstallAction));
-        OnPropertyChanged(nameof(ShowSetupLicenseNotice));
-        OnPropertyChanged(nameof(ShowSetupSmokeAction));
-        OnPropertyChanged(nameof(ShowSetupCompleteAction));
-        OnPropertyChanged(nameof(SetupLicenseNoticeText));
-        OnPropertyChanged(nameof(SetupPresetRecommendationSummary));
-        OnPropertyChanged(nameof(SetupPresetRecommendationDetail));
-        OnPropertyChanged(nameof(SetupCurrentStep));
-        OnPropertyChanged(nameof(SetupStepDisplayName));
-        OnPropertyChanged(nameof(SetupStatusSummary));
-        OnPropertyChanged(nameof(SetupCompleteActionText));
-        OnPropertyChanged(nameof(SetupWizardModalTitle));
-        OnPropertyChanged(nameof(SetupWizardModalGuide));
-        OnPropertyChanged(nameof(SetupMode));
-        OnPropertyChanged(nameof(SetupStorageRoot));
-        OnPropertyChanged(nameof(SetupLicenseAccepted));
     }
 
     private void CommitSetupSelectionDraft()
@@ -1108,25 +1054,7 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSetupSelectionPreview()
     {
-        OnPropertyChanged(nameof(SelectedSetupAsrModel));
-        OnPropertyChanged(nameof(SelectedSetupReviewModel));
-        OnPropertyChanged(nameof(SelectedSettingsReviewModel));
-        OnPropertyChanged(nameof(SelectedSettingsReviewModelId));
-        OnPropertyChanged(nameof(SelectedSetupModelPreset));
-        OnPropertyChanged(nameof(SelectedSetupModelPresetDescription));
-        OnPropertyChanged(nameof(SelectedSetupModelPresetModels));
-        OnPropertyChanged(nameof(SelectedSetupModelsReady));
-        OnPropertyChanged(nameof(SetupMode));
-        OnPropertyChanged(nameof(SetupStorageRoot));
-        OnPropertyChanged(nameof(SetupReviewRuntimeReady));
-        OnPropertyChanged(nameof(SetupTernaryReviewRuntimeReady));
-        OnPropertyChanged(nameof(SetupRequiredRuntimeReady));
-        OnPropertyChanged(nameof(SetupGpuRuntimeRequiredButMissing));
-        OnPropertyChanged(nameof(SetupConditionalRuntimeReady));
-        OnPropertyChanged(nameof(SelectedSetupConfigurationReady));
-        OnPropertyChanged(nameof(SetupPrimaryInstallActionText));
-        OnPropertyChanged(nameof(SetupPrimaryInstallSummary));
-        OnPropertyChanged(nameof(SetupNextActionText));
+        SetupWizardPresentationInvalidator.RaiseSelectionPreviewChanged(OnPropertyChanged);
         RefreshCudaReviewRuntimeSummary();
         OnPropertyChanged(nameof(SetupCudaReviewRuntimeSummary));
         RefreshAsrCudaRuntimeSummary();
