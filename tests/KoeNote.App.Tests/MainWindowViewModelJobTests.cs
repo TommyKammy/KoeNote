@@ -609,9 +609,6 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
             EndSeconds: 10));
 
         viewModel.PlaybackPositionSeconds = 6;
-        Assert.Null(viewModel.SelectedSegment);
-
-        viewModel.IsTranscriptAutoScrollEnabled = true;
 
         Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
         Assert.Equal(1, viewModel.TranscriptAutoScrollRequestId);

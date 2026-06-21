@@ -70,6 +70,14 @@ public sealed class MainWindowViewModelCoreTests : MainWindowViewModelTestBase
         Assert.All(viewModel.StageStatuses, stage => Assert.Equal("未開始", stage.Status));
     }
 
+    [Fact]
+    public void TranscriptAutoScroll_IsEnabledByDefault()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.True(viewModel.IsTranscriptAutoScrollEnabled);
+    }
+
     [Theory]
     [InlineData(JobRunStageState.Skipped)]
     [InlineData(JobRunStageState.Failed)]
