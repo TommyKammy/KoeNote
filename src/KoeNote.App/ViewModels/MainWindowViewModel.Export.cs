@@ -268,8 +268,17 @@ public sealed partial class MainWindowViewModel
         var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(
             SelectedJob.JobId,
             TranscriptDerivativeKinds.Polished);
-        return derivative is { Content.Length: > 0 } &&
-            TranscriptPolishingOutputNormalizer.IsUsableDocument(derivative.Content, out _);
+        if (derivative is not { Content.Length: > 0 })
+        {
+            return false;
+        }
+
+        var content = string.Equals(derivative.GenerationProfile, "manual-edit", StringComparison.Ordinal)
+            ? TranscriptPolishingOutputNormalizer.NormalizePreservedDocument(derivative.Content)
+            : TranscriptPolishingOutputNormalizer.Normalize(derivative.Content);
+        return string.Equals(derivative.GenerationProfile, "manual-edit", StringComparison.Ordinal)
+            ? TranscriptPolishingOutputNormalizer.IsUsablePreservedDocument(content, out _)
+            : TranscriptPolishingOutputNormalizer.IsUsableDocument(content, out _);
     }
 
     private bool CanExportCurrentTranscriptTarget()

@@ -78,6 +78,12 @@ public sealed partial class MainWindowViewModel
             return Task.CompletedTask;
         }
 
+        if (SelectedJob?.JobId == job.JobId &&
+            !ConfirmAndResetReadableDocumentEditsIfNeeded())
+        {
+            return Task.CompletedTask;
+        }
+
         var willMoveToHistory = !IsUnstartedRegisteredJob(job);
         var confirmationMessage = willMoveToHistory
             ? $"「{job.Title}」をクリア履歴へ移動します。後から復元できます。"
@@ -124,6 +130,11 @@ public sealed partial class MainWindowViewModel
     private Task ClearAllJobsAsync()
     {
         if (IsRunInProgress)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return Task.CompletedTask;
         }
@@ -176,6 +187,11 @@ public sealed partial class MainWindowViewModel
     private Task RestoreJobAsync(JobSummary? job)
     {
         if (job is null || IsRunInProgress)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!ConfirmAndResetReadableDocumentEditsIfNeeded())
         {
             return Task.CompletedTask;
         }

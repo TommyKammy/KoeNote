@@ -178,7 +178,6 @@ public sealed partial class MainWindowViewModel
 
         var jobId = SelectedJob.JobId;
         var derivative = _transcriptDerivativeRepository.ReadLatestSuccessful(jobId, TranscriptDerivativeKinds.Polished);
-        var editedTextsByKey = BuildReadableEditedTextMap(ReadableDocumentBlocks, editedBlockTexts);
         var wasDerivativeStale = derivative is not null && _transcriptDerivativeRepository.IsStale(derivative);
         var sourceTranscriptHash = derivative is not null && wasDerivativeStale
             ? derivative.SourceTranscriptHash
@@ -197,7 +196,7 @@ public sealed partial class MainWindowViewModel
             "manual-edit",
             derivative?.Status ?? TranscriptDerivativeStatuses.Succeeded,
             derivative?.ErrorMessage));
-        savedDerivative = SaveEditedReadableDerivativeChunks(savedDerivative, derivative, editedTextsByKey);
+        savedDerivative = SaveEditedReadableDerivativeChunks(savedDerivative, derivative, ReadableDocumentBlocks, editedBlockTexts);
 
         ReadablePolishedContent = content;
         ReadablePolishedStatus = wasDerivativeStale
@@ -212,7 +211,8 @@ public sealed partial class MainWindowViewModel
     private TranscriptDerivative SaveEditedReadableDerivativeChunks(
         TranscriptDerivative savedDerivative,
         TranscriptDerivative? sourceDerivative,
-        IReadOnlyDictionary<string, string> editedTextsByKey)
+        IReadOnlyList<ReadableDocumentBlock> readableBlocks,
+        IReadOnlyList<string> editedBlockTexts)
     {
         if (sourceDerivative is null)
         {
@@ -229,6 +229,7 @@ public sealed partial class MainWindowViewModel
         }
 
         var savedChunkIds = new List<string>(sourceChunks.Length);
+        var readableBlockIndex = 0;
         foreach (var chunk in sourceChunks)
         {
             var chunkBlocks = ReadableDocumentBlockBuilder.Build(chunk.Content);
@@ -241,8 +242,7 @@ public sealed partial class MainWindowViewModel
                 chunkBlocks,
                 chunkBlocks.Select(block =>
                 {
-                    var key = BuildReadableBlockKey(block);
-                    return key.Length > 0 && editedTextsByKey.TryGetValue(key, out var editedText)
+                    return TryGetEditedReadableBlockText(block, readableBlocks, editedBlockTexts, ref readableBlockIndex, out var editedText)
                         ? editedText
                         : block.Text;
                 }).ToArray());
@@ -306,21 +306,42 @@ public sealed partial class MainWindowViewModel
             block.EndSeconds?.ToString("R", CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
-    private static IReadOnlyDictionary<string, string> BuildReadableEditedTextMap(
+    private static bool TryGetEditedReadableBlockText(
+        ReadableDocumentBlock sourceBlock,
         IReadOnlyList<ReadableDocumentBlock> blocks,
-        IReadOnlyList<string> editedTexts)
+        IReadOnlyList<string> editedTexts,
+        ref int blockIndex,
+        out string editedText)
     {
-        var editedTextsByKey = new Dictionary<string, string>(StringComparer.Ordinal);
-        for (var index = 0; index < blocks.Count && index < editedTexts.Count; index++)
+        var sourceKey = BuildReadableBlockKey(sourceBlock);
+        for (var index = Math.Max(0, blockIndex); index < blocks.Count && index < editedTexts.Count; index++)
         {
-            var key = BuildReadableBlockKey(blocks[index]);
-            if (key.Length > 0)
+            if (IsSameReadableSourceBlock(sourceBlock, sourceKey, blocks[index]))
             {
-                editedTextsByKey[key] = editedTexts[index];
+                blockIndex = index + 1;
+                editedText = editedTexts[index];
+                return true;
             }
         }
 
-        return editedTextsByKey;
+        editedText = string.Empty;
+        return false;
+    }
+
+    private static bool IsSameReadableSourceBlock(
+        ReadableDocumentBlock sourceBlock,
+        string sourceKey,
+        ReadableDocumentBlock candidateBlock)
+    {
+        if (sourceKey.Length > 0)
+        {
+            return string.Equals(sourceKey, BuildReadableBlockKey(candidateBlock), StringComparison.Ordinal);
+        }
+
+        return !candidateBlock.HasTimeRange &&
+            string.Equals(sourceBlock.Speaker, candidateBlock.Speaker, StringComparison.Ordinal) &&
+            string.Equals(sourceBlock.TimeRange, candidateBlock.TimeRange, StringComparison.Ordinal) &&
+            string.Equals(sourceBlock.Text, candidateBlock.Text, StringComparison.Ordinal);
     }
 
     private static string BuildManualReadableChunkId(string derivativeId, int chunkIndex)
@@ -350,6 +371,26 @@ public sealed partial class MainWindowViewModel
         {
             LatestLog = "整文の未保存編集を保持しました。保存または破棄してから操作を続けてください。";
             return false;
+        }
+
+        return true;
+    }
+
+    public bool ConfirmDiscardReadableDocumentEditsForClose()
+    {
+        return ConfirmDiscardReadableDocumentEditsIfNeeded();
+    }
+
+    private bool ConfirmAndResetReadableDocumentEditsIfNeeded()
+    {
+        if (!ConfirmDiscardReadableDocumentEditsIfNeeded())
+        {
+            return false;
+        }
+
+        if (IsReadableDocumentEditMode)
+        {
+            ResetReadableDocumentEditState();
         }
 
         return true;
