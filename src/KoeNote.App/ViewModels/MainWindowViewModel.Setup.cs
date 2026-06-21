@@ -940,13 +940,13 @@ public sealed partial class MainWindowViewModel
     {
         var snapshot = _setupFlowCoordinator.BuildSnapshot(_setupSelectionDraft, refreshSmokeChecks);
         var presentation = SetupWizardStatePresenter.Create(snapshot);
-        ApplySetupWizardPresentation(presentation);
-        RefreshDiarizationRuntimeSummary();
         ReplaceItems(SetupSteps, snapshot.StepItems);
         ReplaceItems(SetupAsrModelChoices, snapshot.AsrModelChoices);
         ReplaceItems(SetupReviewModelChoices, snapshot.ReviewModelChoices);
         ReplaceItems(SetupModelPresetChoices, snapshot.PresetChoices);
+        ApplySetupWizardPresentation(presentation);
         AddSyntheticSetupModelPreset(presentation.SelectedModelPreset);
+        RefreshDiarizationRuntimeSummary();
         RefreshAvailableAsrEngines();
 
         if (snapshot.SmokeChecks is not null)
