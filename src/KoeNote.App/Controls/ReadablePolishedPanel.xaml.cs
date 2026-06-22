@@ -17,6 +17,7 @@ public partial class ReadablePolishedPanel : UserControl
     private const double ReadableMetaColumnWidth = 122;
     private const double ReadableDocumentScrollbarReserve = 24;
     private const double ReadableDocumentRightGutter = 48;
+    private const double ReadableBodyCellRightPadding = 40;
 
     private INotifyPropertyChanged? _subscribedViewModel;
     private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
@@ -339,7 +340,7 @@ public partial class ReadablePolishedPanel : UserControl
 
         return new TableCell(paragraph)
         {
-            Padding = new Thickness(0, 0, 0, 26),
+            Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 26),
             BorderBrush = separatorBrush,
             BorderThickness = new Thickness(0, 0, 0, 1)
         };
@@ -380,7 +381,7 @@ public partial class ReadablePolishedPanel : UserControl
 
         return new TableCell(new BlockUIContainer(editor))
         {
-            Padding = new Thickness(0, 0, 0, 20),
+            Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 20),
             BorderBrush = separatorBrush,
             BorderThickness = new Thickness(0, 0, 0, 1)
         };

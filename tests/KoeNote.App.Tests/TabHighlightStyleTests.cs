@@ -188,6 +188,9 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("HorizontalAlignment = HorizontalAlignment.Left", code, StringComparison.Ordinal);
         Assert.DoesNotContain("GridUnitType.Star", code, StringComparison.Ordinal);
         Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
+        Assert.Contains("ReadableBodyCellRightPadding", code, StringComparison.Ordinal);
+        Assert.Contains("Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 26)", code, StringComparison.Ordinal);
+        Assert.Contains("Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 20)", code, StringComparison.Ordinal);
         Assert.Contains("BlockUIContainer", code, StringComparison.Ordinal);
         Assert.Contains("_readableBodyParagraphs", code, StringComparison.Ordinal);
         Assert.Contains("new CommandBinding(ApplicationCommands.Copy", code, StringComparison.Ordinal);
