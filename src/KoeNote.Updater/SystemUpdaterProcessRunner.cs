@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.ComponentModel;
+using System.IO;
 
 namespace KoeNote.Updater;
 

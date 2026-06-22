@@ -15,7 +15,8 @@ public static class Program
             }
 
             var options = UpdaterOptions.Parse(args);
-            var service = new UpdaterService(new SystemUpdaterProcessRunner());
+            await using var progressReporter = WpfUpdaterProgressReporter.CreateIfInteractive();
+            var service = new UpdaterService(new SystemUpdaterProcessRunner(), progressReporter);
             return (int)await service.ExecuteAsync(options);
         }
         catch (ArgumentException exception)
