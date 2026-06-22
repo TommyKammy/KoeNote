@@ -182,6 +182,7 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("new Table", code, StringComparison.Ordinal);
         Assert.Contains("ReadableMetaColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("UpdateReadableDocumentLayoutWidth", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateReadableDocumentLayoutWidth(e.NewSize.Width)", code, StringComparison.Ordinal);
         Assert.Contains("GetReadableBodyColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("document.PageWidth = contentWidth", code, StringComparison.Ordinal);
         Assert.Contains("document.ColumnWidth = contentWidth", code, StringComparison.Ordinal);
