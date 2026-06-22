@@ -61,6 +61,39 @@ public sealed class ReadablePolishedPanelRenderingHelperTests
         Assert.Equal(Color.FromRgb(0x5B, 0x64, 0x72), palette.ForegroundColor);
     }
 
+    [Fact]
+    public void LayoutCalculator_KeepsDocumentWidthInsideViewportWithRightGutter()
+    {
+        var contentWidth = ReadableDocumentLayoutCalculator.CalculateContentWidth(
+            viewportWidth: 1000,
+            metaColumnWidth: 122,
+            rightGutter: 48);
+        var bodyWidth = ReadableDocumentLayoutCalculator.CalculateBodyColumnWidth(
+            contentWidth,
+            metaColumnWidth: 122);
+
+        Assert.Equal(952, contentWidth);
+        Assert.Equal(830, bodyWidth);
+        Assert.True(contentWidth < 1000);
+        Assert.Equal(contentWidth, 122 + bodyWidth);
+    }
+
+    [Fact]
+    public void LayoutCalculator_DoesNotForceMinimumBodyWidthPastNarrowViewport()
+    {
+        var contentWidth = ReadableDocumentLayoutCalculator.CalculateContentWidth(
+            viewportWidth: 180,
+            metaColumnWidth: 122,
+            rightGutter: 48);
+        var bodyWidth = ReadableDocumentLayoutCalculator.CalculateBodyColumnWidth(
+            contentWidth,
+            metaColumnWidth: 122);
+
+        Assert.Equal(132, contentWidth);
+        Assert.Equal(10, bodyWidth);
+        Assert.Equal(contentWidth, 122 + bodyWidth);
+    }
+
     private static ReadableDocumentBlock Block(double? startSeconds, double? endSeconds)
     {
         return new ReadableDocumentBlock(

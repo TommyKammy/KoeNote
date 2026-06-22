@@ -16,6 +16,7 @@ public partial class ReadablePolishedPanel : UserControl
 {
     private const double ReadableMetaColumnWidth = 122;
     private const double ReadableDocumentScrollbarReserve = 24;
+    private const double ReadableDocumentRightGutter = 48;
 
     private INotifyPropertyChanged? _subscribedViewModel;
     private readonly List<FrameworkContentElement> _readableBlockAnchors = [];
@@ -521,20 +522,18 @@ public partial class ReadablePolishedPanel : UserControl
             }
 
             table.Columns[0].Width = new GridLength(ReadableMetaColumnWidth);
-            table.Columns[1].Width = new GridLength(GetReadableBodyColumnWidth(contentWidth));
+            table.Columns[1].Width = new GridLength(
+                ReadableDocumentLayoutCalculator.CalculateBodyColumnWidth(contentWidth, ReadableMetaColumnWidth));
             return;
         }
     }
 
     private double GetReadableBodyColumnWidth() =>
-        GetReadableBodyColumnWidth(GetReadableDocumentContentWidth());
-
-    private static double GetReadableBodyColumnWidth(double contentWidth) =>
-        Math.Max(320, contentWidth - ReadableMetaColumnWidth);
+        ReadableDocumentLayoutCalculator.CalculateBodyColumnWidth(GetReadableDocumentContentWidth(), ReadableMetaColumnWidth);
 
     private double GetReadableDocumentContentWidth()
     {
-        var width = ReadableDocumentRichTextBox.ActualWidth;
+        var width = GetReadableDocumentViewportWidth();
         if (double.IsNaN(width) || width <= 0)
         {
             width = ReadableDocumentRichTextBox.RenderSize.Width;
@@ -545,7 +544,30 @@ public partial class ReadablePolishedPanel : UserControl
             width = 900;
         }
 
-        return Math.Max(ReadableMetaColumnWidth + 320, width - ReadableDocumentScrollbarReserve);
+        return ReadableDocumentLayoutCalculator.CalculateContentWidth(
+            width,
+            ReadableMetaColumnWidth,
+            ReadableDocumentRightGutter);
+    }
+
+    private double GetReadableDocumentViewportWidth()
+    {
+        var scroller = FindVisualChild<ScrollViewer>(ReadableDocumentRichTextBox);
+        if (scroller is not null &&
+            !double.IsNaN(scroller.ViewportWidth) &&
+            !double.IsInfinity(scroller.ViewportWidth) &&
+            scroller.ViewportWidth > 0)
+        {
+            return scroller.ViewportWidth;
+        }
+
+        var width = ReadableDocumentRichTextBox.ActualWidth;
+        if (double.IsNaN(width) || width <= 0)
+        {
+            return width;
+        }
+
+        return Math.Max(0, width - ReadableDocumentScrollbarReserve);
     }
 
     private static ContextMenu BuildReadOnlyTextContextMenu(RichTextBox body)
@@ -719,5 +741,32 @@ public partial class ReadablePolishedPanel : UserControl
 
             inlines.Add(run);
         }
+    }
+}
+
+internal static class ReadableDocumentLayoutCalculator
+{
+    private const double MinimumBodyColumnWidth = 1;
+
+    public static double CalculateContentWidth(double viewportWidth, double metaColumnWidth, double rightGutter)
+    {
+        if (double.IsNaN(viewportWidth) || double.IsInfinity(viewportWidth) || viewportWidth <= 0)
+        {
+            return metaColumnWidth + MinimumBodyColumnWidth;
+        }
+
+        return Math.Max(
+            metaColumnWidth + MinimumBodyColumnWidth,
+            viewportWidth - Math.Max(0, rightGutter));
+    }
+
+    public static double CalculateBodyColumnWidth(double contentWidth, double metaColumnWidth)
+    {
+        if (double.IsNaN(contentWidth) || double.IsInfinity(contentWidth))
+        {
+            return MinimumBodyColumnWidth;
+        }
+
+        return Math.Max(MinimumBodyColumnWidth, contentWidth - metaColumnWidth);
     }
 }
