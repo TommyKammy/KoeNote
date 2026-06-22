@@ -36,6 +36,36 @@ public sealed class UpdaterHelperTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ReportsInstallAndRelaunchProgress()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        var targetExe = Path.Combine(root, "KoeNote.App.exe");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        await File.WriteAllTextAsync(targetExe, "app");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            targetExe,
+            root,
+            0,
+            Path.Combine(root, "update.log"),
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var reporter = new RecordingUpdaterProgressReporter();
+        var service = new UpdaterService(new RecordingUpdaterProcessRunner(), reporter);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.Success, exitCode);
+        Assert.True(reporter.WasShown);
+        Assert.Contains(reporter.Statuses, status => status.Title == "インストーラーを確認しています");
+        Assert.Contains(reporter.Statuses, status => status.Title == "KoeNoteを更新しています");
+        Assert.Contains(reporter.Statuses, status => status.Title == "KoeNoteを再起動しています");
+        Assert.Empty(reporter.TerminalStatuses);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AbortsWhenParentDoesNotExitBeforeTimeout()
     {
         var root = CreateTempRoot();
@@ -116,6 +146,35 @@ public sealed class UpdaterHelperTests
         Assert.Equal(UpdaterExitCode.InstallFailed, exitCode);
         Assert.Empty(runner.Starts);
         Assert.Contains("1603", ReadResult(options.ResultPath).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShowsTerminalProgressWhenInstallFails()
+    {
+        var root = CreateTempRoot();
+        var msiPath = Path.Combine(root, "KoeNote.msi");
+        var logPath = Path.Combine(root, "update.log");
+        await File.WriteAllTextAsync(msiPath, "installer");
+        var options = new UpdaterOptions(
+            msiPath,
+            ComputeSha256("installer"),
+            Path.Combine(root, "KoeNote.App.exe"),
+            root,
+            0,
+            logPath,
+            Path.Combine(root, "update.result.json"),
+            "0.20.0");
+        var reporter = new RecordingUpdaterProgressReporter();
+        var runner = new RecordingUpdaterProcessRunner { InstallExitCode = 1603 };
+        var service = new UpdaterService(runner, reporter);
+
+        var exitCode = await service.ExecuteAsync(options);
+
+        Assert.Equal(UpdaterExitCode.InstallFailed, exitCode);
+        var terminal = Assert.Single(reporter.TerminalStatuses);
+        Assert.Equal("KoeNoteの更新に失敗しました", terminal.Title);
+        Assert.Contains("1603", terminal.Message, StringComparison.Ordinal);
+        Assert.Equal(logPath, terminal.LogPath);
     }
 
     [Fact]
@@ -344,4 +403,38 @@ public sealed class UpdaterHelperTests
     }
 
     private sealed record RunCapture(string FileName, string[] Arguments);
+
+    private sealed class RecordingUpdaterProgressReporter : IUpdaterProgressReporter
+    {
+        public bool WasShown { get; private set; }
+
+        public List<ProgressStatus> Statuses { get; } = [];
+
+        public List<TerminalProgressStatus> TerminalStatuses { get; } = [];
+
+        public void Show(UpdaterOptions options)
+        {
+            WasShown = true;
+        }
+
+        public void ReportStatus(string title, string message)
+        {
+            Statuses.Add(new ProgressStatus(title, message));
+        }
+
+        public Task ReportTerminalAsync(string title, string message, string logPath, CancellationToken cancellationToken)
+        {
+            TerminalStatuses.Add(new TerminalProgressStatus(title, message, logPath));
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed record ProgressStatus(string Title, string Message);
+
+    private sealed record TerminalProgressStatus(string Title, string Message, string LogPath);
 }

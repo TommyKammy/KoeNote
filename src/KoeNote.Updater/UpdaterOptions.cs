@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace KoeNote.Updater;
 
 public sealed record UpdaterOptions(
