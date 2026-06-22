@@ -10,6 +10,17 @@ internal sealed class UpdatePresentationPresenter
             !string.IsNullOrWhiteSpace(message);
     }
 
+    public bool HasForegroundNotification(string title, string message, bool isSuppressed)
+    {
+        return !isSuppressed && HasNotification(title, message);
+    }
+
+    public bool ShouldSuppressNotificationDuringBackgroundDownload(string title, bool isMandatory)
+    {
+        return !isMandatory &&
+            title.StartsWith("Update available:", StringComparison.Ordinal);
+    }
+
     public bool HasVerifiedInstaller(string installerPath)
     {
         return !string.IsNullOrWhiteSpace(installerPath);

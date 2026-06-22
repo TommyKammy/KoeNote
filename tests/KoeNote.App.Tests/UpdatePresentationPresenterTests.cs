@@ -26,6 +26,44 @@ public sealed class UpdatePresentationPresenterTests
     }
 
     [Fact]
+    public void HasForegroundNotification_HidesNotificationOnlyForBackgroundDownloads()
+    {
+        var presenter = new UpdatePresentationPresenter();
+
+        Assert.True(presenter.HasForegroundNotification(
+            "Update available",
+            "Foreground download progress is visible.",
+            isSuppressed: false));
+        Assert.False(presenter.HasForegroundNotification(
+            "Update available",
+            "Downloading quietly.",
+            isSuppressed: true));
+        Assert.False(presenter.HasForegroundNotification(
+            string.Empty,
+            string.Empty,
+            isSuppressed: false));
+    }
+
+    [Fact]
+    public void ShouldSuppressNotificationDuringBackgroundDownload_SuppressesOnlyOptionalAvailableNotice()
+    {
+        var presenter = new UpdatePresentationPresenter();
+
+        Assert.True(presenter.ShouldSuppressNotificationDuringBackgroundDownload(
+            "Update available: KoeNote 0.20.1",
+            isMandatory: false));
+        Assert.False(presenter.ShouldSuppressNotificationDuringBackgroundDownload(
+            "Required update: KoeNote 0.20.1",
+            isMandatory: true));
+        Assert.False(presenter.ShouldSuppressNotificationDuringBackgroundDownload(
+            "Update check failed",
+            isMandatory: false));
+        Assert.False(presenter.ShouldSuppressNotificationDuringBackgroundDownload(
+            "Update download failed",
+            isMandatory: false));
+    }
+
+    [Fact]
     public void ActionVisibility_ReflectsUpdateInstallerAndRunState()
     {
         var presenter = new UpdatePresentationPresenter();
