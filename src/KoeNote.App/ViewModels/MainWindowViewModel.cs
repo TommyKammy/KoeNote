@@ -178,6 +178,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private LatestReleaseInfo? _activeUpdateDownloadRelease;
     private int _updateDownloadGeneration;
     private bool _startBackgroundUpdateDownloadAfterCurrentDownload;
+    private bool _isBackgroundUpdateDownloadInProgress;
     private bool _isDatabaseMaintenanceInProgress;
     private bool _isUpdateCheckInProgress;
     private bool _isUpdateDownloadInProgress;

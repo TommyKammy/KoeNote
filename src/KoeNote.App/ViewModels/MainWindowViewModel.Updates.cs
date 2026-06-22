@@ -34,7 +34,7 @@ public sealed partial class MainWindowViewModel
     public bool HasUpdateNotification => _updatePresentationPresenter.HasForegroundNotification(
         UpdateNotificationTitle,
         UpdateNotificationMessage,
-        IsUpdateDownloadInProgress);
+        _isBackgroundUpdateDownloadInProgress);
 
     public bool IsUpdateMandatory => _availableUpdate?.Mandatory == true;
 
@@ -257,6 +257,7 @@ public sealed partial class MainWindowViewModel
 
         var generation = isBackground ? BeginUpdateDownloadSnapshot() : _updateDownloadGeneration;
         _activeUpdateDownloadRelease = release;
+        SetBackgroundUpdateDownloadInProgress(isBackground);
         IsUpdateDownloadInProgress = true;
         VerifiedUpdateInstallerPath = string.Empty;
         UpdateDownloadProgressText = isBackground ? string.Empty : "Downloading update...";
@@ -319,6 +320,7 @@ public sealed partial class MainWindowViewModel
             var shouldStartNextBackgroundDownload = _startBackgroundUpdateDownloadAfterCurrentDownload;
             _startBackgroundUpdateDownloadAfterCurrentDownload = false;
             IsUpdateDownloadInProgress = false;
+            SetBackgroundUpdateDownloadInProgress(false);
             OnPropertyChanged(nameof(CanShowUpdateDownloadAction));
             if (shouldStartNextBackgroundDownload)
             {
@@ -351,6 +353,15 @@ public sealed partial class MainWindowViewModel
     private int BeginUpdateDownloadSnapshot()
     {
         return ++_updateDownloadGeneration;
+    }
+
+    private void SetBackgroundUpdateDownloadInProgress(bool value)
+    {
+        if (_isBackgroundUpdateDownloadInProgress != value)
+        {
+            _isBackgroundUpdateDownloadInProgress = value;
+            OnPropertyChanged(nameof(HasUpdateNotification));
+        }
     }
 
     private void InvalidateUpdateDownloadSnapshot()
