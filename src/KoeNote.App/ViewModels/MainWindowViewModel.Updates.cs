@@ -34,7 +34,12 @@ public sealed partial class MainWindowViewModel
     public bool HasUpdateNotification => _updatePresentationPresenter.HasForegroundNotification(
         UpdateNotificationTitle,
         UpdateNotificationMessage,
-        _isBackgroundUpdateDownloadInProgress);
+        ShouldSuppressUpdateNotificationForBackgroundDownload);
+
+    private bool ShouldSuppressUpdateNotificationForBackgroundDownload => _isBackgroundUpdateDownloadInProgress &&
+        _updatePresentationPresenter.ShouldSuppressNotificationDuringBackgroundDownload(
+            UpdateNotificationTitle,
+            IsUpdateMandatory);
 
     public bool IsUpdateMandatory => _availableUpdate?.Mandatory == true;
 
