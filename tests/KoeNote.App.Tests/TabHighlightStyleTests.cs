@@ -182,12 +182,16 @@ public sealed class TabHighlightStyleTests
         Assert.Contains("new Table", code, StringComparison.Ordinal);
         Assert.Contains("ReadableMetaColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("UpdateReadableDocumentLayoutWidth", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateReadableDocumentLayoutWidth(e.NewSize.Width)", code, StringComparison.Ordinal);
         Assert.Contains("GetReadableBodyColumnWidth", code, StringComparison.Ordinal);
         Assert.Contains("document.PageWidth = contentWidth", code, StringComparison.Ordinal);
         Assert.Contains("document.ColumnWidth = contentWidth", code, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment = HorizontalAlignment.Left", code, StringComparison.Ordinal);
         Assert.DoesNotContain("GridUnitType.Star", code, StringComparison.Ordinal);
         Assert.Contains("BuildBodyCell", code, StringComparison.Ordinal);
+        Assert.Contains("ReadableBodyCellRightPadding", code, StringComparison.Ordinal);
+        Assert.Contains("Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 26)", code, StringComparison.Ordinal);
+        Assert.Contains("Padding = new Thickness(0, 0, ReadableBodyCellRightPadding, 20)", code, StringComparison.Ordinal);
         Assert.Contains("BlockUIContainer", code, StringComparison.Ordinal);
         Assert.Contains("_readableBodyParagraphs", code, StringComparison.Ordinal);
         Assert.Contains("new CommandBinding(ApplicationCommands.Copy", code, StringComparison.Ordinal);
