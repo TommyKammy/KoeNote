@@ -446,6 +446,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
         viewModel.Segments.Add(first);
         viewModel.Segments.Add(second);
         viewModel.PlaybackPositionSeconds = 1;
+        var initialAutoScrollRequestId = viewModel.TranscriptAutoScrollRequestId;
 
         Assert.True(viewModel.SkipToNextSegmentCommand.CanExecute(null));
 
@@ -453,7 +454,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
 
         Assert.Equal("segment-002", viewModel.SelectedSegment?.SegmentId);
         Assert.Equal(5, viewModel.PlaybackPositionSeconds, 2);
-        Assert.Equal(1, viewModel.TranscriptAutoScrollRequestId);
+        Assert.Equal(initialAutoScrollRequestId + 1, viewModel.TranscriptAutoScrollRequestId);
     }
 
     [Fact]
@@ -908,6 +909,7 @@ public sealed class MainWindowViewModelJobTests : MainWindowViewModelTestBase
             new TranscriptSegment("segment-001", job.JobId, 0, 5, "Speaker_0", "first raw", "first readable")
         ]);
         var viewModel = new MainWindowViewModel(paths);
+        viewModel.IsDetailLayoutSelected = true;
 
         Assert.Equal("first readable", viewModel.SelectedSegmentEditText);
 
