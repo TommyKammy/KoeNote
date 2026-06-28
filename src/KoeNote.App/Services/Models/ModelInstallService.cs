@@ -80,7 +80,7 @@ public sealed class ModelInstallService(
 
     public string GetDefaultInstallPath(ModelCatalogItem catalogItem, string storageRoot)
     {
-        if (catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase))
+        if (IsReviewFileModelRole(catalogItem.Role))
         {
             return Path.Combine(
                 storageRoot,
@@ -90,6 +90,12 @@ public sealed class ModelInstallService(
         }
 
         return Path.Combine(storageRoot, catalogItem.Role, catalogItem.ModelId);
+    }
+
+    private static bool IsReviewFileModelRole(string role)
+    {
+        return role.Equals("review", StringComparison.OrdinalIgnoreCase) ||
+            role.Equals("review_aux", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveDownloadFileName(ModelCatalogItem catalogItem)

@@ -4,6 +4,7 @@ using System.Net;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Diarization;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
@@ -381,15 +382,15 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_SelectModel_RejectsHiddenGemma12BReviewModel()
+    public void SetupWizard_SelectModel_AllowsGemma12BReviewModel()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         var wizard = CreateWizard(paths);
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            wizard.SelectModel("review", "gemma-4-12b-it-qat-q4-0"));
+        var state = wizard.SelectModel("review", "gemma-4-12b-it-qat-q4-0");
 
-        Assert.Contains("not selectable", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
+        Assert.Equal("custom", state.SetupMode);
     }
 
     [Fact]
@@ -418,7 +419,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_LoadState_RepairsHiddenGemma12BReviewSelection()
+    public void SetupWizard_LoadState_PreservesGemma12BReviewSelection()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
@@ -436,10 +437,10 @@ public sealed class SetupWizardServiceTests
 
         var state = wizard.LoadState();
 
-        Assert.False(state.IsCompleted);
-        Assert.False(state.LastSmokeSucceeded);
-        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.True(state.IsCompleted);
+        Assert.True(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.Complete, state.CurrentStep);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
     }
 
     [Fact]
@@ -556,6 +557,69 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_InstallSelectedPresetModels_DownloadsGemma12BMtpDraftForHighAccuracyPreset()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        Directory.CreateDirectory(Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3"));
+        var reviewPath = Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4-0", "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(reviewPath);
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3"));
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+        var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("draft-model")));
+        wizard.SelectModelPreset("high_accuracy");
+        wizard.AcceptLicenses();
+
+        var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+
+        Assert.True(result.IsSucceeded);
+        Assert.Equal(3, result.InstalledModels.Count);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == "faster-whisper-large-v3");
+        Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.ModelId);
+        var draft = Assert.Single(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.MtpDraftModelId);
+        Assert.Equal("review_aux", draft.Role);
+        Assert.True(File.Exists(draft.FilePath));
+        Assert.EndsWith(Gemma12BLocalValidation.MtpDraftFileName, draft.FilePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SetupStep.Install, wizard.LoadState().CurrentStep);
+    }
+
+    [Fact]
+    public async Task SetupWizard_RunSmokeCheck_FailsWhenGemma12BMtpRequirementsAreMissing()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        var reviewPath = Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4-0", "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(reviewPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+        var wizard = CreateWizard(paths);
+        wizard.SelectModelPreset("high_accuracy");
+        wizard.AcceptLicenses();
+
+        var result = await wizard.RunSmokeCheckAsync();
+
+        Assert.False(result.IsSucceeded);
+        Assert.Contains(result.Checks, check =>
+            check.Name == "Gemma 4 12B MTP server runtime" &&
+            !check.IsOk &&
+            check.Detail.Contains("llama-server.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Checks, check =>
+            check.Name == "Gemma 4 12B MTP draft model" &&
+            !check.IsOk &&
+            check.Detail.Contains(Gemma12BLocalValidation.MtpDraftModelId, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SetupWizard_AutomaticPresetRecommendation_SelectsLightweightForLowResourceHost()
     {
         var paths = CreatePaths();
@@ -631,7 +695,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithoutGemma12B()
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithGemma12B()
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
@@ -646,7 +710,7 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("high_accuracy", recommendation.PresetId);
         Assert.Equal("high_accuracy", state.SelectedModelPresetId);
         Assert.Equal("faster-whisper-large-v3", state.SelectedAsrModelId);
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
     }
 
     [Fact]
@@ -1820,6 +1884,17 @@ public sealed class SetupWizardServiceTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }
+    }
+
+    private sealed class BytesHandler(string content) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(content))
+            });
         }
     }
 

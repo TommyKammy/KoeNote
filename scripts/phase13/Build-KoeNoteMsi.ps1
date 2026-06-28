@@ -168,6 +168,12 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
 }
 Write-UpdateLog "review_runtime_verified" @{ path = $reviewRuntimePath }
 
+$reviewServerRuntimePath = Join-Path $publishDir "tools\review\llama-server.exe"
+if (-not (Test-Path -LiteralPath $reviewServerRuntimePath -PathType Leaf)) {
+    throw "Review server runtime is required for Gemma 4 12B MTP but was not published: $reviewServerRuntimePath"
+}
+Write-UpdateLog "review_server_runtime_verified" @{ path = $reviewServerRuntimePath }
+
 $reviewGpuBridgePath = Join-Path $publishDir "tools\review\ggml-cuda.dll"
 if (-not (Test-Path -LiteralPath $reviewGpuBridgePath -PathType Leaf)) {
     throw "Review GPU bridge is required for GPU-ready release MSI builds but was not published: $reviewGpuBridgePath"

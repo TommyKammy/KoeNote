@@ -76,6 +76,10 @@ public sealed class TranscriptPolishingService(
         {
             return SaveFailed(options, sourceHash, exception.Message, sourceSegmentRange);
         }
+        finally
+        {
+            EndRuntimeSession(options);
+        }
 
         var content = string.Join(Environment.NewLine + Environment.NewLine, chunkResults.Select(static result => result.Content.Trim()))
             .Trim();
@@ -168,6 +172,22 @@ public sealed class TranscriptPolishingService(
             sourceHash,
             0,
             TimeSpan.Zero);
+    }
+
+    private void EndRuntimeSession(TranscriptPolishingOptions options)
+    {
+        if (runtime is not ITranscriptPolishingRuntimeSession runtimeSession)
+        {
+            return;
+        }
+
+        try
+        {
+            runtimeSession.EndPolishingSession(options);
+        }
+        catch (Exception)
+        {
+        }
     }
 
     private async Task<TranscriptPolishingChunkResult?> TryPolishChunkWithModelFallbackAsync(

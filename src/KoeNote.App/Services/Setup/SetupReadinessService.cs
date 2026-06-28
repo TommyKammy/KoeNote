@@ -36,7 +36,8 @@ internal sealed class SetupReadinessService(
         return new SetupStepReadiness(
             EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
             AsrModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
-            ReviewModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedReviewModelId, "review"),
+            ReviewModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedReviewModelId, "review") &&
+                _auditBuilder.IsSelectedGemma12BMtpDraftReady(state.SelectedReviewModelId),
             ReviewRuntimeReady: _auditBuilder.IsSelectedReviewRuntimeReady(state.SelectedReviewModelId),
             GpuRuntimeReady: !resources.NvidiaGpuDetected ||
                 (AsrCudaRuntimeLayout.HasPackage(paths) && CudaReviewRuntimeLayout.HasPackage(paths)),
@@ -140,6 +141,7 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId));
 
         if (resources.NvidiaGpuDetected)
         {
@@ -168,6 +170,7 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId));
 
         if (resources.NvidiaGpuDetected)
         {

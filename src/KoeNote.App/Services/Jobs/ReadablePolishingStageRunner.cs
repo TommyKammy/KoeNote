@@ -61,6 +61,22 @@ public sealed class ReadablePolishingStageRunner(
                     $"Gemma 4 12B local validation fallback enabled: {fallbackOptions.ModelId}");
             }
 
+            var polishingOptions = BuildPolishingOptions(
+                job.JobId,
+                profile,
+                taskSettings,
+                promptSettings,
+                outputDirectory,
+                fallbackOptions);
+            if (polishingOptions.UseLlamaServerChatMtp)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "polishing",
+                    "info",
+                    $"Gemma 4 12B MTP server runtime enabled: server=\"{polishingOptions.LlamaServerPath}\" draft=\"{polishingOptions.MtpDraftModelPath}\" draft_tokens={polishingOptions.MtpDraftTokens}");
+            }
+
             jobLogRepository.AddEvent(job.JobId, "polishing", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             jobLogRepository.AddEvent(
                 job.JobId,
@@ -70,13 +86,7 @@ public sealed class ReadablePolishingStageRunner(
             report(new JobRunUpdate(RefreshLogs: true));
 
             var result = await polishingService.PolishAsync(
-                BuildPolishingOptions(
-                    job.JobId,
-                    profile,
-                    taskSettings,
-                    promptSettings,
-                    outputDirectory,
-                    fallbackOptions),
+                polishingOptions,
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(result.Content))
@@ -229,6 +239,14 @@ public sealed class ReadablePolishingStageRunner(
         string outputDirectory,
         TranscriptPolishingOptions? fallbackOptions)
     {
+        var useMtpServer = TryResolveGemma12BMtpServer(
+            profile,
+            out var llamaServerPath,
+            out var mtpDraftModelPath);
+        var generationProfile = useMtpServer
+            ? $"{taskSettings.GenerationProfile}; runtime=llama-server-chat-mtp"
+            : taskSettings.GenerationProfile;
+
         return new TranscriptPolishingOptions(
             jobId,
             profile.LlamaCompletionPath,
@@ -236,7 +254,7 @@ public sealed class ReadablePolishingStageRunner(
             outputDirectory,
             profile.ModelId,
             taskSettings.PromptTemplateId,
-            taskSettings.GenerationProfile,
+            generationProfile,
             promptSettings.PromptVersion,
             ChunkSegmentCount: taskSettings.ChunkSegmentCount,
             Timeout: profile.Timeout,
@@ -253,6 +271,50 @@ public sealed class ReadablePolishingStageRunner(
             ThreadsBatch: profile.ThreadsBatch,
             PromptSettings: promptSettings,
             RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths),
-            ChunkFallbackOptions: fallbackOptions);
+            ChunkFallbackOptions: fallbackOptions,
+            UseLlamaServerChatMtp: useMtpServer,
+            LlamaServerPath: llamaServerPath,
+            MtpDraftModelPath: mtpDraftModelPath);
+    }
+
+    private bool TryResolveGemma12BMtpServer(
+        LlmRuntimeProfile profile,
+        out string? llamaServerPath,
+        out string? mtpDraftModelPath)
+    {
+        llamaServerPath = null;
+        mtpDraftModelPath = null;
+
+        if (!Gemma12BLocalValidation.IsTargetModel(profile.ModelId) ||
+            !Gemma12BLocalValidation.IsMtpServerEnabled())
+        {
+            return false;
+        }
+
+        llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(profile.LlamaCompletionPath);
+        mtpDraftModelPath = ResolveMtpDraftModelPath();
+        return true;
+    }
+
+    private string ResolveMtpDraftModelPath()
+    {
+        var configuredDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configuredDraft))
+        {
+            return configuredDraft;
+        }
+
+        var installedDraft = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installedDraft is not null &&
+            installedDraft.Verified &&
+            File.Exists(installedDraft.FilePath))
+        {
+            return installedDraft.FilePath;
+        }
+
+        var storageRoot = setupStateService.Load().StorageRoot;
+        return string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
     }
 }

@@ -159,6 +159,17 @@ internal sealed class SetupModelSelectionService(
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
     }
 
+    public ModelCatalogItem? GetCatalogItemById(string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return null;
+        }
+
+        return modelCatalogService.LoadBuiltInCatalog().Models
+            .FirstOrDefault(model => model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
     private ModelCatalogEntry? PickRecommended(string role)
     {
         var recommendedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)

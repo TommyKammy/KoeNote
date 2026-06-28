@@ -1,8 +1,8 @@
+using System.Net;
+using System.Net.Http;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
-using System.Net;
-using System.Net.Http;
 
 namespace KoeNote.App.Tests;
 
@@ -21,48 +21,32 @@ public sealed class ModelCatalogServiceTests
         Assert.Equal(
             ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo", "kotoba-whisper-v2.2-faster", "whisper-base", "whisper-small"],
             asrModels.Order(StringComparer.OrdinalIgnoreCase).ToArray());
-        Assert.Contains(entries, entry => entry.ModelId == "whisper-base" && entry.Role == "asr" && entry.QualityLabelSummary.Contains("軽量", StringComparison.Ordinal));
+        Assert.Contains(entries, entry => entry.ModelId == "whisper-base" && entry.Role == "asr");
         Assert.Contains(entries, entry => entry.ModelId == "kotoba-whisper-v2.2-faster" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "faster-whisper-large-v3-turbo" && entry.Role == "asr" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "llm-jp-4-8b-thinking-q4-k-m" && entry.Role == "review" && entry.IsDirectDownloadSupported);
         Assert.Contains(entries, entry => entry.ModelId == "bonsai-8b-q1-0" && entry.Role == "review" && entry.IsDirectDownloadSupported && entry.CatalogItem.Status == "available");
         Assert.Contains(entries, entry => entry.ModelId == "gemma-4-e4b-it-q4-k-m" && entry.Role == "review" && entry.CatalogItem.OutputSanitizerProfile == "markdownSectionOnly");
-        Assert.DoesNotContain(entries, entry => entry.ModelId == "gemma-4-12b-it-qat-q4-0");
+        Assert.Contains(entries, entry => entry.ModelId == Gemma12BLocalValidation.ModelId && entry.Role == "review" && entry.CatalogItem.Status == "available");
+        Assert.DoesNotContain(entries, entry => entry.ModelId == Gemma12BLocalValidation.MtpDraftModelId);
         Assert.DoesNotContain(entries, entry => entry.ModelId == "ternary-bonsai-8b-q2-0");
+
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         Assert.Contains(catalog.Models, model =>
-            model.ModelId == "gemma-4-12b-it-qat-q4-0" &&
+            model.ModelId == Gemma12BLocalValidation.ModelId &&
             model.Role == "review" &&
             model.Family == "gemma" &&
             model.Runtime.PackageId == "runtime-llama-cpp" &&
             model.SizeBytes == 6975877728 &&
-            model.RecommendedFor.Contains("gemma4_12b_disabled_pending_llama_cpp_fix") &&
-            model.Status == "hidden");
+            model.Requirements.GpuRequired &&
+            model.RecommendedFor.Contains("gemma4_12b_mtp") &&
+            model.Status == "available");
+        Assert.Contains(catalog.Models, model =>
+            model.ModelId == Gemma12BLocalValidation.MtpDraftModelId &&
+            model.Role == "review_aux" &&
+            model.Status == "hidden" &&
+            model.Download.Url!.Contains("gemma-4-12B-it-qat-assistant-MTP-Q8_0.gguf", StringComparison.Ordinal));
         Assert.Contains(catalog.Models, model => model.ModelId == "ternary-bonsai-8b-q2-0" && model.Status == "hidden");
-    }
-
-    [Fact]
-    public void ListEntries_IncludesGemma12BWhenLocalValidationFlagIsEnabled()
-    {
-        var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);
-        try
-        {
-            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, "1");
-            var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
-            paths.EnsureCreated();
-            new DatabaseInitializer(paths).EnsureCreated();
-
-            var entries = new ModelCatalogService(paths).ListEntries();
-
-            Assert.Contains(entries, entry =>
-                entry.ModelId == Gemma12BLocalValidation.ModelId &&
-                entry.Role == "review" &&
-                entry.CatalogItem.Status == "hidden");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, previous);
-        }
     }
 
     [Fact]
@@ -82,23 +66,18 @@ public sealed class ModelCatalogServiceTests
         Assert.Equal("bonsai-8b-q1-0", ultraLightweight.ReviewModelId);
 
         var lightweight = presets.Single(preset => preset.PresetId == "lightweight");
-        Assert.Equal("軽量", lightweight.QualityLabel);
         Assert.Equal("whisper-small", lightweight.AsrModelId);
         Assert.Equal("bonsai-8b-q1-0", lightweight.ReviewModelId);
-        Assert.DoesNotContain("Reviewは実験的", lightweight.Badges);
 
         var recommended = presets.Single(preset => preset.PresetId == "recommended");
-        Assert.Equal("推奨", recommended.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", recommended.AsrModelId);
         Assert.Equal("gemma-4-e4b-it-q4-k-m", recommended.ReviewModelId);
 
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
-        Assert.Equal("高精度", highAccuracy.QualityLabel);
         Assert.Equal("faster-whisper-large-v3", highAccuracy.AsrModelId);
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
+        Assert.Equal(Gemma12BLocalValidation.ModelId, highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
-        Assert.Equal("実験的", experimental.QualityLabel);
         Assert.Equal("faster-whisper-large-v3-turbo", experimental.AsrModelId);
         Assert.Equal("gemma-4-e4b-it-q4-k-m", experimental.ReviewModelId);
     }
@@ -136,7 +115,7 @@ public sealed class ModelCatalogServiceTests
         var catalogService = new ModelCatalogService(paths);
         var repository = new InstalledModelRepository(paths);
         var installService = new ModelInstallService(paths, repository, new ModelVerificationService());
-        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "ternary-bonsai-8b-q2-0");
         var modelPath = installService.GetDefaultInstallPath(catalogItem);
         Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
         File.WriteAllText(modelPath, "hidden model");
@@ -157,7 +136,7 @@ public sealed class ModelCatalogServiceTests
         new DatabaseInitializer(paths).EnsureCreated();
         var catalogService = new ModelCatalogService(paths);
         var repository = new InstalledModelRepository(paths);
-        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "ternary-bonsai-8b-q2-0");
         repository.UpsertInstalledModel(new InstalledModel(
             catalogItem.ModelId,
             catalogItem.Role,
@@ -188,13 +167,13 @@ public sealed class ModelCatalogServiceTests
         paths.EnsureCreated();
         new DatabaseInitializer(paths).EnsureCreated();
         var catalogService = new ModelCatalogService(paths);
-        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var catalogItem = catalogService.LoadBuiltInCatalog().Models.First(model => model.ModelId == "ternary-bonsai-8b-q2-0");
         var downloadJobs = new ModelDownloadJobRepository(paths);
         var downloadId = downloadJobs.Start(
             catalogItem.ModelId,
             catalogItem.Download.Url!,
-            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf"),
-            Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4_0.gguf.partial"),
+            Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0.gguf"),
+            Path.Combine(paths.UserModels, "review", "ternary-bonsai-8b-q2-0.gguf.partial"),
             catalogItem.Download.Sha256);
         downloadJobs.MarkPaused(downloadId);
 

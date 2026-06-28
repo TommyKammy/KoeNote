@@ -124,7 +124,7 @@ public sealed class LlmProfileResolverTests
     }
 
     [Fact]
-    public void Resolve_FallsBackToInstalledDefaultGemmaPathWhenSelectedGemmaModelIsHidden()
+    public void Resolve_DoesNotFallbackToE4BWhenGemma12BIsSelected()
     {
         var paths = TestDatabase.CreateReadyPaths();
         var fallbackPath = Path.Combine(paths.Root, "models", "gemma-e4b.gguf");
@@ -151,14 +151,15 @@ public sealed class LlmProfileResolverTests
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var resolver = new LlmProfileResolver(paths, repository);
 
-        var profile = resolver.Resolve(catalog, "gemma-4-12b-it-qat-q4-0");
+        var profile = resolver.Resolve(catalog, Gemma12BLocalValidation.ModelId);
 
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", profile.ModelId);
-        Assert.Equal(fallbackPath, profile.ModelPath);
+        Assert.Equal(Gemma12BLocalValidation.ModelId, profile.ModelId);
+        Assert.NotEqual(fallbackPath, profile.ModelPath);
+        Assert.EndsWith("gemma-4-12b-it-qat-q4_0.gguf", profile.ModelPath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Resolve_AllowsHiddenGemma12BWhenLocalValidationFlagIsEnabled()
+    public void Resolve_AllowsGemma12BAsSelectableHighAccuracyModel()
     {
         var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);
         try

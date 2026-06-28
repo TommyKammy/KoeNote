@@ -1,4 +1,5 @@
 using System.IO;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 
@@ -61,7 +62,23 @@ internal sealed class SetupReadinessAuditBuilder(
 
     public bool IsSelectedReviewRuntimeReady(string? modelId)
     {
-        return File.Exists(GetSelectedReviewRuntimePath(modelId));
+        return File.Exists(GetSelectedReviewRuntimePath(modelId)) &&
+            (!Gemma12BLocalValidation.IsTargetModel(modelId) ||
+             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath)));
+    }
+
+    public bool IsSelectedGemma12BMtpDraftReady(string? modelId)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return true;
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        return installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath);
     }
 
     public bool IsSelectedTernaryReviewRuntimeMissing(SetupState state)
@@ -101,9 +118,43 @@ internal sealed class SetupReadinessAuditBuilder(
         return new SetupSmokeCheck("Review LLM runtime", exists, exists ? runtimePath : $"Missing: {runtimePath}");
     }
 
+    public IReadOnlyList<SetupSmokeCheck> CheckGemma12BMtpRequirements(string? modelId)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return [];
+        }
+
+        var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath);
+        var serverExists = File.Exists(llamaServerPath);
+        var draft = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        var draftExists = draft is not null &&
+            draft.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            draft.Verified &&
+            File.Exists(draft.FilePath);
+
+        return
+        [
+            new SetupSmokeCheck(
+                "Gemma 4 12B MTP server runtime",
+                serverExists,
+                serverExists ? llamaServerPath : $"Missing: {llamaServerPath}"),
+            new SetupSmokeCheck(
+                "Gemma 4 12B MTP draft model",
+                draftExists,
+                draftExists ? draft!.FilePath : $"Not installed: {Gemma12BLocalValidation.MtpDraftModelId}")
+        ];
+    }
+
     public IReadOnlyList<InstalledModel> GetSelectedInstalledModels(SetupState state)
     {
-        return new[] { state.SelectedAsrModelId, state.SelectedReviewModelId }
+        var modelIds = new List<string?>([state.SelectedAsrModelId, state.SelectedReviewModelId]);
+        if (Gemma12BLocalValidation.IsTargetModel(state.SelectedReviewModelId))
+        {
+            modelIds.Add(Gemma12BLocalValidation.MtpDraftModelId);
+        }
+
+        return modelIds
             .Where(static modelId => !string.IsNullOrWhiteSpace(modelId))
             .Select(modelId => installedModelRepository.FindInstalledModel(modelId!))
             .OfType<InstalledModel>()

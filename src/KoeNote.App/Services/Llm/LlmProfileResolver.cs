@@ -91,6 +91,7 @@ public sealed class LlmProfileResolver(
     private static bool ShouldUseDefaultModelAsFallback(ModelCatalogItem? catalogItem, string modelId)
     {
         return !modelId.Equals(FallbackReviewModelId, StringComparison.OrdinalIgnoreCase) &&
+            !Gemma12BLocalValidation.IsTargetModel(modelId) &&
             string.Equals(catalogItem?.Family, "gemma", StringComparison.OrdinalIgnoreCase);
     }
 
