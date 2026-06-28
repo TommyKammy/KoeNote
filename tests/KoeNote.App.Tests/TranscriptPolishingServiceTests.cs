@@ -1,6 +1,7 @@
 using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Transcript;
 
@@ -347,6 +348,65 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public async Task PolishAsync_FallsBackToSourceBlockWhenGemma12BOutputContainsChannelTokens()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => """
+                <|channel>thought
+                I should keep thinking instead of answering.
+                [00:00 - 00:01] Speaker_0: polished
+                """));
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: raw", result.Content);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=visible reasoning channel token", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_UsesChunkModelFallbackWhenGemma12BOutputIsAnomalous()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new ModelAwareFakePolishingRuntime((options, _) =>
+                Gemma12BLocalValidation.IsTargetModel(options.ModelId)
+                    ? "000000000000000000000000000000000000000000000000"
+                    : "[00:00 - 00:01] Speaker_0: e4b polished"));
+        var fallbackOptions = CreateOptions("job-001") with
+        {
+            ModelId = ReviewModelSelectionResolver.DefaultReviewModelId,
+            GenerationProfile = "e4b-fallback"
+        };
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId,
+            ChunkFallbackOptions = fallbackOptions
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=repeated zero token run", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PolishAsync_FallsBackToSourceBlockWhenOutputAddsExtraTimestampedBlocks()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
@@ -682,6 +742,21 @@ public sealed class TranscriptPolishingServiceTests
             return Task.FromResult(new TranscriptPolishingChunkResult(
                 chunk,
                 responseFactory(chunk),
+                TimeSpan.FromMilliseconds(10)));
+        }
+    }
+
+    private sealed class ModelAwareFakePolishingRuntime(
+        Func<TranscriptPolishingOptions, TranscriptPolishingChunk, string> responseFactory) : ITranscriptPolishingRuntime
+    {
+        public Task<TranscriptPolishingChunkResult> PolishChunkAsync(
+            TranscriptPolishingOptions options,
+            TranscriptPolishingChunk chunk,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TranscriptPolishingChunkResult(
+                chunk,
+                responseFactory(options, chunk),
                 TimeSpan.FromMilliseconds(10)));
         }
     }

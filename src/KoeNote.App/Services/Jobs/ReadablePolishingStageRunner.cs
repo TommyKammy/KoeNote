@@ -40,10 +40,26 @@ public sealed class ReadablePolishingStageRunner(
         {
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId(catalog);
-            var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            var profileResolver = new LlmProfileResolver(paths, installedModelRepository);
+            var profile = profileResolver.Resolve(catalog, modelId);
             LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Polishing);
             var promptSettings = ReadablePolishingPromptSettingsResolver.Resolve(profile, promptSettingsRepository);
+            var fallbackOptions = BuildGemma12BChunkFallbackOptions(
+                profileResolver,
+                catalog,
+                profile,
+                job.JobId,
+                outputDirectory,
+                promptSettings);
+            if (fallbackOptions is not null)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "polishing",
+                    "info",
+                    $"Gemma 4 12B local validation fallback enabled: {fallbackOptions.ModelId}");
+            }
 
             jobLogRepository.AddEvent(job.JobId, "polishing", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             jobLogRepository.AddEvent(
@@ -54,30 +70,13 @@ public sealed class ReadablePolishingStageRunner(
             report(new JobRunUpdate(RefreshLogs: true));
 
             var result = await polishingService.PolishAsync(
-                new TranscriptPolishingOptions(
+                BuildPolishingOptions(
                     job.JobId,
-                    profile.LlamaCompletionPath,
-                    profile.ModelPath,
+                    profile,
+                    taskSettings,
+                    promptSettings,
                     outputDirectory,
-                    profile.ModelId,
-                    taskSettings.PromptTemplateId,
-                    taskSettings.GenerationProfile,
-                    promptSettings.PromptVersion,
-                    ChunkSegmentCount: taskSettings.ChunkSegmentCount,
-                    Timeout: profile.Timeout,
-                    OutputSanitizerProfile: profile.OutputSanitizerProfile,
-                    ContextSize: profile.ContextSize,
-                    GpuLayers: profile.GpuLayers,
-                    MaxTokens: taskSettings.MaxTokens,
-                    Temperature: taskSettings.Temperature,
-                    TopP: taskSettings.TopP,
-                    TopK: taskSettings.TopK,
-                    RepeatPenalty: taskSettings.RepeatPenalty,
-                    NoConversation: profile.NoConversation,
-                    Threads: profile.Threads,
-                    ThreadsBatch: profile.ThreadsBatch,
-                    PromptSettings: promptSettings,
-                    RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
+                    fallbackOptions),
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(result.Content))
@@ -191,5 +190,69 @@ public sealed class ReadablePolishingStageRunner(
     {
         var state = setupStateService.Load();
         return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+    }
+
+    private TranscriptPolishingOptions? BuildGemma12BChunkFallbackOptions(
+        LlmProfileResolver profileResolver,
+        ModelCatalog catalog,
+        LlmRuntimeProfile primaryProfile,
+        string jobId,
+        string outputDirectory,
+        ReadablePolishingPromptSettings promptSettings)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(primaryProfile.ModelId))
+        {
+            return null;
+        }
+
+        var fallbackProfile = profileResolver.Resolve(catalog, ReviewModelSelectionResolver.DefaultReviewModelId);
+        if (!File.Exists(fallbackProfile.ModelPath))
+        {
+            return null;
+        }
+
+        var fallbackTaskSettings = new LlmTaskSettingsResolver().Resolve(fallbackProfile, LlmTaskKind.Polishing);
+        return BuildPolishingOptions(
+            jobId,
+            fallbackProfile,
+            fallbackTaskSettings,
+            promptSettings,
+            Path.Combine(outputDirectory, "fallback-e4b"),
+            fallbackOptions: null);
+    }
+
+    private TranscriptPolishingOptions BuildPolishingOptions(
+        string jobId,
+        LlmRuntimeProfile profile,
+        LlmTaskSettings taskSettings,
+        ReadablePolishingPromptSettings promptSettings,
+        string outputDirectory,
+        TranscriptPolishingOptions? fallbackOptions)
+    {
+        return new TranscriptPolishingOptions(
+            jobId,
+            profile.LlamaCompletionPath,
+            profile.ModelPath,
+            outputDirectory,
+            profile.ModelId,
+            taskSettings.PromptTemplateId,
+            taskSettings.GenerationProfile,
+            promptSettings.PromptVersion,
+            ChunkSegmentCount: taskSettings.ChunkSegmentCount,
+            Timeout: profile.Timeout,
+            OutputSanitizerProfile: profile.OutputSanitizerProfile,
+            ContextSize: profile.ContextSize,
+            GpuLayers: profile.GpuLayers,
+            MaxTokens: taskSettings.MaxTokens,
+            Temperature: taskSettings.Temperature,
+            TopP: taskSettings.TopP,
+            TopK: taskSettings.TopK,
+            RepeatPenalty: taskSettings.RepeatPenalty,
+            NoConversation: profile.NoConversation,
+            Threads: profile.Threads,
+            ThreadsBatch: profile.ThreadsBatch,
+            PromptSettings: promptSettings,
+            RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths),
+            ChunkFallbackOptions: fallbackOptions);
     }
 }

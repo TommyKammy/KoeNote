@@ -158,6 +158,50 @@ public sealed class LlmProfileResolverTests
     }
 
     [Fact]
+    public void Resolve_AllowsHiddenGemma12BWhenLocalValidationFlagIsEnabled()
+    {
+        var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, "1");
+            var paths = TestDatabase.CreateReadyPaths();
+            var modelPath = Path.Combine(paths.Root, "models", "gemma12b.gguf");
+            Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+            File.WriteAllText(modelPath, "model");
+            var repository = new InstalledModelRepository(paths);
+            repository.UpsertInstalledModel(new InstalledModel(
+                Gemma12BLocalValidation.ModelId,
+                "review",
+                "llama-cpp",
+                "Gemma 4 12B",
+                "gemma",
+                null,
+                modelPath,
+                null,
+                null,
+                null,
+                true,
+                "Apache-2.0",
+                "download",
+                DateTimeOffset.Now,
+                DateTimeOffset.Now,
+                "installed"));
+            var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
+            var resolver = new LlmProfileResolver(paths, repository);
+
+            var profile = resolver.Resolve(catalog, Gemma12BLocalValidation.ModelId);
+
+            Assert.Equal(Gemma12BLocalValidation.ModelId, profile.ModelId);
+            Assert.Equal("builtin:gemma-4-12b-it-qat-q4-0:gemma12b:local-validation", profile.ProfileId);
+            Assert.Equal(modelPath, profile.ModelPath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
     public void Resolve_UsesLegacyReviewModelPathWhenLegacyModelIsSelected()
     {
         var paths = TestDatabase.CreateReadyPaths();

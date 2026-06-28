@@ -23,7 +23,8 @@ public sealed record TranscriptPolishingOptions(
     int? Threads = null,
     int? ThreadsBatch = null,
     ReadablePolishingPromptSettings? PromptSettings = null,
-    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null,
+    TranscriptPolishingOptions? ChunkFallbackOptions = null);
 
 public sealed record TranscriptPolishingChunk(
     int ChunkIndex,

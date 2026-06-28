@@ -31,8 +31,21 @@ public sealed class TranscriptPolishingService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var chunkResult = await runtime.PolishChunkAsync(options, chunk, cancellationToken);
-                var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
-                if (!TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, normalizedContent, out var fallbackReason))
+                var normalizedContent = NormalizeAndValidateChunk(options, chunkResult, out var fallbackReason);
+                if (fallbackReason.Length > 0 &&
+                    options.ChunkFallbackOptions is not null &&
+                    await TryPolishChunkWithModelFallbackAsync(
+                        options.ChunkFallbackOptions,
+                        chunk,
+                        fallbackReason,
+                        cancellationToken) is { } fallbackChunkResult)
+                {
+                    chunkResult = fallbackChunkResult;
+                    normalizedContent = fallbackChunkResult.Content;
+                    fallbackReason = string.Empty;
+                }
+
+                if (fallbackReason.Length > 0)
                 {
                     if (!string.Equals(fallbackReason, TranscriptPolishingFallbackBuilder.MissingTimestampReason, StringComparison.Ordinal) ||
                         !TranscriptPolishingFallbackBuilder.TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
@@ -155,6 +168,67 @@ public sealed class TranscriptPolishingService(
             sourceHash,
             0,
             TimeSpan.Zero);
+    }
+
+    private async Task<TranscriptPolishingChunkResult?> TryPolishChunkWithModelFallbackAsync(
+        TranscriptPolishingOptions fallbackOptions,
+        TranscriptPolishingChunk chunk,
+        string primaryFailureReason,
+        CancellationToken cancellationToken)
+    {
+        TranscriptPolishingChunkResult fallbackResult;
+        try
+        {
+            fallbackResult = await runtime.PolishChunkAsync(fallbackOptions, chunk, cancellationToken);
+        }
+        catch (Exception exception) when (exception is ReviewWorkerException or TimeoutException)
+        {
+            return null;
+        }
+
+        var normalizedContent = NormalizeAndValidateChunk(fallbackOptions, fallbackResult, out var fallbackReason);
+        if (fallbackReason.Length > 0)
+        {
+            return null;
+        }
+
+        return fallbackResult with
+        {
+            Content = normalizedContent,
+            UsedFallback = true,
+            FallbackReason = $"model={fallbackOptions.ModelId}; primary={primaryFailureReason}"
+        };
+    }
+
+    private static string NormalizeAndValidateChunk(
+        TranscriptPolishingOptions options,
+        TranscriptPolishingChunkResult chunkResult,
+        out string fallbackReason)
+    {
+        var normalizedContent = TranscriptPolishingOutputNormalizer.Normalize(chunkResult.Content);
+        if (ShouldUseStrictAnomalyDetection(options) &&
+            TranscriptPolishingOutputAnomalyDetector.TryFindCriticalAnomaly(
+                chunkResult.Content,
+                normalizedContent,
+                out fallbackReason))
+        {
+            return normalizedContent;
+        }
+
+        if (!TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunkResult.Chunk, normalizedContent, out fallbackReason))
+        {
+            return normalizedContent;
+        }
+
+        fallbackReason = string.Empty;
+        return normalizedContent;
+    }
+
+    private static bool ShouldUseStrictAnomalyDetection(TranscriptPolishingOptions options)
+    {
+        return KoeNote.App.Services.Llm.Gemma12BLocalValidation.IsTargetModel(options.ModelId) ||
+            options.GenerationProfile.Contains("gemma12b", StringComparison.OrdinalIgnoreCase) ||
+            options.PromptTemplateId.Contains("gemma12b", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildChunkId(string derivativeId, TranscriptPolishingChunk chunk)

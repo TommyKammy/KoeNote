@@ -56,6 +56,21 @@ public sealed class LlmTaskSettingsResolverTests
     }
 
     [Fact]
+    public void Resolve_ReturnsGuardedPolishingSettingsForGemma12BLocalValidation()
+    {
+        var settings = Resolve("gemma-4-12b-it-qat-q4-0", LlmTaskKind.Polishing);
+
+        Assert.Equal(LlmTaskKind.Polishing, settings.TaskKind);
+        Assert.Equal(TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId, settings.PromptTemplateId);
+        Assert.Equal("gemma12b-polishing-local-validation", settings.GenerationProfile);
+        Assert.Equal(0, settings.Temperature);
+        Assert.Equal(768, settings.MaxTokens);
+        Assert.Equal(8, settings.ChunkSegmentCount);
+        Assert.Equal(1.15, settings.RepeatPenalty);
+        Assert.Equal("gemma12b_guarded_blocks", settings.ValidationMode);
+    }
+
+    [Fact]
     public void Resolve_PreservesCurrentTernaryReviewAndSummaryLimits()
     {
         var review = Resolve("ternary-bonsai-8b-q2-0", LlmTaskKind.Review);

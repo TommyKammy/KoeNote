@@ -1,4 +1,5 @@
 using KoeNote.App.Services;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using System.Net;
 using System.Net.Http;
@@ -38,6 +39,30 @@ public sealed class ModelCatalogServiceTests
             model.RecommendedFor.Contains("gemma4_12b_disabled_pending_llama_cpp_fix") &&
             model.Status == "hidden");
         Assert.Contains(catalog.Models, model => model.ModelId == "ternary-bonsai-8b-q2-0" && model.Status == "hidden");
+    }
+
+    [Fact]
+    public void ListEntries_IncludesGemma12BWhenLocalValidationFlagIsEnabled()
+    {
+        var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, "1");
+            var paths = new AppPaths(CreateRoot(), CreateRoot(), AppContext.BaseDirectory);
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+
+            var entries = new ModelCatalogService(paths).ListEntries();
+
+            Assert.Contains(entries, entry =>
+                entry.ModelId == Gemma12BLocalValidation.ModelId &&
+                entry.Role == "review" &&
+                entry.CatalogItem.Status == "hidden");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, previous);
+        }
     }
 
     [Fact]

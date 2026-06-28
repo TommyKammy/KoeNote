@@ -11,6 +11,8 @@ public static class ModelCatalogCompatibility
 
     public static bool IsSelectable(ModelCatalogItem model)
     {
-        return !UnsupportedStatuses.Contains(model.Status, StringComparer.OrdinalIgnoreCase);
+        return !UnsupportedStatuses.Contains(model.Status, StringComparer.OrdinalIgnoreCase) ||
+            KoeNote.App.Services.Llm.Gemma12BLocalValidation.IsEnabled() &&
+            KoeNote.App.Services.Llm.Gemma12BLocalValidation.IsTargetModel(model.ModelId);
     }
 }
