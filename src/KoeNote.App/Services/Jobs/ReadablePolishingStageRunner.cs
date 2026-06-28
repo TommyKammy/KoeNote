@@ -298,8 +298,8 @@ public sealed class ReadablePolishingStageRunner(
 
     private string ResolveMtpDraftModelPath()
     {
-        var configuredDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(configuredDraft))
+        var configuredDraft = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configuredDraft is not null)
         {
             return configuredDraft;
         }

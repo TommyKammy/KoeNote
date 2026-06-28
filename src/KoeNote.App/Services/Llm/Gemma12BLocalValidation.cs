@@ -46,8 +46,8 @@ public static class Gemma12BLocalValidation
 
     public static string ResolveMtpDraftModelPath()
     {
-        var configured = Environment.GetEnvironmentVariable(DraftModelPathEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(configured))
+        var configured = GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
         {
             return configured;
         }
@@ -64,8 +64,8 @@ public static class Gemma12BLocalValidation
 
     public static string ResolveMtpDraftModelPath(string storageRoot)
     {
-        var configured = Environment.GetEnvironmentVariable(DraftModelPathEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(configured))
+        var configured = GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
         {
             return configured;
         }
@@ -75,6 +75,12 @@ public static class Gemma12BLocalValidation
             "review_aux",
             MtpDraftModelId,
             MtpDraftFileName);
+    }
+
+    public static string? GetConfiguredMtpDraftModelPath()
+    {
+        var configured = Environment.GetEnvironmentVariable(DraftModelPathEnvironmentVariable);
+        return string.IsNullOrWhiteSpace(configured) ? null : configured;
     }
 
     private static bool IsTruthy(string? value)

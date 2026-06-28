@@ -35,6 +35,7 @@ public sealed class TranscriptPolishingService(
                 if (fallbackReason.Length > 0 &&
                     options.ChunkFallbackOptions is not null &&
                     await TryPolishChunkWithModelFallbackAsync(
+                        options,
                         options.ChunkFallbackOptions,
                         chunk,
                         fallbackReason,
@@ -191,11 +192,14 @@ public sealed class TranscriptPolishingService(
     }
 
     private async Task<TranscriptPolishingChunkResult?> TryPolishChunkWithModelFallbackAsync(
+        TranscriptPolishingOptions primaryOptions,
         TranscriptPolishingOptions fallbackOptions,
         TranscriptPolishingChunk chunk,
         string primaryFailureReason,
         CancellationToken cancellationToken)
     {
+        EndRuntimeSession(primaryOptions);
+
         TranscriptPolishingChunkResult fallbackResult;
         try
         {

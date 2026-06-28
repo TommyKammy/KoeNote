@@ -19,7 +19,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
     private static readonly SemaphoreSlim ServerLock = new(1, 1);
     private static readonly HttpClient ServerHttpClient = new()
     {
-        Timeout = TimeSpan.FromMinutes(10)
+        Timeout = Timeout.InfiniteTimeSpan
     };
     private static readonly JsonSerializerOptions ServerJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -123,13 +123,25 @@ public sealed class LlamaTranscriptPolishingRuntime(
                 "application/json")
         };
 
-        using var response = await ServerHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        var timeout = options.Timeout ?? TimeSpan.FromHours(2);
+        using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        requestTimeout.CancelAfter(timeout);
+
+        string responseJson;
+        try
         {
-            throw new ReviewWorkerException(
-                ReviewFailureCategory.ProcessFailed,
-                $"Transcript polishing llama-server request failed with {(int)response.StatusCode}: {responseJson}");
+            using var response = await ServerHttpClient.SendAsync(request, requestTimeout.Token).ConfigureAwait(false);
+            responseJson = await response.Content.ReadAsStringAsync(requestTimeout.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ReviewWorkerException(
+                    ReviewFailureCategory.ProcessFailed,
+                    $"Transcript polishing llama-server request failed with {(int)response.StatusCode}: {responseJson}");
+            }
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Transcript polishing llama-server request timed out after {timeout}.", exception);
         }
 
         var parsed = JsonSerializer.Deserialize<LlamaServerChatCompletionResponse>(
@@ -183,12 +195,34 @@ public sealed class LlamaTranscriptPolishingRuntime(
             }
 
             StopServerSession();
+            LlamaRuntimePathBridge? modelPathBridge = null;
+            LlamaRuntimePathBridge? draftPathBridge = null;
             var port = GetFreeLoopbackPort();
             var logDirectory = Path.Combine(options.OutputDirectory, "llama-server-mtp");
             Directory.CreateDirectory(logDirectory);
             var stderrPath = Path.Combine(logDirectory, "server.stderr.txt");
             var stdoutPath = Path.Combine(logDirectory, "server.stdout.txt");
-            var process = new Process
+            Process process;
+            TranscriptPolishingOptions safeOptions;
+            string safeDraftPath;
+            try
+            {
+                modelPathBridge = LlamaRuntimePathBridge.Create(options.ModelPath);
+                draftPathBridge = LlamaRuntimePathBridge.Create(draftPath);
+                safeOptions = options with { ModelPath = modelPathBridge.ModelPath };
+                safeDraftPath = draftPathBridge.ModelPath;
+            }
+            catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
+            {
+                modelPathBridge?.Dispose();
+                draftPathBridge?.Dispose();
+                throw new ReviewWorkerException(
+                    ReviewFailureCategory.ProcessFailed,
+                    $"Could not prepare ASCII-safe llama-server runtime paths: {exception.Message}",
+                    exception);
+            }
+
+            process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -204,7 +238,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
                 EnableRaisingEvents = true
             };
 
-            foreach (var argument in BuildServerArguments(options, draftPath, port))
+            foreach (var argument in BuildServerArguments(safeOptions, safeDraftPath, port))
             {
                 process.StartInfo.ArgumentList.Add(argument);
             }
@@ -217,12 +251,16 @@ public sealed class LlamaTranscriptPolishingRuntime(
                 }
             }
 
-            process.Start();
-            _ = RedirectToFileAsync(process.StandardOutput, stdoutPath);
-            _ = RedirectToFileAsync(process.StandardError, stderrPath);
-            var session = new LlamaServerSession(key, process, new Uri($"http://127.0.0.1:{port}"));
             try
             {
+                process.Start();
+                _ = RedirectToFileAsync(process.StandardOutput, stdoutPath);
+                _ = RedirectToFileAsync(process.StandardError, stderrPath);
+                var session = new LlamaServerSession(
+                    key,
+                    process,
+                    new Uri($"http://127.0.0.1:{port}"),
+                    [modelPathBridge, draftPathBridge]);
                 await WaitForServerHealthAsync(session.BaseUri, process, cancellationToken).ConfigureAwait(false);
                 serverSession = session;
                 return session;
@@ -230,6 +268,8 @@ public sealed class LlamaTranscriptPolishingRuntime(
             catch
             {
                 StopProcess(process);
+                modelPathBridge.Dispose();
+                draftPathBridge.Dispose();
                 throw;
             }
         }
@@ -277,13 +317,18 @@ public sealed class LlamaTranscriptPolishingRuntime(
 
             try
             {
-                using var response = await ServerHttpClient.GetAsync(BuildServerEndpoint(baseUri, "health"), cancellationToken).ConfigureAwait(false);
+                using var healthTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                healthTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+                using var response = await ServerHttpClient.GetAsync(BuildServerEndpoint(baseUri, "health"), healthTimeout.Token).ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     return;
                 }
             }
             catch (HttpRequestException)
+            {
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
             }
 
@@ -307,6 +352,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
             Messages: [new LlamaServerChatMessage("user", prompt)],
             MaxTokens: options.MaxTokens,
             Temperature: options.Temperature,
+            RepeatPenalty: options.RepeatPenalty,
             Stream: false);
 
         return JsonSerializer.Serialize(payload, ServerJsonOptions);
@@ -340,6 +386,11 @@ public sealed class LlamaTranscriptPolishingRuntime(
         }
 
         StopProcess(existing.Process);
+        foreach (var pathBridge in existing.PathBridges)
+        {
+            pathBridge.Dispose();
+        }
+
         serverSession = null;
     }
 
@@ -409,13 +460,18 @@ public sealed class LlamaTranscriptPolishingRuntime(
         }
     }
 
-    private sealed record LlamaServerSession(string Key, Process Process, Uri BaseUri);
+    private sealed record LlamaServerSession(
+        string Key,
+        Process Process,
+        Uri BaseUri,
+        IReadOnlyList<IDisposable> PathBridges);
 
     private sealed record LlamaServerChatCompletionRequest(
         [property: JsonPropertyName("model")] string Model,
         [property: JsonPropertyName("messages")] IReadOnlyList<LlamaServerChatMessage> Messages,
         [property: JsonPropertyName("max_tokens")] int MaxTokens,
         [property: JsonPropertyName("temperature")] double Temperature,
+        [property: JsonPropertyName("repeat_penalty")] double? RepeatPenalty,
         [property: JsonPropertyName("stream")] bool Stream);
 
     private sealed record LlamaServerChatMessage(

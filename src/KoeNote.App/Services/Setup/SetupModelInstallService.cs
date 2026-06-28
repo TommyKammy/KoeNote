@@ -42,7 +42,8 @@ internal sealed class SetupModelInstallService(
                 return new SetupInstallResult(false, $"No selected {role} model.", []);
             }
 
-            return await DownloadCatalogItemAsync(catalogItem, progress, cancellationToken);
+            var installItems = ResolveRequiredInstallItems(catalogItem);
+            return await DownloadCatalogItemsAsync(installItems, progress, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -78,8 +79,58 @@ internal sealed class SetupModelInstallService(
             return new SetupInstallResult(false, exception.Message, []);
         }
 
+        return await DownloadCatalogItemsAsync(installItems, progress, cancellationToken);
+    }
+
+    private IReadOnlyList<ModelCatalogItem> ResolveSelectedPresetInstallItems()
+    {
+        var items = new List<ModelCatalogItem>();
+        foreach (var role in new[] { "asr", "review" })
+        {
+            var selected = selectionService.GetSelectedCatalogItem(role);
+            if (selected is not null)
+            {
+                items.AddRange(ResolveRequiredInstallItems(selected));
+            }
+        }
+
+        return items
+            .DistinctBy(static item => item.ModelId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private IReadOnlyList<ModelCatalogItem> ResolveRequiredInstallItems(ModelCatalogItem catalogItem)
+    {
+        var items = new List<ModelCatalogItem> { catalogItem };
+        if (RequiresGemma12BMtpDraft(catalogItem))
+        {
+            var mtpDraft = selectionService.GetCatalogItemById(Gemma12BLocalValidation.MtpDraftModelId)
+                ?? throw new InvalidOperationException($"Gemma 4 12B MTP draft model is not in the catalog: {Gemma12BLocalValidation.MtpDraftModelId}");
+            items.Add(mtpDraft);
+        }
+
+        return items;
+    }
+
+    private static bool RequiresGemma12BMtpDraft(ModelCatalogItem catalogItem)
+    {
+        return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled();
+    }
+
+    private async Task<SetupInstallResult> DownloadCatalogItemsAsync(
+        IReadOnlyList<ModelCatalogItem> catalogItems,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (catalogItems.Count == 1)
+        {
+            return await DownloadCatalogItemAsync(catalogItems[0], progress, cancellationToken);
+        }
+
         var results = new List<SetupInstallResult>();
-        foreach (var catalogItem in installItems)
+        foreach (var catalogItem in catalogItems)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -99,32 +150,10 @@ internal sealed class SetupModelInstallService(
             .Where(static result => !result.IsSucceeded)
             .ToArray();
         var message = failedResults.Length == 0
-            ? $"Preset models are ready: {installedModels.Length} model(s)."
+            ? $"Model assets are ready: {installedModels.Length} item(s)."
             : string.Join(" / ", failedResults.Select(static result => result.Message));
         MarkInstallStep();
         return new SetupInstallResult(failedResults.Length == 0, message, installedModels);
-    }
-
-    private IReadOnlyList<ModelCatalogItem> ResolveSelectedPresetInstallItems()
-    {
-        var items = new List<ModelCatalogItem>();
-        foreach (var role in new[] { "asr", "review" })
-        {
-            var selected = selectionService.GetSelectedCatalogItem(role);
-            if (selected is not null)
-            {
-                items.Add(selected);
-            }
-        }
-
-        if (items.Any(static item => Gemma12BLocalValidation.IsTargetModel(item.ModelId)))
-        {
-            var mtpDraft = selectionService.GetCatalogItemById(Gemma12BLocalValidation.MtpDraftModelId)
-                ?? throw new InvalidOperationException($"Gemma 4 12B MTP draft model is not in the catalog: {Gemma12BLocalValidation.MtpDraftModelId}");
-            items.Add(mtpDraft);
-        }
-
-        return items;
     }
 
     private async Task<SetupInstallResult> DownloadCatalogItemAsync(

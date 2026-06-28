@@ -393,12 +393,15 @@ public sealed partial class MainWindowViewModel
         return MainWindowModelCatalogReadiness.IsReviewModelReady(
             modelId,
             Paths,
-            _installedModelRepository.FindInstalledModel);
+            _installedModelRepository.FindInstalledModel,
+            _setupState.StorageRoot);
     }
 
     private bool IsSelectedReviewRuntimeReady()
     {
-        return File.Exists(GetSelectedReviewRuntimePath());
+        return MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+            ResolveEffectiveReviewModelId(),
+            GetSelectedReviewRuntimePath());
     }
 
     private string GetSelectedReviewRuntimePath()

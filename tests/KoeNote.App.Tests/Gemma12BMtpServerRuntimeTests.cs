@@ -31,7 +31,8 @@ public sealed class Gemma12BMtpServerRuntimeTests
             "output",
             Gemma12BLocalValidation.ModelId,
             MaxTokens: 123,
-            Temperature: 0);
+            Temperature: 0,
+            RepeatPenalty: 1.08);
 
         var json = LlamaTranscriptPolishingRuntime.BuildServerChatCompletionRequestJson(options, "prompt");
 
@@ -40,6 +41,7 @@ public sealed class Gemma12BMtpServerRuntimeTests
         var root = document.RootElement;
         Assert.Equal(Gemma12BLocalValidation.ModelId, root.GetProperty("model").GetString());
         Assert.Equal(123, root.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(1.08, root.GetProperty("repeat_penalty").GetDouble());
         Assert.False(root.GetProperty("stream").GetBoolean());
         var message = root.GetProperty("messages")[0];
         Assert.Equal("user", message.GetProperty("role").GetString());

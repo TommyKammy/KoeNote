@@ -22,6 +22,7 @@ internal static class SetupWizardPresentationInvalidator
             nameof(MainWindowViewModel.SelectedSetupModelPresetDescription),
             nameof(MainWindowViewModel.SelectedSetupModelPresetModels),
             nameof(MainWindowViewModel.SelectedSetupModelsReady),
+            nameof(MainWindowViewModel.SelectedSetupGemma12BMtpDraftReady),
             nameof(MainWindowViewModel.SetupMode),
             nameof(MainWindowViewModel.SetupStorageRoot));
         RaiseReviewRuntimeReadinessChanged(notify);
@@ -63,7 +64,8 @@ internal static class SetupWizardPresentationInvalidator
             nameof(MainWindowViewModel.ReviewModel),
             nameof(MainWindowViewModel.SelectedSetupModelPresetDescription),
             nameof(MainWindowViewModel.SelectedSetupModelPresetModels),
-            nameof(MainWindowViewModel.SelectedSetupModelsReady));
+            nameof(MainWindowViewModel.SelectedSetupModelsReady),
+            nameof(MainWindowViewModel.SelectedSetupGemma12BMtpDraftReady));
     }
 
     private static void RaiseRuntimeReadinessChanged(Action<string> notify)

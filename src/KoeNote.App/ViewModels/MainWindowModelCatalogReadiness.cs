@@ -70,7 +70,8 @@ internal static class MainWindowModelCatalogReadiness
     public static bool IsReviewModelReady(
         string modelId,
         AppPaths paths,
-        Func<string, InstalledModel?> findInstalledModel)
+        Func<string, InstalledModel?> findInstalledModel,
+        string? storageRoot = null)
     {
         if (modelId.Equals(ReviewModelSelectionResolver.LegacyReviewModelId, StringComparison.OrdinalIgnoreCase))
         {
@@ -78,9 +79,48 @@ internal static class MainWindowModelCatalogReadiness
         }
 
         var installed = findInstalledModel(modelId);
-        return installed is not null &&
+        var primaryReady = installed is not null &&
             installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             InstalledPathExists(installed);
+        return primaryReady &&
+            IsGemma12BMtpDraftReady(modelId, storageRoot, findInstalledModel);
+    }
+
+    public static bool IsReviewRuntimeReady(string modelId, string llamaCompletionPath)
+    {
+        return File.Exists(llamaCompletionPath) &&
+            (!RequiresGemma12BMtpAssets(modelId) ||
+             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath)));
+    }
+
+    public static bool IsGemma12BMtpDraftReady(
+        string? modelId,
+        string? storageRoot,
+        Func<string, InstalledModel?> findInstalledModel)
+    {
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
+        {
+            return File.Exists(configured);
+        }
+
+        var installed = findInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            InstalledPathExists(installed))
+        {
+            return true;
+        }
+
+        var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return File.Exists(fallbackPath);
     }
 
     public static bool ModelPathExists(
@@ -99,6 +139,12 @@ internal static class MainWindowModelCatalogReadiness
     private static bool IsFasterWhisperRuntimeReady(AppPaths paths)
     {
         return File.Exists(paths.FasterWhisperScriptPath) && FasterWhisperRuntimeLayout.HasPackage(paths);
+    }
+
+    private static bool RequiresGemma12BMtpAssets(string? modelId)
+    {
+        return Gemma12BLocalValidation.IsTargetModel(modelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private static bool InstalledPathExists(InstalledModel? installed)

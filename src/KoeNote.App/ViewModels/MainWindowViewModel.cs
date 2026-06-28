@@ -1126,14 +1126,22 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         : $"ASR: {FindSetupModelDisplayName(SetupAsrModelChoices, SelectedSetupModelPreset.AsrModelId)} / Review: {FindSetupModelDisplayName(SetupReviewModelChoices, SelectedSetupModelPreset.ReviewModelId)}";
 
     public bool SelectedSetupModelsReady => IsSetupModelReady(SelectedSetupAsrModel) &&
-        IsSetupModelReady(SelectedSetupReviewModel);
+        IsSetupModelReady(SelectedSetupReviewModel) &&
+        SelectedSetupGemma12BMtpDraftReady;
+
+    public bool SelectedSetupGemma12BMtpDraftReady => MainWindowModelCatalogReadiness.IsGemma12BMtpDraftReady(
+        SelectedSetupReviewModel?.ModelId,
+        SetupStorageRoot,
+        _installedModelRepository.FindInstalledModel);
 
     public bool SetupFasterWhisperRuntimeReady => FasterWhisperRuntimeLayout.HasPackage(Paths);
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
     public bool SetupReviewRuntimeReady => SelectedSetupReviewModelRequiresTernaryRuntime() ||
-        File.Exists(Paths.LlamaCompletionPath);
+        MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+            SelectedSetupReviewModel?.ModelId ?? string.Empty,
+            Paths.LlamaCompletionPath);
 
     public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 
@@ -1447,6 +1455,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateModelCatalogCommandStates();
                 UpdateSetupDownloadCommandStates();
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
+                OnPropertyChanged(nameof(SelectedSetupGemma12BMtpDraftReady));
                 OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
                 OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));
