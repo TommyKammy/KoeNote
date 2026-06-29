@@ -106,13 +106,14 @@ internal static class MainWindowModelCatalogReadiness
         var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
         if (configured is not null)
         {
-            return File.Exists(configured);
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
         }
 
         var installed = findInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
         if (installed is not null &&
             installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
-            InstalledPathExists(installed))
+            InstalledPathExists(installed) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath))
         {
             return true;
         }
@@ -120,7 +121,7 @@ internal static class MainWindowModelCatalogReadiness
         var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
             ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
             : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
-        return File.Exists(fallbackPath);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(fallbackPath);
     }
 
     public static bool ModelPathExists(

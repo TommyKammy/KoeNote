@@ -11,6 +11,7 @@ using KoeNote.App.Services.Setup;
 
 namespace KoeNote.App.Tests;
 
+[Collection(Gemma12BEnvironmentCollection.Name)]
 public sealed class SetupWizardServiceTests
 {
     [Fact]

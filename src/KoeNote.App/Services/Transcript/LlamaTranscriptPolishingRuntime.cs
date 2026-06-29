@@ -261,7 +261,11 @@ public sealed class LlamaTranscriptPolishingRuntime(
                     process,
                     new Uri($"http://127.0.0.1:{port}"),
                     [modelPathBridge, draftPathBridge]);
-                await WaitForServerHealthAsync(session.BaseUri, process, cancellationToken).ConfigureAwait(false);
+                await WaitForServerHealthAsync(
+                    session.BaseUri,
+                    process,
+                    options.Timeout ?? TimeSpan.FromHours(2),
+                    cancellationToken).ConfigureAwait(false);
                 serverSession = session;
                 return session;
             }
@@ -302,9 +306,10 @@ public sealed class LlamaTranscriptPolishingRuntime(
     private static async Task WaitForServerHealthAsync(
         Uri baseUri,
         Process process,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(45);
+        var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -335,7 +340,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
             await Task.Delay(500, cancellationToken).ConfigureAwait(false);
         }
 
-        throw new TimeoutException("llama-server did not become healthy within 45 seconds.");
+        throw new TimeoutException($"llama-server did not become healthy within {timeout}.");
     }
 
     internal static Uri BuildServerEndpoint(Uri baseUri, string relativePath)

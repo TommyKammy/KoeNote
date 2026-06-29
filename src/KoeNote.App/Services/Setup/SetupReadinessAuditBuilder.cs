@@ -182,7 +182,7 @@ internal sealed class SetupReadinessAuditBuilder(
         if (configured is not null)
         {
             path = configured;
-            return File.Exists(configured);
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
         }
 
         var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
@@ -190,6 +190,7 @@ internal sealed class SetupReadinessAuditBuilder(
         return installed is not null &&
             installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
-            File.Exists(installed.FilePath);
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
     }
 }

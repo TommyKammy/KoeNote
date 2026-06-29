@@ -5,6 +5,7 @@ using KoeNote.App.ViewModels;
 
 namespace KoeNote.App.Tests;
 
+[Collection(Gemma12BEnvironmentCollection.Name)]
 public sealed class MainWindowModelCatalogReadinessTests
 {
     [Fact]

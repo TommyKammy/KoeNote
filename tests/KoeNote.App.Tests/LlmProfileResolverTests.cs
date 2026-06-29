@@ -5,6 +5,7 @@ using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Tests;
 
+[Collection(Gemma12BEnvironmentCollection.Name)]
 public sealed class LlmProfileResolverTests
 {
     [Fact]
