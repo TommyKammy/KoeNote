@@ -704,6 +704,30 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_DownloadSelectedReviewModel_ReinstallsUnbridgeableDirectLlmFallbackForGemma12B()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var fallbackDirectory = Path.Combine(paths.UserModels, "review", ReviewModelSelectionResolver.DefaultReviewModelId, "directory-model.gguf");
+        Directory.CreateDirectory(fallbackDirectory);
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, ReviewModelSelectionResolver.DefaultReviewModelId, "review", "llama-cpp", fallbackDirectory);
+        var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("model-bytes")));
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.AcceptLicenses();
+
+        var result = await wizard.DownloadSelectedModelAsync("review");
+
+        Assert.True(result.IsSucceeded);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.ModelId);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == ReviewModelSelectionResolver.DefaultReviewModelId);
+        var fallback = installedModels.FindInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId);
+        Assert.NotNull(fallback);
+        Assert.True(File.Exists(fallback.FilePath));
+    }
+
+    [Fact]
     public async Task SetupWizard_RunSmokeCheck_FailsWhenGemma12BMtpRequirementsAreMissing()
     {
         var paths = CreatePathsWithoutTernaryRuntime();

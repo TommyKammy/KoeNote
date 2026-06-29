@@ -103,7 +103,7 @@ internal sealed class SetupModelInstallService(
     {
         var items = new List<ModelCatalogItem> { catalogItem };
         if (RequiresDirectLlmStageFallback(catalogItem) &&
-            !IsInstalledModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review"))
+            !IsInstalledModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review", requireRuntimeBridge: true))
         {
             var fallbackModel = selectionService.GetCatalogItemById(ReviewModelSelectionResolver.DefaultReviewModelId)
                 ?? throw new InvalidOperationException($"Direct LLM fallback model is not in the catalog: {ReviewModelSelectionResolver.DefaultReviewModelId}");
@@ -126,13 +126,15 @@ internal sealed class SetupModelInstallService(
             Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId);
     }
 
-    private bool IsInstalledModelReady(string modelId, string role)
+    private bool IsInstalledModelReady(string modelId, string role, bool requireRuntimeBridge = false)
     {
         var installed = installedModelRepository.FindInstalledModel(modelId);
         return installed is not null &&
             installed.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)) &&
+            (!requireRuntimeBridge ||
+                (File.Exists(installed.FilePath) && LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath)));
     }
 
     private static bool RequiresGemma12BMtpDraft(ModelCatalogItem catalogItem)
@@ -211,8 +213,10 @@ internal sealed class SetupModelInstallService(
     {
         var existing = installedModelRepository.FindInstalledModel(catalogItem.ModelId);
         if (existing is not null &&
-            existing.Verified &&
-            (File.Exists(existing.FilePath) || Directory.Exists(existing.FilePath)))
+            IsInstalledModelReady(
+                catalogItem.ModelId,
+                catalogItem.Role,
+                requireRuntimeBridge: IsDirectLlmStageFallbackModel(catalogItem)))
         {
             MarkInstallStep();
             return new SetupInstallResult(true, $"Already installed: {existing.DisplayName}", [existing]);
@@ -225,6 +229,12 @@ internal sealed class SetupModelInstallService(
         var installed = await modelDownloadService.DownloadAndInstallAsync(catalogItem, targetPath, progress, cancellationToken);
         MarkInstallStep();
         return new SetupInstallResult(true, $"Downloaded and installed: {installed.DisplayName}", [installed]);
+    }
+
+    private static bool IsDirectLlmStageFallbackModel(ModelCatalogItem catalogItem)
+    {
+        return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            catalogItem.ModelId.Equals(ReviewModelSelectionResolver.DefaultReviewModelId, StringComparison.OrdinalIgnoreCase);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)
