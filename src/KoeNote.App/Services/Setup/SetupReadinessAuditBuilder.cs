@@ -67,20 +67,21 @@ internal sealed class SetupReadinessAuditBuilder(
              File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath)));
     }
 
-    public bool IsSelectedGemma12BMtpDraftReady(string? modelId)
+    public bool IsSelectedGemma12BMtpDraftReady(string? modelId, string? storageRoot = null)
     {
         if (!RequiresGemma12BMtpAssets(modelId))
         {
             return true;
         }
 
-        return TryResolveReadyGemma12BMtpDraftPath(out _);
+        return TryResolveReadyGemma12BMtpDraftPath(storageRoot, out _);
     }
 
-    public bool IsSelectedGemma12BMtpRequirementMissing(string? modelId)
+    public bool IsSelectedGemma12BMtpRequirementMissing(SetupState state)
     {
-        return RequiresGemma12BMtpAssets(modelId) &&
-            (!IsSelectedReviewRuntimeReady(modelId) || !IsSelectedGemma12BMtpDraftReady(modelId));
+        return RequiresGemma12BMtpAssets(state.SelectedReviewModelId) &&
+            (!IsSelectedReviewRuntimeReady(state.SelectedReviewModelId) ||
+             !IsSelectedGemma12BMtpDraftReady(state.SelectedReviewModelId, state.StorageRoot));
     }
 
     public bool IsSelectedGpuRequirementSatisfied(SetupState state, SetupHostResources resources)
@@ -131,7 +132,7 @@ internal sealed class SetupReadinessAuditBuilder(
         return new SetupSmokeCheck("Review LLM runtime", exists, exists ? runtimePath : $"Missing: {runtimePath}");
     }
 
-    public IReadOnlyList<SetupSmokeCheck> CheckGemma12BMtpRequirements(string? modelId)
+    public IReadOnlyList<SetupSmokeCheck> CheckGemma12BMtpRequirements(string? modelId, string? storageRoot)
     {
         if (!RequiresGemma12BMtpAssets(modelId))
         {
@@ -140,7 +141,7 @@ internal sealed class SetupReadinessAuditBuilder(
 
         var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath);
         var serverExists = File.Exists(llamaServerPath);
-        var draftExists = TryResolveReadyGemma12BMtpDraftPath(out var draftPath);
+        var draftExists = TryResolveReadyGemma12BMtpDraftPath(storageRoot, out var draftPath);
         draftPath ??= Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath() ??
             $"Not installed: {Gemma12BLocalValidation.MtpDraftModelId}";
 
@@ -226,7 +227,7 @@ internal sealed class SetupReadinessAuditBuilder(
             Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
-    private bool TryResolveReadyGemma12BMtpDraftPath(out string? path)
+    private bool TryResolveReadyGemma12BMtpDraftPath(string? storageRoot, out string? path)
     {
         var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
         if (configured is not null)
@@ -237,10 +238,19 @@ internal sealed class SetupReadinessAuditBuilder(
 
         var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
         path = installed?.FilePath;
-        return installed is not null &&
+        var installedReady = installed is not null &&
             installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
             File.Exists(installed.FilePath) &&
             LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
+        if (installedReady)
+        {
+            return true;
+        }
+
+        path = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(path);
     }
 }

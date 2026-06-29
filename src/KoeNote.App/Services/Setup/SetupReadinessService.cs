@@ -40,7 +40,7 @@ internal sealed class SetupReadinessService(
             EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
             AsrModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
             ReviewModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedReviewModelId, "review") &&
-                _auditBuilder.IsSelectedGemma12BMtpDraftReady(state.SelectedReviewModelId),
+                _auditBuilder.IsSelectedGemma12BMtpDraftReady(state.SelectedReviewModelId, state.StorageRoot),
             ReviewRuntimeReady: _auditBuilder.IsSelectedReviewRuntimeReady(state.SelectedReviewModelId),
             GpuRuntimeReady: gpuRuntimeReady,
             StorageReady: Directory.Exists(state.StorageRoot ?? paths.DefaultModelStorageRoot));
@@ -110,7 +110,7 @@ internal sealed class SetupReadinessService(
 
     public bool IsSelectedGemma12BMtpRequirementMissing(SetupState state)
     {
-        return _auditBuilder.IsSelectedGemma12BMtpRequirementMissing(state.SelectedReviewModelId);
+        return _auditBuilder.IsSelectedGemma12BMtpRequirementMissing(state);
     }
 
     private bool IsCompleteStateReady(
@@ -153,7 +153,7 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
-        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId));
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId, state.StorageRoot));
         checks.AddRange(_auditBuilder.CheckSelectedGpuRequirements(state, resources));
 
         if (resources.NvidiaGpuDetected)
@@ -183,7 +183,7 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
-        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId));
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId, state.StorageRoot));
         checks.AddRange(_auditBuilder.CheckSelectedGpuRequirements(state, resources));
 
         if (resources.NvidiaGpuDetected)

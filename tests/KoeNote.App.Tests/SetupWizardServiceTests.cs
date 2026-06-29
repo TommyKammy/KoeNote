@@ -588,7 +588,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public async Task SetupWizard_InstallSelectedPresetModels_DownloadsGemma12BMtpDraftForSelectedGemma12B()
+    public async Task SetupWizard_InstallSelectedPresetModels_DownloadsGemma12BMtpDraftForHighAccuracyPreset()
     {
         var paths = CreatePaths();
         paths.EnsureCreated();
@@ -600,8 +600,7 @@ public sealed class SetupWizardServiceTests
         UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3"));
         UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
         var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("draft-model")));
-        wizard.SelectModel("asr", "faster-whisper-large-v3");
-        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.SelectModelPreset("high_accuracy");
         wizard.AcceptLicenses();
 
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
@@ -758,6 +757,50 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_RunSmokeCheck_UsesGemma12BMtpDraftFromStorageRoot()
+    {
+        var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, null);
+            var paths = CreatePathsWithoutTernaryRuntime();
+            Touch(paths.FfmpegPath);
+            Touch(paths.LlamaCompletionPath);
+            Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+            CreateFasterWhisperRuntime(paths);
+            CreateDiarizationRuntime(paths);
+            var customStorageRoot = Path.Combine(paths.Root, "custom-models");
+            var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+            Directory.CreateDirectory(asrPath);
+            var reviewPath = Path.Combine(paths.UserModels, "review", "gemma-4-12b-it-qat-q4-0", "gemma-4-12b-it-qat-q4_0.gguf");
+            Touch(reviewPath);
+            var draftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(customStorageRoot);
+            Touch(draftPath);
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            var installedModels = new InstalledModelRepository(paths);
+            UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+            UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+            var wizard = CreateWizard(paths);
+            wizard.SelectModel("asr", "faster-whisper-large-v3");
+            wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+            wizard.SetStorageRoot(customStorageRoot);
+            wizard.AcceptLicenses();
+
+            var result = await wizard.RunSmokeCheckAsync();
+
+            Assert.Contains(result.Checks, check =>
+                check.Name == "Gemma 4 12B MTP draft model" &&
+                check.IsOk &&
+                check.Detail.Equals(draftPath, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previousDraft);
+        }
+    }
+
+    [Fact]
     public void SetupWizard_AutomaticPresetRecommendation_SelectsLightweightForLowResourceHost()
     {
         var paths = CreatePaths();
@@ -833,7 +876,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithE4B()
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithGemma12B()
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
@@ -848,7 +891,7 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("high_accuracy", recommendation.PresetId);
         Assert.Equal("high_accuracy", state.SelectedModelPresetId);
         Assert.Equal("faster-whisper-large-v3", state.SelectedAsrModelId);
-        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
     }
 
     [Fact]
