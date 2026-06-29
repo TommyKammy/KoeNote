@@ -324,6 +324,8 @@ public sealed class VersioningTests
         Assert.DoesNotContain("Start-Job", script);
         Assert.Contains("taskkill.exe", validationScript);
         Assert.DoesNotContain(".Kill($true)", validationScript);
+        Assert.DoesNotContain(".ArgumentList", validationScript);
+        Assert.Contains("exit 1", validationScript);
     }
 
     private static string FindRepoRoot()

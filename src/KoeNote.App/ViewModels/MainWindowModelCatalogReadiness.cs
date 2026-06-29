@@ -83,7 +83,16 @@ internal static class MainWindowModelCatalogReadiness
             installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             InstalledPathExists(installed);
         return primaryReady &&
+            IsDirectLlmStageFallbackReady(modelId, findInstalledModel) &&
             IsGemma12BMtpDraftReady(modelId, storageRoot, findInstalledModel);
+    }
+
+    public static bool IsDirectLlmStageFallbackReady(
+        string? modelId,
+        Func<string, InstalledModel?> findInstalledModel)
+    {
+        return !Gemma12BLocalValidation.IsTargetModel(modelId) ||
+            InstalledPathExists(findInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId));
     }
 
     public static bool IsReviewRuntimeReady(string modelId, string llamaCompletionPath)

@@ -41,7 +41,7 @@ public sealed class MainWindowModelCatalogReadinessTests
     }
 
     [Fact]
-    public void IsReviewModelReady_RequiresGemma12BMtpDraftOrOverrideWhenEnabled()
+    public void IsReviewModelReady_RequiresGemma12BMtpDraftAndDirectStageFallbackWhenEnabled()
     {
         var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
         var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
@@ -71,6 +71,18 @@ public sealed class MainWindowModelCatalogReadinessTests
             var draftOverridePath = Path.Combine(root, "external", Gemma12BLocalValidation.MtpDraftFileName);
             Touch(draftOverridePath);
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, draftOverridePath);
+            Assert.False(MainWindowModelCatalogReadiness.IsReviewModelReady(
+                Gemma12BLocalValidation.ModelId,
+                paths,
+                modelId => installedModels.GetValueOrDefault(modelId),
+                paths.UserModels));
+
+            var fallbackPath = Path.Combine(root, "models", "gemma-e4b.gguf");
+            Touch(fallbackPath);
+            installedModels[ReviewModelSelectionResolver.DefaultReviewModelId] = CreateInstalledModel(
+                ReviewModelSelectionResolver.DefaultReviewModelId,
+                "review",
+                fallbackPath);
             Assert.True(MainWindowModelCatalogReadiness.IsReviewModelReady(
                 Gemma12BLocalValidation.ModelId,
                 paths,

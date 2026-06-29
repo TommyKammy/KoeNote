@@ -28,6 +28,58 @@ Output:
 "@
 }
 
+function ConvertTo-ProcessArgument {
+    param([string]$Argument)
+
+    if ([string]::IsNullOrEmpty($Argument)) {
+        return '""'
+    }
+
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $builder = [System.Text.StringBuilder]::new()
+    [void]$builder.Append('"')
+    $backslashes = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashes++
+            continue
+        }
+
+        if ($character -eq '"') {
+            if ($backslashes -gt 0) {
+                [void]$builder.Append('\' * ($backslashes * 2))
+                $backslashes = 0
+            }
+
+            [void]$builder.Append('\"')
+            continue
+        }
+
+        if ($backslashes -gt 0) {
+            [void]$builder.Append('\' * $backslashes)
+            $backslashes = 0
+        }
+
+        [void]$builder.Append($character)
+    }
+
+    if ($backslashes -gt 0) {
+        [void]$builder.Append('\' * ($backslashes * 2))
+    }
+
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
+function Join-ProcessArguments {
+    param([string[]]$Arguments)
+
+    return (($Arguments | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join " ")
+}
+
 function Invoke-ProcessWithTimeout {
     param(
         [string]$FilePath,
@@ -37,9 +89,7 @@ function Invoke-ProcessWithTimeout {
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $FilePath
-    foreach ($argument in $Arguments) {
-        [void]$startInfo.ArgumentList.Add($argument)
-    }
+    $startInfo.Arguments = Join-ProcessArguments $Arguments
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $startInfo.UseShellExecute = $false
@@ -198,3 +248,9 @@ $report = @{
 
 Set-Content -LiteralPath $OutputPath -Encoding UTF8 -Value ($report | ConvertTo-Json -Depth 8)
 Write-Host "Gemma 4 12B polishing validation report: $OutputPath"
+
+$failedChecks = @($checks | Where-Object { $_.status -eq "fail" })
+if ($failedChecks.Count -gt 0) {
+    Write-Error "Gemma 4 12B polishing validation failed: $($failedChecks.Count) check(s) failed."
+    exit 1
+}

@@ -1418,6 +1418,9 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     private bool IsSetupReviewModelReady()
     {
         return IsSetupModelReady(SelectedSetupReviewModel) &&
+            MainWindowModelCatalogReadiness.IsDirectLlmStageFallbackReady(
+                SelectedSetupReviewModel?.ModelId,
+                _installedModelRepository.FindInstalledModel) &&
             SelectedSetupGemma12BMtpDraftReady;
     }
 
