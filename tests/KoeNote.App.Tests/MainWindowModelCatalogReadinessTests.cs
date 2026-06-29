@@ -26,13 +26,54 @@ public sealed class MainWindowModelCatalogReadinessTests
             Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath));
             Assert.True(MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
                 Gemma12BLocalValidation.ModelId,
-                llamaCompletionPath));
+                llamaCompletionPath,
+                isLlamaServerMtpCapable: static (_, _) => true));
+
+            Assert.False(MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+                Gemma12BLocalValidation.ModelId,
+                llamaCompletionPath,
+                isLlamaServerMtpCapable: static (_, _) => false));
 
             File.Delete(Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath));
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "0");
             Assert.True(MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
                 Gemma12BLocalValidation.ModelId,
                 llamaCompletionPath));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+        }
+    }
+
+    [Fact]
+    public void IsReviewRuntimeReady_PassesRuntimeEnvironmentToGemma12BMtpProbe()
+    {
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, null);
+            var root = CreateRoot();
+            var llamaCompletionPath = Path.Combine(root, "runtime", "llama-completion.exe");
+            Touch(llamaCompletionPath);
+            var environment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["PATH"] = Path.Combine(root, "cuda")
+            };
+            IReadOnlyDictionary<string, string>? observedEnvironment = null;
+
+            var ready = MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+                Gemma12BLocalValidation.ModelId,
+                llamaCompletionPath,
+                environment,
+                (_, passedEnvironment) =>
+                {
+                    observedEnvironment = passedEnvironment;
+                    return true;
+                });
+
+            Assert.True(ready);
+            Assert.Same(environment, observedEnvironment);
         }
         finally
         {

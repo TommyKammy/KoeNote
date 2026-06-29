@@ -87,7 +87,9 @@ public static class Gemma12BLocalValidation
         return string.IsNullOrWhiteSpace(configured) ? null : configured;
     }
 
-    public static bool IsLlamaServerMtpCapable(string llamaServerPath)
+    public static bool IsLlamaServerMtpCapable(
+        string llamaServerPath,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         if (!File.Exists(llamaServerPath))
         {
@@ -96,7 +98,7 @@ public static class Gemma12BLocalValidation
 
         try
         {
-            return LlamaServerHelpSupportsMtp(ReadLlamaServerHelp(llamaServerPath));
+            return LlamaServerHelpSupportsMtp(ReadLlamaServerHelp(llamaServerPath, environment));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
@@ -119,7 +121,9 @@ public static class Gemma12BLocalValidation
              value.Equals("yes", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string ReadLlamaServerHelp(string llamaServerPath)
+    private static string ReadLlamaServerHelp(
+        string llamaServerPath,
+        IReadOnlyDictionary<string, string>? environment)
     {
         var output = new StringBuilder();
         var outputLock = new object();
@@ -136,6 +140,14 @@ public static class Gemma12BLocalValidation
             },
             EnableRaisingEvents = true
         };
+        if (environment is not null)
+        {
+            foreach (var pair in environment)
+            {
+                process.StartInfo.Environment[pair.Key] = pair.Value;
+            }
+        }
+
         process.OutputDataReceived += (_, args) => AppendLine(output, outputLock, args.Data);
         process.ErrorDataReceived += (_, args) => AppendLine(output, outputLock, args.Data);
         process.Start();

@@ -104,11 +104,26 @@ internal static class MainWindowModelCatalogReadiness
             LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
     }
 
-    public static bool IsReviewRuntimeReady(string modelId, string llamaCompletionPath)
+    public static bool IsReviewRuntimeReady(
+        string modelId,
+        string llamaCompletionPath,
+        IReadOnlyDictionary<string, string>? runtimeEnvironment = null,
+        Func<string, IReadOnlyDictionary<string, string>?, bool>? isLlamaServerMtpCapable = null)
     {
-        return File.Exists(llamaCompletionPath) &&
-            (!RequiresGemma12BMtpAssets(modelId) ||
-             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath)));
+        if (!File.Exists(llamaCompletionPath))
+        {
+            return false;
+        }
+
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        isLlamaServerMtpCapable ??= Gemma12BLocalValidation.IsLlamaServerMtpCapable;
+        return isLlamaServerMtpCapable(
+            Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath),
+            runtimeEnvironment);
     }
 
     public static bool IsGemma12BMtpDraftReady(

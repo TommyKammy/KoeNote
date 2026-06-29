@@ -409,7 +409,8 @@ public sealed partial class MainWindowViewModel
     {
         return MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
             ResolveEffectiveReviewModelId(),
-            GetSelectedReviewRuntimePath());
+            GetSelectedReviewRuntimePath(),
+            LlamaRuntimeEnvironment.Build(Paths));
     }
 
     private string GetSelectedReviewRuntimePath()

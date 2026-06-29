@@ -69,9 +69,13 @@ internal sealed class SetupReadinessAuditBuilder(
 
     public bool IsSelectedReviewRuntimeReady(string? modelId)
     {
-        return File.Exists(GetSelectedReviewRuntimePath(modelId)) &&
-            (!RequiresGemma12BMtpAssets(modelId) ||
-             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath)));
+        var runtimePath = GetSelectedReviewRuntimePath(modelId);
+        if (!File.Exists(runtimePath))
+        {
+            return false;
+        }
+
+        return !RequiresGemma12BMtpAssets(modelId) || IsGemma12BMtpServerReady();
     }
 
     public bool IsSelectedGemma12BMtpDraftReady(string? modelId, string? storageRoot = null)
@@ -148,7 +152,7 @@ internal sealed class SetupReadinessAuditBuilder(
 
         var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath);
         var serverExists = File.Exists(llamaServerPath);
-        var serverReady = serverExists && Gemma12BLocalValidation.IsLlamaServerMtpCapable(llamaServerPath);
+        var serverReady = IsGemma12BMtpServerReady();
         var draftExists = TryResolveReadyGemma12BMtpDraftPath(storageRoot, out var draftPath);
         draftPath ??= Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath() ??
             $"Not installed: {Gemma12BLocalValidation.MtpDraftModelId}";
@@ -168,6 +172,13 @@ internal sealed class SetupReadinessAuditBuilder(
                 draftExists,
                 draftPath)
         ];
+    }
+
+    private bool IsGemma12BMtpServerReady()
+    {
+        return Gemma12BLocalValidation.IsLlamaServerMtpCapable(
+            Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath),
+            LlamaRuntimeEnvironment.Build(paths));
     }
 
     public IReadOnlyList<SetupSmokeCheck> CheckDirectLlmFallbackRequirements(string? modelId)
