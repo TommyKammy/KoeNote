@@ -185,6 +185,6 @@ public sealed class ReviewStageRunner(
     {
         var state = setupStateService.Load();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        return DirectLlmStageModelResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
     }
 }

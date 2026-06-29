@@ -291,7 +291,7 @@ public sealed class VersioningTests
     }
 
     [Fact]
-    public void Gemma4ReviewSmokeScript_RecordsHidden12BReleaseDecision()
+    public void Gemma4ReviewSmokeScript_RecordsHighAccuracyMtpReleaseDecision()
     {
         var repoRoot = FindRepoRoot();
         var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "development", "Test-Gemma4ReviewSmoke.ps1"));
@@ -301,9 +301,9 @@ public sealed class VersioningTests
         Assert.Contains("gemma-4-e4b-it-q4-k-m", script);
         Assert.Contains("12B selection guard", script);
         Assert.Contains("unexpected12bPresets", script);
-        Assert.Contains("Gemma 4 12B GGUF model is cataloged but hidden from user selection", script);
-        Assert.Contains("Recommended and high accuracy presets remain on Gemma 4 E4B", script);
-        Assert.Contains("hidden_until_llama_cpp_gemma4_12b_stable", script);
+        Assert.Contains("Gemma 4 12B GGUF model is cataloged for the high-accuracy MTP polishing path", script);
+        Assert.Contains("Recommended remains on Gemma 4 E4B; high accuracy selects Gemma 4 12B", script);
+        Assert.Contains("high_accuracy_mtp_polishing_with_direct_stage_fallback", script);
         Assert.Contains("RunLocalRuntimeSmoke", script);
         Assert.Contains("X-Linked-Size", script);
         Assert.Contains("X-Xet-Hash", script);

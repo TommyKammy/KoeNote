@@ -617,6 +617,44 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_InstallSelectedPresetModels_SkipsGemma12BMtpDraftWhenOverrideIsReady()
+    {
+        var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
+        {
+            var paths = CreatePaths();
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+            Directory.CreateDirectory(asrPath);
+            var reviewPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+            Touch(reviewPath);
+            var draftOverridePath = Path.Combine(paths.Root, "external", Gemma12BLocalValidation.MtpDraftFileName);
+            Touch(draftOverridePath);
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, draftOverridePath);
+            var installedModels = new InstalledModelRepository(paths);
+            UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+            UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+            var wizard = CreateWizard(paths, new HttpClient(new FailingHandler()));
+            wizard.SelectModelPreset("high_accuracy");
+            wizard.AcceptLicenses();
+
+            var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
+
+            Assert.True(result.IsSucceeded);
+            Assert.Equal(2, result.InstalledModels.Count);
+            Assert.Contains(result.InstalledModels, model => model.ModelId == "faster-whisper-large-v3");
+            Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.ModelId);
+            Assert.DoesNotContain(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.MtpDraftModelId);
+            Assert.Null(installedModels.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previousDraft);
+        }
+    }
+
+    [Fact]
     public async Task SetupWizard_DownloadSelectedReviewModel_DownloadsGemma12BMtpDraft()
     {
         var paths = CreatePaths();

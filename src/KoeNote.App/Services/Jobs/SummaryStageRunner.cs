@@ -175,7 +175,7 @@ public sealed class SummaryStageRunner(
     {
         var state = setupStateService.Load();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        return DirectLlmStageModelResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
     }
 
     private static int ResolveSummaryMaxAttempts(string modelId, string? modelFamily)

@@ -102,7 +102,7 @@ internal sealed class SetupModelInstallService(
     private IReadOnlyList<ModelCatalogItem> ResolveRequiredInstallItems(ModelCatalogItem catalogItem)
     {
         var items = new List<ModelCatalogItem> { catalogItem };
-        if (RequiresGemma12BMtpDraft(catalogItem))
+        if (RequiresGemma12BMtpDraft(catalogItem) && !IsGemma12BMtpDraftAlreadyReady())
         {
             var mtpDraft = selectionService.GetCatalogItemById(Gemma12BLocalValidation.MtpDraftModelId)
                 ?? throw new InvalidOperationException($"Gemma 4 12B MTP draft model is not in the catalog: {Gemma12BLocalValidation.MtpDraftModelId}");
@@ -117,6 +117,31 @@ internal sealed class SetupModelInstallService(
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId) &&
             Gemma12BLocalValidation.IsMtpServerEnabled();
+    }
+
+    private bool IsGemma12BMtpDraftAlreadyReady()
+    {
+        var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
+        {
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath))
+        {
+            return true;
+        }
+
+        var storageRoot = stateService.Load().StorageRoot;
+        var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(fallbackPath);
     }
 
     private async Task<SetupInstallResult> DownloadCatalogItemsAsync(
