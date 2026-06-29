@@ -205,6 +205,13 @@ public sealed class LlamaTranscriptSummaryRuntime(
         {
             throw new TimeoutException($"Transcript summary llama-server request timed out after {timeout}.", exception);
         }
+        catch (HttpRequestException exception)
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"Transcript summary llama-server request failed: {exception.Message}",
+                exception);
+        }
 
         var content = LlamaTranscriptPolishingRuntime.ExtractServerChatCompletionContent(responseJson);
         return new ProcessRunResult(

@@ -10,6 +10,7 @@ using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Tests;
 
+[Collection(Gemma12BEnvironmentCollection.Name)]
 public sealed class LlmStageLoggingTests
 {
     [Fact]
@@ -97,24 +98,82 @@ public sealed class LlmStageLoggingTests
     [Fact]
     public async Task SummaryStageRunner_UsesGemma12BMtpForHighAccuracyPreset()
     {
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
         var paths = TestDatabase.CreateReadyPaths();
-        PrepareRuntimeFiles(paths);
-        var modelPath = Path.Combine(paths.DefaultModelStorageRoot, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
-        var draftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels);
-        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
-        Directory.CreateDirectory(Path.GetDirectoryName(draftPath)!);
-        File.WriteAllText(modelPath, "model");
-        File.WriteAllText(draftPath, "draft");
-        File.WriteAllText(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath), "server");
-        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        try
         {
-            SelectedModelPresetId = "high_accuracy",
-            SelectedReviewModelId = Gemma12BLocalValidation.ModelId
-        });
-        var job = CreateJob(paths, "job-summary-mtp");
-        SaveSegments(paths, job.JobId);
-        var fakeRuntime = new FakeSummaryRuntime();
-        var runner = new SummaryStageRunner(
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, null);
+            PrepareRuntimeFiles(paths);
+            var modelPath = Path.Combine(paths.DefaultModelStorageRoot, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+            var draftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels);
+            Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(draftPath)!);
+            File.WriteAllText(modelPath, "model");
+            File.WriteAllText(draftPath, "draft");
+            File.WriteAllText(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath), "server");
+            new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+            {
+                SelectedModelPresetId = "high_accuracy",
+                SelectedReviewModelId = Gemma12BLocalValidation.ModelId
+            });
+            var job = CreateJob(paths, "job-summary-mtp");
+            SaveSegments(paths, job.JobId);
+            var fakeRuntime = new FakeSummaryRuntime();
+            var runner = CreateSummaryRunner(paths, fakeRuntime);
+
+            await runner.RunAsync(job, _ => { }, CancellationToken.None);
+
+            Assert.NotNull(fakeRuntime.LastOptions);
+            Assert.Equal(Gemma12BLocalValidation.ModelId, fakeRuntime.LastOptions.ModelId);
+            Assert.True(fakeRuntime.LastOptions.UseLlamaServerChatMtp);
+            Assert.EndsWith("llama-server.exe", fakeRuntime.LastOptions.LlamaServerPath, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(draftPath, fakeRuntime.LastOptions.MtpDraftModelPath);
+            Assert.Contains("runtime=llama-server-chat-mtp", fakeRuntime.LastOptions.GenerationProfile, StringComparison.Ordinal);
+            var logs = new JobLogRepository(paths).ReadLatest(job.JobId);
+            Assert.Contains(logs, entry =>
+                entry.Stage == "summary" &&
+                entry.Message.Contains("Gemma 4 12B MTP server runtime enabled for summary", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+        }
+    }
+
+    [Fact]
+    public async Task SummaryStageRunner_FallsBackToDirectModelWhenGemma12BMtpIsDisabled()
+    {
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        var paths = TestDatabase.CreateReadyPaths();
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "0");
+            PrepareRuntimeFiles(paths);
+            new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+            {
+                SelectedModelPresetId = "high_accuracy",
+                SelectedReviewModelId = Gemma12BLocalValidation.ModelId
+            });
+            var job = CreateJob(paths, "job-summary-mtp-disabled");
+            SaveSegments(paths, job.JobId);
+            var fakeRuntime = new FakeSummaryRuntime();
+            var runner = CreateSummaryRunner(paths, fakeRuntime);
+
+            await runner.RunAsync(job, _ => { }, CancellationToken.None);
+
+            Assert.NotNull(fakeRuntime.LastOptions);
+            Assert.Equal(ReviewModelSelectionResolver.DefaultReviewModelId, fakeRuntime.LastOptions.ModelId);
+            Assert.False(fakeRuntime.LastOptions.UseLlamaServerChatMtp);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+        }
+    }
+
+    private static SummaryStageRunner CreateSummaryRunner(AppPaths paths, FakeSummaryRuntime fakeRuntime)
+    {
+        return new SummaryStageRunner(
             paths,
             new JobRepository(paths),
             new StageProgressRepository(paths),
@@ -125,19 +184,6 @@ public sealed class LlmStageLoggingTests
                 new TranscriptReadRepository(paths),
                 new TranscriptDerivativeRepository(paths),
                 fakeRuntime));
-
-        await runner.RunAsync(job, _ => { }, CancellationToken.None);
-
-        Assert.NotNull(fakeRuntime.LastOptions);
-        Assert.Equal(Gemma12BLocalValidation.ModelId, fakeRuntime.LastOptions.ModelId);
-        Assert.True(fakeRuntime.LastOptions.UseLlamaServerChatMtp);
-        Assert.EndsWith("llama-server.exe", fakeRuntime.LastOptions.LlamaServerPath, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(draftPath, fakeRuntime.LastOptions.MtpDraftModelPath);
-        Assert.Contains("runtime=llama-server-chat-mtp", fakeRuntime.LastOptions.GenerationProfile, StringComparison.Ordinal);
-        var logs = new JobLogRepository(paths).ReadLatest(job.JobId);
-        Assert.Contains(logs, entry =>
-            entry.Stage == "summary" &&
-            entry.Message.Contains("Gemma 4 12B MTP server runtime enabled for summary", StringComparison.Ordinal));
     }
 
     private static JobSummary CreateJob(AppPaths paths, string jobId)

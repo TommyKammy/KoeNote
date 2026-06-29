@@ -194,7 +194,11 @@ public sealed class SummaryStageRunner(
     {
         var state = setupStateService.Load();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        var selectedModelId = ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        return Gemma12BLocalValidation.IsTargetModel(selectedModelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled()
+            ? selectedModelId
+            : DirectLlmStageModelResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
     }
 
     private bool TryResolveGemma12BMtpServer(
