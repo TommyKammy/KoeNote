@@ -1422,56 +1422,65 @@ public sealed class SetupWizardServiceTests
     [Fact]
     public void SetupWizard_LoadState_ReopensSetupWhenCompletedDirectLlmFallbackIsMissing()
     {
-        var paths = CreatePathsWithoutTernaryRuntime();
-        Touch(paths.FfmpegPath);
-        Touch(paths.LlamaCompletionPath);
-        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
-        CreateFasterWhisperRuntime(paths);
-        CreateDiarizationRuntime(paths);
-        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
-        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
-        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
-        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
-        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
-        Touch(paths.AsrCudaRuntimeMarkerPath);
-        CreateCudaReviewRuntime(paths);
-        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
-        Directory.CreateDirectory(asrPath);
-        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
-        Touch(gemma12BPath);
-        Touch(Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels));
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
-        var installedModels = new InstalledModelRepository(paths);
-        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
-        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
-        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        try
         {
-            IsCompleted = true,
-            CurrentStep = SetupStep.Complete,
-            LastSmokeSucceeded = true,
-            LicenseAccepted = true,
-            SelectedAsrModelId = "faster-whisper-large-v3",
-            SelectedReviewModelId = Gemma12BLocalValidation.ModelId,
-            StorageRoot = paths.UserModels
-        });
-        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
-            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
-            maxGpuMemoryGb: 24,
-            nvidiaGpuDetected: true));
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "0");
+            var paths = CreatePathsWithoutTernaryRuntime();
+            Touch(paths.FfmpegPath);
+            Touch(paths.LlamaCompletionPath);
+            Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+            CreateFasterWhisperRuntime(paths);
+            CreateDiarizationRuntime(paths);
+            Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+            Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+            Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+            Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
+            Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+            Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+            Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+            Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+            Touch(paths.AsrCudaRuntimeMarkerPath);
+            CreateCudaReviewRuntime(paths);
+            var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+            Directory.CreateDirectory(asrPath);
+            var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+            Touch(gemma12BPath);
+            Touch(Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels));
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            var installedModels = new InstalledModelRepository(paths);
+            UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+            UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+            new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+            {
+                IsCompleted = true,
+                CurrentStep = SetupStep.Complete,
+                LastSmokeSucceeded = true,
+                LicenseAccepted = true,
+                SelectedAsrModelId = "faster-whisper-large-v3",
+                SelectedReviewModelId = Gemma12BLocalValidation.ModelId,
+                StorageRoot = paths.UserModels
+            });
+            var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+                totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                maxGpuMemoryGb: 24,
+                nvidiaGpuDetected: true));
 
-        var state = wizard.LoadState();
+            var state = wizard.LoadState();
 
-        Assert.False(state.IsCompleted);
-        Assert.False(state.LastSmokeSucceeded);
-        Assert.Equal(SetupStep.SmokeTest, state.CurrentStep);
-        Assert.Contains(
-            "Review/Summary fallback model",
-            File.ReadAllText(paths.SetupReportPath),
-            StringComparison.OrdinalIgnoreCase);
+            Assert.False(state.IsCompleted);
+            Assert.False(state.LastSmokeSucceeded);
+            Assert.Equal(SetupStep.SmokeTest, state.CurrentStep);
+            Assert.Contains(
+                "Review/Summary fallback model",
+                File.ReadAllText(paths.SetupReportPath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+        }
     }
 
     [Fact]

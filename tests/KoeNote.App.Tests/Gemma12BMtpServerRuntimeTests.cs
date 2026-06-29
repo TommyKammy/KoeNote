@@ -93,7 +93,14 @@ public sealed class Gemma12BMtpServerRuntimeTests
             Temperature: 0,
             RepeatPenalty: 1.2);
 
-        var json = ReviewWorker.BuildServerChatCompletionRequestJson(options, "review prompt");
+        var json = ReviewWorker.BuildServerChatCompletionRequestJson(options, "review prompt", """
+            {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+            """);
 
         Assert.DoesNotContain("reasoning_content", json, StringComparison.OrdinalIgnoreCase);
         using var document = JsonDocument.Parse(json);
@@ -105,6 +112,10 @@ public sealed class Gemma12BMtpServerRuntimeTests
         var message = root.GetProperty("messages")[0];
         Assert.Equal("user", message.GetProperty("role").GetString());
         Assert.Equal("review prompt", message.GetProperty("content").GetString());
+        var responseFormat = root.GetProperty("response_format");
+        Assert.Equal("json_schema", responseFormat.GetProperty("type").GetString());
+        Assert.True(responseFormat.GetProperty("json_schema").GetProperty("strict").GetBoolean());
+        Assert.Equal("array", responseFormat.GetProperty("json_schema").GetProperty("schema").GetProperty("type").GetString());
     }
 
     [Fact]

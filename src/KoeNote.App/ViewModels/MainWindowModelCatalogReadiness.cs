@@ -91,7 +91,8 @@ internal static class MainWindowModelCatalogReadiness
         string? modelId,
         Func<string, InstalledModel?> findInstalledModel)
     {
-        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId) ||
+            Gemma12BLocalValidation.IsMtpServerEnabled())
         {
             return true;
         }

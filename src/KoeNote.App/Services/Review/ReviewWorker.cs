@@ -155,7 +155,7 @@ public sealed class ReviewWorker(
         try
         {
             processResult = options.UseLlamaServerChatMtp
-                ? await RunServerChatMtpAsync(options, promptFilePath, timeout, cancellationToken).ConfigureAwait(false)
+                ? await RunServerChatMtpAsync(options, promptFilePath, schemaPath, timeout, cancellationToken).ConfigureAwait(false)
                 : await RunCompletionAsync(options, promptFilePath, schemaPath, timeout, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (LlamaRuntimePathBridge.IsBridgePreparationException(exception))
@@ -210,15 +210,19 @@ public sealed class ReviewWorker(
     private static async Task<ProcessRunResult> RunServerChatMtpAsync(
         ReviewRunOptions options,
         string promptPath,
+        string? schemaPath,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         var prompt = await File.ReadAllTextAsync(promptPath, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+        var schemaJson = schemaPath is null
+            ? null
+            : await File.ReadAllTextAsync(schemaPath, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
         var session = await EnsureServerSessionAsync(options, cancellationToken).ConfigureAwait(false);
         using var request = new HttpRequestMessage(HttpMethod.Post, LlamaTranscriptPolishingRuntime.BuildServerEndpoint(session.BaseUri, "v1/chat/completions"))
         {
             Content = new StringContent(
-                BuildServerChatCompletionRequestJson(options, prompt),
+                BuildServerChatCompletionRequestJson(options, prompt, schemaJson),
                 Encoding.UTF8,
                 "application/json")
         };
@@ -254,12 +258,13 @@ public sealed class ReviewWorker(
             ExitCode: 0,
             Duration: DateTimeOffset.UtcNow - startedAt,
             StandardOutput: LlamaTranscriptPolishingRuntime.ExtractServerChatCompletionContent(responseJson),
-            StandardError: string.Empty);
+            StandardError: ReadServerLog(session.StderrPath));
     }
 
     internal static string BuildServerChatCompletionRequestJson(
         ReviewRunOptions options,
-        string prompt)
+        string prompt,
+        string? jsonSchema = null)
     {
         var payload = new LlamaServerChatCompletionRequest(
             Model: options.ModelId,
@@ -267,9 +272,23 @@ public sealed class ReviewWorker(
             MaxTokens: options.MaxTokens,
             Temperature: options.Temperature,
             RepeatPenalty: options.RepeatPenalty,
+            ResponseFormat: BuildServerResponseFormat(jsonSchema),
             Stream: false);
 
         return JsonSerializer.Serialize(payload, ServerJsonOptions);
+    }
+
+    private static LlamaServerResponseFormat? BuildServerResponseFormat(string? jsonSchema)
+    {
+        if (string.IsNullOrWhiteSpace(jsonSchema))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(jsonSchema);
+        return new LlamaServerResponseFormat(
+            "json_schema",
+            new LlamaServerJsonSchema("review_corrections", document.RootElement.Clone(), Strict: true));
     }
 
     private static async Task<LlamaServerSession> EnsureServerSessionAsync(
@@ -366,6 +385,7 @@ public sealed class ReviewWorker(
                     key,
                     process,
                     new Uri($"http://127.0.0.1:{port}"),
+                    stderrPath,
                     [modelPathBridge, draftPathBridge]);
                 await WaitForServerHealthAsync(
                     session.BaseUri,
@@ -654,6 +674,22 @@ public sealed class ReviewWorker(
         }
     }
 
+    private static string ReadServerLog(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? File.ReadAllText(path, Encoding.UTF8) : string.Empty;
+        }
+        catch (IOException)
+        {
+            return string.Empty;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
+    }
+
     private sealed record ReviewChunkResult(
         string RawOutput,
         string RawOutputPath,
@@ -685,6 +721,7 @@ public sealed class ReviewWorker(
         string Key,
         Process Process,
         Uri BaseUri,
+        string StderrPath,
         IReadOnlyList<IDisposable> PathBridges);
 
     private sealed record LlamaServerChatCompletionRequest(
@@ -693,9 +730,19 @@ public sealed class ReviewWorker(
         [property: JsonPropertyName("max_tokens")] int MaxTokens,
         [property: JsonPropertyName("temperature")] double Temperature,
         [property: JsonPropertyName("repeat_penalty")] double? RepeatPenalty,
+        [property: JsonPropertyName("response_format")] LlamaServerResponseFormat? ResponseFormat,
         [property: JsonPropertyName("stream")] bool Stream);
 
     private sealed record LlamaServerChatMessage(
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("content")] string? Content);
+
+    private sealed record LlamaServerResponseFormat(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("json_schema")] LlamaServerJsonSchema JsonSchema);
+
+    private sealed record LlamaServerJsonSchema(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("schema")] JsonElement Schema,
+        [property: JsonPropertyName("strict")] bool Strict);
 }
