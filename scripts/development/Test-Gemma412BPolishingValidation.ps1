@@ -249,8 +249,11 @@ $report = @{
 Set-Content -LiteralPath $OutputPath -Encoding UTF8 -Value ($report | ConvertTo-Json -Depth 8)
 Write-Host "Gemma 4 12B polishing validation report: $OutputPath"
 
-$failedChecks = @($checks | Where-Object { $_.status -eq "fail" })
+$failedChecks = @($checks | Where-Object {
+    $_.status -eq "fail" -or
+        ($_.label -eq "gemma12b" -and $_.status -eq "skipped")
+})
 if ($failedChecks.Count -gt 0) {
-    Write-Error "Gemma 4 12B polishing validation failed: $($failedChecks.Count) check(s) failed."
+    [Console]::Error.WriteLine("Gemma 4 12B polishing validation failed: $($failedChecks.Count) required check(s) failed or skipped.")
     exit 1
 }

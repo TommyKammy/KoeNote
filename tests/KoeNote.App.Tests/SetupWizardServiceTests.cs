@@ -772,6 +772,57 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_RunSmokeCheck_FailsWhenDirectLlmFallbackCannotUseRuntimeBridge()
+    {
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "0");
+            var paths = CreatePathsWithoutTernaryRuntime();
+            Touch(paths.FfmpegPath);
+            Touch(paths.LlamaCompletionPath);
+            CreateFasterWhisperRuntime(paths);
+            CreateDiarizationRuntime(paths);
+            CreateAsrCudaRuntime(paths);
+            CreateCudaReviewRuntime(paths);
+            var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+            Directory.CreateDirectory(asrPath);
+            var reviewPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+            Touch(reviewPath);
+            var fallbackPath = Path.Combine(paths.UserModels, "review", ReviewModelSelectionResolver.DefaultReviewModelId, "directory-model.gguf");
+            Directory.CreateDirectory(fallbackPath);
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            var installedModels = new InstalledModelRepository(paths);
+            UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+            UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+            UpsertVerified(installedModels, ReviewModelSelectionResolver.DefaultReviewModelId, "review", "llama-cpp", fallbackPath);
+            var wizard = CreateWizard(
+                paths,
+                hostResourceProbe: new FixedHostResourceProbe(
+                    totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+                    maxGpuMemoryGb: 24,
+                    nvidiaGpuDetected: true),
+                runtimeSmokeService: new PassingRuntimeSmokeService());
+            wizard.SelectModel("asr", "faster-whisper-large-v3");
+            wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+            wizard.AcceptLicenses();
+
+            var result = await wizard.RunSmokeCheckAsync();
+
+            Assert.False(result.IsSucceeded);
+            Assert.Contains(result.Checks, check =>
+                check.Name == "Review/Summary fallback model" &&
+                !check.IsOk &&
+                check.Detail.Contains("runtime bridge unavailable", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+        }
+    }
+
+    [Fact]
     public async Task SetupWizard_RunSmokeCheck_UsesGemma12BMtpDraftPathOverride()
     {
         var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
@@ -2323,6 +2374,28 @@ public sealed class SetupWizardServiceTests
         {
             Calls++;
             throw exception;
+        }
+    }
+
+    private sealed class PassingRuntimeSmokeService : ISetupRuntimeSmokeService
+    {
+        private static readonly SetupSmokeCheck[] Checks =
+        [
+            new("runtime smoke", true, "passed")
+        ];
+
+        public IReadOnlyList<SetupSmokeCheck> RunReadiness(SetupState state, bool nvidiaGpuDetected)
+        {
+            return Checks;
+        }
+
+        public Task<IReadOnlyList<SetupSmokeCheck>> RunAsync(
+            SetupState state,
+            bool runRuntimeActions,
+            bool nvidiaGpuDetected,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<SetupSmokeCheck>>(Checks);
         }
     }
 

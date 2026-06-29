@@ -46,7 +46,7 @@ internal sealed class SetupReadinessAuditBuilder(
         ];
     }
 
-    public bool IsSelectedModelReady(string? modelId, string role)
+    public bool IsSelectedModelReady(string? modelId, string role, bool requireRuntimeBridge = false)
     {
         if (string.IsNullOrWhiteSpace(modelId))
         {
@@ -57,13 +57,14 @@ internal sealed class SetupReadinessAuditBuilder(
         return installed is not null &&
             installed.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
-            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath)) &&
+            (!requireRuntimeBridge || LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath));
     }
 
     public bool IsSelectedDirectLlmFallbackReady(string? modelId)
     {
         return !RequiresDirectLlmStageFallback(modelId) ||
-            IsSelectedModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review");
+            IsSelectedModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review", requireRuntimeBridge: true);
     }
 
     public bool IsSelectedReviewRuntimeReady(string? modelId)
@@ -186,13 +187,14 @@ internal sealed class SetupReadinessAuditBuilder(
         var exists = File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
         var verified = installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             installed.Verified &&
-            exists;
+            exists &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
         return
         [
             new SetupSmokeCheck(
                 "Review/Summary fallback model",
                 verified,
-                verified ? installed.FilePath : $"Verification failed or missing: {installed.FilePath}")
+                verified ? installed.FilePath : $"Verification failed, missing, or runtime bridge unavailable: {installed.FilePath}")
         ];
     }
 
