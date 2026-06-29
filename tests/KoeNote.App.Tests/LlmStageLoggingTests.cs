@@ -2,6 +2,7 @@ using KoeNote.App.Models;
 using KoeNote.App.Services;
 using KoeNote.App.Services.Asr;
 using KoeNote.App.Services.Jobs;
+using KoeNote.App.Services.Llm;
 using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
 using KoeNote.App.Services.Setup;
@@ -93,6 +94,52 @@ public sealed class LlmStageLoggingTests
         Assert.Equal(JobRunProgressPlan.Completed, reader.GetInt32(1));
     }
 
+    [Fact]
+    public async Task SummaryStageRunner_UsesGemma12BMtpForHighAccuracyPreset()
+    {
+        var paths = TestDatabase.CreateReadyPaths();
+        PrepareRuntimeFiles(paths);
+        var modelPath = Path.Combine(paths.DefaultModelStorageRoot, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        var draftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels);
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(draftPath)!);
+        File.WriteAllText(modelPath, "model");
+        File.WriteAllText(draftPath, "draft");
+        File.WriteAllText(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath), "server");
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            SelectedModelPresetId = "high_accuracy",
+            SelectedReviewModelId = Gemma12BLocalValidation.ModelId
+        });
+        var job = CreateJob(paths, "job-summary-mtp");
+        SaveSegments(paths, job.JobId);
+        var fakeRuntime = new FakeSummaryRuntime();
+        var runner = new SummaryStageRunner(
+            paths,
+            new JobRepository(paths),
+            new StageProgressRepository(paths),
+            new JobLogRepository(paths),
+            new InstalledModelRepository(paths),
+            new SetupStateService(paths),
+            new TranscriptSummaryService(
+                new TranscriptReadRepository(paths),
+                new TranscriptDerivativeRepository(paths),
+                fakeRuntime));
+
+        await runner.RunAsync(job, _ => { }, CancellationToken.None);
+
+        Assert.NotNull(fakeRuntime.LastOptions);
+        Assert.Equal(Gemma12BLocalValidation.ModelId, fakeRuntime.LastOptions.ModelId);
+        Assert.True(fakeRuntime.LastOptions.UseLlamaServerChatMtp);
+        Assert.EndsWith("llama-server.exe", fakeRuntime.LastOptions.LlamaServerPath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(draftPath, fakeRuntime.LastOptions.MtpDraftModelPath);
+        Assert.Contains("runtime=llama-server-chat-mtp", fakeRuntime.LastOptions.GenerationProfile, StringComparison.Ordinal);
+        var logs = new JobLogRepository(paths).ReadLatest(job.JobId);
+        Assert.Contains(logs, entry =>
+            entry.Stage == "summary" &&
+            entry.Message.Contains("Gemma 4 12B MTP server runtime enabled for summary", StringComparison.Ordinal));
+    }
+
     private static JobSummary CreateJob(AppPaths paths, string jobId)
     {
         TestDatabase.InsertReviewReadyJob(paths, jobId, "meeting");
@@ -143,11 +190,14 @@ public sealed class LlmStageLoggingTests
 
     private sealed class FakeSummaryRuntime : ITranscriptSummaryRuntime
     {
+        public TranscriptSummaryOptions? LastOptions { get; private set; }
+
         public Task<TranscriptSummaryChunkResult> SummarizeChunkAsync(
             TranscriptSummaryOptions options,
             TranscriptSummaryChunk chunk,
             CancellationToken cancellationToken = default)
         {
+            LastOptions = options;
             return Task.FromResult(new TranscriptSummaryChunkResult(
                 chunk,
                 $"## Overview{Environment.NewLine}{Environment.NewLine}Summary for {chunk.SourceSegmentIds}.",
@@ -159,6 +209,7 @@ public sealed class LlmStageLoggingTests
             IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
             CancellationToken cancellationToken = default)
         {
+            LastOptions = options;
             return Task.FromResult($"## Overview{Environment.NewLine}{Environment.NewLine}Merged summary.");
         }
     }

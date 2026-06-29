@@ -158,6 +158,10 @@ public sealed class TranscriptSummaryService(
         {
             return SaveFallback(options, source, sourceHash, segments, exception.Message, chunkResults);
         }
+        finally
+        {
+            EndRuntimeSession(options);
+        }
     }
 
     private TranscriptSummaryResult SaveFailed(
@@ -357,6 +361,23 @@ public sealed class TranscriptSummaryService(
         if (options.ChunkSegmentCount <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(options), "Chunk segment count must be greater than zero.");
+        }
+    }
+
+    private void EndRuntimeSession(TranscriptSummaryOptions options)
+    {
+        if (runtime is not ITranscriptSummaryRuntimeSession runtimeSession)
+        {
+            return;
+        }
+
+        try
+        {
+            runtimeSession.EndSummarySession(options);
+        }
+        catch (Exception)
+        {
+            // Runtime cleanup is best effort; summary output has already been decided.
         }
     }
 

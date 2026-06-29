@@ -38,14 +38,30 @@ public sealed class SummaryStageRunner(
             var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
             LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Summary);
+            var useMtpServer = TryResolveGemma12BMtpServer(
+                profile,
+                out var llamaServerPath,
+                out var mtpDraftModelPath);
+            var generationProfile = useMtpServer
+                ? $"{taskSettings.GenerationProfile}; runtime=llama-server-chat-mtp"
+                : taskSettings.GenerationProfile;
             jobLogRepository.AddEvent(job.JobId, "summary", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
+            if (useMtpServer)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "summary",
+                    "info",
+                    $"Gemma 4 12B MTP server runtime enabled for summary: server=\"{llamaServerPath}\" draft=\"{mtpDraftModelPath}\"");
+            }
+
             var result = await summaryService.SummarizeAsync(new TranscriptSummaryOptions(
                 job.JobId,
                 profile.LlamaCompletionPath,
                 profile.ModelPath,
                 outputDirectory,
                 profile.ModelId,
-                taskSettings.GenerationProfile,
+                generationProfile,
                 taskSettings.PromptVersion,
                 ChunkSegmentCount: taskSettings.ChunkSegmentCount,
                 Timeout: profile.Timeout,
@@ -63,7 +79,10 @@ public sealed class SummaryStageRunner(
                 PromptTemplateId: taskSettings.PromptTemplateId,
                 ValidationMode: taskSettings.ValidationMode,
                 MaxAttempts: ResolveSummaryMaxAttempts(profile.ModelId, profile.ModelFamily),
-                RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
+                RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths),
+                UseLlamaServerChatMtp: useMtpServer,
+                LlamaServerPath: llamaServerPath,
+                MtpDraftModelPath: mtpDraftModelPath),
                 cancellationToken);
 
             var finishedAt = DateTimeOffset.Now;
@@ -175,7 +194,50 @@ public sealed class SummaryStageRunner(
     {
         var state = setupStateService.Load();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        return DirectLlmStageModelResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+    }
+
+    private bool TryResolveGemma12BMtpServer(
+        LlmRuntimeProfile profile,
+        out string? llamaServerPath,
+        out string? mtpDraftModelPath)
+    {
+        llamaServerPath = null;
+        mtpDraftModelPath = null;
+
+        if (!Gemma12BLocalValidation.IsTargetModel(profile.ModelId) ||
+            !Gemma12BLocalValidation.IsMtpServerEnabled())
+        {
+            return false;
+        }
+
+        llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(profile.LlamaCompletionPath);
+        mtpDraftModelPath = ResolveMtpDraftModelPath();
+        return true;
+    }
+
+    internal string ResolveMtpDraftModelPath()
+    {
+        var configuredDraft = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configuredDraft is not null)
+        {
+            return configuredDraft;
+        }
+
+        var installedDraft = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installedDraft is not null &&
+            installedDraft.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installedDraft.Verified &&
+            File.Exists(installedDraft.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installedDraft.FilePath))
+        {
+            return installedDraft.FilePath;
+        }
+
+        var storageRoot = setupStateService.Load().StorageRoot;
+        return string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
     }
 
     private static int ResolveSummaryMaxAttempts(string modelId, string? modelFamily)
