@@ -91,6 +91,8 @@ public sealed class Gemma12BMtpServerRuntimeTests
             ModelId: Gemma12BLocalValidation.ModelId,
             MaxTokens: 789,
             Temperature: 0,
+            TopP: 0.8,
+            TopK: 32,
             RepeatPenalty: 1.2);
 
         var json = ReviewWorker.BuildServerChatCompletionRequestJson(options, "review prompt", """
@@ -107,6 +109,8 @@ public sealed class Gemma12BMtpServerRuntimeTests
         var root = document.RootElement;
         Assert.Equal(Gemma12BLocalValidation.ModelId, root.GetProperty("model").GetString());
         Assert.Equal(789, root.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(0.8, root.GetProperty("top_p").GetDouble());
+        Assert.Equal(32, root.GetProperty("top_k").GetInt32());
         Assert.Equal(1.2, root.GetProperty("repeat_penalty").GetDouble());
         Assert.False(root.GetProperty("stream").GetBoolean());
         var message = root.GetProperty("messages")[0];

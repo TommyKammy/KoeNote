@@ -1146,7 +1146,8 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
             SelectedSetupReviewModel?.ModelId ?? string.Empty,
             Paths.LlamaCompletionPath,
-            LlamaRuntimeEnvironment.Build(Paths));
+            LlamaRuntimeEnvironment.Build(Paths),
+            Gemma12BLocalValidation.IsLlamaServerMtpCapable);
 
     public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 

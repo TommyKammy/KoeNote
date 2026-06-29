@@ -271,6 +271,8 @@ public sealed class ReviewWorker(
             Messages: [new LlamaServerChatMessage("user", prompt)],
             MaxTokens: options.MaxTokens,
             Temperature: options.Temperature,
+            TopP: options.TopP,
+            TopK: options.TopK,
             RepeatPenalty: options.RepeatPenalty,
             ResponseFormat: BuildServerResponseFormat(jsonSchema),
             Stream: false);
@@ -729,6 +731,8 @@ public sealed class ReviewWorker(
         [property: JsonPropertyName("messages")] IReadOnlyList<LlamaServerChatMessage> Messages,
         [property: JsonPropertyName("max_tokens")] int MaxTokens,
         [property: JsonPropertyName("temperature")] double Temperature,
+        [property: JsonPropertyName("top_p")] double? TopP,
+        [property: JsonPropertyName("top_k")] int? TopK,
         [property: JsonPropertyName("repeat_penalty")] double? RepeatPenalty,
         [property: JsonPropertyName("response_format")] LlamaServerResponseFormat? ResponseFormat,
         [property: JsonPropertyName("stream")] bool Stream);

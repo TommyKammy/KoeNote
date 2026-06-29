@@ -314,12 +314,15 @@ internal sealed class SetupModelSelectionService(
         var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
         return File.Exists(runtimePath) &&
             (!RequiresGemma12BMtpAssets(modelId) ||
-             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath)));
+             Gemma12BLocalValidation.IsLlamaServerMtpCapable(
+                 Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath),
+                 LlamaRuntimeEnvironment.Build(paths)));
     }
 
     private bool IsDirectLlmFallbackReady(string modelId)
     {
-        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId) ||
+            Gemma12BLocalValidation.IsMtpServerEnabled())
         {
             return true;
         }

@@ -123,7 +123,8 @@ internal sealed class SetupModelInstallService(
     private static bool RequiresDirectLlmStageFallback(ModelCatalogItem catalogItem)
     {
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
-            Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId);
+            Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId) &&
+            !Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private bool IsInstalledModelReady(string modelId, string role, bool requireRuntimeBridge = false)
