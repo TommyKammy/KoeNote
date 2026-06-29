@@ -53,6 +53,26 @@ public sealed class Gemma12BMtpServerRuntimeTests
     }
 
     [Fact]
+    public void ExtractServerChatCompletionContent_ThrowsJsonParseFailedForMalformedJson()
+    {
+        var exception = Assert.Throws<ReviewWorkerException>(() =>
+            LlamaTranscriptPolishingRuntime.ExtractServerChatCompletionContent("{ not json"));
+
+        Assert.Equal(ReviewFailureCategory.JsonParseFailed, exception.Category);
+        Assert.Contains("malformed JSON", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ExtractServerChatCompletionContent_ThrowsJsonParseFailedForMissingChoices()
+    {
+        var exception = Assert.Throws<ReviewWorkerException>(() =>
+            LlamaTranscriptPolishingRuntime.ExtractServerChatCompletionContent("""{"id":"cmpl-test"}"""));
+
+        Assert.Equal(ReviewFailureCategory.JsonParseFailed, exception.Category);
+        Assert.Contains("empty content", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void IsMtpServerEnabled_DefaultsOnForDistributionAndCanBeDisabled()
     {
         var previousValidation = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);

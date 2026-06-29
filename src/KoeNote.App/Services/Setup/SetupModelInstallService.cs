@@ -216,7 +216,8 @@ internal sealed class SetupModelInstallService(
             IsInstalledModelReady(
                 catalogItem.ModelId,
                 catalogItem.Role,
-                requireRuntimeBridge: IsDirectLlmStageFallbackModel(catalogItem)))
+                requireRuntimeBridge: IsDirectLlmStageFallbackModel(catalogItem) ||
+                    IsGemma12BMtpDraftModel(catalogItem)))
         {
             MarkInstallStep();
             return new SetupInstallResult(true, $"Already installed: {existing.DisplayName}", [existing]);
@@ -235,6 +236,11 @@ internal sealed class SetupModelInstallService(
     {
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             catalogItem.ModelId.Equals(ReviewModelSelectionResolver.DefaultReviewModelId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGemma12BMtpDraftModel(ModelCatalogItem catalogItem)
+    {
+        return catalogItem.ModelId.Equals(Gemma12BLocalValidation.MtpDraftModelId, StringComparison.OrdinalIgnoreCase);
     }
 
     public SetupInstallResult RegisterSelectedLocalModel(string role, string modelPath)

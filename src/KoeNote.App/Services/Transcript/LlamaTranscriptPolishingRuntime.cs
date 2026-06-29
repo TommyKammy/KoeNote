@@ -145,17 +145,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
             throw new TimeoutException($"Transcript polishing llama-server request timed out after {timeout}.", exception);
         }
 
-        var parsed = JsonSerializer.Deserialize<LlamaServerChatCompletionResponse>(
-            responseJson,
-            ServerJsonOptions);
-        var content = parsed?.Choices.FirstOrDefault()?.Message.Content;
-        if (string.IsNullOrWhiteSpace(content))
-        {
-            var reasoningLength = parsed?.Choices.FirstOrDefault()?.Message.ReasoningContent?.Length ?? 0;
-            throw new ReviewWorkerException(
-                ReviewFailureCategory.JsonParseFailed,
-                $"Transcript polishing llama-server returned empty content. reasoning_content_length={reasoningLength}.");
-        }
+        var content = ExtractServerChatCompletionContent(responseJson);
 
         var sanitized = LlmOutputSanitizer.SanitizeMarkdown(content, options.OutputSanitizerProfile);
         if (string.IsNullOrWhiteSpace(sanitized))
@@ -365,6 +355,35 @@ public sealed class LlamaTranscriptPolishingRuntime(
         return JsonSerializer.Serialize(payload, ServerJsonOptions);
     }
 
+    internal static string ExtractServerChatCompletionContent(string responseJson)
+    {
+        LlamaServerChatCompletionResponse? parsed;
+        try
+        {
+            parsed = JsonSerializer.Deserialize<LlamaServerChatCompletionResponse>(
+                responseJson,
+                ServerJsonOptions);
+        }
+        catch (JsonException exception)
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.JsonParseFailed,
+                "Transcript polishing llama-server returned malformed JSON.",
+                exception);
+        }
+
+        var message = parsed?.Choices?.FirstOrDefault()?.Message;
+        if (string.IsNullOrWhiteSpace(message?.Content))
+        {
+            var reasoningLength = message?.ReasoningContent?.Length ?? 0;
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.JsonParseFailed,
+                $"Transcript polishing llama-server returned empty content. reasoning_content_length={reasoningLength}.");
+        }
+
+        return message.Content;
+    }
+
     private static async Task RedirectToFileAsync(StreamReader reader, string path)
     {
         await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
@@ -501,8 +520,8 @@ public sealed class LlamaTranscriptPolishingRuntime(
     }
 
     private sealed record LlamaServerChatChoice(
-        [property: JsonPropertyName("message")] LlamaServerChatMessage Message);
+        [property: JsonPropertyName("message")] LlamaServerChatMessage? Message);
 
     private sealed record LlamaServerChatCompletionResponse(
-        [property: JsonPropertyName("choices")] IReadOnlyList<LlamaServerChatChoice> Choices);
+        [property: JsonPropertyName("choices")] IReadOnlyList<LlamaServerChatChoice>? Choices);
 }

@@ -738,6 +738,29 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_DownloadSelectedReviewModel_ReinstallsUnbridgeableGemma12BMtpDraft()
+    {
+        var paths = CreatePaths();
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var draftDirectory = Path.Combine(paths.UserModels, "review_aux", Gemma12BLocalValidation.MtpDraftModelId, "directory-draft.gguf");
+        Directory.CreateDirectory(draftDirectory);
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.MtpDraftModelId, "review_aux", "llama-cpp", draftDirectory);
+        var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("model-bytes")));
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.AcceptLicenses();
+
+        var result = await wizard.DownloadSelectedModelAsync("review");
+
+        Assert.True(result.IsSucceeded);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.MtpDraftModelId);
+        var draft = installedModels.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        Assert.NotNull(draft);
+        Assert.True(File.Exists(draft.FilePath));
+    }
+
+    [Fact]
     public async Task SetupWizard_RunSmokeCheck_FailsWhenGemma12BMtpRequirementsAreMissing()
     {
         var paths = CreatePathsWithoutTernaryRuntime();

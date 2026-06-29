@@ -142,12 +142,21 @@ function Get-FreeLoopbackPort {
 function Stop-ProcessTree {
     param([System.Diagnostics.Process]$Process)
 
-    if ($null -eq $Process -or $Process.HasExited) {
+    if ($null -eq $Process) {
         return
     }
 
     try {
-        & taskkill.exe /PID $Process.Id /T /F | Out-Null
+        $processId = $Process.Id
+        if ($processId -le 0) {
+            return
+        }
+
+        if ($Process.HasExited) {
+            return
+        }
+
+        & taskkill.exe /PID $processId /T /F | Out-Null
         [void]$Process.WaitForExit(5000)
     }
     catch {
