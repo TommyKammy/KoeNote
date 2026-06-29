@@ -25,6 +25,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+    private static readonly TimeSpan ServerStopTimeout = TimeSpan.FromSeconds(10);
 
     private static LlamaServerSession? serverSession;
 
@@ -406,6 +407,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
+                process.WaitForExit((int)ServerStopTimeout.TotalMilliseconds);
             }
         }
         catch (InvalidOperationException)
