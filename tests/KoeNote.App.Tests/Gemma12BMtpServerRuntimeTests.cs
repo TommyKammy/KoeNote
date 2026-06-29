@@ -225,4 +225,40 @@ public sealed class Gemma12BMtpServerRuntimeTests
         Assert.Equal(ReviewFailureCategory.MissingRuntime, exception.Category);
         Assert.Contains("llama-server runtime not found", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task PolishChunkAsync_FailsFastWhenMtpServerRuntimeLacksMtpOptions()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var llamaCompletionPath = Path.Combine(root, "runtime", "llama-completion.exe");
+        var llamaServerPath = Path.Combine(root, "runtime", "llama-server.exe");
+        var modelPath = Path.Combine(root, "models", "model.gguf");
+        var draftPath = Path.Combine(root, "models", "draft.gguf");
+        Directory.CreateDirectory(Path.GetDirectoryName(llamaCompletionPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+        File.WriteAllText(llamaCompletionPath, "runtime");
+        File.WriteAllText(llamaServerPath, "runtime without mtp help");
+        File.WriteAllText(modelPath, "model");
+        File.WriteAllText(draftPath, "draft");
+        var runtime = new LlamaTranscriptPolishingRuntime(new ExternalProcessRunner(), new TranscriptPolishingPromptBuilder());
+        var options = new TranscriptPolishingOptions(
+            "job-001",
+            llamaCompletionPath,
+            modelPath,
+            Path.Combine(root, "output"),
+            Gemma12BLocalValidation.ModelId,
+            UseLlamaServerChatMtp: true,
+            LlamaServerPath: llamaServerPath,
+            MtpDraftModelPath: draftPath);
+
+        var exception = await Assert.ThrowsAsync<ReviewWorkerException>(() =>
+            runtime.PolishChunkAsync(
+                options,
+                new TranscriptPolishingChunk(1, [
+                    new TranscriptReadModel("000001", 0, 1, "Speaker_0", "hello", "", "Speaker_0", "hello", null, null)
+                ])));
+
+        Assert.Equal(ReviewFailureCategory.ProcessFailed, exception.Category);
+        Assert.Contains("does not support Gemma 12B MTP options", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

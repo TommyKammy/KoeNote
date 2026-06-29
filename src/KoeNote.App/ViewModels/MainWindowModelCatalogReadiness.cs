@@ -120,10 +120,10 @@ internal static class MainWindowModelCatalogReadiness
             return true;
         }
 
-        isLlamaServerMtpCapable ??= Gemma12BLocalValidation.IsLlamaServerMtpCapable;
-        return isLlamaServerMtpCapable(
-            Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath),
-            runtimeEnvironment);
+        var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath);
+        return isLlamaServerMtpCapable is null
+            ? File.Exists(llamaServerPath)
+            : isLlamaServerMtpCapable(llamaServerPath, runtimeEnvironment);
     }
 
     public static bool IsGemma12BMtpDraftReady(

@@ -437,7 +437,7 @@ public sealed class TranscriptPolishingServiceTests
         });
 
         Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
-        Assert.Equal(TimeSpan.FromMilliseconds(10), result.Duration);
+        Assert.True(result.Duration >= TimeSpan.FromMilliseconds(10));
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
         Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=Transcript polishing llama-server returned empty content", chunk.GenerationProfile, StringComparison.Ordinal);
     }
@@ -453,9 +453,41 @@ public sealed class TranscriptPolishingServiceTests
         var service = new TranscriptPolishingService(
             new TranscriptReadRepository(fixture.Paths),
             derivativeRepository,
+            new DelayedTimeoutThenFallbackRuntime());
+        var fallbackOptions = CreateOptions("job-001") with
+        {
+            ModelId = ReviewModelSelectionResolver.DefaultReviewModelId,
+            GenerationProfile = "e4b-fallback"
+        };
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId,
+            ChunkFallbackOptions = fallbackOptions
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
+        Assert.True(result.Duration >= TimeSpan.FromMilliseconds(20));
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=Transcript polishing llama-server request timed out", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_UsesChunkModelFallbackWhenGemma12BProcessFails()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
             new ModelAwareFakePolishingRuntime((options, _) =>
                 Gemma12BLocalValidation.IsTargetModel(options.ModelId)
-                    ? throw new TimeoutException("Transcript polishing llama-server request timed out.")
+                    ? throw new ReviewWorkerException(
+                        ReviewFailureCategory.ProcessFailed,
+                        "llama-server runtime does not support Gemma 12B MTP options.")
                     : "[00:00 - 00:01] Speaker_0: e4b polished"));
         var fallbackOptions = CreateOptions("job-001") with
         {
@@ -471,7 +503,7 @@ public sealed class TranscriptPolishingServiceTests
 
         Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
-        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=Transcript polishing llama-server request timed out", chunk.GenerationProfile, StringComparison.Ordinal);
+        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=llama-server runtime does not support Gemma 12B MTP options", chunk.GenerationProfile, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -900,6 +932,26 @@ public sealed class TranscriptPolishingServiceTests
                 chunk,
                 responseFactory(options, chunk),
                 TimeSpan.FromMilliseconds(10)));
+        }
+    }
+
+    private sealed class DelayedTimeoutThenFallbackRuntime : ITranscriptPolishingRuntime
+    {
+        public async Task<TranscriptPolishingChunkResult> PolishChunkAsync(
+            TranscriptPolishingOptions options,
+            TranscriptPolishingChunk chunk,
+            CancellationToken cancellationToken = default)
+        {
+            if (Gemma12BLocalValidation.IsTargetModel(options.ModelId))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(30), cancellationToken);
+                throw new TimeoutException("Transcript polishing llama-server request timed out.");
+            }
+
+            return new TranscriptPolishingChunkResult(
+                chunk,
+                "[00:00 - 00:01] Speaker_0: e4b polished",
+                TimeSpan.FromMilliseconds(10));
         }
     }
 

@@ -62,12 +62,13 @@ This keeps long jobs recoverable while 12B behavior is being measured.
 
 ## Local smoke command
 
-Run the direct llama.cpp smoke without starting the app:
+Run the MTP `llama-server` smoke without starting the app:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File scripts\development\Test-Gemma412BPolishingValidation.ps1 `
   -ModelPath "$env:LOCALAPPDATA\KoeNote\models\review\gemma-4-12b-it-qat-q4-0\gemma-4-12b-it-qat-q4_0.gguf" `
+  -MtpDraftModelPath "$env:LOCALAPPDATA\KoeNote\models\review_aux\gemma-4-12b-it-qat-assistant-mtp-q8-0\gemma-4-12b-it-qat-assistant-mtp-q8_0.gguf" `
   -E4BModelPath "$env:LOCALAPPDATA\KoeNote\models\review\gemma-4-e4b-it-q4-k-m\gemma-4-E4B-it-Q4_K_M.gguf"
 ```
 

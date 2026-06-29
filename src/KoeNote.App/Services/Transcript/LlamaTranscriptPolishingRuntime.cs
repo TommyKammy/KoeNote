@@ -196,6 +196,7 @@ public sealed class LlamaTranscriptPolishingRuntime(
             }
 
             StopServerSession();
+            ValidateServerCapability(options);
             LlamaRuntimePathBridge? modelPathBridge = null;
             LlamaRuntimePathBridge? draftPathBridge = null;
             var port = GetFreeLoopbackPort();
@@ -464,6 +465,16 @@ public sealed class LlamaTranscriptPolishingRuntime(
         if (!File.Exists(options.MtpDraftModelPath))
         {
             throw new ReviewWorkerException(ReviewFailureCategory.MissingModel, $"Gemma 12B MTP draft model not found: {options.MtpDraftModelPath}");
+        }
+    }
+
+    private static void ValidateServerCapability(TranscriptPolishingOptions options)
+    {
+        if (!Gemma12BLocalValidation.IsLlamaServerMtpCapable(options.LlamaServerPath!, options.RuntimeEnvironment))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"llama-server runtime does not support Gemma 12B MTP options: {options.LlamaServerPath}");
         }
     }
 

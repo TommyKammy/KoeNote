@@ -87,7 +87,8 @@ function Invoke-ProcessWithTimeout {
     param(
         [string]$FilePath,
         [string[]]$Arguments,
-        [int]$TimeoutSeconds
+        [int]$TimeoutSeconds,
+        [hashtable]$Environment = @{}
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -97,6 +98,9 @@ function Invoke-ProcessWithTimeout {
     $startInfo.RedirectStandardError = $true
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    foreach ($key in $Environment.Keys) {
+        $startInfo.Environment[$key] = [string]$Environment[$key]
+    }
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
@@ -211,8 +215,14 @@ function Invoke-CompletionPolishingProbe {
         "--reasoning", "off"
     )
 
+    $environment = @{}
+    if (-not [string]::IsNullOrWhiteSpace($CudaReviewRuntimeDirectory)) {
+        $environment["PATH"] = "$CudaReviewRuntimeDirectory$([IO.Path]::PathSeparator)$env:PATH"
+        $environment["KOENOTE_CUDA_REVIEW_RUNTIME_DIR"] = $CudaReviewRuntimeDirectory
+    }
+
     try {
-        $result = Invoke-ProcessWithTimeout $CompletionRuntimePath $arguments $RuntimeTimeoutSeconds
+        $result = Invoke-ProcessWithTimeout $CompletionRuntimePath $arguments $RuntimeTimeoutSeconds $environment
         $combined = "$($result.stdout)`n$($result.stderr)"
         $anomalies = @(Test-Anomalies $combined)
         $hasExpectedBlocks = $result.stdout -match "\[00:00 - 00:02\]\s+Speaker_0:" -and
