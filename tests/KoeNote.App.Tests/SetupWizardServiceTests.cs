@@ -763,6 +763,49 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public async Task SetupWizard_RunSmokeCheck_FailsWhenGemma12BMtpServerDoesNotSupportDraftMtp()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        CreateAsrCudaRuntime(paths);
+        CreateCudaReviewRuntime(paths);
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        var reviewPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(reviewPath);
+        var fallbackPath = Path.Combine(paths.UserModels, "review", ReviewModelSelectionResolver.DefaultReviewModelId, "gemma-4-e4b-it-Q4_K_M.gguf");
+        Touch(fallbackPath);
+        var draftPath = Path.Combine(paths.UserModels, "review_aux", Gemma12BLocalValidation.MtpDraftModelId, Gemma12BLocalValidation.MtpDraftFileName);
+        Touch(draftPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+        UpsertVerified(installedModels, ReviewModelSelectionResolver.DefaultReviewModelId, "review", "llama-cpp", fallbackPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.MtpDraftModelId, "review_aux", "llama-cpp", draftPath);
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 24,
+            nvidiaGpuDetected: true));
+        wizard.SelectModel("asr", "faster-whisper-large-v3");
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.AcceptLicenses();
+
+        var result = await wizard.RunSmokeCheckAsync();
+
+        Assert.False(result.IsSucceeded);
+        Assert.Contains(result.Checks, check =>
+            check.Name == "Gemma 4 12B MTP server runtime" &&
+            !check.IsOk &&
+            check.Detail.Contains("Unsupported", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task SetupWizard_RunSmokeCheck_SkipsGemma12BMtpRequirementsWhenDisabled()
     {
         var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);

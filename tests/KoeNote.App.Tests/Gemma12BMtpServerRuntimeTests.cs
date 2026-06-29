@@ -1,7 +1,10 @@
 using System.Text.Json;
 using KoeNote.App.Services;
+using KoeNote.App.Services.Jobs;
 using KoeNote.App.Services.Llm;
+using KoeNote.App.Services.Models;
 using KoeNote.App.Services.Review;
+using KoeNote.App.Services.Setup;
 using KoeNote.App.Services.Transcript;
 
 namespace KoeNote.App.Tests;
@@ -109,6 +112,79 @@ public sealed class Gemma12BMtpServerRuntimeTests
                 Path.Combine("models", "review_aux", Gemma12BLocalValidation.MtpDraftModelId),
                 path,
                 StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
+    public void LlamaServerHelpSupportsMtp_RequiresDraftMtpOptions()
+    {
+        Assert.True(Gemma12BLocalValidation.LlamaServerHelpSupportsMtp("""
+            --spec-type TYPE
+            draft-mtp
+            --model-draft FNAME
+            """));
+        Assert.False(Gemma12BLocalValidation.LlamaServerHelpSupportsMtp("""
+            --model FNAME
+            --ctx-size N
+            """));
+    }
+
+    [Fact]
+    public void ResolveMtpDraftModelPath_SkipsUnbridgeableInstalledDraft()
+    {
+        var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, null);
+            var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+            var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            var installedModels = new InstalledModelRepository(paths);
+            var badDraftPath = Path.Combine(paths.UserModels, "review_aux", Gemma12BLocalValidation.MtpDraftModelId, "directory-draft.gguf");
+            Directory.CreateDirectory(badDraftPath);
+            installedModels.UpsertInstalledModel(new InstalledModel(
+                Gemma12BLocalValidation.MtpDraftModelId,
+                "review_aux",
+                "llama-cpp",
+                Gemma12BLocalValidation.MtpDraftModelId,
+                Family: null,
+                Version: null,
+                badDraftPath,
+                ManifestPath: null,
+                SizeBytes: 0,
+                Sha256: null,
+                Verified: true,
+                LicenseName: "test",
+                SourceType: "test",
+                InstalledAt: DateTimeOffset.UtcNow,
+                LastVerifiedAt: DateTimeOffset.UtcNow,
+                Status: "installed"));
+            var fallbackDraftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels);
+            Directory.CreateDirectory(Path.GetDirectoryName(fallbackDraftPath)!);
+            File.WriteAllText(fallbackDraftPath, "draft");
+            new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+            {
+                StorageRoot = paths.UserModels
+            });
+            var runner = new ReadablePolishingStageRunner(
+                paths,
+                new JobRepository(paths),
+                new StageProgressRepository(paths),
+                new JobLogRepository(paths),
+                installedModels,
+                new SetupStateService(paths),
+                new TranscriptPolishingService(
+                    new TranscriptReadRepository(paths),
+                    new TranscriptDerivativeRepository(paths),
+                    new LlamaTranscriptPolishingRuntime(new ExternalProcessRunner(), new TranscriptPolishingPromptBuilder())),
+                new ReadablePolishingPromptSettingsRepository(paths));
+
+            Assert.Equal(fallbackDraftPath, runner.ResolveMtpDraftModelPath());
         }
         finally
         {

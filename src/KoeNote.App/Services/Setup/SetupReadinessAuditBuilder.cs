@@ -148,6 +148,7 @@ internal sealed class SetupReadinessAuditBuilder(
 
         var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath);
         var serverExists = File.Exists(llamaServerPath);
+        var serverReady = serverExists && Gemma12BLocalValidation.IsLlamaServerMtpCapable(llamaServerPath);
         var draftExists = TryResolveReadyGemma12BMtpDraftPath(storageRoot, out var draftPath);
         draftPath ??= Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath() ??
             $"Not installed: {Gemma12BLocalValidation.MtpDraftModelId}";
@@ -156,8 +157,12 @@ internal sealed class SetupReadinessAuditBuilder(
         [
             new SetupSmokeCheck(
                 "Gemma 4 12B MTP server runtime",
-                serverExists,
-                serverExists ? llamaServerPath : $"Missing: {llamaServerPath}"),
+                serverReady,
+                serverReady
+                    ? llamaServerPath
+                    : serverExists
+                        ? $"Unsupported llama-server MTP runtime: {llamaServerPath}"
+                        : $"Missing: {llamaServerPath}"),
             new SetupSmokeCheck(
                 "Gemma 4 12B MTP draft model",
                 draftExists,

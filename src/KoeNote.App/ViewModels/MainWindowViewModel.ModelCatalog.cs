@@ -390,6 +390,14 @@ public sealed partial class MainWindowViewModel
     private bool IsReviewModelReady()
     {
         var modelId = ResolveEffectiveReviewModelId();
+        var catalogItem = _modelCatalogService.LoadBuiltInCatalog().Models.FirstOrDefault(model =>
+            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (catalogItem?.Requirements.GpuRequired == true &&
+            _setupPresetRecommendation?.Resources.NvidiaGpuDetected != true)
+        {
+            return false;
+        }
+
         return MainWindowModelCatalogReadiness.IsReviewModelReady(
             modelId,
             Paths,

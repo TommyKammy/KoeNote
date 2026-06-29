@@ -296,7 +296,7 @@ public sealed class ReadablePolishingStageRunner(
         return true;
     }
 
-    private string ResolveMtpDraftModelPath()
+    internal string ResolveMtpDraftModelPath()
     {
         var configuredDraft = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
         if (configuredDraft is not null)
@@ -306,8 +306,10 @@ public sealed class ReadablePolishingStageRunner(
 
         var installedDraft = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
         if (installedDraft is not null &&
+            installedDraft.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
             installedDraft.Verified &&
-            File.Exists(installedDraft.FilePath))
+            File.Exists(installedDraft.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installedDraft.FilePath))
         {
             return installedDraft.FilePath;
         }
