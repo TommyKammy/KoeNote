@@ -265,6 +265,36 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
+    public void SetupDownloadReviewCommand_CanInstallHiddenGemma12BMtpDraftWhenPrimaryIsReady()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+        var paths = CreatePathsWithoutTernaryRuntime(root);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        CreateVerifiedStandardAsrModel(paths);
+        Touch(paths.LlamaCompletionPath);
+        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(gemma12BPath);
+        RegisterVerifiedModel(paths, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            LicenseAccepted = true,
+            CurrentStep = SetupStep.InstallPlan,
+            SetupMode = "custom",
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = Gemma12BLocalValidation.ModelId
+        });
+
+        var viewModel = new MainWindowViewModel(paths);
+
+        Assert.False(viewModel.SelectedSetupGemma12BMtpDraftReady);
+        Assert.False(viewModel.SelectedSetupModelsReady);
+        Assert.True(viewModel.SetupDownloadReviewCommand.CanExecute(null));
+        Assert.Contains("整文モデル", viewModel.SetupPrimaryInstallSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SelectedSetupConfigurationReady_RequiresAsrCudaRuntimeWithDetectedGpu()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

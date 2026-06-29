@@ -96,6 +96,27 @@ public sealed class Gemma12BMtpServerRuntimeTests
     }
 
     [Fact]
+    public void ResolveMtpDraftModelPath_UsesReviewAuxDefaultFolder()
+    {
+        var previous = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, null);
+
+            var path = Gemma12BLocalValidation.ResolveMtpDraftModelPath();
+
+            Assert.Contains(
+                Path.Combine("models", "review_aux", Gemma12BLocalValidation.MtpDraftModelId),
+                path,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
     public async Task PolishChunkAsync_FailsFastWhenMtpServerRuntimeIsMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));

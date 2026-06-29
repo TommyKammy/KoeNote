@@ -1126,8 +1126,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         : $"ASR: {FindSetupModelDisplayName(SetupAsrModelChoices, SelectedSetupModelPreset.AsrModelId)} / Review: {FindSetupModelDisplayName(SetupReviewModelChoices, SelectedSetupModelPreset.ReviewModelId)}";
 
     public bool SelectedSetupModelsReady => IsSetupModelReady(SelectedSetupAsrModel) &&
-        IsSetupModelReady(SelectedSetupReviewModel) &&
-        SelectedSetupGemma12BMtpDraftReady;
+        IsSetupReviewModelReady();
 
     public bool SelectedSetupGemma12BMtpDraftReady => MainWindowModelCatalogReadiness.IsGemma12BMtpDraftReady(
         SelectedSetupReviewModel?.ModelId,
@@ -1244,7 +1243,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 missing.Add("文字起こしモデル");
             }
 
-            if (!IsSetupModelReady(SelectedSetupReviewModel))
+            if (!IsSetupReviewModelReady())
             {
                 missing.Add("整文モデル");
             }
@@ -1407,6 +1406,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     {
         return model?.InstalledModel is { Verified: true } installed &&
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
+    }
+
+    private bool IsSetupReviewModelReady()
+    {
+        return IsSetupModelReady(SelectedSetupReviewModel) &&
+            SelectedSetupGemma12BMtpDraftReady;
     }
 
     public string ModelDownloadProgressSummary

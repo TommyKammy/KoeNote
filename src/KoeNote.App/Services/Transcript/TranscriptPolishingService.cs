@@ -36,6 +36,7 @@ public sealed class TranscriptPolishingService(
                     options.ChunkFallbackOptions is not null &&
                     await TryPolishChunkWithModelFallbackAsync(
                         options,
+                        chunkResult.Duration,
                         options.ChunkFallbackOptions,
                         chunk,
                         fallbackReason,
@@ -193,6 +194,7 @@ public sealed class TranscriptPolishingService(
 
     private async Task<TranscriptPolishingChunkResult?> TryPolishChunkWithModelFallbackAsync(
         TranscriptPolishingOptions primaryOptions,
+        TimeSpan primaryDuration,
         TranscriptPolishingOptions fallbackOptions,
         TranscriptPolishingChunk chunk,
         string primaryFailureReason,
@@ -213,12 +215,20 @@ public sealed class TranscriptPolishingService(
         var normalizedContent = NormalizeAndValidateChunk(fallbackOptions, fallbackResult, out var fallbackReason);
         if (fallbackReason.Length > 0)
         {
-            return null;
+            if (!string.Equals(fallbackReason, TranscriptPolishingFallbackBuilder.MissingTimestampReason, StringComparison.Ordinal) ||
+                !TranscriptPolishingFallbackBuilder.TryRecoverMissingTimestampContent(chunk, normalizedContent, out var recoveredContent) ||
+                !TranscriptPolishingFallbackBuilder.IsChunkOutputUsable(chunk, recoveredContent, out fallbackReason))
+            {
+                return null;
+            }
+
+            normalizedContent = recoveredContent;
         }
 
         return fallbackResult with
         {
             Content = normalizedContent,
+            Duration = primaryDuration + fallbackResult.Duration,
             UsedFallback = true,
             FallbackReason = $"model={fallbackOptions.ModelId}; primary={primaryFailureReason}"
         };

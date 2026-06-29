@@ -1616,6 +1616,42 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
+    public void SetupWizard_SelectSettingsModel_InvalidatesCompletedSetupWhenGemma12BMtpAssetsAreMissing()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);
+        Touch(paths.ReviewModelPath);
+        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(gemma12BPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", paths.KotobaWhisperFasterModelPath);
+        UpsertVerified(installedModels, "llm-jp-4-8b-thinking-q4-k-m", "review", "llm-jp-gguf", paths.ReviewModelPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+            SelectedReviewModelId = "llm-jp-4-8b-thinking-q4-k-m"
+        });
+        var wizard = CreateWizard(paths);
+
+        var state = wizard.SelectSettingsModel("review", Gemma12BLocalValidation.ModelId);
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.ReviewModel, state.CurrentStep);
+        Assert.Equal(Gemma12BLocalValidation.ModelId, state.SelectedReviewModelId);
+    }
+
+    [Fact]
     public void SetupWizard_SelectSettingsModel_InvalidatesCompletedSetupWhenReviewBridgeCannotBePrepared()
     {
         var paths = CreatePaths();

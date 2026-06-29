@@ -279,7 +279,9 @@ internal sealed class SetupModelSelectionService(
         }
 
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
-            ? IsReviewRuntimeReady(catalogItem.ModelId) && IsReviewRuntimePathBridgeReady(installed)
+            ? IsReviewRuntimeReady(catalogItem.ModelId) &&
+              IsReviewRuntimePathBridgeReady(installed) &&
+              IsGemma12BMtpDraftReady(catalogItem.ModelId)
             : FasterWhisperRuntimeLayout.HasPackage(paths);
     }
 
@@ -303,7 +305,45 @@ internal sealed class SetupModelSelectionService(
     {
         var catalog = modelCatalogService.LoadBuiltInCatalog();
         var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
-        return File.Exists(runtimePath);
+        return File.Exists(runtimePath) &&
+            (!RequiresGemma12BMtpAssets(modelId) ||
+             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath)));
+    }
+
+    private bool IsGemma12BMtpDraftReady(string modelId)
+    {
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
+        {
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath))
+        {
+            return true;
+        }
+
+        var storageRoot = stateService.Load().StorageRoot;
+        var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(fallbackPath);
+    }
+
+    private static bool RequiresGemma12BMtpAssets(string modelId)
+    {
+        return Gemma12BLocalValidation.IsTargetModel(modelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private static bool IsReviewRuntimePathBridgeReady(InstalledModel installed)

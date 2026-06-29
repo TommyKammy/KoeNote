@@ -402,6 +402,39 @@ public sealed class TranscriptPolishingServiceTests
         });
 
         Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
+        Assert.Equal(TimeSpan.FromMilliseconds(20), result.Duration);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=repeated zero token run", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_RecoversMissingTimestampContentFromChunkModelFallback()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new ModelAwareFakePolishingRuntime((options, _) =>
+                Gemma12BLocalValidation.IsTargetModel(options.ModelId)
+                    ? "000000000000000000000000000000000000000000000000"
+                    : "Speaker_0: e4b recovered"));
+        var fallbackOptions = CreateOptions("job-001") with
+        {
+            ModelId = ReviewModelSelectionResolver.DefaultReviewModelId,
+            GenerationProfile = "e4b-fallback"
+        };
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId,
+            ChunkFallbackOptions = fallbackOptions
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: e4b recovered", result.Content);
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
         Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=repeated zero token run", chunk.GenerationProfile, StringComparison.Ordinal);
     }

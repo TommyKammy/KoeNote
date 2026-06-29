@@ -57,7 +57,7 @@ public static class Gemma12BLocalValidation
             localAppData,
             "KoeNote",
             "models",
-            "review",
+            "review_aux",
             MtpDraftModelId,
             MtpDraftFileName);
     }
