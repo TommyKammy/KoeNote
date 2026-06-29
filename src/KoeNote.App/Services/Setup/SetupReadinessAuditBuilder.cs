@@ -77,6 +77,23 @@ internal sealed class SetupReadinessAuditBuilder(
         return TryResolveReadyGemma12BMtpDraftPath(out _);
     }
 
+    public bool IsSelectedGemma12BMtpRequirementMissing(string? modelId)
+    {
+        return RequiresGemma12BMtpAssets(modelId) &&
+            (!IsSelectedReviewRuntimeReady(modelId) || !IsSelectedGemma12BMtpDraftReady(modelId));
+    }
+
+    public bool IsSelectedGpuRequirementSatisfied(SetupState state, SetupHostResources resources)
+    {
+        if (resources.NvidiaGpuDetected)
+        {
+            return true;
+        }
+
+        return GetSelectedCatalogModels(state)
+            .All(static model => !model.Requirements.GpuRequired);
+    }
+
     public bool IsSelectedTernaryReviewRuntimeMissing(SetupState state)
     {
         if (string.IsNullOrWhiteSpace(state.SelectedReviewModelId))
@@ -140,6 +157,22 @@ internal sealed class SetupReadinessAuditBuilder(
         ];
     }
 
+    public IReadOnlyList<SetupSmokeCheck> CheckSelectedGpuRequirements(SetupState state, SetupHostResources resources)
+    {
+        if (resources.NvidiaGpuDetected)
+        {
+            return [];
+        }
+
+        return GetSelectedCatalogModels(state)
+            .Where(static model => model.Requirements.GpuRequired)
+            .Select(static model => new SetupSmokeCheck(
+                $"{model.DisplayName} GPU requirement",
+                false,
+                "This model requires an NVIDIA GPU. Select another model or use a GPU-equipped PC."))
+            .ToArray();
+    }
+
     public IReadOnlyList<InstalledModel> GetSelectedInstalledModels(SetupState state)
     {
         var modelIds = new List<string?>([state.SelectedAsrModelId, state.SelectedReviewModelId]);
@@ -152,6 +185,23 @@ internal sealed class SetupReadinessAuditBuilder(
             .Where(static modelId => !string.IsNullOrWhiteSpace(modelId))
             .Select(modelId => installedModelRepository.FindInstalledModel(modelId!))
             .OfType<InstalledModel>()
+            .ToArray();
+    }
+
+    private IReadOnlyList<ModelCatalogItem> GetSelectedCatalogModels(SetupState state)
+    {
+        var selected = new[]
+        {
+            (ModelId: state.SelectedAsrModelId, Role: "asr"),
+            (ModelId: state.SelectedReviewModelId, Role: "review")
+        };
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        return selected
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ModelId))
+            .Select(item => catalog.Models.FirstOrDefault(model =>
+                model.Role.Equals(item.Role, StringComparison.OrdinalIgnoreCase) &&
+                model.ModelId.Equals(item.ModelId, StringComparison.OrdinalIgnoreCase)))
+            .OfType<ModelCatalogItem>()
             .ToArray();
     }
 

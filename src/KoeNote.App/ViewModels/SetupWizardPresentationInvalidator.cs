@@ -83,6 +83,7 @@ internal static class SetupWizardPresentationInvalidator
             nameof(MainWindowViewModel.SetupCudaReviewRuntimeActionText),
             nameof(MainWindowViewModel.SetupTernaryReviewRuntimeReady),
             nameof(MainWindowViewModel.SetupRequiredRuntimeReady),
+            nameof(MainWindowViewModel.SelectedSetupGpuRequirementSatisfied),
             nameof(MainWindowViewModel.SetupGpuRuntimeRequiredButMissing),
             nameof(MainWindowViewModel.SetupConditionalRuntimeReady),
             nameof(MainWindowViewModel.SelectedSetupConfigurationReady));
@@ -95,6 +96,7 @@ internal static class SetupWizardPresentationInvalidator
             nameof(MainWindowViewModel.SetupReviewRuntimeReady),
             nameof(MainWindowViewModel.SetupTernaryReviewRuntimeReady),
             nameof(MainWindowViewModel.SetupRequiredRuntimeReady),
+            nameof(MainWindowViewModel.SelectedSetupGpuRequirementSatisfied),
             nameof(MainWindowViewModel.SetupGpuRuntimeRequiredButMissing),
             nameof(MainWindowViewModel.SetupConditionalRuntimeReady),
             nameof(MainWindowViewModel.SelectedSetupConfigurationReady));

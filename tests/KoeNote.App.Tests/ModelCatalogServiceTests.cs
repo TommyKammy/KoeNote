@@ -75,7 +75,7 @@ public sealed class ModelCatalogServiceTests
 
         var highAccuracy = presets.Single(preset => preset.PresetId == "high_accuracy");
         Assert.Equal("faster-whisper-large-v3", highAccuracy.AsrModelId);
-        Assert.Equal(Gemma12BLocalValidation.ModelId, highAccuracy.ReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", highAccuracy.ReviewModelId);
 
         var experimental = presets.Single(preset => preset.PresetId == "experimental");
         Assert.Equal("faster-whisper-large-v3-turbo", experimental.AsrModelId);

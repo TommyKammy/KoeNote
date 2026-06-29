@@ -10,7 +10,8 @@ internal sealed class SetupModelSelectionService(
     AppPaths paths,
     SetupStateService stateService,
     ModelCatalogService modelCatalogService,
-    InstalledModelRepository installedModelRepository)
+    InstalledModelRepository installedModelRepository,
+    ISetupHostResourceProbe hostResourceProbe)
 {
     public IReadOnlyList<ModelCatalogEntry> GetSelectableModels(string role)
     {
@@ -272,6 +273,11 @@ internal sealed class SetupModelSelectionService(
 
     private bool IsSelectionReadyForCompletion(ModelCatalogItem catalogItem)
     {
+        if (catalogItem.Requirements.GpuRequired && !hostResourceProbe.GetResources().NvidiaGpuDetected)
+        {
+            return false;
+        }
+
         var installed = GetReadyInstalledModel(catalogItem);
         if (installed is null)
         {

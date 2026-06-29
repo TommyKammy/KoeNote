@@ -134,7 +134,7 @@ public sealed class MainWindowViewModelModelTests : MainWindowViewModelTestBase
         new DatabaseInitializer(paths).EnsureCreated();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
         var installService = new ModelInstallService(paths, new InstalledModelRepository(paths), new ModelVerificationService());
-        var reviewItem = catalog.Models.First(model => model.ModelId == "gemma-4-12b-it-qat-q4-0");
+        var reviewItem = catalog.Models.First(model => model.ModelId == "ternary-bonsai-8b-q2-0");
         var reviewPath = installService.GetDefaultInstallPath(reviewItem);
         Directory.CreateDirectory(Path.GetDirectoryName(reviewPath)!);
         File.WriteAllText(reviewPath, "review");

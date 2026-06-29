@@ -1133,6 +1133,11 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupStorageRoot,
         _installedModelRepository.FindInstalledModel);
 
+    public bool SelectedSetupGpuRequirementSatisfied =>
+        _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true ||
+        (SelectedSetupAsrModel?.CatalogItem.Requirements.GpuRequired != true &&
+         SelectedSetupReviewModel?.CatalogItem.Requirements.GpuRequired != true);
+
     public bool SetupFasterWhisperRuntimeReady => FasterWhisperRuntimeLayout.HasPackage(Paths);
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
@@ -1168,10 +1173,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupTernaryReviewRuntimeReady;
 
     public bool SetupGpuRuntimeRequiredButMissing =>
+        !SelectedSetupGpuRequirementSatisfied ||
         (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady) ||
         (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady);
 
     public bool SetupConditionalRuntimeReady =>
+        SelectedSetupGpuRequirementSatisfied &&
         (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady);
 

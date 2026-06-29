@@ -423,6 +423,33 @@ public sealed class SetupWizardServiceTests
     public void SetupWizard_LoadState_PreservesGemma12BReviewSelection()
     {
         var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        CreateCudaReviewRuntime(paths);
+        var asrPath = Path.Combine(paths.UserModels, "asr", "kotoba-whisper-v2.2-faster");
+        Directory.CreateDirectory(asrPath);
+        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(gemma12BPath);
+        var draftPath = Path.Combine(paths.UserModels, "review_aux", Gemma12BLocalValidation.MtpDraftModelId, Gemma12BLocalValidation.MtpDraftFileName);
+        Touch(draftPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "kotoba-whisper-v2.2-faster", "asr", "kotoba-whisper-v2.2-faster", asrPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.MtpDraftModelId, "review_aux", "llama-cpp", draftPath);
         new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
         {
             IsCompleted = true,
@@ -434,7 +461,10 @@ public sealed class SetupWizardServiceTests
             SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
             SelectedReviewModelId = "gemma-4-12b-it-qat-q4-0"
         });
-        var wizard = CreateWizard(paths);
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 24,
+            nvidiaGpuDetected: true));
 
         var state = wizard.LoadState();
 
@@ -558,7 +588,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public async Task SetupWizard_InstallSelectedPresetModels_DownloadsGemma12BMtpDraftForHighAccuracyPreset()
+    public async Task SetupWizard_InstallSelectedPresetModels_DownloadsGemma12BMtpDraftForSelectedGemma12B()
     {
         var paths = CreatePaths();
         paths.EnsureCreated();
@@ -570,7 +600,8 @@ public sealed class SetupWizardServiceTests
         UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3"));
         UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
         var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("draft-model")));
-        wizard.SelectModelPreset("high_accuracy");
+        wizard.SelectModel("asr", "faster-whisper-large-v3");
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
         wizard.AcceptLicenses();
 
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
@@ -631,7 +662,8 @@ public sealed class SetupWizardServiceTests
         UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
         UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
         var wizard = CreateWizard(paths);
-        wizard.SelectModelPreset("high_accuracy");
+        wizard.SelectModel("asr", "faster-whisper-large-v3");
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
         wizard.AcceptLicenses();
 
         var result = await wizard.RunSmokeCheckAsync();
@@ -669,7 +701,8 @@ public sealed class SetupWizardServiceTests
             UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
             UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
             var wizard = CreateWizard(paths);
-            wizard.SelectModelPreset("high_accuracy");
+            wizard.SelectModel("asr", "faster-whisper-large-v3");
+            wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
             wizard.AcceptLicenses();
 
             var result = await wizard.RunSmokeCheckAsync();
@@ -707,7 +740,8 @@ public sealed class SetupWizardServiceTests
             UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
             UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
             var wizard = CreateWizard(paths);
-            wizard.SelectModelPreset("high_accuracy");
+            wizard.SelectModel("asr", "faster-whisper-large-v3");
+            wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
             wizard.AcceptLicenses();
 
             var result = await wizard.RunSmokeCheckAsync();
@@ -799,7 +833,7 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithGemma12B()
+    public void SetupWizard_AutomaticPresetRecommendation_SelectsHighAccuracyWithE4B()
     {
         var paths = CreatePaths();
         var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
@@ -814,7 +848,7 @@ public sealed class SetupWizardServiceTests
         Assert.Equal("high_accuracy", recommendation.PresetId);
         Assert.Equal("high_accuracy", state.SelectedModelPresetId);
         Assert.Equal("faster-whisper-large-v3", state.SelectedAsrModelId);
-        Assert.Equal("gemma-4-12b-it-qat-q4-0", state.SelectedReviewModelId);
+        Assert.Equal("gemma-4-e4b-it-q4-k-m", state.SelectedReviewModelId);
     }
 
     [Fact]
@@ -1016,6 +1050,97 @@ public sealed class SetupWizardServiceTests
             "ASR CUDA runtime",
             File.ReadAllText(paths.SetupReportPath),
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetupWizard_LoadState_ReopensSetupWhenCompletedGemma12BMtpAssetsAreMissing()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublas64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cublasLt64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudart64_12.dll"));
+        Touch(Path.Combine(paths.AsrCTranslate2RuntimeDirectory, "cudnn64_9.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.exe"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "crispasr.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "whisper.dll"));
+        Touch(Path.Combine(paths.AsrRuntimeDirectory, "ggml-cuda.dll"));
+        Touch(paths.AsrCudaRuntimeMarkerPath);
+        CreateCudaReviewRuntime(paths);
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(gemma12BPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        {
+            IsCompleted = true,
+            CurrentStep = SetupStep.Complete,
+            LastSmokeSucceeded = true,
+            LicenseAccepted = true,
+            SelectedAsrModelId = "faster-whisper-large-v3",
+            SelectedReviewModelId = Gemma12BLocalValidation.ModelId,
+            StorageRoot = paths.UserModels
+        });
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: 24,
+            nvidiaGpuDetected: true));
+
+        var state = wizard.LoadState();
+
+        Assert.False(state.IsCompleted);
+        Assert.False(state.LastSmokeSucceeded);
+        Assert.Equal(SetupStep.SmokeTest, state.CurrentStep);
+        Assert.Contains(
+            "Gemma 4 12B MTP",
+            File.ReadAllText(paths.SetupReportPath),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SetupWizard_RunSmokeCheck_FailsWhenGpuRequiredModelIsSelectedWithoutNvidiaGpu()
+    {
+        var paths = CreatePathsWithoutTernaryRuntime();
+        Touch(paths.FfmpegPath);
+        Touch(paths.LlamaCompletionPath);
+        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+        CreateFasterWhisperRuntime(paths);
+        CreateDiarizationRuntime(paths);
+        var asrPath = Path.Combine(paths.UserModels, "asr", "faster-whisper-large-v3");
+        Directory.CreateDirectory(asrPath);
+        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+        Touch(gemma12BPath);
+        var draftPath = Path.Combine(paths.UserModels, "review_aux", Gemma12BLocalValidation.MtpDraftModelId, Gemma12BLocalValidation.MtpDraftFileName);
+        Touch(draftPath);
+        paths.EnsureCreated();
+        new DatabaseInitializer(paths).EnsureCreated();
+        var installedModels = new InstalledModelRepository(paths);
+        UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+        UpsertVerified(installedModels, Gemma12BLocalValidation.MtpDraftModelId, "review_aux", "llama-cpp", draftPath);
+        var wizard = CreateWizard(paths, hostResourceProbe: new FixedHostResourceProbe(
+            totalMemoryBytes: 32L * 1024 * 1024 * 1024,
+            maxGpuMemoryGb: null,
+            nvidiaGpuDetected: false));
+        wizard.SelectModel("asr", "faster-whisper-large-v3");
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.AcceptLicenses();
+
+        var result = await wizard.RunSmokeCheckAsync();
+
+        Assert.False(result.IsSucceeded);
+        Assert.Contains(result.Checks, check =>
+            check.Name.Contains("GPU requirement", StringComparison.OrdinalIgnoreCase) &&
+            !check.IsOk &&
+            check.Detail.Contains("requires an NVIDIA GPU", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
