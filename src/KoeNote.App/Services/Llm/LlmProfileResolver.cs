@@ -91,11 +91,18 @@ public sealed class LlmProfileResolver(
     private static bool ShouldUseDefaultModelAsFallback(ModelCatalogItem? catalogItem, string modelId)
     {
         return !modelId.Equals(FallbackReviewModelId, StringComparison.OrdinalIgnoreCase) &&
+            !Gemma12BLocalValidation.IsTargetModel(modelId) &&
             string.Equals(catalogItem?.Family, "gemma", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDisabledForRuntime(ModelCatalogItem catalogItem)
     {
+        if (Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId) &&
+            Gemma12BLocalValidation.IsEnabled())
+        {
+            return false;
+        }
+
         return catalogItem.RecommendedFor.Contains(
             "gemma4_12b_disabled_pending_llama_cpp_fix",
             StringComparer.OrdinalIgnoreCase);

@@ -96,6 +96,11 @@ if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
     throw "Review runtime is required but missing from publish output: $reviewRuntimePath"
 }
 
+$reviewServerRuntimePath = Join-Path $publishDir "tools\review\llama-server.exe"
+if (-not (Test-Path -LiteralPath $reviewServerRuntimePath -PathType Leaf)) {
+    throw "Review server runtime is required for Gemma 4 12B MTP but missing from publish output: $reviewServerRuntimePath"
+}
+
 $reviewGpuBridgePath = Join-Path $publishDir "tools\review\ggml-cuda.dll"
 if (-not (Test-Path -LiteralPath $reviewGpuBridgePath -PathType Leaf)) {
     throw "Review GPU bridge is required but missing from publish output: $reviewGpuBridgePath"

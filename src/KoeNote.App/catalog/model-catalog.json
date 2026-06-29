@@ -38,7 +38,7 @@
       "display_name": "高精度",
       "description": "日本語精度と専門語を重視する構成です。処理時間とメモリ使用量は大きめです。",
       "asr_model_id": "faster-whisper-large-v3",
-      "review_model_id": "gemma-4-e4b-it-q4-k-m",
+      "review_model_id": "gemma-4-12b-it-qat-q4-0",
       "badges": ["高精度"],
       "recommended_for": ["high_accuracy_japanese", "domain_terms"]
     },
@@ -273,7 +273,7 @@
       "engine_id": "llama-cpp",
       "display_name": "Gemma 4 12B it QAT Q4_0",
       "language": ["ja", "multi"],
-      "recommended_for": ["hidden", "gemma4_12b_disabled_pending_llama_cpp_fix"],
+      "recommended_for": ["high_accuracy_review", "gemma4_12b_mtp", "requires_mtp_draft"],
       "quality_labels": ["推奨", "高精度"],
       "runtime": {
         "type": "llama-cpp",
@@ -290,7 +290,38 @@
         "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf"
       },
       "requirements": {
-        "gpu_required": false,
+        "gpu_required": true,
+        "recommended_vram_gb": 12,
+        "python_required": false
+      },
+      "status": "available",
+      "output_sanitizer_profile": "markdownSectionOnly"
+    },
+    {
+      "model_id": "gemma-4-12b-it-qat-assistant-MTP-Q8_0-GGUF",
+      "family": "gemma",
+      "role": "review_aux",
+      "engine_id": "llama-cpp",
+      "display_name": "Gemma 4 12B MTP draft Q8_0",
+      "language": ["ja", "multi"],
+      "recommended_for": ["gemma4_12b_mtp_draft", "support_model"],
+      "quality_labels": ["高精度"],
+      "runtime": {
+        "type": "llama-cpp",
+        "package_id": "runtime-llama-cpp"
+      },
+      "size_bytes": 465127040,
+      "download": {
+        "type": "huggingface",
+        "url": "https://huggingface.co/Janvitos/gemma-4-12B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-12B-it-qat-assistant-MTP-Q8_0.gguf",
+        "sha256": null
+      },
+      "license": {
+        "name": "Apache-2.0",
+        "url": "https://huggingface.co/Janvitos/gemma-4-12B-it-qat-assistant-MTP-Q8_0-GGUF"
+      },
+      "requirements": {
+        "gpu_required": true,
         "recommended_vram_gb": 12,
         "python_required": false
       },

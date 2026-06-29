@@ -33,13 +33,17 @@ internal sealed class SetupReadinessService(
     public SetupStepReadiness GetStepReadiness(SetupState state)
     {
         var resources = hostResourceProbe.GetResources();
+        var gpuRuntimeReady = _auditBuilder.IsSelectedGpuRequirementSatisfied(state, resources) &&
+            (!resources.NvidiaGpuDetected ||
+             (AsrCudaRuntimeLayout.HasPackage(paths) && CudaReviewRuntimeLayout.HasPackage(paths)));
         return new SetupStepReadiness(
             EnvironmentReady: GetEnvironmentChecks().All(static check => check.IsOk),
             AsrModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedAsrModelId, "asr"),
-            ReviewModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedReviewModelId, "review"),
+            ReviewModelReady: _auditBuilder.IsSelectedModelReady(state.SelectedReviewModelId, "review") &&
+                _auditBuilder.IsSelectedDirectLlmFallbackReady(state.SelectedReviewModelId) &&
+                _auditBuilder.IsSelectedGemma12BMtpDraftReady(state.SelectedReviewModelId, state.StorageRoot),
             ReviewRuntimeReady: _auditBuilder.IsSelectedReviewRuntimeReady(state.SelectedReviewModelId),
-            GpuRuntimeReady: !resources.NvidiaGpuDetected ||
-                (AsrCudaRuntimeLayout.HasPackage(paths) && CudaReviewRuntimeLayout.HasPackage(paths)),
+            GpuRuntimeReady: gpuRuntimeReady,
             StorageReady: Directory.Exists(state.StorageRoot ?? paths.DefaultModelStorageRoot));
     }
 
@@ -100,6 +104,21 @@ internal sealed class SetupReadinessService(
             (!AsrCudaRuntimeLayout.HasPackage(paths) || !CudaReviewRuntimeLayout.HasPackage(paths));
     }
 
+    public bool IsSelectedGpuRequirementMissing(SetupState state)
+    {
+        return !_auditBuilder.IsSelectedGpuRequirementSatisfied(state, hostResourceProbe.GetResources());
+    }
+
+    public bool IsSelectedDirectLlmFallbackMissing(SetupState state)
+    {
+        return !_auditBuilder.IsSelectedDirectLlmFallbackReady(state.SelectedReviewModelId);
+    }
+
+    public bool IsSelectedGemma12BMtpRequirementMissing(SetupState state)
+    {
+        return _auditBuilder.IsSelectedGemma12BMtpRequirementMissing(state);
+    }
+
     private bool IsCompleteStateReady(
         SetupState state,
         out IReadOnlyList<SetupSmokeCheck> checks,
@@ -140,6 +159,9 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+        checks.AddRange(_auditBuilder.CheckDirectLlmFallbackRequirements(state.SelectedReviewModelId));
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId, state.StorageRoot));
+        checks.AddRange(_auditBuilder.CheckSelectedGpuRequirements(state, resources));
 
         if (resources.NvidiaGpuDetected)
         {
@@ -168,6 +190,9 @@ internal sealed class SetupReadinessService(
             new("license accepted", state.LicenseAccepted, state.LicenseAccepted ? "accepted" : "Open License step and accept model licenses."),
             new("storage root", Directory.Exists(state.StorageRoot ?? string.Empty), state.StorageRoot ?? paths.DefaultModelStorageRoot)
         ];
+        checks.AddRange(_auditBuilder.CheckDirectLlmFallbackRequirements(state.SelectedReviewModelId));
+        checks.AddRange(_auditBuilder.CheckGemma12BMtpRequirements(state.SelectedReviewModelId, state.StorageRoot));
+        checks.AddRange(_auditBuilder.CheckSelectedGpuRequirements(state, resources));
 
         if (resources.NvidiaGpuDetected)
         {

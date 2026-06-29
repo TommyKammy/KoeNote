@@ -41,6 +41,19 @@ public sealed class LlamaRuntimePathBridge : IDisposable
         return exception is IOException or UnauthorizedAccessException or Win32Exception;
     }
 
+    public static bool CanPrepareModelPath(string modelPath)
+    {
+        try
+        {
+            using var bridge = Create(modelPath);
+            return true;
+        }
+        catch (Exception exception) when (exception is FileNotFoundException || IsBridgePreparationException(exception))
+        {
+            return false;
+        }
+    }
+
     public string AddInputFile(string sourcePath)
     {
         if (!File.Exists(sourcePath))

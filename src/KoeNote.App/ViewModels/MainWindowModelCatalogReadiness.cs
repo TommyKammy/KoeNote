@@ -70,7 +70,8 @@ internal static class MainWindowModelCatalogReadiness
     public static bool IsReviewModelReady(
         string modelId,
         AppPaths paths,
-        Func<string, InstalledModel?> findInstalledModel)
+        Func<string, InstalledModel?> findInstalledModel,
+        string? storageRoot = null)
     {
         if (modelId.Equals(ReviewModelSelectionResolver.LegacyReviewModelId, StringComparison.OrdinalIgnoreCase))
         {
@@ -78,9 +79,82 @@ internal static class MainWindowModelCatalogReadiness
         }
 
         var installed = findInstalledModel(modelId);
-        return installed is not null &&
+        var primaryReady = installed is not null &&
             installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
             InstalledPathExists(installed);
+        return primaryReady &&
+            IsDirectLlmStageFallbackReady(modelId, findInstalledModel) &&
+            IsGemma12BMtpDraftReady(modelId, storageRoot, findInstalledModel);
+    }
+
+    public static bool IsDirectLlmStageFallbackReady(
+        string? modelId,
+        Func<string, InstalledModel?> findInstalledModel)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return true;
+        }
+
+        var installed = findInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId);
+        return installed is not null &&
+            installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
+    }
+
+    public static bool IsReviewRuntimeReady(
+        string modelId,
+        string llamaCompletionPath,
+        IReadOnlyDictionary<string, string>? runtimeEnvironment = null,
+        Func<string, IReadOnlyDictionary<string, string>?, bool>? isLlamaServerMtpCapable = null)
+    {
+        if (!File.Exists(llamaCompletionPath))
+        {
+            return false;
+        }
+
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        var llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(llamaCompletionPath);
+        return isLlamaServerMtpCapable is null
+            ? File.Exists(llamaServerPath)
+            : isLlamaServerMtpCapable(llamaServerPath, runtimeEnvironment);
+    }
+
+    public static bool IsGemma12BMtpDraftReady(
+        string? modelId,
+        string? storageRoot,
+        Func<string, InstalledModel?> findInstalledModel)
+    {
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
+        {
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
+        }
+
+        var installed = findInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            InstalledPathExists(installed) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath))
+        {
+            return true;
+        }
+
+        var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(fallbackPath);
     }
 
     public static bool ModelPathExists(
@@ -99,6 +173,12 @@ internal static class MainWindowModelCatalogReadiness
     private static bool IsFasterWhisperRuntimeReady(AppPaths paths)
     {
         return File.Exists(paths.FasterWhisperScriptPath) && FasterWhisperRuntimeLayout.HasPackage(paths);
+    }
+
+    private static bool RequiresGemma12BMtpAssets(string? modelId)
+    {
+        return Gemma12BLocalValidation.IsTargetModel(modelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private static bool InstalledPathExists(InstalledModel? installed)

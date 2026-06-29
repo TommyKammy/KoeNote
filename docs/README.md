@@ -11,6 +11,7 @@ This directory keeps current product/developer documentation near the top level 
 - [Core packaging](development/core-packaging.md)
 - [Core UI smoke checklist](development/core-ui-smoke.md)
 - [Gemma 4 12B review model compatibility](development/gemma-4-12b-review-compatibility.md)
+- [Gemma 4 12B QAT local validation roadmap](development/gemma-4-12b-local-validation-roadmap.md)
 - [Images](images/)
 
 ## Archive

@@ -181,8 +181,12 @@ if (Test-Path -LiteralPath $reviewRuntimeSource -PathType Container) {
         "*cusparse*.dll"
     )
     Copy-FilteredDirectory -SourceDir $reviewRuntimeSource -DestinationDir $reviewRuntimeDestination -ExcludePatterns $reviewRuntimeExcludes
+    if ($RequireReviewRuntime -or $RequireGpuReadyRuntime) {
+        Assert-RequiredRuntimeFiles -Directory $reviewRuntimeDestination -Patterns @("llama-completion.exe", "llama-server.exe") -RuntimeName "review"
+    }
+
     if ($RequireGpuReadyRuntime) {
-        Assert-RequiredRuntimeFiles -Directory $reviewRuntimeDestination -Patterns @("llama-completion.exe", "ggml-cuda*.dll") -RuntimeName "review"
+        Assert-RequiredRuntimeFiles -Directory $reviewRuntimeDestination -Patterns @("ggml-cuda*.dll") -RuntimeName "review GPU"
     }
 }
 elseif ($RequireReviewRuntime) {

@@ -23,7 +23,13 @@ public sealed record TranscriptPolishingOptions(
     int? Threads = null,
     int? ThreadsBatch = null,
     ReadablePolishingPromptSettings? PromptSettings = null,
-    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null,
+    TranscriptPolishingOptions? ChunkFallbackOptions = null,
+    bool UseLlamaServerChatMtp = false,
+    string? LlamaServerPath = null,
+    string? MtpDraftModelPath = null,
+    int MtpDraftGpuLayers = 999,
+    int MtpDraftTokens = 4);
 
 public sealed record TranscriptPolishingChunk(
     int ChunkIndex,
@@ -55,4 +61,9 @@ public interface ITranscriptPolishingRuntime
         TranscriptPolishingOptions options,
         TranscriptPolishingChunk chunk,
         CancellationToken cancellationToken = default);
+}
+
+public interface ITranscriptPolishingRuntimeSession
+{
+    void EndPolishingSession(TranscriptPolishingOptions options);
 }

@@ -57,6 +57,13 @@ $asrCTranslate2RuntimeDir = Join-Path $payloadRoot "tools\asr-ctranslate2-cuda"
 $bundledPythonDir = Join-Path $payloadRoot "tools\python"
 $ffmpegRuntimeDir = Join-Path $payloadRoot "tools"
 
+foreach ($requiredReviewRuntime in @("llama-completion.exe", "llama-server.exe")) {
+    $requiredReviewRuntimePath = Join-Path $reviewRuntimeDir $requiredReviewRuntime
+    if (-not (Test-Path -LiteralPath $requiredReviewRuntimePath -PathType Leaf)) {
+        $failures.Add("Review runtime payload is missing required file: tools\review\$requiredReviewRuntime")
+    }
+}
+
 $ffmpegRequiredPatterns = @(
     "avcodec-*.dll",
     "avdevice-*.dll",

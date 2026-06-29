@@ -40,10 +40,42 @@ public sealed class ReadablePolishingStageRunner(
         {
             var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
             var modelId = ResolveReviewModelId(catalog);
-            var profile = new LlmProfileResolver(paths, installedModelRepository).Resolve(catalog, modelId);
+            var profileResolver = new LlmProfileResolver(paths, installedModelRepository);
+            var profile = profileResolver.Resolve(catalog, modelId);
             LlmGpuRuntimeGuard.ThrowIfRequiredRuntimeMissing(paths, hostResourceProbe, profile);
             var taskSettings = new LlmTaskSettingsResolver().Resolve(profile, LlmTaskKind.Polishing);
             var promptSettings = ReadablePolishingPromptSettingsResolver.Resolve(profile, promptSettingsRepository);
+            var fallbackOptions = BuildGemma12BChunkFallbackOptions(
+                profileResolver,
+                catalog,
+                profile,
+                job.JobId,
+                outputDirectory,
+                promptSettings);
+            if (fallbackOptions is not null)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "polishing",
+                    "info",
+                    $"Gemma 4 12B local validation fallback enabled: {fallbackOptions.ModelId}");
+            }
+
+            var polishingOptions = BuildPolishingOptions(
+                job.JobId,
+                profile,
+                taskSettings,
+                promptSettings,
+                outputDirectory,
+                fallbackOptions);
+            if (polishingOptions.UseLlamaServerChatMtp)
+            {
+                jobLogRepository.AddEvent(
+                    job.JobId,
+                    "polishing",
+                    "info",
+                    $"Gemma 4 12B MTP server runtime enabled: server=\"{polishingOptions.LlamaServerPath}\" draft=\"{polishingOptions.MtpDraftModelPath}\" draft_tokens={polishingOptions.MtpDraftTokens}");
+            }
 
             jobLogRepository.AddEvent(job.JobId, "polishing", "info", LlmExecutionLogFormatter.Format(profile, taskSettings));
             jobLogRepository.AddEvent(
@@ -54,30 +86,7 @@ public sealed class ReadablePolishingStageRunner(
             report(new JobRunUpdate(RefreshLogs: true));
 
             var result = await polishingService.PolishAsync(
-                new TranscriptPolishingOptions(
-                    job.JobId,
-                    profile.LlamaCompletionPath,
-                    profile.ModelPath,
-                    outputDirectory,
-                    profile.ModelId,
-                    taskSettings.PromptTemplateId,
-                    taskSettings.GenerationProfile,
-                    promptSettings.PromptVersion,
-                    ChunkSegmentCount: taskSettings.ChunkSegmentCount,
-                    Timeout: profile.Timeout,
-                    OutputSanitizerProfile: profile.OutputSanitizerProfile,
-                    ContextSize: profile.ContextSize,
-                    GpuLayers: profile.GpuLayers,
-                    MaxTokens: taskSettings.MaxTokens,
-                    Temperature: taskSettings.Temperature,
-                    TopP: taskSettings.TopP,
-                    TopK: taskSettings.TopK,
-                    RepeatPenalty: taskSettings.RepeatPenalty,
-                    NoConversation: profile.NoConversation,
-                    Threads: profile.Threads,
-                    ThreadsBatch: profile.ThreadsBatch,
-                    PromptSettings: promptSettings,
-                    RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths)),
+                polishingOptions,
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(result.Content))
@@ -191,5 +200,123 @@ public sealed class ReadablePolishingStageRunner(
     {
         var state = setupStateService.Load();
         return ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+    }
+
+    private TranscriptPolishingOptions? BuildGemma12BChunkFallbackOptions(
+        LlmProfileResolver profileResolver,
+        ModelCatalog catalog,
+        LlmRuntimeProfile primaryProfile,
+        string jobId,
+        string outputDirectory,
+        ReadablePolishingPromptSettings promptSettings)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(primaryProfile.ModelId))
+        {
+            return null;
+        }
+
+        var fallbackProfile = profileResolver.Resolve(catalog, ReviewModelSelectionResolver.DefaultReviewModelId);
+        if (!File.Exists(fallbackProfile.ModelPath))
+        {
+            return null;
+        }
+
+        var fallbackTaskSettings = new LlmTaskSettingsResolver().Resolve(fallbackProfile, LlmTaskKind.Polishing);
+        return BuildPolishingOptions(
+            jobId,
+            fallbackProfile,
+            fallbackTaskSettings,
+            promptSettings,
+            Path.Combine(outputDirectory, "fallback-e4b"),
+            fallbackOptions: null);
+    }
+
+    private TranscriptPolishingOptions BuildPolishingOptions(
+        string jobId,
+        LlmRuntimeProfile profile,
+        LlmTaskSettings taskSettings,
+        ReadablePolishingPromptSettings promptSettings,
+        string outputDirectory,
+        TranscriptPolishingOptions? fallbackOptions)
+    {
+        var useMtpServer = TryResolveGemma12BMtpServer(
+            profile,
+            out var llamaServerPath,
+            out var mtpDraftModelPath);
+        var generationProfile = useMtpServer
+            ? $"{taskSettings.GenerationProfile}; runtime=llama-server-chat-mtp"
+            : taskSettings.GenerationProfile;
+
+        return new TranscriptPolishingOptions(
+            jobId,
+            profile.LlamaCompletionPath,
+            profile.ModelPath,
+            outputDirectory,
+            profile.ModelId,
+            taskSettings.PromptTemplateId,
+            generationProfile,
+            promptSettings.PromptVersion,
+            ChunkSegmentCount: taskSettings.ChunkSegmentCount,
+            Timeout: profile.Timeout,
+            OutputSanitizerProfile: profile.OutputSanitizerProfile,
+            ContextSize: profile.ContextSize,
+            GpuLayers: profile.GpuLayers,
+            MaxTokens: taskSettings.MaxTokens,
+            Temperature: taskSettings.Temperature,
+            TopP: taskSettings.TopP,
+            TopK: taskSettings.TopK,
+            RepeatPenalty: taskSettings.RepeatPenalty,
+            NoConversation: profile.NoConversation,
+            Threads: profile.Threads,
+            ThreadsBatch: profile.ThreadsBatch,
+            PromptSettings: promptSettings,
+            RuntimeEnvironment: LlamaRuntimeEnvironment.Build(paths),
+            ChunkFallbackOptions: fallbackOptions,
+            UseLlamaServerChatMtp: useMtpServer,
+            LlamaServerPath: llamaServerPath,
+            MtpDraftModelPath: mtpDraftModelPath);
+    }
+
+    private bool TryResolveGemma12BMtpServer(
+        LlmRuntimeProfile profile,
+        out string? llamaServerPath,
+        out string? mtpDraftModelPath)
+    {
+        llamaServerPath = null;
+        mtpDraftModelPath = null;
+
+        if (!Gemma12BLocalValidation.IsTargetModel(profile.ModelId) ||
+            !Gemma12BLocalValidation.IsMtpServerEnabled())
+        {
+            return false;
+        }
+
+        llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(profile.LlamaCompletionPath);
+        mtpDraftModelPath = ResolveMtpDraftModelPath();
+        return true;
+    }
+
+    internal string ResolveMtpDraftModelPath()
+    {
+        var configuredDraft = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configuredDraft is not null)
+        {
+            return configuredDraft;
+        }
+
+        var installedDraft = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installedDraft is not null &&
+            installedDraft.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installedDraft.Verified &&
+            File.Exists(installedDraft.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installedDraft.FilePath))
+        {
+            return installedDraft.FilePath;
+        }
+
+        var storageRoot = setupStateService.Load().StorageRoot;
+        return string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
     }
 }

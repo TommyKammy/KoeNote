@@ -10,7 +10,8 @@ internal sealed class SetupModelSelectionService(
     AppPaths paths,
     SetupStateService stateService,
     ModelCatalogService modelCatalogService,
-    InstalledModelRepository installedModelRepository)
+    InstalledModelRepository installedModelRepository,
+    ISetupHostResourceProbe hostResourceProbe)
 {
     public IReadOnlyList<ModelCatalogEntry> GetSelectableModels(string role)
     {
@@ -159,6 +160,17 @@ internal sealed class SetupModelSelectionService(
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
     }
 
+    public ModelCatalogItem? GetCatalogItemById(string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return null;
+        }
+
+        return modelCatalogService.LoadBuiltInCatalog().Models
+            .FirstOrDefault(model => model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+    }
+
     private ModelCatalogEntry? PickRecommended(string role)
     {
         var recommendedModelId = role.Equals("asr", StringComparison.OrdinalIgnoreCase)
@@ -261,6 +273,11 @@ internal sealed class SetupModelSelectionService(
 
     private bool IsSelectionReadyForCompletion(ModelCatalogItem catalogItem)
     {
+        if (catalogItem.Requirements.GpuRequired && !hostResourceProbe.GetResources().NvidiaGpuDetected)
+        {
+            return false;
+        }
+
         var installed = GetReadyInstalledModel(catalogItem);
         if (installed is null)
         {
@@ -268,7 +285,10 @@ internal sealed class SetupModelSelectionService(
         }
 
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
-            ? IsReviewRuntimeReady(catalogItem.ModelId) && IsReviewRuntimePathBridgeReady(installed)
+            ? IsReviewRuntimeReady(catalogItem.ModelId) &&
+              IsReviewRuntimePathBridgeReady(installed) &&
+              IsDirectLlmFallbackReady(catalogItem.ModelId) &&
+              IsGemma12BMtpDraftReady(catalogItem.ModelId)
             : FasterWhisperRuntimeLayout.HasPackage(paths);
     }
 
@@ -292,7 +312,60 @@ internal sealed class SetupModelSelectionService(
     {
         var catalog = modelCatalogService.LoadBuiltInCatalog();
         var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
-        return File.Exists(runtimePath);
+        return File.Exists(runtimePath) &&
+            (!RequiresGemma12BMtpAssets(modelId) ||
+             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath)));
+    }
+
+    private bool IsDirectLlmFallbackReady(string modelId)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return true;
+        }
+
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var fallback = catalog.Models.FirstOrDefault(model =>
+            model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            model.ModelId.Equals(ReviewModelSelectionResolver.DefaultReviewModelId, StringComparison.OrdinalIgnoreCase));
+        return fallback is not null &&
+            GetReadyInstalledModel(fallback) is not null;
+    }
+
+    private bool IsGemma12BMtpDraftReady(string modelId)
+    {
+        if (!RequiresGemma12BMtpAssets(modelId))
+        {
+            return true;
+        }
+
+        var configured = Gemma12BLocalValidation.GetConfiguredMtpDraftModelPath();
+        if (configured is not null)
+        {
+            return LlamaRuntimePathBridge.CanPrepareModelPath(configured);
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(Gemma12BLocalValidation.MtpDraftModelId);
+        if (installed is not null &&
+            installed.Role.Equals("review_aux", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath))
+        {
+            return true;
+        }
+
+        var storageRoot = stateService.Load().StorageRoot;
+        var fallbackPath = string.IsNullOrWhiteSpace(storageRoot)
+            ? Gemma12BLocalValidation.ResolveMtpDraftModelPath()
+            : Gemma12BLocalValidation.ResolveMtpDraftModelPath(storageRoot);
+        return LlamaRuntimePathBridge.CanPrepareModelPath(fallbackPath);
+    }
+
+    private static bool RequiresGemma12BMtpAssets(string modelId)
+    {
+        return Gemma12BLocalValidation.IsTargetModel(modelId) &&
+            Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private static bool IsReviewRuntimePathBridgeReady(InstalledModel installed)

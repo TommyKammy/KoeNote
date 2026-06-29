@@ -1126,14 +1126,27 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         : $"ASR: {FindSetupModelDisplayName(SetupAsrModelChoices, SelectedSetupModelPreset.AsrModelId)} / Review: {FindSetupModelDisplayName(SetupReviewModelChoices, SelectedSetupModelPreset.ReviewModelId)}";
 
     public bool SelectedSetupModelsReady => IsSetupModelReady(SelectedSetupAsrModel) &&
-        IsSetupModelReady(SelectedSetupReviewModel);
+        IsSetupReviewModelReady();
+
+    public bool SelectedSetupGemma12BMtpDraftReady => MainWindowModelCatalogReadiness.IsGemma12BMtpDraftReady(
+        SelectedSetupReviewModel?.ModelId,
+        SetupStorageRoot,
+        _installedModelRepository.FindInstalledModel);
+
+    public bool SelectedSetupGpuRequirementSatisfied =>
+        _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true ||
+        (SelectedSetupAsrModel?.CatalogItem.Requirements.GpuRequired != true &&
+         SelectedSetupReviewModel?.CatalogItem.Requirements.GpuRequired != true);
 
     public bool SetupFasterWhisperRuntimeReady => FasterWhisperRuntimeLayout.HasPackage(Paths);
 
     public bool SetupDiarizationRuntimeReady => DiarizationRuntimeLayout.HasPackage(Paths);
 
     public bool SetupReviewRuntimeReady => SelectedSetupReviewModelRequiresTernaryRuntime() ||
-        File.Exists(Paths.LlamaCompletionPath);
+        MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+            SelectedSetupReviewModel?.ModelId ?? string.Empty,
+            Paths.LlamaCompletionPath,
+            LlamaRuntimeEnvironment.Build(Paths));
 
     public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 
@@ -1161,10 +1174,12 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
         SetupTernaryReviewRuntimeReady;
 
     public bool SetupGpuRuntimeRequiredButMissing =>
+        !SelectedSetupGpuRequirementSatisfied ||
         (SetupAsrCudaRuntimeRecommended && !SetupAsrCudaRuntimeReady) ||
         (SetupCudaReviewRuntimeRecommended && !SetupCudaReviewRuntimeReady);
 
     public bool SetupConditionalRuntimeReady =>
+        SelectedSetupGpuRequirementSatisfied &&
         (!SetupAsrCudaRuntimeRecommended || SetupAsrCudaRuntimeReady) &&
         (!SetupCudaReviewRuntimeRecommended || SetupCudaReviewRuntimeReady);
 
@@ -1236,7 +1251,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 missing.Add("文字起こしモデル");
             }
 
-            if (!IsSetupModelReady(SelectedSetupReviewModel))
+            if (!IsSetupReviewModelReady())
             {
                 missing.Add("整文モデル");
             }
@@ -1401,6 +1416,15 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
+    private bool IsSetupReviewModelReady()
+    {
+        return IsSetupModelReady(SelectedSetupReviewModel) &&
+            MainWindowModelCatalogReadiness.IsDirectLlmStageFallbackReady(
+                SelectedSetupReviewModel?.ModelId,
+                _installedModelRepository.FindInstalledModel) &&
+            SelectedSetupGemma12BMtpDraftReady;
+    }
+
     public string ModelDownloadProgressSummary
     {
         get => _modelDownloadProgressSummary;
@@ -1447,6 +1471,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
                 UpdateModelCatalogCommandStates();
                 UpdateSetupDownloadCommandStates();
                 OnPropertyChanged(nameof(SelectedSetupModelsReady));
+                OnPropertyChanged(nameof(SelectedSetupGemma12BMtpDraftReady));
                 OnPropertyChanged(nameof(SetupFasterWhisperRuntimeReady));
                 OnPropertyChanged(nameof(SetupDiarizationRuntimeReady));
                 OnPropertyChanged(nameof(SetupAsrCudaRuntimeReady));

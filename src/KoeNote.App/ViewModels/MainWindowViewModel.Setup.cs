@@ -217,7 +217,7 @@ public sealed partial class MainWindowViewModel
             _setupState.LicenseAccepted &&
             SetupStepFlow.HasReached(_setupState.CurrentStep, SetupStep.InstallPlan) &&
             SelectedSetupReviewModel is not null &&
-            !IsSetupModelReady(SelectedSetupReviewModel);
+            !IsSetupReviewModelReady();
     }
 
     private bool CanInstallCudaReviewRuntime()
@@ -1257,7 +1257,7 @@ public sealed partial class MainWindowViewModel
             new(
                 "整文モデル",
                 SelectedSetupReviewModel?.DisplayName ?? "未選択",
-                IsSetupModelReady(SelectedSetupReviewModel) ? "導入済み" : "導入します"),
+                IsSetupReviewModelReady() ? "導入済み" : "導入します"),
             new(
                 "ASR runtime",
                 "文字起こしに必要な実行環境",

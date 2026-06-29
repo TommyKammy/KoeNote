@@ -390,15 +390,27 @@ public sealed partial class MainWindowViewModel
     private bool IsReviewModelReady()
     {
         var modelId = ResolveEffectiveReviewModelId();
+        var catalogItem = _modelCatalogService.LoadBuiltInCatalog().Models.FirstOrDefault(model =>
+            model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (catalogItem?.Requirements.GpuRequired == true &&
+            _setupPresetRecommendation?.Resources.NvidiaGpuDetected != true)
+        {
+            return false;
+        }
+
         return MainWindowModelCatalogReadiness.IsReviewModelReady(
             modelId,
             Paths,
-            _installedModelRepository.FindInstalledModel);
+            _installedModelRepository.FindInstalledModel,
+            _setupState.StorageRoot);
     }
 
     private bool IsSelectedReviewRuntimeReady()
     {
-        return File.Exists(GetSelectedReviewRuntimePath());
+        return MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
+            ResolveEffectiveReviewModelId(),
+            GetSelectedReviewRuntimePath(),
+            LlamaRuntimeEnvironment.Build(Paths));
     }
 
     private string GetSelectedReviewRuntimePath()

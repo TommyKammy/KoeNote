@@ -67,6 +67,11 @@ if ($RequireReviewRuntime) {
     if (-not (Test-Path -LiteralPath $reviewRuntimePath -PathType Leaf)) {
         throw "Missing review runtime: $reviewRuntimePath"
     }
+
+    $reviewServerRuntimePath = Join-Path $PublishDir "tools\review\llama-server.exe"
+    if (-not (Test-Path -LiteralPath $reviewServerRuntimePath -PathType Leaf)) {
+        throw "Missing review server runtime for Gemma 4 12B MTP: $reviewServerRuntimePath"
+    }
 }
 
 $forbiddenModelFiles = @(

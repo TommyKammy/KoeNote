@@ -51,6 +51,13 @@ public static class ReviewModelSelectionResolver
             catalog.Models.Any(model =>
                 model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
                 model.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase) &&
-                ModelCatalogCompatibility.IsSelectable(model));
+                (ModelCatalogCompatibility.IsSelectable(model) ||
+                 IsLocalValidationModel(model)));
+    }
+
+    private static bool IsLocalValidationModel(ModelCatalogItem model)
+    {
+        return Gemma12BLocalValidation.IsEnabled() &&
+            Gemma12BLocalValidation.IsTargetModel(model.ModelId);
     }
 }

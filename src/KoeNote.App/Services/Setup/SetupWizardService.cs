@@ -46,8 +46,13 @@ public sealed class SetupWizardService
         _ternaryReviewRuntimeService = ternaryReviewRuntimeService ?? new TernaryReviewRuntimeService(paths, new HttpClient());
         _cudaReviewRuntimeService = cudaReviewRuntimeService ?? new CudaReviewRuntimeService(paths, new HttpClient());
         _stateService = stateService;
-        _selectionService = new SetupModelSelectionService(paths, stateService, modelCatalogService, installedModelRepository);
         var resourceProbe = hostResourceProbe ?? new WindowsSetupHostResourceProbe();
+        _selectionService = new SetupModelSelectionService(
+            paths,
+            stateService,
+            modelCatalogService,
+            installedModelRepository,
+            resourceProbe);
         _presetRecommendationService = new SetupPresetRecommendationService(
             modelCatalogService,
             resourceProbe);
@@ -78,7 +83,10 @@ public sealed class SetupWizardService
 
         if (state.IsCompleted &&
             (_readinessService.IsSelectedTernaryReviewRuntimeMissing(state) ||
-                _readinessService.IsRequiredGpuRuntimeMissing()))
+                _readinessService.IsRequiredGpuRuntimeMissing() ||
+                _readinessService.IsSelectedGpuRequirementMissing(state) ||
+                _readinessService.IsSelectedDirectLlmFallbackMissing(state) ||
+                _readinessService.IsSelectedGemma12BMtpRequirementMissing(state)))
         {
             return _readinessService.CompleteIfReady();
         }

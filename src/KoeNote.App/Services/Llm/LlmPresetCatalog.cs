@@ -27,6 +27,11 @@ public static class LlmPresetCatalog
                 NoConversation: true);
         }
 
+        if (Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return Standard("gemma12b:local-validation");
+        }
+
         if (IsGemma(modelId, family))
         {
             return Standard("gemma:balanced");
@@ -142,6 +147,18 @@ public static class LlmPresetCatalog
 
     private static LlmTaskSettings ResolvePolishingSettings(string modelId, string? family)
     {
+        if (Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return Polishing(
+                TranscriptPolishingPromptBuilder.GemmaBlockPromptTemplateId,
+                "gemma12b-polishing-local-validation",
+                maxTokens: 768,
+                chunkSegmentCount: 8,
+                temperature: 0,
+                repeatPenalty: 1.15,
+                validationMode: "gemma12b_guarded_blocks");
+        }
+
         if (IsTernaryBonsai(modelId, family))
         {
             return Polishing(
@@ -206,14 +223,16 @@ public static class LlmPresetCatalog
         string generationProfile,
         int maxTokens,
         int chunkSegmentCount,
-        double? repeatPenalty = null)
+        double temperature = 0.1,
+        double? repeatPenalty = null,
+        string validationMode = "markdown_non_empty")
     {
         return new LlmTaskSettings(
             LlmTaskKind.Polishing,
             PromptTemplateId: promptTemplateId,
             PromptVersion: TranscriptPolishingPromptBuilder.PromptVersion,
             GenerationProfile: generationProfile,
-            Temperature: 0.1,
+            Temperature: temperature,
             TopP: null,
             TopK: null,
             RepeatPenalty: repeatPenalty,
@@ -222,7 +241,7 @@ public static class LlmPresetCatalog
             ChunkOverlap: 0,
             UseJsonSchema: false,
             EnableRepair: false,
-            ValidationMode: "markdown_non_empty");
+            ValidationMode: validationMode);
     }
 
     private static LlmRuntimePreset Standard(string presetId)

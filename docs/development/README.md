@@ -5,6 +5,7 @@ Current developer-facing notes live here. Historical phase-by-phase implementati
 - [Core packaging](core-packaging.md)
 - [Core UI smoke checklist](core-ui-smoke.md)
 - [Gemma 4 12B review model compatibility](gemma-4-12b-review-compatibility.md)
+- [Gemma 4 12B QAT local validation roadmap](gemma-4-12b-local-validation-roadmap.md)
 - [LLM profile / task settings roadmap](llm-profile-task-settings-roadmap.md)
 - [Review candidate confirmation flow](review-candidate-confirmation-flow.md)
 - [Standard/detail layout manual checks](standard-detail-layout-manual-checks.md)
