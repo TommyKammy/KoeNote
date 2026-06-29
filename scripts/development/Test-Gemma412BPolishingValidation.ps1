@@ -54,7 +54,8 @@ function Invoke-ProcessWithTimeout {
 
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         try {
-            $process.Kill($true)
+            & taskkill.exe /PID $process.Id /T /F | Out-Null
+            [void]$process.WaitForExit(5000)
         }
         catch {
         }

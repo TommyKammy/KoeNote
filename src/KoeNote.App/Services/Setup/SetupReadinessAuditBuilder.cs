@@ -60,6 +60,12 @@ internal sealed class SetupReadinessAuditBuilder(
             (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
+    public bool IsSelectedDirectLlmFallbackReady(string? modelId)
+    {
+        return !RequiresDirectLlmStageFallback(modelId) ||
+            IsSelectedModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review");
+    }
+
     public bool IsSelectedReviewRuntimeReady(string? modelId)
     {
         return File.Exists(GetSelectedReviewRuntimePath(modelId)) &&
@@ -158,6 +164,38 @@ internal sealed class SetupReadinessAuditBuilder(
         ];
     }
 
+    public IReadOnlyList<SetupSmokeCheck> CheckDirectLlmFallbackRequirements(string? modelId)
+    {
+        if (!RequiresDirectLlmStageFallback(modelId))
+        {
+            return [];
+        }
+
+        var installed = installedModelRepository.FindInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId);
+        if (installed is null)
+        {
+            return
+            [
+                new SetupSmokeCheck(
+                    "Review/Summary fallback model",
+                    false,
+                    $"Not installed: {ReviewModelSelectionResolver.DefaultReviewModelId}")
+            ];
+        }
+
+        var exists = File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath);
+        var verified = installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            exists;
+        return
+        [
+            new SetupSmokeCheck(
+                "Review/Summary fallback model",
+                verified,
+                verified ? installed.FilePath : $"Verification failed or missing: {installed.FilePath}")
+        ];
+    }
+
     public IReadOnlyList<SetupSmokeCheck> CheckSelectedGpuRequirements(SetupState state, SetupHostResources resources)
     {
         if (resources.NvidiaGpuDetected)
@@ -177,6 +215,11 @@ internal sealed class SetupReadinessAuditBuilder(
     public IReadOnlyList<InstalledModel> GetSelectedInstalledModels(SetupState state)
     {
         var modelIds = new List<string?>([state.SelectedAsrModelId, state.SelectedReviewModelId]);
+        if (RequiresDirectLlmStageFallback(state.SelectedReviewModelId))
+        {
+            modelIds.Add(ReviewModelSelectionResolver.DefaultReviewModelId);
+        }
+
         if (RequiresGemma12BMtpAssets(state.SelectedReviewModelId))
         {
             modelIds.Add(Gemma12BLocalValidation.MtpDraftModelId);
@@ -225,6 +268,11 @@ internal sealed class SetupReadinessAuditBuilder(
     {
         return Gemma12BLocalValidation.IsTargetModel(modelId) &&
             Gemma12BLocalValidation.IsMtpServerEnabled();
+    }
+
+    private static bool RequiresDirectLlmStageFallback(string? modelId)
+    {
+        return Gemma12BLocalValidation.IsTargetModel(modelId);
     }
 
     private bool TryResolveReadyGemma12BMtpDraftPath(string? storageRoot, out string? path)

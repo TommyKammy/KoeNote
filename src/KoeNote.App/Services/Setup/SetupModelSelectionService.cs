@@ -287,6 +287,7 @@ internal sealed class SetupModelSelectionService(
         return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase)
             ? IsReviewRuntimeReady(catalogItem.ModelId) &&
               IsReviewRuntimePathBridgeReady(installed) &&
+              IsDirectLlmFallbackReady(catalogItem.ModelId) &&
               IsGemma12BMtpDraftReady(catalogItem.ModelId)
             : FasterWhisperRuntimeLayout.HasPackage(paths);
     }
@@ -314,6 +315,21 @@ internal sealed class SetupModelSelectionService(
         return File.Exists(runtimePath) &&
             (!RequiresGemma12BMtpAssets(modelId) ||
              File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath)));
+    }
+
+    private bool IsDirectLlmFallbackReady(string modelId)
+    {
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return true;
+        }
+
+        var catalog = modelCatalogService.LoadBuiltInCatalog();
+        var fallback = catalog.Models.FirstOrDefault(model =>
+            model.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            model.ModelId.Equals(ReviewModelSelectionResolver.DefaultReviewModelId, StringComparison.OrdinalIgnoreCase));
+        return fallback is not null &&
+            GetReadyInstalledModel(fallback) is not null;
     }
 
     private bool IsGemma12BMtpDraftReady(string modelId)

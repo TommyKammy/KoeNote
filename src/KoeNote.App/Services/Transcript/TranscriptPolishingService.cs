@@ -30,7 +30,29 @@ public sealed class TranscriptPolishingService(
             foreach (var chunk in chunks)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var chunkResult = await runtime.PolishChunkAsync(options, chunk, cancellationToken);
+                TranscriptPolishingChunkResult chunkResult;
+                try
+                {
+                    chunkResult = await runtime.PolishChunkAsync(options, chunk, cancellationToken);
+                }
+                catch (ReviewWorkerException exception) when (ShouldAttemptChunkModelFallback(options, exception))
+                {
+                    if (await TryPolishChunkWithModelFallbackAsync(
+                        options,
+                        TimeSpan.Zero,
+                        options.ChunkFallbackOptions!,
+                        chunk,
+                        exception.Message,
+                        cancellationToken) is not { } exceptionFallbackChunkResult)
+                    {
+                        throw;
+                    }
+
+                    chunkResults.Add(exceptionFallbackChunkResult);
+                    duration += exceptionFallbackChunkResult.Duration;
+                    continue;
+                }
+
                 var normalizedContent = NormalizeAndValidateChunk(options, chunkResult, out var fallbackReason);
                 if (fallbackReason.Length > 0 &&
                     options.ChunkFallbackOptions is not null &&
@@ -263,6 +285,15 @@ public sealed class TranscriptPolishingService(
         return KoeNote.App.Services.Llm.Gemma12BLocalValidation.IsTargetModel(options.ModelId) ||
             options.GenerationProfile.Contains("gemma12b", StringComparison.OrdinalIgnoreCase) ||
             options.PromptTemplateId.Contains("gemma12b", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldAttemptChunkModelFallback(
+        TranscriptPolishingOptions options,
+        ReviewWorkerException exception)
+    {
+        return options.ChunkFallbackOptions is not null &&
+            exception.Category == ReviewFailureCategory.JsonParseFailed &&
+            ShouldUseStrictAnomalyDetection(options);
     }
 
     private static string BuildChunkId(string derivativeId, TranscriptPolishingChunk chunk)

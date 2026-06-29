@@ -295,6 +295,7 @@ public sealed class VersioningTests
     {
         var repoRoot = FindRepoRoot();
         var script = File.ReadAllText(Path.Combine(repoRoot, "scripts", "development", "Test-Gemma4ReviewSmoke.ps1"));
+        var validationScript = File.ReadAllText(Path.Combine(repoRoot, "scripts", "development", "Test-Gemma412BPolishingValidation.ps1"));
 
         Assert.Contains("gemma-4-12b-it-qat-q4-0", script);
         Assert.Contains("gemma-4-12b-it-qat-q4_0.gguf", script);
@@ -321,6 +322,8 @@ public sealed class VersioningTests
         Assert.Contains("response_uri = $Uri", script);
         Assert.Contains("\"--reasoning\", \"off\"", script);
         Assert.DoesNotContain("Start-Job", script);
+        Assert.Contains("taskkill.exe", validationScript);
+        Assert.DoesNotContain(".Kill($true)", validationScript);
     }
 
     private static string FindRepoRoot()

@@ -102,6 +102,14 @@ internal sealed class SetupModelInstallService(
     private IReadOnlyList<ModelCatalogItem> ResolveRequiredInstallItems(ModelCatalogItem catalogItem)
     {
         var items = new List<ModelCatalogItem> { catalogItem };
+        if (RequiresDirectLlmStageFallback(catalogItem) &&
+            !IsInstalledModelReady(ReviewModelSelectionResolver.DefaultReviewModelId, "review"))
+        {
+            var fallbackModel = selectionService.GetCatalogItemById(ReviewModelSelectionResolver.DefaultReviewModelId)
+                ?? throw new InvalidOperationException($"Direct LLM fallback model is not in the catalog: {ReviewModelSelectionResolver.DefaultReviewModelId}");
+            items.Add(fallbackModel);
+        }
+
         if (RequiresGemma12BMtpDraft(catalogItem) && !IsGemma12BMtpDraftAlreadyReady())
         {
             var mtpDraft = selectionService.GetCatalogItemById(Gemma12BLocalValidation.MtpDraftModelId)
@@ -110,6 +118,21 @@ internal sealed class SetupModelInstallService(
         }
 
         return items;
+    }
+
+    private static bool RequiresDirectLlmStageFallback(ModelCatalogItem catalogItem)
+    {
+        return catalogItem.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            Gemma12BLocalValidation.IsTargetModel(catalogItem.ModelId);
+    }
+
+    private bool IsInstalledModelReady(string modelId, string role)
+    {
+        var installed = installedModelRepository.FindInstalledModel(modelId);
+        return installed is not null &&
+            installed.Role.Equals(role, StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            (File.Exists(installed.FilePath) || Directory.Exists(installed.FilePath));
     }
 
     private static bool RequiresGemma12BMtpDraft(ModelCatalogItem catalogItem)

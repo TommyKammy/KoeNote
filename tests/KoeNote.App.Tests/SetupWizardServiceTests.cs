@@ -606,9 +606,10 @@ public sealed class SetupWizardServiceTests
         var result = await wizard.InstallSelectedPresetModelsAsync(progress: null);
 
         Assert.True(result.IsSucceeded);
-        Assert.Equal(3, result.InstalledModels.Count);
+        Assert.Equal(4, result.InstalledModels.Count);
         Assert.Contains(result.InstalledModels, model => model.ModelId == "faster-whisper-large-v3");
         Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.ModelId);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == ReviewModelSelectionResolver.DefaultReviewModelId);
         var draft = Assert.Single(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.MtpDraftModelId);
         Assert.Equal("review_aux", draft.Role);
         Assert.True(File.Exists(draft.FilePath));
@@ -629,12 +630,15 @@ public sealed class SetupWizardServiceTests
             Directory.CreateDirectory(asrPath);
             var reviewPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
             Touch(reviewPath);
+            var fallbackPath = Path.Combine(paths.UserModels, "review", ReviewModelSelectionResolver.DefaultReviewModelId, "gemma-4-e4b-it-Q4_K_M.gguf");
+            Touch(fallbackPath);
             var draftOverridePath = Path.Combine(paths.Root, "external", Gemma12BLocalValidation.MtpDraftFileName);
             Touch(draftOverridePath);
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, draftOverridePath);
             var installedModels = new InstalledModelRepository(paths);
             UpsertVerified(installedModels, "faster-whisper-large-v3", "asr", "faster-whisper-large-v3", asrPath);
             UpsertVerified(installedModels, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", reviewPath);
+            UpsertVerified(installedModels, ReviewModelSelectionResolver.DefaultReviewModelId, "review", "llama-cpp", fallbackPath);
             var wizard = CreateWizard(paths, new HttpClient(new FailingHandler()));
             wizard.SelectModelPreset("high_accuracy");
             wizard.AcceptLicenses();
@@ -679,6 +683,21 @@ public sealed class SetupWizardServiceTests
         {
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
         }
+    }
+
+    [Fact]
+    public async Task SetupWizard_DownloadSelectedReviewModel_DownloadsDirectLlmFallbackForGemma12B()
+    {
+        var paths = CreatePaths();
+        var wizard = CreateWizard(paths, new HttpClient(new BytesHandler("model-bytes")));
+        wizard.SelectModel("review", Gemma12BLocalValidation.ModelId);
+        wizard.AcceptLicenses();
+
+        var result = await wizard.DownloadSelectedModelAsync("review");
+
+        Assert.True(result.IsSucceeded);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == Gemma12BLocalValidation.ModelId);
+        Assert.Contains(result.InstalledModels, model => model.ModelId == ReviewModelSelectionResolver.DefaultReviewModelId);
     }
 
     [Fact]
