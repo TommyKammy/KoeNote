@@ -45,11 +45,34 @@ public sealed class TranscriptPolishingService(
                         exception.Message,
                         cancellationToken) is not { } exceptionFallbackChunkResult)
                     {
-                        throw;
+                        exceptionFallbackChunkResult = BuildSourceFallbackChunkResult(
+                            chunk,
+                            TimeSpan.Zero,
+                            exception.Message);
                     }
 
                     chunkResults.Add(exceptionFallbackChunkResult);
                     duration += exceptionFallbackChunkResult.Duration;
+                    continue;
+                }
+                catch (TimeoutException exception) when (ShouldAttemptChunkModelFallback(options, exception))
+                {
+                    if (await TryPolishChunkWithModelFallbackAsync(
+                        options,
+                        TimeSpan.Zero,
+                        options.ChunkFallbackOptions!,
+                        chunk,
+                        exception.Message,
+                        cancellationToken) is not { } timeoutFallbackChunkResult)
+                    {
+                        timeoutFallbackChunkResult = BuildSourceFallbackChunkResult(
+                            chunk,
+                            TimeSpan.Zero,
+                            exception.Message);
+                    }
+
+                    chunkResults.Add(timeoutFallbackChunkResult);
+                    duration += timeoutFallbackChunkResult.Duration;
                     continue;
                 }
 
@@ -256,6 +279,19 @@ public sealed class TranscriptPolishingService(
         };
     }
 
+    private static TranscriptPolishingChunkResult BuildSourceFallbackChunkResult(
+        TranscriptPolishingChunk chunk,
+        TimeSpan primaryDuration,
+        string primaryFailureReason)
+    {
+        return new TranscriptPolishingChunkResult(
+            chunk,
+            TranscriptPolishingFallbackBuilder.BuildFallbackChunkContent(chunk),
+            primaryDuration,
+            UsedFallback: true,
+            FallbackReason: $"source_chunk; primary={primaryFailureReason}");
+    }
+
     private static string NormalizeAndValidateChunk(
         TranscriptPolishingOptions options,
         TranscriptPolishingChunkResult chunkResult,
@@ -293,6 +329,14 @@ public sealed class TranscriptPolishingService(
     {
         return options.ChunkFallbackOptions is not null &&
             exception.Category == ReviewFailureCategory.JsonParseFailed &&
+            ShouldUseStrictAnomalyDetection(options);
+    }
+
+    private static bool ShouldAttemptChunkModelFallback(
+        TranscriptPolishingOptions options,
+        TimeoutException exception)
+    {
+        return options.ChunkFallbackOptions is not null &&
             ShouldUseStrictAnomalyDetection(options);
     }
 

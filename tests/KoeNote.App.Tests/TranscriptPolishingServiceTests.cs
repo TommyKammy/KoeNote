@@ -443,6 +443,80 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public async Task PolishAsync_UsesChunkModelFallbackWhenGemma12BTimesOut()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new ModelAwareFakePolishingRuntime((options, _) =>
+                Gemma12BLocalValidation.IsTargetModel(options.ModelId)
+                    ? throw new TimeoutException("Transcript polishing llama-server request timed out.")
+                    : "[00:00 - 00:01] Speaker_0: e4b polished"));
+        var fallbackOptions = CreateOptions("job-001") with
+        {
+            ModelId = ReviewModelSelectionResolver.DefaultReviewModelId,
+            GenerationProfile = "e4b-fallback"
+        };
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId,
+            ChunkFallbackOptions = fallbackOptions
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: e4b polished", result.Content);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=model=gemma-4-e4b-it-q4-k-m; primary=Transcript polishing llama-server request timed out", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_FallsBackToSourceChunkWhenGemma12BAndChunkModelFallbackFail()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw", "raw")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new ModelAwareFakePolishingRuntime((options, _) =>
+            {
+                if (Gemma12BLocalValidation.IsTargetModel(options.ModelId))
+                {
+                    throw new ReviewWorkerException(
+                        ReviewFailureCategory.JsonParseFailed,
+                        "Transcript polishing llama-server returned empty content.");
+                }
+
+                throw new TimeoutException("Fallback model timed out.");
+            }));
+        var fallbackOptions = CreateOptions("job-001") with
+        {
+            ModelId = ReviewModelSelectionResolver.DefaultReviewModelId,
+            GenerationProfile = "e4b-fallback"
+        };
+
+        var result = await service.PolishAsync(CreateOptions("job-001") with
+        {
+            ModelId = Gemma12BLocalValidation.ModelId,
+            ChunkFallbackOptions = fallbackOptions
+        });
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: raw", result.Content);
+        var derivative = derivativeRepository.ReadById(result.DerivativeId);
+        Assert.NotNull(derivative);
+        Assert.Equal(TranscriptDerivativeStatuses.Succeeded, derivative.Status);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=source_chunk; primary=Transcript polishing llama-server returned empty content", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PolishAsync_RecoversMissingTimestampContentFromChunkModelFallback()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();

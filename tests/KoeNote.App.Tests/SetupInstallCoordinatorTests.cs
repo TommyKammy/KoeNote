@@ -31,10 +31,10 @@ public sealed class SetupInstallCoordinatorTests
             [
                 "models",
                 "asr-runtime",
+                "cuda-review-runtime",
                 "review-runtime",
                 "asr-cuda-runtime",
                 "diarization-runtime",
-                "cuda-review-runtime",
                 "ternary-review-runtime"
             ],
             steps);
@@ -61,7 +61,7 @@ public sealed class SetupInstallCoordinatorTests
                 Step("ternary-review-runtime", steps)));
 
         Assert.False(result);
-        Assert.Equal(["models", "asr-runtime", "review-runtime"], steps);
+        Assert.Equal(["models", "asr-runtime", "cuda-review-runtime", "review-runtime"], steps);
     }
 
     private static Func<CancellationToken, Task<bool>> Step(string name, ICollection<string> steps)

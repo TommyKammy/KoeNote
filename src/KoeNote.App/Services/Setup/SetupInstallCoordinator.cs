@@ -19,6 +19,12 @@ internal sealed class SetupInstallCoordinator
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (!await sequence.InstallCudaReviewRuntimeAsync(cancellationToken))
+        {
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         if (!sequence.ValidateReviewRuntime())
         {
             return false;
@@ -32,12 +38,6 @@ internal sealed class SetupInstallCoordinator
 
         cancellationToken.ThrowIfCancellationRequested();
         if (!await sequence.InstallDiarizationRuntimeAsync(cancellationToken))
-        {
-            return false;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!await sequence.InstallCudaReviewRuntimeAsync(cancellationToken))
         {
             return false;
         }
