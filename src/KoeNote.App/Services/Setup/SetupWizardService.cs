@@ -85,6 +85,7 @@ public sealed class SetupWizardService
             (_readinessService.IsSelectedTernaryReviewRuntimeMissing(state) ||
                 _readinessService.IsRequiredGpuRuntimeMissing() ||
                 _readinessService.IsSelectedGpuRequirementMissing(state) ||
+                _readinessService.IsSelectedDirectLlmFallbackMissing(state) ||
                 _readinessService.IsSelectedGemma12BMtpRequirementMissing(state)))
         {
             return _readinessService.CompleteIfReady();

@@ -77,6 +77,18 @@ public sealed class MainWindowModelCatalogReadinessTests
                 modelId => installedModels.GetValueOrDefault(modelId),
                 paths.UserModels));
 
+            var fallbackDirectory = Path.Combine(root, "models", "gemma-e4b-directory.gguf");
+            Directory.CreateDirectory(fallbackDirectory);
+            installedModels[ReviewModelSelectionResolver.DefaultReviewModelId] = CreateInstalledModel(
+                ReviewModelSelectionResolver.DefaultReviewModelId,
+                "review",
+                fallbackDirectory);
+            Assert.False(MainWindowModelCatalogReadiness.IsReviewModelReady(
+                Gemma12BLocalValidation.ModelId,
+                paths,
+                modelId => installedModels.GetValueOrDefault(modelId),
+                paths.UserModels));
+
             var fallbackPath = Path.Combine(root, "models", "gemma-e4b.gguf");
             Touch(fallbackPath);
             installedModels[ReviewModelSelectionResolver.DefaultReviewModelId] = CreateInstalledModel(

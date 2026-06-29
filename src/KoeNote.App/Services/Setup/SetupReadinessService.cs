@@ -109,6 +109,11 @@ internal sealed class SetupReadinessService(
         return !_auditBuilder.IsSelectedGpuRequirementSatisfied(state, hostResourceProbe.GetResources());
     }
 
+    public bool IsSelectedDirectLlmFallbackMissing(SetupState state)
+    {
+        return !_auditBuilder.IsSelectedDirectLlmFallbackReady(state.SelectedReviewModelId);
+    }
+
     public bool IsSelectedGemma12BMtpRequirementMissing(SetupState state)
     {
         return _auditBuilder.IsSelectedGemma12BMtpRequirementMissing(state);

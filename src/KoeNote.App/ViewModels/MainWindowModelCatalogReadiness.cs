@@ -91,8 +91,17 @@ internal static class MainWindowModelCatalogReadiness
         string? modelId,
         Func<string, InstalledModel?> findInstalledModel)
     {
-        return !Gemma12BLocalValidation.IsTargetModel(modelId) ||
-            InstalledPathExists(findInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId));
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        {
+            return true;
+        }
+
+        var installed = findInstalledModel(ReviewModelSelectionResolver.DefaultReviewModelId);
+        return installed is not null &&
+            installed.Role.Equals("review", StringComparison.OrdinalIgnoreCase) &&
+            installed.Verified &&
+            File.Exists(installed.FilePath) &&
+            LlamaRuntimePathBridge.CanPrepareModelPath(installed.FilePath);
     }
 
     public static bool IsReviewRuntimeReady(string modelId, string llamaCompletionPath)
