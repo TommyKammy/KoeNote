@@ -25,7 +25,12 @@ public sealed record TranscriptSummaryOptions(
     string ValidationMode = "markdown_non_empty",
     int MaxAttempts = 2,
     int Attempt = 1,
-    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null,
+    bool UseLlamaServerChatMtp = false,
+    string? LlamaServerPath = null,
+    string? MtpDraftModelPath = null,
+    int MtpDraftGpuLayers = 999,
+    int MtpDraftTokens = 4);
 
 public sealed record TranscriptSummaryChunk(
     int ChunkIndex,
@@ -60,4 +65,9 @@ public interface ITranscriptSummaryRuntime
         TranscriptSummaryOptions options,
         IReadOnlyList<TranscriptSummaryChunkResult> chunkResults,
         CancellationToken cancellationToken = default);
+}
+
+public interface ITranscriptSummaryRuntimeSession
+{
+    void EndSummarySession(TranscriptSummaryOptions options);
 }

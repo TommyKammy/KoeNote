@@ -53,6 +53,33 @@ public sealed class Gemma12BMtpServerRuntimeTests
     }
 
     [Fact]
+    public void BuildSummaryServerChatCompletionRequestJson_ForwardsRepeatPenalty()
+    {
+        var options = new TranscriptSummaryOptions(
+            "job-001",
+            "llama-completion.exe",
+            "model.gguf",
+            "output",
+            Gemma12BLocalValidation.ModelId,
+            MaxTokens: 456,
+            Temperature: 0,
+            RepeatPenalty: 1.15);
+
+        var json = LlamaTranscriptSummaryRuntime.BuildServerChatCompletionRequestJson(options, "summary prompt");
+
+        Assert.DoesNotContain("reasoning_content", json, StringComparison.OrdinalIgnoreCase);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal(Gemma12BLocalValidation.ModelId, root.GetProperty("model").GetString());
+        Assert.Equal(456, root.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(1.15, root.GetProperty("repeat_penalty").GetDouble());
+        Assert.False(root.GetProperty("stream").GetBoolean());
+        var message = root.GetProperty("messages")[0];
+        Assert.Equal("user", message.GetProperty("role").GetString());
+        Assert.Equal("summary prompt", message.GetProperty("content").GetString());
+    }
+
+    [Fact]
     public void ExtractServerChatCompletionContent_ThrowsJsonParseFailedForMalformedJson()
     {
         var exception = Assert.Throws<ReviewWorkerException>(() =>
