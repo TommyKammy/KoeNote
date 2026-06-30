@@ -50,6 +50,39 @@ function Get-RelativePath {
     return [Uri]::UnescapeDataString($rootUri.MakeRelativeUri($pathUri).ToString()).Replace('/', '\')
 }
 
+function Test-FileContainsText {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$Text
+    )
+
+    if (-not (Test-Path -LiteralPath $FilePath -PathType Leaf)) {
+        return $false
+    }
+
+    $bytes = [IO.File]::ReadAllBytes($FilePath)
+    $needle = [Text.Encoding]::ASCII.GetBytes($Text)
+    if ($needle.Length -eq 0 -or $bytes.Length -lt $needle.Length) {
+        return $false
+    }
+
+    for ($index = 0; $index -le $bytes.Length - $needle.Length; $index++) {
+        $matched = $true
+        for ($offset = 0; $offset -lt $needle.Length; $offset++) {
+            if ($bytes[$index + $offset] -ne $needle[$offset]) {
+                $matched = $false
+                break
+            }
+        }
+
+        if ($matched) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 $failures = New-Object System.Collections.Generic.List[string]
 $reviewRuntimeDir = Join-Path $payloadRoot "tools\review"
 $asrRuntimeDir = Join-Path $payloadRoot "tools\asr"
@@ -57,11 +90,19 @@ $asrCTranslate2RuntimeDir = Join-Path $payloadRoot "tools\asr-ctranslate2-cuda"
 $bundledPythonDir = Join-Path $payloadRoot "tools\python"
 $ffmpegRuntimeDir = Join-Path $payloadRoot "tools"
 
-foreach ($requiredReviewRuntime in @("llama-completion.exe", "llama-server.exe")) {
+foreach ($requiredReviewRuntime in @("llama-completion.exe", "llama-server.exe", "llama-server-impl.dll")) {
     $requiredReviewRuntimePath = Join-Path $reviewRuntimeDir $requiredReviewRuntime
     if (-not (Test-Path -LiteralPath $requiredReviewRuntimePath -PathType Leaf)) {
         $failures.Add("Review runtime payload is missing required file: tools\review\$requiredReviewRuntime")
     }
+}
+
+$reviewServerRuntimePath = Join-Path $reviewRuntimeDir "llama-server.exe"
+$reviewServerImplementationPath = Join-Path $reviewRuntimeDir "llama-server-impl.dll"
+if ((Test-Path -LiteralPath $reviewServerRuntimePath -PathType Leaf) -and
+    (Test-Path -LiteralPath $reviewServerImplementationPath -PathType Leaf) -and
+    -not (Test-FileContainsText -FilePath $reviewServerImplementationPath -Text "931eb37f8")) {
+    $failures.Add("Review server runtime does not match expected llama.cpp b9848 build 931eb37f8: tools\review\llama-server-impl.dll")
 }
 
 $ffmpegRequiredPatterns = @(
