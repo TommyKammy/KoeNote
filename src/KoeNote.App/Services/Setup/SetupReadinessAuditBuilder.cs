@@ -290,7 +290,8 @@ internal sealed class SetupReadinessAuditBuilder(
 
     private static bool RequiresDirectLlmStageFallback(string? modelId)
     {
-        return Gemma12BLocalValidation.IsTargetModel(modelId);
+        return Gemma12BLocalValidation.IsTargetModel(modelId) &&
+            !Gemma12BLocalValidation.IsMtpServerEnabled();
     }
 
     private bool TryResolveReadyGemma12BMtpDraftPath(string? storageRoot, out string? path)

@@ -319,7 +319,8 @@ internal sealed class SetupModelSelectionService(
 
     private bool IsDirectLlmFallbackReady(string modelId)
     {
-        if (!Gemma12BLocalValidation.IsTargetModel(modelId))
+        if (!Gemma12BLocalValidation.IsTargetModel(modelId) ||
+            Gemma12BLocalValidation.IsMtpServerEnabled())
         {
             return true;
         }

@@ -27,4 +27,9 @@ public sealed record ReviewRunOptions(
     bool EnableRepair = true,
     string ReasoningMode = "off",
     string PromptProfile = "default",
-    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null);
+    IReadOnlyDictionary<string, string>? RuntimeEnvironment = null,
+    bool UseLlamaServerChatMtp = false,
+    string? LlamaServerPath = null,
+    string? MtpDraftModelPath = null,
+    int MtpDraftGpuLayers = 999,
+    int MtpDraftTokens = 4);

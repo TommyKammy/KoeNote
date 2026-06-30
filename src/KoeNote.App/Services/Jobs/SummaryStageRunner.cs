@@ -194,11 +194,11 @@ public sealed class SummaryStageRunner(
     {
         var state = setupStateService.Load();
         var catalog = new ModelCatalogService(paths).LoadBuiltInCatalog();
-        var selectedModelId = ReviewModelSelectionResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
-        return Gemma12BLocalValidation.IsTargetModel(selectedModelId) &&
-            Gemma12BLocalValidation.IsMtpServerEnabled()
-            ? selectedModelId
-            : DirectLlmStageModelResolver.Resolve(catalog, state.SelectedReviewModelId, state.SelectedModelPresetId);
+        return DirectLlmStageModelResolver.Resolve(
+            catalog,
+            state.SelectedReviewModelId,
+            state.SelectedModelPresetId,
+            allowGemma12BMtpServer: Gemma12BLocalValidation.IsMtpServerEnabled());
     }
 
     private bool TryResolveGemma12BMtpServer(
@@ -217,6 +217,13 @@ public sealed class SummaryStageRunner(
 
         llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(profile.LlamaCompletionPath);
         mtpDraftModelPath = ResolveMtpDraftModelPath();
+        if (!Gemma12BLocalValidation.IsLlamaServerMtpCapable(llamaServerPath, LlamaRuntimeEnvironment.Build(paths)))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"llama-server runtime does not support Gemma 12B MTP options: {llamaServerPath}");
+        }
+
         return true;
     }
 

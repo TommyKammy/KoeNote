@@ -34,6 +34,20 @@ public sealed class DirectLlmStageModelResolverTests
     }
 
     [Fact]
+    public void Resolve_AllowsGemma12BWhenMtpServerIsAvailable()
+    {
+        var catalog = LoadCatalog();
+
+        var modelId = DirectLlmStageModelResolver.Resolve(
+            catalog,
+            selectedModelId: null,
+            selectedPresetId: "high_accuracy",
+            allowGemma12BMtpServer: true);
+
+        Assert.Equal(Gemma12BLocalValidation.ModelId, modelId);
+    }
+
+    [Fact]
     public void Resolve_KeepsNonGemma12BSelection()
     {
         var catalog = LoadCatalog();

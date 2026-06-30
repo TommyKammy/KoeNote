@@ -1145,8 +1145,7 @@ public sealed partial class MainWindowViewModel : INotifyPropertyChanged
     public bool SetupReviewRuntimeReady => SelectedSetupReviewModelRequiresTernaryRuntime() ||
         MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
             SelectedSetupReviewModel?.ModelId ?? string.Empty,
-            Paths.LlamaCompletionPath,
-            LlamaRuntimeEnvironment.Build(Paths));
+            Paths.LlamaCompletionPath);
 
     public bool SetupAsrCudaRuntimeRecommended => _setupPresetRecommendation?.Resources.NvidiaGpuDetected == true;
 

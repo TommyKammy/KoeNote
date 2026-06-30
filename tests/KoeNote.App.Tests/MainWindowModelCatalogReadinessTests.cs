@@ -82,7 +82,7 @@ public sealed class MainWindowModelCatalogReadinessTests
     }
 
     [Fact]
-    public void IsReviewModelReady_RequiresGemma12BMtpDraftAndDirectStageFallbackWhenEnabled()
+    public void IsReviewModelReady_RequiresGemma12BMtpDraftButNotDirectStageFallbackWhenEnabled()
     {
         var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
         var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
@@ -112,7 +112,7 @@ public sealed class MainWindowModelCatalogReadinessTests
             var draftOverridePath = Path.Combine(root, "external", Gemma12BLocalValidation.MtpDraftFileName);
             Touch(draftOverridePath);
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, draftOverridePath);
-            Assert.False(MainWindowModelCatalogReadiness.IsReviewModelReady(
+            Assert.True(MainWindowModelCatalogReadiness.IsReviewModelReady(
                 Gemma12BLocalValidation.ModelId,
                 paths,
                 modelId => installedModels.GetValueOrDefault(modelId),
@@ -124,6 +124,53 @@ public sealed class MainWindowModelCatalogReadinessTests
                 ReviewModelSelectionResolver.DefaultReviewModelId,
                 "review",
                 fallbackDirectory);
+            Assert.True(MainWindowModelCatalogReadiness.IsReviewModelReady(
+                Gemma12BLocalValidation.ModelId,
+                paths,
+                modelId => installedModels.GetValueOrDefault(modelId),
+                paths.UserModels));
+
+            var fallbackPath = Path.Combine(root, "models", "gemma-e4b.gguf");
+            Touch(fallbackPath);
+            installedModels[ReviewModelSelectionResolver.DefaultReviewModelId] = CreateInstalledModel(
+                ReviewModelSelectionResolver.DefaultReviewModelId,
+                "review",
+                fallbackPath);
+            Assert.True(MainWindowModelCatalogReadiness.IsReviewModelReady(
+                Gemma12BLocalValidation.ModelId,
+                paths,
+                modelId => installedModels.GetValueOrDefault(modelId),
+                paths.UserModels));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previousDraft);
+        }
+    }
+
+    [Fact]
+    public void IsReviewModelReady_RequiresDirectStageFallbackWhenGemma12BMtpIsDisabled()
+    {
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "0");
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, null);
+            var root = CreateRoot();
+            var paths = new AppPaths(root, root, AppContext.BaseDirectory);
+            paths.EnsureCreated();
+            var modelPath = Path.Combine(root, "models", "gemma-12b.gguf");
+            Touch(modelPath);
+            var installedModels = new Dictionary<string, InstalledModel>(StringComparer.OrdinalIgnoreCase)
+            {
+                [Gemma12BLocalValidation.ModelId] = CreateInstalledModel(
+                    Gemma12BLocalValidation.ModelId,
+                    "review",
+                    modelPath)
+            };
+
             Assert.False(MainWindowModelCatalogReadiness.IsReviewModelReady(
                 Gemma12BLocalValidation.ModelId,
                 paths,
@@ -136,6 +183,7 @@ public sealed class MainWindowModelCatalogReadinessTests
                 ReviewModelSelectionResolver.DefaultReviewModelId,
                 "review",
                 fallbackPath);
+
             Assert.True(MainWindowModelCatalogReadiness.IsReviewModelReady(
                 Gemma12BLocalValidation.ModelId,
                 paths,
