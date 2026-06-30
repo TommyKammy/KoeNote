@@ -680,7 +680,14 @@ public sealed class ReviewWorker(
     {
         try
         {
-            return File.Exists(path) ? File.ReadAllText(path, Encoding.UTF8) : string.Empty;
+            if (!File.Exists(path))
+            {
+                return string.Empty;
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return reader.ReadToEnd();
         }
         catch (IOException)
         {

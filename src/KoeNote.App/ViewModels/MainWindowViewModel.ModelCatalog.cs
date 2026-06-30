@@ -409,9 +409,7 @@ public sealed partial class MainWindowViewModel
     {
         return MainWindowModelCatalogReadiness.IsReviewRuntimeReady(
             ResolveEffectiveReviewModelId(),
-            GetSelectedReviewRuntimePath(),
-            LlamaRuntimeEnvironment.Build(Paths),
-            Gemma12BLocalValidation.IsLlamaServerMtpCapable);
+            GetSelectedReviewRuntimePath());
     }
 
     private string GetSelectedReviewRuntimePath()
