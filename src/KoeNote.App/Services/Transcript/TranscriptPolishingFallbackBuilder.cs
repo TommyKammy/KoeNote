@@ -91,7 +91,8 @@ internal static class TranscriptPolishingFallbackBuilder
             var sourceBlock = sourceBlocks[index];
             var first = sourceBlock[0];
             var last = sourceBlock[^1];
-            var text = StripSpeakerPrefix(lines[index], first.Speaker).Trim();
+            var normalizedLine = TranscriptPolishingOutputNormalizer.NormalizeTrailingEllipsisNoise(lines[index]);
+            var text = StripSpeakerPrefix(normalizedLine, first.Speaker).Trim();
             if (string.IsNullOrWhiteSpace(text) || LooksLikeGeneratedWrapper(text))
             {
                 return false;

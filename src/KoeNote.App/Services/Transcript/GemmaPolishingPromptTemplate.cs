@@ -16,6 +16,7 @@ internal static class GemmaPolishingPromptTemplate
             - Do not output text from any previous or later chunk.
             - Within a speaker block, add Japanese punctuation and split sentences at natural boundaries.
             - Do not keep source segment line breaks when they make the prose choppy.
+            - Do not end a speaker block with ellipses such as three or more dots or repeated ellipsis characters. Use normal sentence punctuation instead.
             - Preserve the meaning and intent of each speaker.
             - Add punctuation and paragraph breaks.
             - Remove fillers, repeated words, and obvious self-corrections only when they do not affect meaning.
