@@ -27,6 +27,8 @@ $installerProject = Join-Path $repoRoot "src\KoeNote.Installer\KoeNote.Installer
 $publishDir = Join-Path $repoRoot "artifacts\publish\KoeNote-$RuntimeIdentifier"
 $generatedWxs = Join-Path $repoRoot "src\KoeNote.Installer\PayloadFiles.wxs"
 $installerOut = Join-Path $repoRoot "artifacts\msi"
+$reviewRuntimeTag = "b9848"
+$reviewRuntimeSourceUrl = "https://github.com/ggml-org/llama.cpp/releases/download/$reviewRuntimeTag/llama-$reviewRuntimeTag-bin-win-cuda-12.4-x64.zip"
 $ternaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $ternaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$ternaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
 $updateLogDir = Join-Path $repoRoot "artifacts\logs\updates"
@@ -300,6 +302,8 @@ $manifest = [ordered]@{
     }
     review_runtime = [ordered]@{
         required = $true
+        tag = $reviewRuntimeTag
+        source_url = $reviewRuntimeSourceUrl
         path = $reviewRuntimePath
     }
     gpu_ready_runtime = [ordered]@{

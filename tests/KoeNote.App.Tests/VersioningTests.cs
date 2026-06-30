@@ -139,6 +139,8 @@ public sealed class VersioningTests
         Assert.Contains("review_gpu_bridge_verified", buildScript);
         Assert.Contains("asr_gpu_runtime_verified", buildScript);
         Assert.Contains("review_runtime = [ordered]@", buildScript);
+        Assert.Contains("reviewRuntimeTag = \"b9848\"", buildScript);
+        Assert.Contains("source_url = $reviewRuntimeSourceUrl", buildScript);
         Assert.Contains("gpu_ready_runtime = [ordered]@", buildScript);
         Assert.Contains("Review runtime is required for release MSI builds", buildScript);
         Assert.Contains("Review runtime is required but missing from publish output", verificationScript);
@@ -147,6 +149,9 @@ public sealed class VersioningTests
         Assert.Contains("Release manifest is missing review_runtime metadata", verificationScript);
         Assert.Contains("Release manifest is missing gpu_ready_runtime metadata", verificationScript);
         Assert.Contains("review_runtime.required", verificationScript);
+        Assert.Contains("expectedReviewRuntimeTag = \"b9848\"", verificationScript);
+        Assert.Contains("review_runtime.tag", verificationScript);
+        Assert.Contains("review_runtime.source_url", verificationScript);
         Assert.DoesNotContain("Ternary review runtime is required for release MSI builds", buildScript);
         Assert.Contains("ternary_review_runtime_skipped", buildScript);
         Assert.Contains("ternary_review_runtime = [ordered]@", buildScript);
@@ -192,6 +197,9 @@ public sealed class VersioningTests
         Assert.Contains("MaxReviewRuntimeMB = 700", guardScript);
         Assert.Contains("MaxAsrRuntimeMB = 180", guardScript);
         Assert.Contains("MaxBundledPythonMB = 120", guardScript);
+        Assert.Contains("llama-server-impl.dll", guardScript);
+        Assert.Contains("931eb37f8", guardScript);
+        Assert.Contains("Review server runtime does not match expected llama.cpp b9848 build", guardScript);
         Assert.Contains("Release payload guard failed", guardScript);
         Assert.Contains("release_payload_guard_verified", buildScript);
         Assert.Contains("Test-KoeNoteReleasePayloadGuard.ps1", buildScript);

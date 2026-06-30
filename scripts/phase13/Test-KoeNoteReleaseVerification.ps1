@@ -10,6 +10,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $artifactIntegrityScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteArtifactIntegrity.ps1"
 $payloadGuardScript = Join-Path $repoRoot "scripts\phase13\Test-KoeNoteReleasePayloadGuard.ps1"
 $testProject = Join-Path $repoRoot "tests\KoeNote.App.Tests\KoeNote.App.Tests.csproj"
+$expectedReviewRuntimeTag = "b9848"
+$expectedReviewRuntimeSourceUrl = "https://github.com/ggml-org/llama.cpp/releases/download/$expectedReviewRuntimeTag/llama-$expectedReviewRuntimeTag-bin-win-cuda-12.4-x64.zip"
 $expectedTernaryReviewRuntimeTag = "prism-b8846-d104cf1"
 $expectedTernaryReviewRuntimeSourceUrl = "https://github.com/PrismML-Eng/llama.cpp/releases/download/$expectedTernaryReviewRuntimeTag/llama-bin-win-cpu-x64.zip"
 $expectedCudaRedistManifestUrl = "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.0.json"
@@ -140,6 +142,14 @@ if (-not ($manifest.PSObject.Properties.Name -contains "review_runtime")) {
 
 if (-not [bool]$manifest.review_runtime.required) {
     throw "Release manifest must mark review_runtime.required as true."
+}
+
+if ($manifest.review_runtime.tag -ne $expectedReviewRuntimeTag) {
+    throw "Release manifest review runtime tag does not match. Expected $expectedReviewRuntimeTag but got $($manifest.review_runtime.tag)."
+}
+
+if ($manifest.review_runtime.source_url -ne $expectedReviewRuntimeSourceUrl) {
+    throw "Release manifest review runtime source_url does not match. Expected $expectedReviewRuntimeSourceUrl but got $($manifest.review_runtime.source_url)."
 }
 
 if (-not ($manifest.PSObject.Properties.Name -contains "ternary_review_runtime")) {
