@@ -290,7 +290,7 @@ public sealed class ReviewWorker(
         using var document = JsonDocument.Parse(jsonSchema);
         return new LlamaServerResponseFormat(
             "json_schema",
-            new LlamaServerJsonSchema("review_corrections", document.RootElement.Clone(), Strict: true));
+            document.RootElement.Clone());
     }
 
     private static async Task<LlamaServerSession> EnsureServerSessionAsync(
@@ -750,10 +750,5 @@ public sealed class ReviewWorker(
 
     private sealed record LlamaServerResponseFormat(
         [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("json_schema")] LlamaServerJsonSchema JsonSchema);
-
-    private sealed record LlamaServerJsonSchema(
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("schema")] JsonElement Schema,
-        [property: JsonPropertyName("strict")] bool Strict);
+        [property: JsonPropertyName("schema")] JsonElement Schema);
 }

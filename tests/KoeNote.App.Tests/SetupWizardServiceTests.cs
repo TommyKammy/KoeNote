@@ -2173,17 +2173,16 @@ public sealed class SetupWizardServiceTests
     }
 
     [Fact]
-    public void SetupWizard_SelectSettingsModel_PreservesCompletedSetupForGemma12BMtpOnlyAssets()
+    public void SetupWizard_SelectSettingsModel_PreservesCompletedSetupForGemma12BMtpOnlyAssetsWithoutProbingServerHelp()
     {
         var previousServer = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable);
         try
         {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable, null);
             var paths = CreatePathsWithoutTernaryRuntime();
             Touch(paths.FfmpegPath);
             Touch(paths.LlamaCompletionPath);
-            Environment.SetEnvironmentVariable(
-                Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable,
-                CreateMtpCapableLlamaServerHelpScript(paths));
+            Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
             CreateFasterWhisperRuntime(paths);
             CreateDiarizationRuntime(paths);
             Directory.CreateDirectory(paths.KotobaWhisperFasterModelPath);

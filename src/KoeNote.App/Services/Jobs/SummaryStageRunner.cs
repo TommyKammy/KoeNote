@@ -217,6 +217,13 @@ public sealed class SummaryStageRunner(
 
         llamaServerPath = Gemma12BLocalValidation.ResolveLlamaServerPath(profile.LlamaCompletionPath);
         mtpDraftModelPath = ResolveMtpDraftModelPath();
+        if (!Gemma12BLocalValidation.IsLlamaServerMtpCapable(llamaServerPath, LlamaRuntimeEnvironment.Build(paths)))
+        {
+            throw new ReviewWorkerException(
+                ReviewFailureCategory.ProcessFailed,
+                $"llama-server runtime does not support Gemma 12B MTP options: {llamaServerPath}");
+        }
+
         return true;
     }
 

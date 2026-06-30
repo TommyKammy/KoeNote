@@ -98,11 +98,18 @@ public sealed class LlmStageLoggingTests
     [Fact]
     public async Task SummaryStageRunner_UsesGemma12BMtpForHighAccuracyPreset()
     {
+        var previousGemma = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable);
         var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        var previousServer = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable);
         var paths = TestDatabase.CreateReadyPaths();
         try
         {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, "1");
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, null);
+            var llamaServerPath = CreateMtpCapableLlamaServerHelpScript(paths);
+            Environment.SetEnvironmentVariable(
+                Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable,
+                llamaServerPath);
             PrepareRuntimeFiles(paths);
             var modelPath = Path.Combine(paths.DefaultModelStorageRoot, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
             var draftPath = Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels);
@@ -110,7 +117,6 @@ public sealed class LlmStageLoggingTests
             Directory.CreateDirectory(Path.GetDirectoryName(draftPath)!);
             File.WriteAllText(modelPath, "model");
             File.WriteAllText(draftPath, "draft");
-            File.WriteAllText(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath), "server");
             new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
             {
                 SelectedModelPresetId = "high_accuracy",
@@ -126,7 +132,7 @@ public sealed class LlmStageLoggingTests
             Assert.NotNull(fakeRuntime.LastOptions);
             Assert.Equal(Gemma12BLocalValidation.ModelId, fakeRuntime.LastOptions.ModelId);
             Assert.True(fakeRuntime.LastOptions.UseLlamaServerChatMtp);
-            Assert.EndsWith("llama-server.exe", fakeRuntime.LastOptions.LlamaServerPath, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(llamaServerPath, fakeRuntime.LastOptions.LlamaServerPath);
             Assert.Equal(draftPath, fakeRuntime.LastOptions.MtpDraftModelPath);
             Assert.Contains("runtime=llama-server-chat-mtp", fakeRuntime.LastOptions.GenerationProfile, StringComparison.Ordinal);
             var logs = new JobLogRepository(paths).ReadLatest(job.JobId);
@@ -136,7 +142,9 @@ public sealed class LlmStageLoggingTests
         }
         finally
         {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableEnvironmentVariable, previousGemma);
             Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.LlamaServerPathEnvironmentVariable, previousServer);
         }
     }
 
@@ -219,6 +227,17 @@ public sealed class LlmStageLoggingTests
         Directory.CreateDirectory(Path.GetDirectoryName(paths.ReviewModelPath)!);
         File.WriteAllText(paths.LlamaCompletionPath, "runtime");
         File.WriteAllText(paths.ReviewModelPath, "model");
+    }
+
+    private static string CreateMtpCapableLlamaServerHelpScript(AppPaths paths)
+    {
+        var scriptPath = Path.Combine(paths.Root, "fake-llama-server.cmd");
+        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+        File.WriteAllText(scriptPath, """
+            @echo off
+            echo --spec-type draft-mtp --model-draft
+            """, System.Text.Encoding.ASCII);
+        return scriptPath;
     }
 
     private sealed class JsonArrayProcessRunner : ExternalProcessRunner

@@ -314,9 +314,7 @@ internal sealed class SetupModelSelectionService(
         var runtimePath = ReviewRuntimeResolver.ResolveLlamaCompletionPath(paths, catalog, modelId);
         return File.Exists(runtimePath) &&
             (!RequiresGemma12BMtpAssets(modelId) ||
-             Gemma12BLocalValidation.IsLlamaServerMtpCapable(
-                 Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath),
-                 LlamaRuntimeEnvironment.Build(paths)));
+             File.Exists(Gemma12BLocalValidation.ResolveLlamaServerPath(runtimePath)));
     }
 
     private bool IsDirectLlmFallbackReady(string modelId)

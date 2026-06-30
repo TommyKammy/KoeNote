@@ -118,8 +118,8 @@ public sealed class Gemma12BMtpServerRuntimeTests
         Assert.Equal("review prompt", message.GetProperty("content").GetString());
         var responseFormat = root.GetProperty("response_format");
         Assert.Equal("json_schema", responseFormat.GetProperty("type").GetString());
-        Assert.True(responseFormat.GetProperty("json_schema").GetProperty("strict").GetBoolean());
-        Assert.Equal("array", responseFormat.GetProperty("json_schema").GetProperty("schema").GetProperty("type").GetString());
+        Assert.False(responseFormat.TryGetProperty("json_schema", out _));
+        Assert.Equal("array", responseFormat.GetProperty("schema").GetProperty("type").GetString());
     }
 
     [Fact]
