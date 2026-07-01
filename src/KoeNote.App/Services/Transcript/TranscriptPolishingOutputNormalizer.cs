@@ -22,12 +22,22 @@ public static class TranscriptPolishingOutputNormalizer
                 continue;
             }
 
-            if (IsTranscriptBlockLine(trimmed) && HasPreviousContentLine(builder))
+            if (IsStandaloneEllipsisNoiseLine(trimmed))
             {
+                NormalizeLastContentLine(builder);
+                continue;
+            }
+
+            if ((IsTranscriptBlockLine(trimmed) || IsSpeakerPrefixedLine(trimmed)) && HasPreviousContentLine(builder))
+            {
+                NormalizeLastContentLine(builder);
                 AddBlankLineIfNeeded(builder);
             }
 
-            if (IsConsecutiveDuplicateContentLine(builder, line))
+            var duplicateComparisonLine = IsTranscriptBlockLine(trimmed) || IsSpeakerPrefixedLine(trimmed)
+                ? NormalizeTrailingEllipsisNoise(line)
+                : line;
+            if (IsConsecutiveDuplicateContentLine(builder, duplicateComparisonLine))
             {
                 continue;
             }
@@ -35,6 +45,7 @@ public static class TranscriptPolishingOutputNormalizer
             builder.Add(line);
         }
 
+        NormalizeLastContentLine(builder);
         return string.Join(Environment.NewLine, TrimBlankEdges(builder)).Trim();
     }
 
@@ -129,6 +140,7 @@ public static class TranscriptPolishingOutputNormalizer
             {
                 if (insideBlock && current.Count > 0)
                 {
+                    NormalizeLastContentLine(current);
                     blocks.Add(string.Join("\n", TrimBlankEdges(current)));
                 }
 
@@ -141,6 +153,7 @@ public static class TranscriptPolishingOutputNormalizer
             {
                 if (insideBlock)
                 {
+                    NormalizeLastContentLine(current);
                     blocks.Add(string.Join("\n", TrimBlankEdges(current)));
                     current.Clear();
                     insideBlock = false;
@@ -157,6 +170,7 @@ public static class TranscriptPolishingOutputNormalizer
 
         if (insideBlock && current.Count > 0)
         {
+            NormalizeLastContentLine(current);
             blocks.Add(string.Join("\n", TrimBlankEdges(current)));
         }
 
@@ -223,6 +237,174 @@ public static class TranscriptPolishingOutputNormalizer
             character is '。' or '、' or '.' or ',' or ':' or '：' or ';' or '；' or '!' or '！' or '?' or '？');
     }
 
+    private static void NormalizeLastContentLine(IList<string> lines)
+    {
+        for (var index = lines.Count - 1; index >= 0; index--)
+        {
+            if (string.IsNullOrWhiteSpace(lines[index]))
+            {
+                continue;
+            }
+
+            lines[index] = NormalizeTrailingEllipsisNoise(lines[index]);
+            return;
+        }
+    }
+
+    internal static string NormalizeTrailingEllipsisNoise(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return line;
+        }
+
+        var trimmedLine = line.TrimEnd();
+        var suffixStart = trimmedLine.Length;
+        while (suffixStart > 0 && IsTrailingSuffixPunctuation(trimmedLine, suffixStart - 1))
+        {
+            suffixStart--;
+        }
+
+        var core = trimmedLine[..suffixStart];
+        var suffix = trimmedLine[suffixStart..];
+        if (string.IsNullOrWhiteSpace(core))
+        {
+            return line;
+        }
+
+        var ellipsisEnd = core.Length - 1;
+        var ellipsisStart = ellipsisEnd;
+        while (ellipsisStart >= 0 && IsEllipsisNoise(core[ellipsisStart]))
+        {
+            ellipsisStart--;
+        }
+
+        var ellipsisLength = ellipsisEnd - ellipsisStart;
+        if (!IsTrailingEllipsisRun(core, ellipsisStart + 1, ellipsisLength))
+        {
+            return line;
+        }
+
+        var prefix = TrimDanglingSeparator(core[..(ellipsisStart + 1)].TrimEnd());
+        if (prefix.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (EndsWithSpeakerSeparator(prefix))
+        {
+            return string.Empty;
+        }
+
+        if (IsSentenceTerminal(prefix[^1]))
+        {
+            return $"{prefix}{RemoveSentenceTerminalSuffix(suffix)}";
+        }
+
+        return ContainsSentenceTerminal(suffix)
+            ? $"{prefix}{suffix}"
+            : $"{prefix}\u3002{suffix}";
+    }
+
+    private static bool IsTrailingEllipsisRun(string line, int start, int length)
+    {
+        if (length <= 0)
+        {
+            return false;
+        }
+
+        var hasUnicodeEllipsis = false;
+        var dotCount = 0;
+        for (var index = start; index < start + length; index++)
+        {
+            if (line[index] is '\u2026' or '\u22EF')
+            {
+                hasUnicodeEllipsis = true;
+            }
+            else if (line[index] is '.' or '\uFF0E')
+            {
+                dotCount++;
+            }
+        }
+
+        return hasUnicodeEllipsis || dotCount >= 3;
+    }
+
+    private static bool IsEllipsisNoise(char character)
+    {
+        return character is '.' or '\uFF0E' or '\u2026' or '\u22EF';
+    }
+
+    private static bool IsStandaloneEllipsisNoiseLine(string value)
+    {
+        return value.Length > 0 &&
+            value.Any(IsEllipsisNoise) &&
+            value.All(static character =>
+                IsEllipsisNoise(character) ||
+                IsSentenceTerminal(character) ||
+                IsClosingPunctuation(character));
+    }
+
+    private static string TrimDanglingSeparator(string value)
+    {
+        var end = value.Length;
+        while (end > 0 && IsDanglingSeparator(value[end - 1]))
+        {
+            end--;
+        }
+
+        return end == value.Length ? value : value[..end].TrimEnd();
+    }
+
+    private static bool IsDanglingSeparator(char character)
+    {
+        return character is ',' or '\u3001' or '\uFF0C';
+    }
+
+    private static bool EndsWithSpeakerSeparator(string value)
+    {
+        return value.EndsWith(':') || value.EndsWith('\uFF1A');
+    }
+
+    private static bool IsSentenceTerminal(char character)
+    {
+        return character is '.' or '\u3002' or '!' or '?' or '\uFF01' or '\uFF1F';
+    }
+
+    private static bool IsEllipsisDotPart(string value, int index)
+    {
+        if (value[index] is not ('.' or '\uFF0E'))
+        {
+            return false;
+        }
+
+        return index > 0 && IsEllipsisNoise(value[index - 1]) ||
+            index + 1 < value.Length && IsEllipsisNoise(value[index + 1]);
+    }
+
+    private static bool IsTrailingSuffixPunctuation(string value, int index)
+    {
+        return IsClosingPunctuation(value[index]) ||
+            IsSentenceTerminal(value[index]) && !IsEllipsisDotPart(value, index);
+    }
+
+    private static bool ContainsSentenceTerminal(string value)
+    {
+        return value.Any(IsSentenceTerminal);
+    }
+
+    private static string RemoveSentenceTerminalSuffix(string value)
+    {
+        return new string(value.Where(static character => !IsSentenceTerminal(character)).ToArray());
+    }
+
+    private static bool IsClosingPunctuation(char character)
+    {
+        return character is ')' or ']' or '}' or '"' or '\'' or
+            '\u300D' or '\u300F' or '\u3011' or '\uFF09' or '\uFF3D' or '\uFF5D' or
+            '\u2019' or '\u201D';
+    }
+
     private static bool IsTranscriptBlockLine(string trimmedLine)
     {
         if (trimmedLine.Length == 0)
@@ -237,6 +419,34 @@ public static class TranscriptPolishingOutputNormalizer
             trimmedLine[offset + 2] == ':' &&
             char.IsDigit(trimmedLine[offset + 3]) &&
             char.IsDigit(trimmedLine[offset + 4]);
+    }
+
+    private static bool IsSpeakerPrefixedLine(string trimmedLine)
+    {
+        if (trimmedLine.Length == 0 || trimmedLine[0] == '[')
+        {
+            return false;
+        }
+
+        var colonIndex = trimmedLine.IndexOfAny([':', '\uFF1A']);
+        if (colonIndex is <= 0 or > 32)
+        {
+            return false;
+        }
+
+        var label = trimmedLine[..colonIndex].Trim();
+        return IsDefaultSpeakerLabel(label);
+    }
+
+    private static bool IsDefaultSpeakerLabel(string value)
+    {
+        if (value.StartsWith("Speaker_", StringComparison.OrdinalIgnoreCase))
+        {
+            return value["Speaker_".Length..].All(char.IsDigit);
+        }
+
+        return value.StartsWith("Speaker ", StringComparison.OrdinalIgnoreCase) &&
+            value["Speaker ".Length..].All(char.IsDigit);
     }
 
     private static bool HasTranscriptBlockLine(string content)

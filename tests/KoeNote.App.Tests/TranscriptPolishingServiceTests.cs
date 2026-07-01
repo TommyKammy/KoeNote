@@ -173,6 +173,55 @@ public sealed class TranscriptPolishingServiceTests
     }
 
     [Fact]
+    public void OutputNormalizer_RemovesTrailingEllipsisNoise()
+    {
+        var normalized = TranscriptPolishingOutputNormalizer.Normalize(string.Join(Environment.NewLine, [
+            "[00:00 - 00:01] Speaker_0: first......\u3002",
+            "[00:01 - 00:02] Speaker_1: second......",
+            "[00:02 - 00:03] Speaker_2: third\u2026\u3002",
+            "[00:03 - 00:04] Speaker_3: keep v1.2.",
+            "[00:04 - 00:05] Speaker_4: keep middle... text.",
+            "[00:05 - 00:06] Speaker_5: keep mid-block......",
+            "Conclusion: continuation.",
+            "[00:06 - 00:07] Speaker_6: \u300Cquoted\u2026\u2026\u300D",
+            "[00:07 - 00:08] Speaker_7: question?\u2026\u2026\u3002",
+            "[00:08 - 00:09] Speaker_8: excited......\uFF01\uFF1F",
+            "[00:09 - 00:10] Speaker_9: \u300Cquoted outside\u2026\u2026\u300D\u3002",
+            "[00:10 - 00:11] Speaker_10: body\u2026\u2026",
+            "\u2026\u2026\u3002",
+            "[00:11 - 00:12] Speaker_11: comma,\u2026\u2026\u3002"
+        ]));
+
+        Assert.Contains("Speaker_0: first\u3002", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_1: second\u3002", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_2: third\u3002", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_3: keep v1.2.", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_4: keep middle... text.", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_5: keep mid-block......", normalized, StringComparison.Ordinal);
+        Assert.Contains("Conclusion: continuation.", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_6: \u300Cquoted\u3002\u300D", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_7: question?", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_8: excited\uFF01\uFF1F", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_9: \u300Cquoted outside\u300D\u3002", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_10: body\u3002", normalized, StringComparison.Ordinal);
+        Assert.Contains("Speaker_11: comma\u3002", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("question?\u3002", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("comma,\u3002", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u2026\u3002", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OutputNormalizer_SuppressesDuplicateBlocksAfterTrailingEllipsisNormalization()
+    {
+        var normalized = TranscriptPolishingOutputNormalizer.Normalize(string.Join(Environment.NewLine, [
+            "[00:00 - 00:01] Speaker_0: repeated......",
+            "[00:00 - 00:01] Speaker_0: repeated......"
+        ]));
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: repeated\u3002", normalized);
+    }
+
+    [Fact]
     public async Task PolishAsync_DropsBareEndBlockAndConsecutiveDuplicateTailLines()
     {
         var fixture = TestDatabase.CreateRepositoryFixture();
@@ -229,6 +278,112 @@ public sealed class TranscriptPolishingServiceTests
         Assert.DoesNotContain("raw one", result.Content, StringComparison.Ordinal);
         var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
         Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_NormalizesMarkedBlocksThatOmitTimestamps()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw one", "raw one"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_1", "raw two", "raw two")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => string.Join(Environment.NewLine, [
+                "BEGIN_BLOCK block-001",
+                "Speaker_0: first\u2026\u2026 ",
+                "END_BLOCK block-001",
+                "",
+                "BEGIN_BLOCK block-002",
+                "Speaker_1: \u300Csecond\u2026\u2026\u300D",
+                "END_BLOCK block-002"
+            ])));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal(
+            $"[00:00 - 00:01] Speaker_0: first\u3002{Environment.NewLine}{Environment.NewLine}[00:01 - 00:02] Speaker_1: \u300Csecond\u3002\u300D",
+            result.Content);
+        Assert.DoesNotContain("\u2026", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_NormalizesUnmarkedBlocksThatOmitTimestamps()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw one", "raw one"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "Speaker_1", "raw two", "raw two")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => string.Join(Environment.NewLine, [
+                "Speaker_0: first\u2026\u2026",
+                "Speaker_1: second\u2026\u2026"
+            ])));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal(
+            $"[00:00 - 00:01] Speaker_0: first\u3002{Environment.NewLine}{Environment.NewLine}[00:01 - 00:02] Speaker_1: second\u3002",
+            result.Content);
+        Assert.DoesNotContain("\u2026", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_NormalizesAliasPrefixedBlocksThatOmitTimestamps()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "\u4F50\u85E4", "raw one", "raw one"),
+            new TranscriptSegment("000002", "job-001", 1, 2, "\u7530\u4E2D", "raw two", "raw two")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => string.Join(Environment.NewLine, [
+                "\u4F50\u85E4: first\u2026\u2026",
+                "\u7530\u4E2D: second\u2026\u2026"
+            ])));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal(
+            $"[00:00 - 00:01] \u4F50\u85E4: first\u3002{Environment.NewLine}{Environment.NewLine}[00:01 - 00:02] \u7530\u4E2D: second\u3002",
+            result.Content);
+        Assert.DoesNotContain("\u2026", result.Content, StringComparison.Ordinal);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.DoesNotContain("fallback=", chunk.GenerationProfile, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PolishAsync_FallsBackToSourceBlockWhenBodyIsOnlyEllipsisNoise()
+    {
+        var fixture = TestDatabase.CreateRepositoryFixture();
+        SaveSegments(fixture.Paths, [
+            new TranscriptSegment("000001", "job-001", 0, 1, "Speaker_0", "raw source", "raw source")
+        ]);
+        var derivativeRepository = new TranscriptDerivativeRepository(fixture.Paths);
+        var service = new TranscriptPolishingService(
+            new TranscriptReadRepository(fixture.Paths),
+            derivativeRepository,
+            new FakePolishingRuntime(_ => "[00:00 - 00:01] Speaker_0: ......"));
+
+        var result = await service.PolishAsync(CreateOptions("job-001"));
+
+        Assert.Equal("[00:00 - 00:01] Speaker_0: raw source", result.Content);
+        var chunk = Assert.Single(derivativeRepository.ReadChunks(result.DerivativeId));
+        Assert.Contains("fallback=empty", chunk.GenerationProfile, StringComparison.Ordinal);
     }
 
     [Fact]
