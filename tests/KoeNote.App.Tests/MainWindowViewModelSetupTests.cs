@@ -295,35 +295,47 @@ public sealed class MainWindowViewModelSetupTests : MainWindowViewModelTestBase
     }
 
     [Fact]
-    public void SelectedSetupConfigurationReady_RequiresDirectLlmFallbackForGemma12B()
+    public void SelectedSetupModelsReady_AcceptsGemma12BWhenMtpAssetsAreReady()
     {
-        var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
-        var paths = CreatePathsWithoutTernaryRuntime(root);
-        paths.EnsureCreated();
-        new DatabaseInitializer(paths).EnsureCreated();
-        CreateVerifiedStandardAsrModel(paths);
-        Touch(paths.LlamaCompletionPath);
-        Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
-        var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
-        Touch(gemma12BPath);
-        Touch(Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels));
-        RegisterVerifiedModel(paths, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
-        new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+        var previousMtp = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable);
+        var previousDraft = Environment.GetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable);
+        try
         {
-            LicenseAccepted = true,
-            CurrentStep = SetupStep.InstallPlan,
-            SetupMode = "custom",
-            SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
-            SelectedReviewModelId = Gemma12BLocalValidation.ModelId,
-            StorageRoot = paths.UserModels
-        });
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, "1");
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, null);
+            var root = Path.Combine(Path.GetTempPath(), "KoeNote.Tests", Guid.NewGuid().ToString("N"));
+            var paths = CreatePathsWithoutTernaryRuntime(root);
+            paths.EnsureCreated();
+            new DatabaseInitializer(paths).EnsureCreated();
+            CreateVerifiedStandardAsrModel(paths);
+            Touch(paths.LlamaCompletionPath);
+            Touch(Gemma12BLocalValidation.ResolveLlamaServerPath(paths.LlamaCompletionPath));
+            var gemma12BPath = Path.Combine(paths.UserModels, "review", Gemma12BLocalValidation.ModelId, "gemma-4-12b-it-qat-q4_0.gguf");
+            Touch(gemma12BPath);
+            Touch(Gemma12BLocalValidation.ResolveMtpDraftModelPath(paths.UserModels));
+            RegisterVerifiedModel(paths, Gemma12BLocalValidation.ModelId, "review", "llama-cpp", gemma12BPath);
+            new SetupStateService(paths).Save(SetupState.Default(paths.UserModels) with
+            {
+                LicenseAccepted = true,
+                CurrentStep = SetupStep.InstallPlan,
+                SetupMode = "custom",
+                SelectedAsrModelId = "kotoba-whisper-v2.2-faster",
+                SelectedReviewModelId = Gemma12BLocalValidation.ModelId,
+                StorageRoot = paths.UserModels
+            });
 
-        var viewModel = new MainWindowViewModel(paths);
+            var viewModel = new MainWindowViewModel(paths);
 
-        Assert.True(viewModel.SelectedSetupGemma12BMtpDraftReady);
-        Assert.False(viewModel.SelectedSetupModelsReady);
-        Assert.False(viewModel.SelectedSetupConfigurationReady);
-        Assert.True(viewModel.SetupDownloadReviewCommand.CanExecute(null));
+            Assert.True(viewModel.SelectedSetupGemma12BMtpDraftReady);
+            Assert.True(viewModel.SelectedSetupModelsReady);
+            Assert.False(viewModel.SelectedSetupConfigurationReady);
+            Assert.False(viewModel.SetupDownloadReviewCommand.CanExecute(null));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.EnableMtpServerEnvironmentVariable, previousMtp);
+            Environment.SetEnvironmentVariable(Gemma12BLocalValidation.DraftModelPathEnvironmentVariable, previousDraft);
+        }
     }
 
     [Fact]
